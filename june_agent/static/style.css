@@ -1,0 +1,150 @@
+body {
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+    margin: 0;
+    padding: 20px;
+    background-color: #f4f4f4;
+    color: #333;
+}
+
+.container {
+    max-width: 960px;
+    margin: auto;
+    overflow: auto;
+    padding: 20px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+h1, h2 {
+    color: #333;
+    margin-bottom: 0.7em;
+}
+
+h1 {
+    text-align: center;
+    margin-bottom: 1em;
+}
+
+/* Form Section & Other Sections */
+.form-section, .tasks-section, .logs-section, .status-section {
+    margin-bottom: 30px;
+    padding: 20px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+textarea, input[type="text"] { /* Apply to textarea and text inputs */
+    width: calc(100% - 22px); /* Adjust for padding (10px*2) and border (1px*2) */
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box; /* Includes padding and border in the element's total width and height */
+}
+
+button[type="submit"] {
+    display: inline-block;
+    background: #5cb85c;
+    color: #fff;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+button[type="submit"]:hover {
+    background: #4cae4c;
+}
+
+#form-message {
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 4px;
+    text-align: center; /* Center message text */
+}
+
+#form-message.success {
+    background-color: #dff0d8;
+    color: #3c763d;
+    border: 1px solid #d6e9c6;
+}
+
+#form-message.error {
+    background-color: #f2dede;
+    color: #a94442;
+    border: 1px solid #ebccd1;
+}
+
+
+/* Task List & Log List */
+/* The script creates a ul with class 'tasks' or 'logs' inside the #tasks-list or #agent-log div */
+div#tasks-list ul.tasks, div#agent-log ul.logs {
+    list-style-type: none;
+    padding: 0;
+}
+
+div#tasks-list ul.tasks li.task-item,
+div#agent-log ul.logs li.log-item {
+    background: #f9f9f9;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    border: 1px solid #eee; /* Default border */
+}
+
+/* Individual property divs within task items or log items */
+.task-item div, .log-item div {
+    margin-bottom: 5px;
+}
+
+.task-id, .task-status, .task-requests {
+    font-size: 0.9em;
+    color: #555;
+}
+
+.task-description {
+    font-weight: bold; /* Make description stand out */
+}
+
+.task-result pre, .task-error pre {
+    background-color: #eee;
+    padding: 8px;
+    border-radius: 3px;
+    white-space: pre-wrap; /* Wrap long lines in <pre> */
+    word-wrap: break-word; /* Break words if necessary */
+    font-family: Consolas, "Courier New", monospace; /* Monospace for <pre> */
+    font-size: 0.9em;
+}
+
+/* Status-specific styling for task items */
+.task-item.status-pending { border-left: 5px solid #f0ad4e; } /* Orange */
+.task-item.status-processing { border-left: 5px solid #5bc0de; } /* Blue */
+.task-item.status-completed { border-left: 5px solid #5cb85c; } /* Green */
+.task-item.status-failed { border-left: 5px solid #d9534f; } /* Red */
+.task-item.status-unknown { border-left: 5px solid #777; } /* Grey for unknown/default */
+
+
+/* Agent Status Element (the span within the status-section) */
+#agent-status { /* Styles the span where status text is displayed */
+    font-weight: bold;
+    padding: 5px;
+    border-radius: 4px;
+    display: inline-block; /* To allow padding and background */
+}
+
+/* Example: Style the entire paragraph containing the agent status span */
+.status-section p {
+    font-size: 1.1em;
+    padding: 10px;
+    background-color: #e7e7e7;
+    border-radius: 4px;
+}
