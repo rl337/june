@@ -83,6 +83,7 @@ class DatabaseManager:
             status TEXT DEFAULT 'pending',
             phase TEXT,
             result TEXT,
+            error_message TEXT, -- Added
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL,
             FOREIGN KEY (initiative_id) REFERENCES initiatives (id) ON DELETE CASCADE,

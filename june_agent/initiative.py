@@ -1,152 +1,130 @@
 import uuid
 import logging
-from june_agent.db import DatabaseManager # Assuming db.py is in june_agent package
-# from june_agent.task import Task # Forward declaration for type hinting if needed early
+import datetime # Keep for Pydantic models if they use it, and for ORM defaults.
+
+# SQLAlchemy imports
+from sqlalchemy.orm import Session
+from june_agent.models_v2.orm_models import InitiativeORM, TaskORM # Assuming TaskORM is needed for task relationship
+from june_agent.models_v2.pydantic_models import InitiativeSchema, InitiativeCreate, InitiativeUpdate # For .from_orm and type hints
+
+# Temporarily, we might still need the old Task class if Initiative.tasks holds instances of it
+# For now, let's assume Initiative.tasks will hold TaskSchema or ORM Task objects if directly accessed.
+# from june_agent.task import Task # Old task class
+
+# Imports that might be needed by Pydantic models if they have complex types
+from typing import Optional, List
 
 logger = logging.getLogger(__name__)
 
-class Initiative:
-    def __init__(self, name: str, description: str, db_manager: DatabaseManager, initiative_id: str | None = None, status: str = 'pending', created_at: str | None = None, updated_at: str | None = None):
-        self.id = initiative_id if initiative_id else uuid.uuid4().hex
-        self.name = name
-        self.description = description
-        self.db_manager = db_manager
-        self.status = status
-        self.tasks = [] # In-memory list of Task objects associated with this initiative
+class Initiative: # This class now acts more like a domain model or service for Initiatives
+    # It will operate on InitiativeORM objects and use SQLAlchemy sessions.
 
-        current_time = self.db_manager.get_current_timestamp()
-        self.created_at = created_at if created_at else current_time
-        self.updated_at = updated_at if updated_at else current_time
+    # We are moving away from this class being the primary data holder.
+    # Pydantic and ORM models will handle that. This class might eventually
+    # become a service class or be merged. For now, we adapt its methods.
 
-        logger.info(f"Initiative initialized: {self.name} (ID: {self.id})")
+    # The __init__ is more for conceptual representation if an instance of this 'service' class
+    # were to hold a specific loaded ORM object, but classmethods are preferred for stateless operations.
+    def __init__(self,
+                 orm_obj: InitiativeORM): # Now takes an ORM object
+        self._orm_obj = orm_obj # Keep a reference to the ORM object
 
-    def add_task_object(self, task) -> None: # Changed method name to avoid conflict
-        """Adds an existing Task object to this initiative's in-memory list."""
-        if task not in self.tasks:
-            self.tasks.append(task)
-            task.initiative_id = self.id # Ensure task knows its initiative
-            logger.info(f"Task {task.id} added to initiative {self.id} in memory.")
-        else:
-            logger.warning(f"Task {task.id} already present in initiative {self.id}.")
+    # Expose properties from the ORM object
+    @property
+    def id(self) -> str: return self._orm_obj.id
+    @property
+    def name(self) -> str: return self._orm_obj.name
+    @property
+    def description(self) -> Optional[str]: return self._orm_obj.description
+    @property
+    def status(self) -> str: return self._orm_obj.status
+    @property
+    def created_at(self) -> datetime.datetime: return self._orm_obj.created_at
+    @property
+    def updated_at(self) -> datetime.datetime: return self._orm_obj.updated_at
+    @property
+    def tasks(self) -> List[TaskORM]: return self._orm_obj.tasks
 
-
-    def update_status(self, new_status: str) -> None:
-        self.status = new_status
-        self.updated_at = self.db_manager.get_current_timestamp()
-        logger.info(f"Initiative {self.id} status updated to {new_status}.")
-        self.save() # Persist status change
-
-    def save(self) -> None:
-        """Saves the initiative to the database."""
-        query_select = "SELECT id FROM initiatives WHERE id = ?"
-        existing = self.db_manager.fetch_one(query_select, (self.id,))
-
-        self.updated_at = self.db_manager.get_current_timestamp() # Ensure updated_at is fresh
-
-        if existing:
-            query_update = """
-            UPDATE initiatives
-            SET name = ?, description = ?, status = ?, updated_at = ?
-            WHERE id = ?
-            """
-            try:
-                self.db_manager.execute_query(query_update, (self.name, self.description, self.status, self.updated_at, self.id))
-                logger.info(f"Initiative {self.id} updated in the database.")
-            except Exception as e:
-                logger.error(f"Failed to update initiative {self.id}: {e}", exc_info=True)
-        else:
-            query_insert = """
-            INSERT INTO initiatives (id, name, description, status, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """
-            try:
-                self.db_manager.execute_query(query_insert, (self.id, self.name, self.description, self.status, self.created_at, self.updated_at))
-                logger.info(f"Initiative {self.id} saved to the database.")
-            except Exception as e:
-                logger.error(f"Failed to save new initiative {self.id}: {e}", exc_info=True)
 
     @classmethod
-    def load(cls, initiative_id: str, db_manager: DatabaseManager):
-        """Loads an initiative from the database by its ID."""
-        query = "SELECT id, name, description, status, created_at, updated_at FROM initiatives WHERE id = ?"
-        row = db_manager.fetch_one(query, (initiative_id,))
-        if row:
+    def create(cls, db: Session, initiative_create: InitiativeCreate) -> InitiativeSchema:
+        """Creates a new initiative in the database."""
+        db_initiative_orm = InitiativeORM(
+            name=initiative_create.name,
+            description=initiative_create.description,
+            status=initiative_create.status
+            # id, created_at, updated_at have defaults in ORM
+        )
+        db.add(db_initiative_orm)
+        db.commit()
+        db.refresh(db_initiative_orm)
+        logger.info(f"Initiative created with ID: {db_initiative_orm.id}, Name: '{db_initiative_orm.name}'")
+
+        # Populate task_ids for the schema
+        schema = InitiativeSchema.from_orm(db_initiative_orm)
+        schema.task_ids = [task.id for task in db_initiative_orm.tasks] # tasks will be empty on create
+        return schema
+
+    @classmethod
+    def get(cls, db: Session, initiative_id: str) -> Optional[InitiativeSchema]:
+        """Loads an initiative from the database by its ID using SQLAlchemy."""
+        db_initiative_orm = db.query(InitiativeORM).filter(InitiativeORM.id == initiative_id).first()
+        if db_initiative_orm:
             logger.info(f"Initiative {initiative_id} loaded from database.")
-            # tasks will need to be loaded separately if desired upon loading an initiative
-            return cls(name=row['name'], description=row['description'], db_manager=db_manager,
-                       initiative_id=row['id'], status=row['status'], created_at=row['created_at'], updated_at=row['updated_at'])
-        else:
-            logger.warning(f"Initiative with ID {initiative_id} not found in the database.")
+            schema = InitiativeSchema.from_orm(db_initiative_orm)
+            schema.task_ids = [task.id for task in db_initiative_orm.tasks] # Populate task_ids
+            return schema
+        logger.warning(f"Initiative with ID {initiative_id} not found.")
+        return None
+
+    @classmethod
+    def get_all(cls, db: Session, skip: int = 0, limit: int = 100) -> List[InitiativeSchema]:
+        """Loads all initiatives from the database with pagination."""
+        db_initiatives_orm = db.query(InitiativeORM).order_by(InitiativeORM.created_at.desc()).offset(skip).limit(limit).all()
+
+        results = []
+        for db_init_orm in db_initiatives_orm:
+            schema = InitiativeSchema.from_orm(db_init_orm)
+            schema.task_ids = [task.id for task in db_init_orm.tasks] # Populate task_ids
+            results.append(schema)
+
+        logger.info(f"Loaded {len(results)} initiatives from database.")
+        return results
+
+    @classmethod
+    def update(cls, db: Session, initiative_id: str, initiative_update: InitiativeUpdate) -> Optional[InitiativeSchema]:
+        """Updates an existing initiative in the database."""
+        db_initiative_orm = db.query(InitiativeORM).filter(InitiativeORM.id == initiative_id).first()
+        if not db_initiative_orm:
+            logger.warning(f"Initiative with ID {initiative_id} not found for update.")
             return None
 
-    def to_dict(self) -> dict:
-        """Returns a dictionary representation of the initiative."""
-        return {
-            'id': self.id,
-            'name': self.name,
-            'description': self.description,
-            'status': self.status,
-            'created_at': self.created_at,
-            'updated_at': self.updated_at,
-            'num_tasks': len(self.tasks), # Number of in-memory tasks
-            'task_ids': [task.id for task in self.tasks] # IDs of in-memory tasks
-        }
+        update_data = initiative_update.dict(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(db_initiative_orm, key, value)
+
+        # updated_at is handled by onupdate in ORM model
+        db.add(db_initiative_orm)
+        db.commit()
+        db.refresh(db_initiative_orm)
+        logger.info(f"Initiative {initiative_id} updated.")
+
+        schema = InitiativeSchema.from_orm(db_initiative_orm)
+        schema.task_ids = [task.id for task in db_initiative_orm.tasks] # Populate task_ids
+        return schema
 
     @classmethod
-    def load_all(cls, db_manager: DatabaseManager):
-        """Loads all initiatives from the database."""
-        query = "SELECT id FROM initiatives ORDER BY created_at DESC"
-        rows = db_manager.fetch_all(query)
-        initiatives = []
-        for row in rows:
-            initiative = cls.load(row['id'], db_manager)
-            if initiative:
-                initiatives.append(initiative)
-        logger.info(f"Loaded {len(initiatives)} initiatives from database.")
-        return initiatives
+    def delete(cls, db: Session, initiative_id: str) -> bool:
+        """Deletes an initiative from the database."""
+        db_initiative_orm = db.query(InitiativeORM).filter(InitiativeORM.id == initiative_id).first()
+        if not db_initiative_orm:
+            logger.warning(f"Initiative with ID {initiative_id} not found for deletion.")
+            return False
 
-if __name__ == '__main__':
-    # This is a basic test block. More comprehensive tests should be in the tests/ directory.
-    logger.info("Running basic test for Initiative class...")
-    # Use a dedicated test DB or ensure cleanup
-    db_path_test = 'test_initiative_june_agent.db'
-    db_manager_test = DatabaseManager(db_path=db_path_test)
+        db.delete(db_initiative_orm)
+        db.commit()
+        logger.info(f"Initiative {initiative_id} deleted.")
+        return True
 
-    try:
-        db_manager_test.connect()
-        db_manager_test.create_tables() # Ensure tables are created
-
-        # Create and save a new initiative
-        test_initiative_name = "Test Initiative Alpha"
-        test_initiative_desc = "Description for test initiative Alpha."
-        initiative_alpha = Initiative(name=test_initiative_name, description=test_initiative_desc, db_manager=db_manager_test)
-        initiative_alpha.save()
-        logger.info(f"Saved initiative: {initiative_alpha.to_dict()}")
-
-        # Load the initiative from DB
-        loaded_initiative = Initiative.load(initiative_id=initiative_alpha.id, db_manager=db_manager_test)
-        if loaded_initiative:
-            logger.info(f"Loaded initiative: {loaded_initiative.to_dict()}")
-            assert loaded_initiative.name == test_initiative_name
-            assert loaded_initiative.id == initiative_alpha.id
-        else:
-            logger.error("Failed to load initiative.")
-
-        # Update status
-        if loaded_initiative:
-            loaded_initiative.update_status("in_progress")
-            # Verify by loading again
-            reloaded_initiative = Initiative.load(initiative_id=loaded_initiative.id, db_manager=db_manager_test)
-            if reloaded_initiative:
-                logger.info(f"Reloaded initiative after status update: {reloaded_initiative.to_dict()}")
-                assert reloaded_initiative.status == "in_progress"
-            else:
-                logger.error("Failed to reload initiative after status update.")
-
-    except Exception as e:
-        logger.error(f"Error during Initiative class test: {e}", exc_info=True)
-    finally:
-        db_manager_test.close()
-        # import os
-        # os.remove(db_path_test) # Clean up the test database
-        # logger.info(f"Test database {db_path_test} removed.")
+# Note: The old `if __name__ == '__main__':` block is removed.
+# Tests should be used for validation.
