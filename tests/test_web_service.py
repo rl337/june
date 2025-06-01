@@ -68,14 +68,49 @@ class TestWebServiceWithInMemory(unittest.TestCase):
     # or refactor the /status endpoint.
     # Given the constraints, I will mark these as expected to fail or adapt them
     # to show they are aware of this discrepancy.
+    # These tests are now re-enabled and adapted for InMemoryModelService.
 
-    @unittest.skip("Skipping /status tests as it uses direct DB access, not InMemoryModelService provided to app.")
-    def test_get_status_empty_db(self):
-        pass # This would require get_db() to point to a controlled empty test DB
+    def test_get_status_empty_db(self): # Renaming to reflect InMemory
+        # self.model_service is fresh InMemoryModelService
+        response = self.client.get('/status')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertEqual(data['agent_overall_status'], 'idle')
+        self.assertEqual(data['total_initiatives'], 0)
+        self.assertEqual(data['total_tasks'], 0)
+        # Check specific status counts are zero
+        for status_key in data['status_counts']:
+            self.assertEqual(data['status_counts'][status_key], 0)
 
-    @unittest.skip("Skipping /status tests as it uses direct DB access, not InMemoryModelService provided to app.")
     def test_get_status_with_data(self):
-        pass
+        # Use helpers that use self.model_service (InMemoryModelService)
+        init1_schema = self._add_initiative(name="Main Init") # Uses self.model_service
+
+        # Add tasks using TaskCreate DTO and the service
+        self.model_service.create_task(
+            TaskCreate(description="Pending Task", status=DomainTask.STATUS_PENDING),
+            initiative_id=init1_schema.id
+        )
+        self.model_service.create_task(
+            TaskCreate(description="Executing Task", status=DomainTask.STATUS_EXECUTING),
+            initiative_id=init1_schema.id
+        )
+        self.model_service.create_task(
+            TaskCreate(description="Completed Task", status=DomainTask.STATUS_COMPLETED),
+            initiative_id=init1_schema.id
+        )
+
+        response = self.client.get('/status')
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+
+        self.assertEqual(data['agent_overall_status'], 'processing')
+        self.assertEqual(data['total_initiatives'], 1)
+        self.assertEqual(data['total_tasks'], 3)
+        self.assertEqual(data['status_counts'][DomainTask.STATUS_PENDING], 1)
+        self.assertEqual(data['status_counts'][DomainTask.STATUS_EXECUTING], 1)
+        self.assertEqual(data['status_counts'][DomainTask.STATUS_COMPLETED], 1)
+        self.assertEqual(data['status_counts'][DomainTask.STATUS_FAILED], 0)
 
     # --- Test /initiatives (using InMemoryModelService) ---
     def test_get_initiatives_empty(self):

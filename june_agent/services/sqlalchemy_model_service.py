@@ -1,6 +1,7 @@
 import datetime
 from typing import List, Optional, Any
 from sqlalchemy.orm import Session, joinedload, selectinload # For eager loading
+from sqlalchemy import func # Added func for count
 
 from june_agent.services.model_service_interface import IModelService
 from june_agent.models_v2.orm_models import InitiativeORM, TaskORM, Base # Base for create_all if needed here
@@ -10,22 +11,41 @@ from june_agent.models_v2.pydantic_models import (
 )
 # Import the domain Task object for conversions and for its constants
 from june_agent.task import Task as DomainTask
-from june_agent.db_v2 import get_db, engine # For session and potentially direct engine use
+from june_agent.services.sqlalchemy_database import get_db, engine, SessionLocal # For session and potentially direct engine use
 
 import logging
 logger = logging.getLogger(__name__)
 
 class SQLAlchemyModelService(IModelService):
+    """
+    SQLAlchemy-based implementation of the IModelService interface.
+    This service uses SQLAlchemy ORM to interact with a relational database.
+    It manages database sessions per method call, ensuring sessions are closed.
+    """
 
-    def __init__(self, session_factory): # session_factory like db_v2.SessionLocal
+    def __init__(self, session_factory=SessionLocal):
+        """
+        Initializes the SQLAlchemyModelService.
+        Args:
+            session_factory: A factory that produces SQLAlchemy Session objects.
+                             Defaults to SessionLocal from sqlalchemy_database.
+        """
         self.session_factory = session_factory
 
     # --- Helper for session management ---
     def _get_session(self) -> Session:
-        return self.session_factory() # Create a new session
+        """Creates and returns a new SQLAlchemy session from the configured session factory."""
+        return self.session_factory()
 
     # --- Initiative Methods ---
     def create_initiative(self, initiative_create: InitiativeCreate) -> InitiativeSchema:
+        """
+        Creates a new initiative in the database.
+        Args:
+            initiative_create: Pydantic model with data for the new initiative.
+        Returns:
+            The created initiative as an InitiativeSchema.
+        """
         db = self._get_session()
         try:
             db_initiative_orm = InitiativeORM(
@@ -50,10 +70,12 @@ class SQLAlchemyModelService(IModelService):
     def get_initiative(self, initiative_id: str) -> Optional[InitiativeSchema]:
         db = self._get_session()
         try:
-            # Eager load tasks to populate task_ids in the schema
+            # Eager load tasks relationship to ensure task_ids can be populated,
+            # though for a newly created initiative, tasks list will be empty.
             db_initiative_orm = db.query(InitiativeORM).options(selectinload(InitiativeORM.tasks)).filter(InitiativeORM.id == initiative_id).first()
             if db_initiative_orm:
                 schema = InitiativeSchema.from_orm(db_initiative_orm)
+                # Explicitly populate task_ids from the ORM relationship.
                 schema.task_ids = [task.id for task in db_initiative_orm.tasks]
                 return schema
             return None
@@ -63,15 +85,16 @@ class SQLAlchemyModelService(IModelService):
     def get_all_initiatives(self, skip: int = 0, limit: int = 100) -> List[InitiativeSchema]:
         db = self._get_session()
         try:
+            # Eager load the 'tasks' relationship for each initiative.
             db_initiatives_orm = (db.query(InitiativeORM)
-                                  .options(selectinload(InitiativeORM.tasks)) # Eager load tasks
+                                  .options(selectinload(InitiativeORM.tasks))
                                   .order_by(InitiativeORM.created_at.desc())
                                   .offset(skip).limit(limit).all())
 
             schemas = []
             for db_init_orm in db_initiatives_orm:
                 schema = InitiativeSchema.from_orm(db_init_orm)
-                schema.task_ids = [task.id for task in db_init_orm.tasks]
+                schema.task_ids = [task.id for task in db_init_orm.tasks] # Populate task_ids
                 schemas.append(schema)
             return schemas
         finally:
@@ -84,16 +107,17 @@ class SQLAlchemyModelService(IModelService):
             if not db_initiative_orm:
                 return None
 
-            update_data = initiative_update.dict(exclude_unset=True)
+            update_data = initiative_update.model_dump(exclude_unset=True) # Pydantic V2
             for key, value in update_data.items():
                 setattr(db_initiative_orm, key, value)
 
-            db.add(db_initiative_orm) # Add to session before commit if changed
+            db.add(db_initiative_orm)
             db.commit()
             db.refresh(db_initiative_orm)
 
             schema = InitiativeSchema.from_orm(db_initiative_orm)
-            schema.task_ids = [task.id for task in db_initiative_orm.tasks] # Re-populate task_ids
+            # Re-populate task_ids. If tasks were modified (e.g. via cascade), this ensures freshness.
+            schema.task_ids = [task.id for task in db_initiative_orm.tasks]
             return schema
         except Exception:
             db.rollback()
@@ -108,7 +132,9 @@ class SQLAlchemyModelService(IModelService):
             if not db_initiative_orm:
                 return False
 
-            db.delete(db_initiative_orm) # Cascade delete for tasks is handled by DB schema
+            # Cascade deletion of associated tasks is handled by the database schema
+            # (defined in InitiativeORM.tasks relationship with cascade="all, delete-orphan").
+            db.delete(db_initiative_orm)
             db.commit()
             return True
         except Exception:
@@ -119,6 +145,16 @@ class SQLAlchemyModelService(IModelService):
 
     # --- Task ORM <-> Domain Conversion Helpers ---
     def _task_orm_to_domain(self, task_orm: TaskORM, load_subtasks: bool = False, db: Optional[Session] = None) -> DomainTask:
+        """
+        Converts a TaskORM (SQLAlchemy model) to a DomainTask (pure Python object).
+        Args:
+            task_orm: The SQLAlchemy ORM Task object.
+            load_subtasks: If True, recursively converts and loads subtasks into the domain object.
+                           Requires the `db` session if subtasks weren't eager-loaded on `task_orm`.
+            db: The SQLAlchemy session, needed if `load_subtasks` is True and subtasks are lazy-loaded.
+        Returns:
+            A DomainTask instance.
+        """
         domain = DomainTask(
             task_id=task_orm.id,
             description=task_orm.description,
@@ -130,20 +166,32 @@ class SQLAlchemyModelService(IModelService):
             error_message=task_orm.error_message,
             created_at=task_orm.created_at,
             updated_at=task_orm.updated_at
-            # requests are not persisted, subtasks need explicit loading if required here
+            # `requests` are ephemeral to the domain object, not part of ORM/DB state.
+            # `subtasks` (as domain objects) are populated below if `load_subtasks` is True.
         )
-        if load_subtasks and db: # Only if db session is provided
-            # This uses the ORM's subtasks relationship.
-            # Ensure subtasks are loaded in the ORM object (e.g., via selectinload or by access).
-            # Accessing task_orm.subtasks might trigger a lazy load if not already loaded.
-            domain.subtasks = [self._task_orm_to_domain(sub_orm, db=db, load_subtasks=False) for sub_orm in task_orm.subtasks]
-            # Set load_subtasks=False in recursive call to prevent very deep loads unless specifically designed for.
+        if load_subtasks:
+            if not hasattr(task_orm, 'subtasks'):
+                 logger.warning(f"Task ORM {task_orm.id} was expected to have 'subtasks' pre-loaded for domain conversion but didn't.")
+            # Convert ORM subtasks to domain subtasks.
+            # Recursive call sets load_subtasks=False to load only one level of domain subtasks.
+            domain.subtasks = [self._task_orm_to_domain(sub_orm, db=db, load_subtasks=False)
+                               for sub_orm in task_orm.subtasks]
         return domain
 
     def _task_domain_to_orm(self, domain_task: DomainTask, db_task_orm: Optional[TaskORM] = None) -> TaskORM:
-        if db_task_orm is None: # Creating new ORM obj
+        """
+        Converts a DomainTask (pure Python object) to a TaskORM (SQLAlchemy model),
+        either by updating an existing ORM object or creating a new one.
+        Args:
+            domain_task: The source DomainTask object.
+            db_task_orm: An optional existing TaskORM object to update. If None, a new one is created.
+        Returns:
+            A TaskORM instance populated with data from the domain_task.
+        """
+        if db_task_orm is None:
             db_task_orm = TaskORM(id=domain_task.id, created_at=domain_task.created_at)
 
+        # Update all relevant fields from the domain object to the ORM object.
         db_task_orm.description = domain_task.description
         db_task_orm.initiative_id = domain_task.initiative_id
         db_task_orm.parent_task_id = domain_task.parent_task_id
@@ -154,12 +202,22 @@ class SQLAlchemyModelService(IModelService):
         # updated_at is handled by ORM onupdate or set explicitly before commit if needed
         db_task_orm.updated_at = domain_task.updated_at # Sync from domain's last update
 
-        # Subtasks are not directly managed here; relationships are handled by SQLAlchemy
-        # when parent and child ORM objects are session-managed and linked.
+            # Subtask ORM objects are not directly created or linked here.
+            # SQLAlchemy's relationship management handles linking.
         return db_task_orm
 
     # --- Task Methods ---
     def create_task(self, task_create: TaskCreate, initiative_id: str) -> TaskSchema:
+        """
+        Creates a new task in the database, associated with an initiative.
+        Args:
+            task_create: Pydantic model with new task data.
+            initiative_id: The ID of the parent initiative.
+        Returns:
+            The created task as a Pydantic schema.
+        Raises:
+            ValueError: If the parent initiative is not found.
+        """
         db = self._get_session()
         try:
             # Verify initiative exists
@@ -264,7 +322,7 @@ class SQLAlchemyModelService(IModelService):
             if not db_task_orm:
                 return None
 
-            update_data = task_update.dict(exclude_unset=True)
+            update_data = task_update.model_dump(exclude_unset=True) # Pydantic V2
             for key, value in update_data.items():
                 setattr(db_task_orm, key, value)
 
@@ -363,7 +421,7 @@ class SQLAlchemyModelService(IModelService):
         db = self._get_session()
         try:
             if not db.query(InitiativeORM).filter(InitiativeORM.id == default_initiative_id).first():
-                init_orm = InitiativeORM(id=default_initiative_id, name="Main Agent Initiative (SQLAlchemy)", status="active")
+                init_orm = InitiativeORM(id=default_initiative_id, name="Main Agent Initiative (SQLAlchemy)", status="active") # type: ignore
                 db.add(init_orm)
                 logger.info(f"SQLAlchemyModelService: Created default initiative {default_initiative_id}")
 
@@ -382,5 +440,29 @@ class SQLAlchemyModelService(IModelService):
             db.rollback()
             logger.error(f"SQLAlchemyModelService: Error in ensure_initial_data: {e}", exc_info=True)
             raise
+        finally:
+            db.close()
+
+    def get_total_initiatives_count(self) -> int:
+        db = self._get_session()
+        try:
+            return db.query(func.count(InitiativeORM.id)).scalar_one()
+        finally:
+            db.close()
+
+    def get_task_counts_by_status(self) -> Dict[str, int]:
+        db = self._get_session()
+        try:
+            counts = {}
+            # Use DomainTask constants for status values
+            statuses_to_query = [
+                DomainTask.STATUS_PENDING, DomainTask.STATUS_ASSESSING,
+                DomainTask.STATUS_EXECUTING, DomainTask.STATUS_RECONCILING,
+                DomainTask.STATUS_PENDING_SUBTASKS, DomainTask.STATUS_COMPLETED,
+                DomainTask.STATUS_FAILED
+            ]
+            for status_val in statuses_to_query:
+                counts[status_val] = db.query(func.count(TaskORM.id)).filter(TaskORM.status == status_val).scalar_one()
+            return counts
         finally:
             db.close()
