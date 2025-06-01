@@ -1,112 +1,165 @@
 import logging
-import threading # For running the agent loop in a background thread
-import time # For adding delays in the agent loop
-# uuid is no longer needed here as Task generates its own ID.
-# os and together are no longer directly used here.
+import threading
+import time
+import os # For checking if DB exists
+import sqlite3 # For catching sqlite3.Error
 
-from .task import Task
-from .request import TogetherAIRequest
-from .web_service import create_app
+from june_agent.db import DatabaseManager
+from june_agent.initiative import Initiative
+from june_agent.task import Task
+from june_agent.request import TogetherAIRequest # Still needed if default requests are added
+from june_agent.web_service import create_app
 
-# Configure basic logging for the application.
-# This setup logs messages with INFO level and above to the console.
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(module)s - %(message)s')
+# Configure basic logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-# Global list to store all tasks managed by the agent.
-# This list is shared between the agent_loop and the web_service.
-tasks_list: list[Task] = []
-
-# Global list to store agent activity logs.
+# Global list for agent activity logs (for UI display)
 agent_logs: list[str] = []
 MAX_LOG_ENTRIES = 100
 
-# The old find_task_by_id helper is no longer needed here as tasks are processed directly
-# and task finding logic for API calls is within the Task.process or request execution.
+DB_PATH = 'june_agent.db' # Define DB Path
 
-# The old call_together_api function is removed. Its functionality is now part of
-# TogetherAIRequest.execute() and Task.process().
+def ensure_initial_initiative_and_task(db_manager: DatabaseManager):
+    """Ensures at least one initiative and task exist for demonstration/testing."""
+    initiative_id_to_check = "init_main_001"
+    task_id_to_check = "task_main_001_assess"
 
-def agent_loop():
+    # Check if the main initiative exists
+    initiative = Initiative.load(initiative_id=initiative_id_to_check, db_manager=db_manager)
+    if not initiative:
+        logger.info(f"Creating initial default initiative '{initiative_id_to_check}'.")
+        initiative = Initiative(
+            name="Main Agent Initiative",
+            description="Default initiative for ongoing agent tasks.",
+            db_manager=db_manager,
+            initiative_id=initiative_id_to_check,
+            status="active" # Changed from "pending" to "active"
+        )
+        initiative.save()
+
+        # Since initiative is new, the task also needs to be created.
+        logger.info(f"Creating initial default task '{task_id_to_check}' for new initiative '{initiative.id}'.")
+        initial_task = Task(
+            description="Default task: Assess current agent objectives and plan.",
+            db_manager=db_manager,
+            task_id=task_id_to_check,
+            initiative_id=initiative.id,
+            status=Task.STATUS_PENDING,
+            phase=Task.PHASE_ASSESSMENT
+        )
+        initial_task.save()
+        # initiative.add_task_object(initial_task) # Not strictly needed here as loop loads from DB
+        logger.info(f"Initial task '{initial_task.id}' created and saved.")
+    else:
+        logger.info(f"Initial initiative '{initiative_id_to_check}' already exists.")
+        # Initiative exists, check if the specific default task exists
+        task = Task.load(task_id=task_id_to_check, db_manager=db_manager)
+        if not task:
+            logger.info(f"Creating initial default task '{task_id_to_check}' for existing initiative '{initiative.id}'.")
+            initial_task = Task(
+                description="Default task: Assess current agent objectives and plan (for existing init).",
+                db_manager=db_manager,
+                task_id=task_id_to_check,
+                initiative_id=initiative.id,
+                status=Task.STATUS_PENDING,
+                phase=Task.PHASE_ASSESSMENT
+            )
+            initial_task.save()
+            logger.info(f"Initial task '{initial_task.id}' created and saved for existing initiative.")
+        else:
+            logger.info(f"Initial task '{task_id_to_check}' already exists for initiative '{initiative.id}'.")
+
+
+def agent_loop(db_manager: DatabaseManager):
     """
     Main background loop for the agent.
-    This function runs in a separate thread and periodically checks for pending tasks.
-    For each pending task, it assigns a request handler (e.g., TogetherAIRequest)
-    and then tells the task to process itself.
+    Periodically queries the database for tasks requiring processing and advances them through phases.
     """
-    logging.info("Agent_loop thread started.")
+    logger.info("Agent_loop thread started.")
     while True:
         try:
-            current_tasks_snapshot = list(tasks_list)
+            # Query for tasks that need processing.
+            # A task is processable if:
+            # 1. Phase is ASSESSMENT, EXECUTION, or RECONCILIATION
+            # 2. Status is PENDING_SUBTASKS (picked up by RECONCILIATION logic within process_current_phase)
+            query = """
+            SELECT id FROM tasks
+            WHERE (phase IN (?, ?, ?)) OR status = ?
+            ORDER BY updated_at ASC -- Process tasks that haven't been touched recently first
+            """
+            task_ids_to_process = db_manager.fetch_all(query, (
+                Task.PHASE_ASSESSMENT, Task.PHASE_EXECUTION, Task.PHASE_RECONCILIATION,
+                Task.STATUS_PENDING_SUBTASKS
+            ))
 
-            if not current_tasks_snapshot:
-                pass
-            else:
-                pending_tasks_to_process = [task for task in current_tasks_snapshot if task.status == 'pending']
+            if task_ids_to_process:
+                logger.info(f"Found {len(task_ids_to_process)} tasks potentially requiring processing.")
+                for row in task_ids_to_process:
+                    task_id = row['id']
+                    task = Task.load(task_id=task_id, db_manager=db_manager)
+                    if not task:
+                        logger.warning(f"Task ID {task_id} found in query but could not be loaded. Skipping.")
+                        continue
 
-                if pending_tasks_to_process:
-                    logging.info(f"Found {len(pending_tasks_to_process)} pending tasks to process.")
-                    for task in pending_tasks_to_process:
-                        if task.status == 'pending':
-                            log_entry_pickup = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Picking up task: {task.id} - {task.description[:50]}..."
-                            agent_logs.append(log_entry_pickup)
-                            logging.info(f"Agent picking up task ID: {task.id} - '{task.description[:50]}...'") # Keep console log
+                    log_entry_pickup = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Agent considering task: {task.id} - '{task.description[:30]}' (Status: {task.status}, Phase: {task.phase})"
+                    agent_logs.append(log_entry_pickup)
+                    logger.info(f"Agent considering task ID: {task.id} - '{task.description[:50]}' (Status: {task.status}, Phase: {task.phase})")
 
-                            if not task.requests:
-                                task.add_request(TogetherAIRequest())
-                                logging.info(f"Added TogetherAIRequest to task {task.id}.")
-                            else:
-                                logging.info(f"Task {task.id} already has {len(task.requests)} request(s). Proceeding to process.")
+                    task.process_current_phase() # This method handles logic and saving
 
-                            task.process()
+                    log_entry_outcome = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Task {task.id} processed. New Status: {task.status}, New Phase: {task.phase}"
+                    agent_logs.append(log_entry_outcome)
+                    logger.info(f"Task {task.id} processed. New Status: {task.status}, New Phase: {task.phase}")
 
-                            # Log outcome
-                            if task.status == "completed":
-                                log_entry_done = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Task {task.id} completed. Result: {str(task.result)[:100]}..."
-                                agent_logs.append(log_entry_done)
-                            elif task.status == "failed":
-                                log_entry_fail = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Task {task.id} failed. Error: {str(task.error_message)[:100]}..."
-                                agent_logs.append(log_entry_fail)
+                    if task.status == Task.STATUS_FAILED:
+                         agent_logs.append(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Task {task.id} failed. Error: {str(task.error_message)[:100]}...")
 
-                            # Cap the logs
-                            if len(agent_logs) > MAX_LOG_ENTRIES:
-                                agent_logs.pop(0)
-                # else:
-                    # logging.debug("No pending tasks found in this iteration. Sleeping.")
+                    if len(agent_logs) > MAX_LOG_ENTRIES: # Cap the logs
+                        agent_logs.pop(0)
+            # else:
+                # logger.debug("No tasks found requiring active processing in this iteration.")
 
-
+        except sqlite3.Error as db_err:
+            logger.error(f"Database error in agent_loop: {db_err}", exc_info=True)
+            time.sleep(15)
         except Exception as e:
-            # Catch-all for unexpected errors within the loop to prevent the agent thread from crashing.
-            logging.error(f"Critical error in agent_loop: {e}", exc_info=True)
-            # Avoid continuous fast error loops in case of persistent issues by still sleeping.
+            logger.error(f"Critical error in agent_loop: {e}", exc_info=True)
+            # Avoid continuous fast error loops by still sleeping
 
-        time.sleep(5) # Pause for 5 seconds before checking for new tasks again.
+        time.sleep(10) # Pause for 10 seconds
 
 if __name__ == "__main__":
-    # This block executes when the script is run directly (e.g., python -m june_agent).
-    logging.info("June agent process starting...")
+    logger.info("June agent process starting...")
 
-    # Initialize the global tasks list. This list will be shared with the web service.
-    # tasks_list is already defined globally, so just ensuring it's clear it's used from here.
+    db_manager = DatabaseManager(db_path=DB_PATH)
+    try:
+        db_manager.connect()
+        db_manager.create_tables()
+        logger.info("Database initialized and tables created/verified.")
 
-    # Start the agent_loop in a daemon thread.
-    # Daemon threads automatically exit when the main program (Flask server in this case) exits.
-    logging.info("Initializing and starting agent_loop thread...")
-    agent_thread = threading.Thread(target=agent_loop, daemon=True)
+        # Ensure initial content. Call this after connect() and create_tables().
+        ensure_initial_initiative_and_task(db_manager)
+
+    except Exception as e:
+        logger.error(f"Failed to initialize database or ensure initial data: {e}", exc_info=True)
+        # Exit if DB initialization fails, as the agent cannot function.
+        exit(1)
+
+
+    logger.info("Initializing and starting agent_loop thread...")
+    agent_thread = threading.Thread(target=agent_loop, args=(db_manager,), daemon=True)
     agent_thread.start()
 
-    # Create the Flask application using the factory from web_service.
-    # Pass the shared tasks_list, Task class, and agent_logs to the factory.
-    logging.info("Creating Flask application...")
+    logger.info("Creating Flask application...")
     flask_app = create_app(
-        tasks_list_ref=tasks_list,
-        task_class_ref=Task,
+        db_manager_ref=db_manager,
         agent_logs_ref=agent_logs
     )
 
-    # Start the Flask development server.
-    # It will listen on all available network interfaces (0.0.0.0) on port 8080.
-    logging.info("Starting Flask web server on host 0.0.0.0, port 8080...")
-    # Note: flask_app.run() is blocking for the main thread. The agent_loop runs in its daemon thread.
+    logger.info("Starting Flask web server on host 0.0.0.0, port 8080...")
     flask_app.run(host='0.0.0.0', port=8080)
 
-    logging.info("June agent process shutting down.") # This line might only be reached if app.run() is non-blocking or server is stopped.
+    logger.info("June agent process shutting down.")
+    if db_manager:
+        db_manager.close()

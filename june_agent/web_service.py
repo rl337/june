@@ -1,110 +1,148 @@
 import logging
 from flask import Flask, request, jsonify
-from .task import Task # Assuming Task is in .task
+from june_agent.db import DatabaseManager # Added
+from june_agent.initiative import Initiative # Added
+from june_agent.task import Task
 
-# Configure logging for this module
-# logger = logging.getLogger(__name__) # Preferred for libraries
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(module)s - %(message)s')
+# Configure logging
+logger = logging.getLogger(__name__)
 
-
-def create_app(tasks_list_ref: list, task_class_ref: type[Task], agent_logs_ref: list):
-    """
-    Application factory for the Flask web service.
-
-    Args:
-        tasks_list_ref (list): A reference to the global list holding all tasks.
-        task_class_ref (type[Task]): A reference to the Task class.
-        agent_logs_ref (list): A reference to the global list holding agent logs.
-
-    Returns:
-        Flask: The configured Flask application instance.
-    """
-    # Ensure static files are served from 'june_agent/static'
-    # __name__ here is 'june_agent.web_service'
-    # static_folder path is relative to the location of web_service.py
+def create_app(db_manager_ref: DatabaseManager, agent_logs_ref: list):
+    """Application factory for the Flask web service."""
     app = Flask(__name__, static_folder='../static', static_url_path='/static')
 
-    # The global agent_status might be managed by the main agent logic.
-    # For the web service, it can report a simple status or a derived one.
-    # For now, let's assume a simple static status for the web service itself.
-    # More complex status reporting can be derived from task_list_ref or other sources.
-    # agent_overall_status = "running" # This could be passed in or managed differently.
+    app.config['db_manager'] = db_manager_ref
+    app.config['agent_logs_ref'] = agent_logs_ref
 
     @app.route('/')
     def serve_index():
-        """Serves the main index.html page from the static folder."""
-        # app.send_static_file will look in the app.static_folder,
-        # which was configured as '../static' relative to web_service.py,
-        # effectively pointing to 'june_agent/static/'.
         return app.send_static_file('index.html')
 
-@app.route('/logs')
-def get_agent_logs():
-    """API endpoint to get the agent's activity logs."""
-    logs = app.config.get('agent_logs_ref', [])
-    # Return logs, perhaps newest first if that's desired for display
-    # For now, returning in collected order (oldest first, newest last)
-    return jsonify(list(logs))
+    @app.route('/logs')
+    def get_agent_logs():
+        logs = app.config.get('agent_logs_ref', [])
+        return jsonify(list(logs))
 
     @app.route('/status', methods=['GET'])
     def get_status():
-        """
-        API endpoint to get the current overall status of the agent and task counts.
-        """
-        # Calculate task status counts from the shared tasks_list_ref
-        pending_tasks = sum(1 for task_obj in tasks_list_ref if task_obj.status == 'pending')
-        processing_tasks = sum(1 for task_obj in tasks_list_ref if task_obj.status == 'processing')
-        completed_tasks = sum(1 for task_obj in tasks_list_ref if task_obj.status == 'completed')
-        failed_tasks = sum(1 for task_obj in tasks_list_ref if task_obj.status == 'failed')
+        db_manager = app.config['db_manager']
+        try:
+            total_tasks = db_manager.fetch_one("SELECT COUNT(*) as count FROM tasks")[0]
+            pending_tasks = db_manager.fetch_one("SELECT COUNT(*) as count FROM tasks WHERE status = ?", (Task.STATUS_PENDING,))[0]
+            assessing_tasks = db_manager.fetch_one("SELECT COUNT(*) as count FROM tasks WHERE status = ?", (Task.STATUS_ASSESSING,))[0]
+            executing_tasks = db_manager.fetch_one("SELECT COUNT(*) as count FROM tasks WHERE status = ?", (Task.STATUS_EXECUTING,))[0]
+            reconciling_tasks = db_manager.fetch_one("SELECT COUNT(*) as count FROM tasks WHERE status = ?", (Task.STATUS_RECONCILING,))[0]
+            pending_sub_tasks = db_manager.fetch_one("SELECT COUNT(*) as count FROM tasks WHERE status = ?", (Task.STATUS_PENDING_SUBTASKS,))[0]
+            completed_tasks = db_manager.fetch_one("SELECT COUNT(*) as count FROM tasks WHERE status = ?", (Task.STATUS_COMPLETED,))[0]
+            failed_tasks = db_manager.fetch_one("SELECT COUNT(*) as count FROM tasks WHERE status = ?", (Task.STATUS_FAILED,))[0]
 
-        # The 'agent_overall_status' could be more dynamic in a mature system
-        # For now, if there are processing tasks, we can indicate it's busy, else idle.
-        current_agent_status = "processing" if processing_tasks > 0 else "idle"
+            total_initiatives = db_manager.fetch_one("SELECT COUNT(*) as count FROM initiatives")[0]
 
-        return jsonify({
-            'agent_overall_status': current_agent_status,
-            'total_tasks': len(tasks_list_ref),
-            'pending_tasks': pending_tasks,
-            'processing_tasks': processing_tasks,
-            'completed_tasks': completed_tasks,
-            'failed_tasks': failed_tasks
-        })
+            active_processing_count = assessing_tasks + executing_tasks + reconciling_tasks + pending_sub_tasks
+            current_agent_status = "processing" if active_processing_count > 0 else "idle"
+
+            return jsonify({
+                'agent_overall_status': current_agent_status,
+                'total_initiatives': total_initiatives,
+                'total_tasks': total_tasks,
+                'status_counts': {
+                    Task.STATUS_PENDING: pending_tasks,
+                    Task.STATUS_ASSESSING: assessing_tasks,
+                    Task.STATUS_EXECUTING: executing_tasks,
+                    Task.STATUS_RECONCILING: reconciling_tasks,
+                    Task.STATUS_PENDING_SUBTASKS: pending_sub_tasks,
+                    Task.STATUS_COMPLETED: completed_tasks,
+                    Task.STATUS_FAILED: failed_tasks,
+                }
+            })
+        except Exception as e:
+            logger.error(f"Error fetching status from DB: {e}", exc_info=True)
+            return jsonify({'error': 'Failed to retrieve status from database'}), 500
+
+    @app.route('/initiatives', methods=['GET'])
+    def get_initiatives():
+        db_manager = app.config['db_manager']
+        try:
+            initiatives = Initiative.load_all(db_manager)
+            # For each initiative, load its tasks to populate task_ids for the UI
+            # This could be heavy if there are many initiatives and tasks.
+            # Consider optimizing if performance becomes an issue (e.g., selective loading).
+            for init in initiatives:
+                init.tasks = Task.load_all(db_manager, initiative_id=init.id) # Populate tasks for to_dict
+            return jsonify([init.to_dict() for init in initiatives])
+        except Exception as e:
+            logger.error(f"Error fetching initiatives: {e}", exc_info=True)
+            return jsonify({'error': 'Failed to retrieve initiatives'}), 500
+
+    @app.route('/initiatives/<string:initiative_id>', methods=['GET'])
+    def get_initiative_detail(initiative_id):
+        db_manager = app.config['db_manager']
+        try:
+            initiative = Initiative.load(initiative_id, db_manager)
+            if not initiative:
+                return jsonify({'error': 'Initiative not found'}), 404
+            # Load tasks for this specific initiative to populate task_ids
+            initiative.tasks = Task.load_all(db_manager, initiative_id=initiative.id)
+            return jsonify(initiative.to_dict())
+        except Exception as e:
+            logger.error(f"Error fetching initiative {initiative_id}: {e}", exc_info=True)
+            return jsonify({'error': 'Failed to retrieve initiative details'}), 500
 
     @app.route('/tasks', methods=['GET', 'POST'])
     def manage_tasks():
-        """
-        API endpoint to manage tasks.
-        - GET: Retrieves a list of all tasks.
-        - POST: Creates a new task.
-        """
+        db_manager = app.config['db_manager']
         if request.method == 'GET':
-            # Convert each Task object in tasks_list_ref to its dictionary representation
-            return jsonify([task_obj.to_dict() for task_obj in tasks_list_ref])
+            initiative_id_filter = request.args.get('initiative_id')
+            try:
+                tasks = Task.load_all(db_manager, initiative_id=initiative_id_filter)
+                return jsonify([task.to_dict() for task in tasks])
+            except Exception as e:
+                logger.error(f"Error fetching tasks: {e}", exc_info=True)
+                return jsonify({'error': 'Failed to retrieve tasks'}), 500
 
         elif request.method == 'POST':
             data = request.get_json()
-            # Enhanced validation for description
-            if not data or 'description' not in data:
-                logging.warning("Task creation failed via API: 'description' key missing.")
-                return jsonify({'error': "Missing 'description' key in request JSON."}), 400
+            if not data or 'description' not in data or 'initiative_id' not in data:
+                return jsonify({'error': "Missing 'description' or 'initiative_id' in request."}), 400
 
-            description_value = data['description']
-            if not isinstance(description_value, str) or not description_value.strip():
-                logging.warning(f"Task creation failed via API: description is not a non-empty string. Value: {description_value!r}")
-                return jsonify({'error': 'Task description must be a non-empty string.'}), 400
+            description = data['description'].strip()
+            initiative_id = data['initiative_id'].strip()
 
-            description = description_value.strip()
+            if not description or not initiative_id:
+                return jsonify({'error': "'description' and 'initiative_id' must be non-empty strings."}), 400
 
-            # Use the provided task_class_ref to create a new task instance
-            new_task_obj = task_class_ref(description=description)
+            # Verify initiative exists
+            parent_initiative = Initiative.load(initiative_id, db_manager)
+            if not parent_initiative:
+                return jsonify({'error': f"Initiative with ID '{initiative_id}' not found."}), 404
 
-            # The agent loop will be responsible for adding the appropriate APIRequest to the task.
-            # The web service only creates the task entry.
-            tasks_list_ref.append(new_task_obj)
+            try:
+                # Create new task, initially in pending status and assessment phase
+                new_task = Task(
+                    description=description,
+                    db_manager=db_manager,
+                    initiative_id=initiative_id,
+                    status=Task.STATUS_PENDING, # Explicitly set
+                    phase=Task.PHASE_ASSESSMENT # Explicitly set
+                )
+                new_task.save()
+                logger.info(f"New task '{new_task.id}' created via API for initiative '{initiative_id}'.")
+                return jsonify(new_task.to_dict()), 201
+            except Exception as e:
+                logger.error(f"Error creating task via API: {e}", exc_info=True)
+                return jsonify({'error': 'Failed to create task'}), 500
 
-            logging.info(f"New task created via API: ID {new_task_obj.id}, Description: '{new_task_obj.description[:50]}...'")
-            return jsonify(new_task_obj.to_dict()), 201 # 201 Created
+    @app.route('/tasks/<string:task_id>', methods=['GET'])
+    def get_task_detail(task_id):
+        db_manager = app.config['db_manager']
+        try:
+            task = Task.load(task_id, db_manager)
+            if not task:
+                return jsonify({'error': 'Task not found'}), 404
+            task.load_subtasks() # Ensure subtasks are loaded for the dict representation
+            return jsonify(task.to_dict())
+        except Exception as e:
+            logger.error(f"Error fetching task {task_id}: {e}", exc_info=True)
+            return jsonify({'error': 'Failed to retrieve task details'}), 500
 
-    app.config['tasks_list_ref'] = tasks_list_ref
-    app.config['agent_logs_ref'] = agent_logs_ref # Store agent_logs_ref in app config
     return app

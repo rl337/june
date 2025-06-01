@@ -13,29 +13,45 @@
         <div class="status-section">
             <h2>Agent Status</h2>
             <p>Status: <span id="agent-status">loading...</span></p>
+            <div id="detailed-status-counts"></div> <!-- For detailed counts -->
         </div>
 
         <div class="form-section">
             <h2>Create New Task</h2>
             <form id="create-task-form">
-                <label for="task-description">Task Description:</label>
-                <textarea id="task-description" name="description" rows="3" required></textarea>
+                <div>
+                    <label for="initiative-select">Select Initiative:</label>
+                    <select id="initiative-select" name="initiative_id" required>
+                        <option value="">Loading initiatives...</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="task-description">Task Description:</label>
+                    <textarea id="task-description" name="description" rows="3" required></textarea>
+                </div>
                 <button type="submit">Create Task</button>
             </form>
-            <div id="form-message"></div> <!-- For success/error messages from form submission -->
+            <div id="form-message"></div>
+        </div>
+
+        <div class="initiatives-section">
+            <h2>Current Initiatives</h2>
+            <div id="initiatives-list">
+                <p>Loading initiatives...</p>
+            </div>
         </div>
 
         <div class="tasks-section">
             <h2>Current Tasks</h2>
-            <div id="tasks-list"> <!-- Changed from ul to div for more flexible content rendering -->
+            <div id="tasks-list">
                 <p>Loading tasks...</p>
             </div>
         </div>
 
-        <div class="logs-section"> <!-- This section was not in the previous simple UI -->
+        <div class="logs-section">
             <h2>Agent Log</h2>
             <div id="agent-log">
-                <p>Agent activity logs will appear here (feature not yet implemented).</p>
+                <p>Loading logs...</p>
             </div>
         </div>
     </div>

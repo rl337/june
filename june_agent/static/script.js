@@ -1,49 +1,31 @@
 // June Agent UI client-side logic
 
-// Helper function to prevent XSS
 function escapeHTML(str) {
     if (str === null || str === undefined) return '';
     return String(str).replace(/[&<>"']/g, function (match) {
-        return {
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot;',
-            "'": '&#39;'
-        }[match];
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[match];
     });
 }
 
-// This will be assigned to window.fetchAndDisplayLogs within DOMContentLoaded
+// Fetch and Display Agent Logs (implementation from previous version, assumed correct)
 function fetchAndDisplayLogsImplementation() {
     const agentLogDiv = document.getElementById('agent-log');
     if (!agentLogDiv) {
         console.error("Agent log container 'agent-log' not found.");
         return;
     }
-
     fetch('/logs')
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
+        .then(response => response.ok ? response.json() : Promise.reject(response.status))
         .then(logs => {
-            agentLogDiv.innerHTML = ''; // Clear previous logs
-
+            agentLogDiv.innerHTML = '';
             if (!Array.isArray(logs) || logs.length === 0) {
-                agentLogDiv.innerHTML = '<p>No agent logs available.</p>';
-                return;
+                agentLogDiv.innerHTML = '<p>No agent logs available.</p>'; return;
             }
-
             const ul = document.createElement('ul');
-            ul.className = 'logs'; // For styling
-            // Display logs, newest first by reversing the client-side array.
+            ul.className = 'logs';
             logs.slice().reverse().forEach(logEntry => {
                 const li = document.createElement('li');
                 li.className = 'log-item';
-                // Assuming logEntry is a string, escape it
                 li.textContent = escapeHTML(String(logEntry));
                 ul.appendChild(li);
             });
@@ -51,184 +33,194 @@ function fetchAndDisplayLogsImplementation() {
         })
         .catch(error => {
             console.error('Error fetching agent logs:', error);
-            if (agentLogDiv) {
-                agentLogDiv.innerHTML = '<p>Error loading agent logs.</p>';
-            }
+            if (agentLogDiv) agentLogDiv.innerHTML = '<p>Error loading agent logs.</p>';
         });
 }
 
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Element references
     const agentStatusElement = document.getElementById('agent-status');
+    const detailedStatusCountsElement = document.getElementById('detailed-status-counts');
     const createTaskForm = document.getElementById('create-task-form');
+    const initiativeSelectElement = document.getElementById('initiative-select');
     const taskDescriptionInput = document.getElementById('task-description');
+    const initiativesListDiv = document.getElementById('initiatives-list');
     const tasksListDiv = document.getElementById('tasks-list');
     const formMessageDiv = document.getElementById('form-message');
-    const agentLogElement = document.getElementById('agent-log'); // Used by fetchAndDisplayLogsImplementation
 
-    // Assign the log fetching function to the window object or ensure it's callable
     window.fetchAndDisplayLogs = fetchAndDisplayLogsImplementation;
 
-
-    // Function to fetch agent status (using async/await for consistency)
     async function fetchAgentStatus() {
-        if (!agentStatusElement) return;
+        if (!agentStatusElement || !detailedStatusCountsElement) return;
         try {
             const response = await fetch('/status');
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
             const data = await response.json();
-            agentStatusElement.textContent =
-                `${data.agent_overall_status} (Total: ${data.total_tasks}, ` +
-                `Pending: ${data.pending_tasks}, Processing: ${data.processing_tasks}, ` +
-                `Completed: ${data.completed_tasks}, Failed: ${data.failed_tasks})`;
+
+            agentStatusElement.textContent = `${escapeHTML(data.agent_overall_status)} (Initiatives: ${data.total_initiatives}, Tasks: ${data.total_tasks})`;
+
+            detailedStatusCountsElement.innerHTML = '<strong>Task Statuses:</strong><ul>';
+            for (const status in data.status_counts) {
+                detailedStatusCountsElement.innerHTML += `<li>${escapeHTML(status)}: ${data.status_counts[status]}</li>`;
+            }
+            detailedStatusCountsElement.innerHTML += '</ul>';
+
         } catch (error) {
             console.error('Failed to fetch agent status:', error);
             agentStatusElement.textContent = 'Error loading status';
+            detailedStatusCountsElement.innerHTML = '';
         }
     }
 
-    // Function to fetch and display tasks (refined version)
-    function fetchAndDisplayTasks() {
-        if (!tasksListDiv) {
-            console.error("Task list container 'tasks-list' not found.");
-            return;
-        }
+    async function fetchAndDisplayInitiatives() {
+        if (!initiativesListDiv || !initiativeSelectElement) return;
+        try {
+            const response = await fetch('/initiatives');
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const initiatives = await response.json();
 
-        fetch('/tasks')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(tasks => {
-                tasksListDiv.innerHTML = ''; // Clear previous tasks
+            initiativesListDiv.innerHTML = '';
+            initiativeSelectElement.innerHTML = '<option value="">-- Select an Initiative --</option>';
 
-                if (tasks.length === 0) {
-                    tasksListDiv.innerHTML = '<p>No tasks found.</p>';
-                    return;
-                }
+            if (initiatives.length === 0) {
+                initiativesListDiv.innerHTML = '<p>No initiatives found.</p>';
+                return;
+            }
 
-                const ul = document.createElement('ul');
-                ul.className = 'tasks';
-                tasks.forEach(task => {
-                    const li = document.createElement('li');
-                    li.className = `task-item status-${escapeHTML(task.status ? task.status.toLowerCase() : 'unknown')}`;
+            const ul = document.createElement('ul');
+            ul.className = 'initiatives';
+            initiatives.forEach(init => {
+                const li = document.createElement('li');
+                li.className = `initiative-item status-${escapeHTML(init.status ? init.status.toLowerCase() : 'unknown')}`;
+                li.innerHTML = `
+                    <div class="initiative-id"><strong>ID:</strong> ${escapeHTML(init.id)}</div>
+                    <div class="initiative-name"><strong>Name:</strong> ${escapeHTML(init.name)}</div>
+                    <div class="initiative-description"><strong>Description:</strong> ${escapeHTML(init.description)}</div>
+                    <div class="initiative-status"><strong>Status:</strong> ${escapeHTML(init.status)}</div>
+                    <div class="initiative-tasks"><strong>Tasks (${init.task_ids.length}):</strong> ${escapeHTML(init.task_ids.join(', '))}</div>
+                    <div class="initiative-created"><strong>Created:</strong> ${escapeHTML(new Date(init.created_at).toLocaleString())}</div>
+                `;
+                ul.appendChild(li);
 
-                    let taskHTML = `
-                        <div class="task-id"><strong>ID:</strong> ${escapeHTML(task.id)}</div>
-                        <div class="task-description"><strong>Description:</strong> ${escapeHTML(task.description)}</div>
-                        <div class="task-status"><strong>Status:</strong> ${escapeHTML(task.status)}</div>
-                    `;
-
-                    if (task.result) {
-                        taskHTML += `<div class="task-result"><strong>Result:</strong> <pre>${escapeHTML(task.result)}</pre></div>`;
-                    }
-                    if (task.error_message) {
-                        taskHTML += `<div class="task-error"><strong>Error:</strong> <pre>${escapeHTML(task.error_message)}</pre></div>`;
-                    }
-                    if (task.num_requests !== undefined) {
-                         taskHTML += `<div class="task-requests"><strong>Requests:</strong> ${task.num_requests}</div>`;
-                    }
-
-                    li.innerHTML = taskHTML;
-                    ul.appendChild(li);
-                });
-                tasksListDiv.appendChild(ul);
-            })
-            .catch(error => {
-                console.error('Error fetching tasks:', error);
-                if (tasksListDiv) {
-                    tasksListDiv.innerHTML = '<p>Error loading tasks. Please try again later.</p>';
-                }
+                // Populate select dropdown
+                const option = document.createElement('option');
+                option.value = escapeHTML(init.id);
+                option.textContent = escapeHTML(init.name) + ` (ID: ${escapeHTML(init.id.substring(0,8))}...)`;
+                initiativeSelectElement.appendChild(option);
             });
+            initiativesListDiv.appendChild(ul);
+            if (initiatives.length > 0 && initiativeSelectElement.options.length > 1) {
+                 // Pre-select the first initiative if available and not the placeholder
+                // initiativeSelectElement.value = initiatives[0].id;
+            }
+
+
+        } catch (error) {
+            console.error('Error fetching initiatives:', error);
+            if (initiativesListDiv) initiativesListDiv.innerHTML = '<p>Error loading initiatives.</p>';
+            initiativeSelectElement.innerHTML = '<option value="">Error loading</option>';
+        }
     }
 
-    // Handle task creation form submission
+    async function fetchAndDisplayTasks() {
+        if (!tasksListDiv) return;
+        // Optional: Add filter by selected initiative later
+        // const selectedInitiativeId = initiativeSelectElement.value;
+        // const fetchUrl = selectedInitiativeId ? `/tasks?initiative_id=${selectedInitiativeId}` : '/tasks';
+        const fetchUrl = '/tasks';
+
+        try {
+            const response = await fetch(fetchUrl);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const tasks = await response.json();
+
+            tasksListDiv.innerHTML = '';
+            if (tasks.length === 0) {
+                tasksListDiv.innerHTML = '<p>No tasks found.</p>'; return;
+            }
+
+            const ul = document.createElement('ul');
+            ul.className = 'tasks';
+            tasks.forEach(task => {
+                const li = document.createElement('li');
+                li.className = `task-item status-${escapeHTML(task.status ? task.status.toLowerCase() : 'unknown')}`;
+                let subtaskInfo = task.subtask_ids && task.subtask_ids.length > 0 ? `(${task.subtask_ids.join(', ')})` : '(none)';
+                li.innerHTML = `
+                    <div class="task-id"><strong>ID:</strong> ${escapeHTML(task.id)}</div>
+                    <div class="task-description"><strong>Description:</strong> ${escapeHTML(task.description)}</div>
+                    <div class="task-status"><strong>Status:</strong> ${escapeHTML(task.status)}</div>
+                    <div class="task-phase"><strong>Phase:</strong> ${escapeHTML(task.phase || 'N/A')}</div>
+                    <div class="task-initiative"><strong>Initiative ID:</strong> ${escapeHTML(task.initiative_id || 'N/A')}</div>
+                    <div class="task-parent"><strong>Parent Task ID:</strong> ${escapeHTML(task.parent_task_id || 'N/A')}</div>
+                    <div class="task-subtasks"><strong>Subtasks ${task.num_subtasks || 0}:</strong> ${escapeHTML(subtaskInfo)}</div>
+                    ${task.result ? `<div class="task-result"><strong>Result:</strong> <pre>${escapeHTML(task.result)}</pre></div>` : ''}
+                    ${task.error_message ? `<div class="task-error"><strong>Error:</strong> <pre>${escapeHTML(task.error_message)}</pre></div>` : ''}
+                    <div class="task-created"><strong>Created:</strong> ${escapeHTML(new Date(task.created_at).toLocaleString())}</div>
+                `;
+                ul.appendChild(li);
+            });
+            tasksListDiv.appendChild(ul);
+        } catch (error) {
+            console.error('Error fetching tasks:', error);
+            if (tasksListDiv) tasksListDiv.innerHTML = '<p>Error loading tasks.</p>';
+        }
+    }
+
     if (createTaskForm) {
         createTaskForm.addEventListener('submit', async (event) => {
             event.preventDefault();
             const description = taskDescriptionInput.value.trim();
+            const initiativeId = initiativeSelectElement.value;
 
             if (!description) {
-                if(formMessageDiv) {
-                    formMessageDiv.textContent = 'Task description cannot be empty.';
-                    formMessageDiv.className = 'message error';
-                } else {
-                    alert('Task description cannot be empty.');
-                }
-                return;
+                formMessageDiv.textContent = 'Task description cannot be empty.';
+                formMessageDiv.className = 'message error'; return;
             }
-
-            if(formMessageDiv) {
-                formMessageDiv.textContent = '';
-                formMessageDiv.className = 'message';
+            if (!initiativeId) {
+                formMessageDiv.textContent = 'Please select an initiative.';
+                formMessageDiv.className = 'message error'; return;
             }
+            formMessageDiv.textContent = ''; formMessageDiv.className = 'message';
 
             try {
                 const response = await fetch('/tasks', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ description: description }),
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ description: description, initiative_id: initiativeId }),
                 });
-
                 if (!response.ok) {
-                    let errorMsg = `Server error: ${response.status}`;
-                    try {
-                        const errData = await response.json();
-                        errorMsg = errData.error || errorMsg;
-                    } catch (e) {
-                        console.warn("Could not parse error response as JSON", e);
-                    }
-                    throw new Error(errorMsg);
+                    const errData = await response.json().catch(() => ({error: `Server error: ${response.status}`}));
+                    throw new Error(errData.error || `Server error: ${response.status}`);
                 }
-
                 const data = await response.json();
-
-                if(formMessageDiv) {
-                    formMessageDiv.textContent = 'Task created successfully! (ID: ' + data.id + ')';
-                    formMessageDiv.className = 'message success';
-                }
+                formMessageDiv.textContent = 'Task created successfully! (ID: ' + data.id + ')';
+                formMessageDiv.className = 'message success';
                 taskDescriptionInput.value = '';
+                // initiativeSelectElement.value = ''; // Optionally reset initiative selection
 
-                fetchAndDisplayTasks();
-                fetchAgentStatus();
-                window.fetchAndDisplayLogs(); // Refresh logs after task creation as well
+                fetchAndDisplayTasks(); // Refresh tasks list
+                fetchAgentStatus();     // Refresh status
+                window.fetchAndDisplayLogs(); // Refresh logs
             } catch (error) {
                 console.error('Error creating task:', error);
-                if(formMessageDiv) {
-                    formMessageDiv.textContent = 'Error creating task: ' + error.message;
-                    formMessageDiv.className = 'message error';
-                } else {
-                    alert('Error creating task: ' + error.message);
-                }
+                formMessageDiv.textContent = 'Error creating task: ' + error.message;
+                formMessageDiv.className = 'message error';
             }
         });
     }
 
     // Initial data fetch
     fetchAgentStatus();
+    fetchAndDisplayInitiatives(); // Fetch initiatives first to populate dropdown
     fetchAndDisplayTasks();
-    window.fetchAndDisplayLogs(); // Call the implemented function
+    window.fetchAndDisplayLogs();
 
-    // Set up polling to refresh data periodically
-    const POLLING_INTERVAL = 7500; // milliseconds (e.g., 7.5 seconds)
-
-    setInterval(function() {
-        console.log("Polling for updates..."); // Optional: for debugging polling
-        if (typeof fetchAgentStatus === 'function') {
-            fetchAgentStatus();
-        }
-        if (typeof fetchAndDisplayTasks === 'function') {
-            fetchAndDisplayTasks();
-        }
-        if (typeof window.fetchAndDisplayLogs === 'function') {
-            window.fetchAndDisplayLogs();
-        }
+    // Polling
+    const POLLING_INTERVAL = 7500;
+    setInterval(() => {
+        fetchAgentStatus();
+        fetchAndDisplayInitiatives(); // Keep initiative list (and dropdown) updated
+        fetchAndDisplayTasks();
+        window.fetchAndDisplayLogs();
     }, POLLING_INTERVAL);
 });
