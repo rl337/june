@@ -3,7 +3,7 @@ from flask import Flask, request, jsonify, make_response # Added make_response
 from pydantic import ValidationError # For catching Pydantic validation errors
 
 # ModelService interface and Pydantic schemas
-from june_agent.services.model_service_interface import IModelService
+from june_agent.services.model_service_interface import ModelServiceAbc # Updated import
 from june_agent.models_v2.pydantic_models import (
     InitiativeSchema, InitiativeCreate, InitiativeUpdate,
     TaskSchema, TaskCreate, TaskUpdate
@@ -19,7 +19,7 @@ from june_agent.task import Task as DomainTask
 
 logger = logging.getLogger(__name__)
 
-def create_app(model_service_ref: IModelService, agent_logs_ref: list) -> Flask:
+def create_app(model_service_ref: ModelServiceAbc, agent_logs_ref: list) -> Flask: # Updated type hint
     """
     Application factory for the June Agent's Flask web service.
 
@@ -90,7 +90,7 @@ def create_app(model_service_ref: IModelService, agent_logs_ref: list) -> Flask:
         # For now, using get_db() directly as a temporary measure if IModelService
         # doesn't have get_total_initiatives_count(), get_tasks_count_by_status() etc.
         # This endpoint now uses the ModelService for all data.
-        model_service: IModelService = app.config['model_service']
+        model_service: ModelServiceAbc = app.config['model_service'] # Updated type hint
 
         total_initiatives = model_service.get_total_initiatives_count()
         task_counts = model_service.get_task_counts_by_status() # Dict[str, int]
@@ -118,7 +118,7 @@ def create_app(model_service_ref: IModelService, agent_logs_ref: list) -> Flask:
     @app.route('/initiatives', methods=['GET'])
     def list_initiatives():
         """Lists all initiatives, optionally paginated."""
-        model_service: IModelService = app.config['model_service']
+        model_service: ModelServiceAbc = app.config['model_service'] # Updated type hint
         # TODO: Add skip/limit query parameters from request.args
         initiative_schemas = model_service.get_all_initiatives()
         return jsonify([s.model_dump() for s in initiative_schemas])
@@ -126,7 +126,7 @@ def create_app(model_service_ref: IModelService, agent_logs_ref: list) -> Flask:
     @app.route('/initiatives', methods=['POST'])
     def create_initiative_api():
         """Creates a new initiative from JSON payload."""
-        model_service: IModelService = app.config['model_service']
+        model_service: ModelServiceAbc = app.config['model_service'] # Updated type hint
         initiative_data = InitiativeCreate(**request.get_json()) # Validates request data
         created_initiative_schema = model_service.create_initiative(initiative_data)
         return make_response(jsonify(created_initiative_schema.model_dump()), 201)
@@ -134,7 +134,7 @@ def create_app(model_service_ref: IModelService, agent_logs_ref: list) -> Flask:
     @app.route('/initiatives/<string:initiative_id>', methods=['GET'])
     def get_initiative_detail(initiative_id: str):
         """Retrieves details for a specific initiative by its ID."""
-        model_service: IModelService = app.config['model_service']
+        model_service: ModelServiceAbc = app.config['model_service'] # Updated type hint
         initiative_schema = model_service.get_initiative(initiative_id)
         if not initiative_schema:
             return jsonify({"detail": "Initiative not found"}), 404
@@ -143,7 +143,7 @@ def create_app(model_service_ref: IModelService, agent_logs_ref: list) -> Flask:
     @app.route('/initiatives/<string:initiative_id>', methods=['PUT'])
     def update_initiative_api(initiative_id: str):
         """Updates an existing initiative by its ID from JSON payload."""
-        model_service: IModelService = app.config['model_service']
+        model_service: ModelServiceAbc = app.config['model_service'] # Updated type hint
         update_data = InitiativeUpdate(**request.get_json()) # Validates update data
         updated_schema = model_service.update_initiative(initiative_id, update_data)
         if not updated_schema:
@@ -153,7 +153,7 @@ def create_app(model_service_ref: IModelService, agent_logs_ref: list) -> Flask:
     @app.route('/initiatives/<string:initiative_id>', methods=['DELETE'])
     def delete_initiative_api(initiative_id: str):
         """Deletes an initiative by its ID."""
-        model_service: IModelService = app.config['model_service']
+        model_service: ModelServiceAbc = app.config['model_service'] # Updated type hint
         success = model_service.delete_initiative(initiative_id)
         if not success:
             return jsonify({"detail": "Initiative not found for deletion"}), 404
@@ -167,7 +167,7 @@ def create_app(model_service_ref: IModelService, agent_logs_ref: list) -> Flask:
         Lists tasks, optionally filtered by initiative_id.
         Supports pagination via query parameters (TODO: implement skip/limit).
         """
-        model_service: IModelService = app.config['model_service']
+        model_service: ModelServiceAbc = app.config['model_service'] # Updated type hint
         initiative_id_filter = request.args.get('initiative_id')
         # TODO: Add skip/limit query parameters from request.args to service call
         task_schemas = model_service.get_all_tasks(initiative_id=initiative_id_filter)
@@ -176,8 +176,7 @@ def create_app(model_service_ref: IModelService, agent_logs_ref: list) -> Flask:
     @app.route('/tasks', methods=['POST'])
     def create_task_api():
         """Creates a new task from JSON payload, associated with an initiative."""
-        model_service: IModelService = app.config['model_service']
-        model_service: IModelService = app.config['model_service']
+        model_service: ModelServiceAbc = app.config['model_service'] # Updated type hint
         json_data = request.get_json()
 
         if not isinstance(json_data, dict):
@@ -203,7 +202,7 @@ def create_app(model_service_ref: IModelService, agent_logs_ref: list) -> Flask:
     @app.route('/tasks/<string:task_id>', methods=['GET'])
     def get_task_detail(task_id: str):
         """Retrieves details for a specific task by its ID."""
-        model_service: IModelService = app.config['model_service']
+        model_service: ModelServiceAbc = app.config['model_service'] # Updated type hint
         task_schema = model_service.get_task(task_id)
         if not task_schema:
             return jsonify({"detail": "Task not found"}), 404
@@ -212,7 +211,7 @@ def create_app(model_service_ref: IModelService, agent_logs_ref: list) -> Flask:
     @app.route('/tasks/<string:task_id>', methods=['PUT'])
     def update_task_api(task_id: str):
         """Updates an existing task by its ID from JSON payload."""
-        model_service: IModelService = app.config['model_service']
+        model_service: ModelServiceAbc = app.config['model_service'] # Updated type hint
         update_data_pydantic = TaskUpdate(**request.get_json()) # Validates
         updated_schema = model_service.update_task(task_id, update_data_pydantic)
         if not updated_schema:

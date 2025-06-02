@@ -3,7 +3,7 @@ import datetime
 import copy # For deepcopying objects to simulate DB detachment
 from typing import List, Optional, Dict, Any
 
-from june_agent.services.model_service_interface import IModelService
+from june_agent.services.model_service_interface import ModelServiceAbc # Updated import
 from june_agent.models_v2.pydantic_models import (
     InitiativeSchema, InitiativeCreate, InitiativeUpdate,
     TaskSchema, TaskCreate, TaskUpdate
@@ -17,9 +17,9 @@ from june_agent.models_v2.pydantic_models import (
 # For these, we'll need the domain Task class.
 from june_agent.task import Task as DomainTask # Import the domain Task class
 
-class InMemoryModelService(IModelService):
+class InMemoryModelService(ModelServiceAbc): # Updated inheritance
     """
-    In-memory implementation of the IModelService interface.
+    In-memory implementation of the ModelServiceAbc interface.
     This service stores data in dictionaries and is primarily used for testing
     or simple deployments without a persistent database.
     It simulates database operations like CRUD and relationships.

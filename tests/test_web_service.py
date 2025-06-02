@@ -2,7 +2,7 @@ import unittest
 import json
 from june_agent.web_service import create_app
 from june_agent.services.in_memory_model_service import InMemoryModelService
-from june_agent.services.model_service_interface import IModelService # For type hint
+from june_agent.services.model_service_interface import ModelServiceAbc # Updated import
 from june_agent.models_v2.pydantic_models import (
     InitiativeCreate, InitiativeUpdate,
     TaskCreate, TaskUpdate, InitiativeSchema, TaskSchema
@@ -14,7 +14,7 @@ from june_agent.task import Task as DomainTask # For status constants
 class TestWebServiceWithInMemory(unittest.TestCase):
 
     def setUp(self):
-        self.model_service: IModelService = InMemoryModelService() # Use InMemory service
+        self.model_service: ModelServiceAbc = InMemoryModelService() # Updated type hint
         self.agent_logs = []
 
         self.app = create_app(

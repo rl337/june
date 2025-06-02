@@ -10,9 +10,9 @@ from june_agent.models_v2.pydantic_models import (
     TaskSchema, TaskCreate, TaskUpdate
 )
 
-class IModelService(ABC):
+class ModelServiceAbc(ABC):
     """
-    Interface defining the contract for a model service.
+    Abstract Base Class (ABC) defining the contract for a model service.
     A model service provides methods for creating, reading, updating, and deleting (CRUD)
     domain entities (Initiatives and Tasks), abstracting the underlying persistence mechanism.
     It uses Pydantic schemas for data transfer objects (DTOs) in most public methods,

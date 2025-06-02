@@ -3,8 +3,8 @@ from typing import List, Optional, Any
 from sqlalchemy.orm import Session, joinedload, selectinload # For eager loading
 from sqlalchemy import func # Added func for count
 
-from june_agent.services.model_service_interface import IModelService
-from june_agent.models_v2.orm_models import InitiativeORM, TaskORM, Base # Base for create_all if needed here
+from june_agent.services.model_service_interface import ModelServiceAbc # Updated import
+from june_agent.models_v2.orm_models import InitiativeORM, TaskORM, Base
 from june_agent.models_v2.pydantic_models import (
     InitiativeSchema, InitiativeCreate, InitiativeUpdate,
     TaskSchema, TaskCreate, TaskUpdate
@@ -16,9 +16,9 @@ from june_agent.services.sqlalchemy_database import get_db, engine, SessionLocal
 import logging
 logger = logging.getLogger(__name__)
 
-class SQLAlchemyModelService(IModelService):
+class SQLAlchemyModelService(ModelServiceAbc): # Updated inheritance
     """
-    SQLAlchemy-based implementation of the IModelService interface.
+    SQLAlchemy-based implementation of the ModelServiceAbc interface.
     This service uses SQLAlchemy ORM to interact with a relational database.
     It manages database sessions per method call, ensuring sessions are closed.
     """

@@ -5,7 +5,7 @@ import os
 
 # Core application components
 from june_agent.agent import Agent  # The main agent controller.
-from june_agent.services.model_service_interface import IModelService  # Service interface for type hinting.
+from june_agent.services.model_service_interface import ModelServiceAbc  # Updated import
 from june_agent.services.sqlalchemy_model_service import SQLAlchemyModelService # Default DB-backed service.
 # from june_agent.services.in_memory_model_service import InMemoryModelService # Alternative in-memory service.
 
@@ -37,7 +37,7 @@ agent_logs: List[str] = []
 MAX_LOG_ENTRIES = 100 # Maximum number of log entries to keep in `agent_logs`.
 
 
-def ensure_initial_data_via_service(model_service: IModelService) -> None:
+def ensure_initial_data_via_service(model_service: ModelServiceAbc) -> None: # Updated type hint
     """
     Ensures that essential default/initial data exists in the persistence layer,
     using the provided model service. This typically includes a default initiative
@@ -80,9 +80,9 @@ if __name__ == "__main__":
         # 2. Instantiate the ModelService:
         # This service abstracts data persistence. SQLAlchemyModelService uses the live database.
         # For testing or different backends, another implementation of IModelService could be used.
-        model_service_instance: IModelService = SQLAlchemyModelService(session_factory=SessionLocal)
+        model_service_instance: ModelServiceAbc = SQLAlchemyModelService(session_factory=SessionLocal) # Updated type hint
         # Example for using InMemoryModelService:
-        # model_service_instance: IModelService = InMemoryModelService()
+        # model_service_instance: ModelServiceAbc = InMemoryModelService()
         logger.info(f"Using ModelService implementation: {type(model_service_instance).__name__}")
 
         # 3. Ensure Initial/Default Data:

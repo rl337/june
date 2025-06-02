@@ -3,21 +3,19 @@ import threading
 import time
 from typing import List, Optional
 
-from june_agent.services.model_service_interface import IModelService
-from june_agent.task import Task as DomainTask # The pure domain object
+from june_agent.services.model_service_interface import ModelServiceAbc
+from june_agent.task import Task as DomainTask
+# Import TaskCreate for creating subtasks
+from june_agent.models_v2.pydantic_models import TaskCreate, TaskSchema
 
 logger = logging.getLogger(__name__)
 
-# Attempt to import agent_logs and MAX_LOG_ENTRIES from __main__
-# This creates a dependency that might need to be refactored later
-# if agent_logs are to be managed by the Agent instance itself.
 try:
     from june_agent.__main__ import agent_logs, MAX_LOG_ENTRIES
 except ImportError:
-    # Fallback if __main__ is not structured as expected or during tests
     logger.warning("Could not import agent_logs from __main__. Using local fallback for Agent logs.")
-    agent_logs: List[str] = [] # Fallback global list for agent activity logs.
-    MAX_LOG_ENTRIES = 100 # Fallback max log entries.
+    agent_logs: List[str] = []
+    MAX_LOG_ENTRIES = 100
 
 
 class Agent:
@@ -26,15 +24,16 @@ class Agent:
     It runs a background loop to fetch processable tasks from a model service,
     executes their current phase logic (using domain Task objects),
     and saves their updated state back through the model service.
+    It also handles creation of subtasks if suggested by task assessment.
     """
-    def __init__(self, model_service: IModelService, run_interval_seconds: int = 10):
+    def __init__(self, model_service: ModelServiceAbc, run_interval_seconds: int = 10):
         """
         Initializes the Agent.
         Args:
-            model_service: An instance of a class implementing IModelService, used for all data operations.
+            model_service: An instance of a class implementing ModelServiceAbc, used for all data operations.
             run_interval_seconds: The time interval (in seconds) between agent processing cycles.
         """
-        self.model_service: IModelService = model_service
+        self.model_service: ModelServiceAbc = model_service
         self.run_interval_seconds: int = run_interval_seconds
         self._running: bool = False  # Flag to control the agent's processing loop.
         self._thread: Optional[threading.Thread] = None # Holds the background processing thread.
@@ -49,7 +48,6 @@ class Agent:
         log_entry = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {message}"
 
         # Uses the agent_logs list imported from __main__ (or its fallback).
-        # This is a simple way to share logs; more robust IPC could be used in complex scenarios.
         agent_logs.append(log_entry)
         if len(agent_logs) > MAX_LOG_ENTRIES:
             agent_logs.pop(0)
@@ -61,13 +59,12 @@ class Agent:
         """
         Executes a single processing cycle of the agent.
         Fetches processable tasks, advances their phase using domain object logic,
+        handles subtask creation if indicated by assessment,
         and saves their updated state back via the model service.
-        This method is designed to be called repeatedly by the agent's main loop.
         """
         logger.debug("Agent: Starting single processing cycle.")
         try:
             # Fetch tasks that are ready for processing as domain objects.
-            # The service layer is responsible for determining which tasks are "processable".
             processable_tasks: List[DomainTask] = self.model_service.get_processable_tasks_domain_objects()
 
             if not processable_tasks:
@@ -81,26 +78,68 @@ class Agent:
                 original_status_for_log = task.status
                 original_phase_for_log = task.phase
 
-                self._log_activity(f"Considering task: {task_id_for_log} - '{task.description[:30]}' (Status: {original_status_for_log}, Phase: {original_phase_for_log})")
+                self._log_activity(
+                    f"Considering task: {task_id_for_log} - '{task.description[:30]}' "
+                    f"(Status: {original_status_for_log}, Phase: {original_phase_for_log})"
+                )
 
-                # Process the current phase (modifies task in-memory)
-                task.process_current_phase()
+                task.process_current_phase() # This modifies task in-memory
 
-                # Persist changes using the model service
+                # After processing, check if assessment resulted in subtask suggestions
+                if task.status == DomainTask.STATUS_PENDING_SUBTASKS and task.suggested_subtasks:
+                    self._log_activity(
+                        f"Task {task.id} requires subtask breakdown. "
+                        f"Suggested subtasks: {len(task.suggested_subtasks)}"
+                    )
+                    # created_subtask_ids = [] # Not strictly needed if not immediately re-populating parent's list
+                    for sub_desc in task.suggested_subtasks:
+                        if not task.initiative_id:
+                            logger.error(f"Parent task {task.id} is missing initiative_id. Cannot create subtask '{sub_desc}'.")
+                            # Fail the parent task if it's essential for subtasks to have an initiative ID
+                            # and the parent is supposed to provide it.
+                            task.status = DomainTask.STATUS_FAILED
+                            task.error_message = (task.error_message or "") + f"Missing initiative_id; cannot create subtask '{sub_desc}'. "
+                            break # Stop processing further subtasks for this parent
+
+                        subtask_create_dto = TaskCreate(
+                            description=sub_desc,
+                            initiative_id=task.initiative_id, # Subtask belongs to the same initiative
+                            parent_task_id=task.id,          # Link to this parent task
+                            # Default status/phase (e.g., pending/assessment) will be set by TaskCreate Pydantic model or ORM defaults.
+                        )
+                        try:
+                            # The IModelService create_task method takes initiative_id as a separate argument.
+                            created_sub_schema = self.model_service.create_task(
+                                subtask_create_dto,
+                                initiative_id=task.initiative_id # Pass initiative_id explicitly
+                            )
+                            self._log_activity(f"Created subtask {created_sub_schema.id} ('{sub_desc[:30]}...') for parent {task.id}.")
+                            # created_subtask_ids.append(created_sub_schema.id)
+                        except Exception as e_sub:
+                            logger.error(f"Failed to create subtask '{sub_desc}' for parent {task.id}: {e_sub}", exc_info=True)
+                            task.error_message = (task.error_message or "") + f"Failed to create subtask '{sub_desc}'. "
+                            # Optionally, parent task could be marked as FAILED here, or just log and continue.
+                            # Current behavior: Log error, parent task remains PENDING_SUBTASKS (or previous state if error occurred during subtask processing).
+                            # The parent will be saved with this error message.
+
+                    task.suggested_subtasks = None # Clear suggestions as they've been processed or attempted.
+
+                # Persist the (parent) task's state
+                # (e.g., status changed to PENDING_SUBTASKS, or COMPLETED by assessment, or FAILED, etc.)
                 try:
-                    # save_task_domain_object should handle both create and update based on existence
                     updated_task_schema = self.model_service.save_task_domain_object(task)
                     self._log_activity(
                         f"Task {updated_task_schema.id} processed and saved. "
                         f"New Status: {updated_task_schema.status}, New Phase: {updated_task_schema.phase}"
                     )
-                    if updated_task_schema.status == DomainTask.STATUS_FAILED: # Use DomainTask for constants
-                        self._log_activity(f"Task {updated_task_schema.id} failed. Error: {str(updated_task_schema.error_message)[:100]}...")
+                    if updated_task_schema.status == DomainTask.STATUS_FAILED:
+                        self._log_activity(
+                            f"Task {updated_task_schema.id} failed. Error: {str(updated_task_schema.error_message)[:100]}..."
+                        )
                 except Exception as e:
-                    logger.error(f"Agent: Failed to save task {task_id_for_log} after processing: {e}", exc_info=True)
+                    logger.error(f"Agent: Failed to save task {task_id_for_log} after processing/subtask creation: {e}", exc_info=True)
                     # If save failed, the task's state in the persistence layer is unchanged.
                     # It will likely be picked up again in the next cycle if still processable.
-                    # More sophisticated error handling could mark the task as error-prone temporarily.
                     pass
 
         except Exception as e:
@@ -131,11 +170,13 @@ class Agent:
             # Responsive sleep: check for stop signal periodically.
             if sleep_duration > 0:
                 for _ in range(int(sleep_duration / 0.1) +1): # Check roughly every 100ms
-                    if not self._running:
-                        break
-                    time.sleep(min(0.1, sleep_duration - (_ * 0.1) )) # Sleep remaining part of 100ms or less
-                    if (_ * 0.1) >= sleep_duration: # Ensure we don't oversleep
-                        break
+                    if not self._running: break
+                    # Calculate remaining sleep for this sub-interval to avoid oversleeping
+                    # if sleep_duration is not a multiple of 0.1
+                    current_loop_sleep = min(0.1, sleep_duration - (_ * 0.1))
+                    if current_loop_sleep <=0: break # Avoid negative sleep
+                    time.sleep(current_loop_sleep)
+                    if (_ * 0.1) >= sleep_duration: break
             elif sleep_duration < 0:
                 logger.warning(f"Agent: Processing cycle took longer than interval. Elapsed: {elapsed_time:.2f}s, Interval: {self.run_interval_seconds}s")
 
