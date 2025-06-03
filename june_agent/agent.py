@@ -7,6 +7,7 @@ from june_agent.services.model_service_interface import ModelServiceAbc
 from june_agent.task import Task as DomainTask
 # Import TaskCreate for creating subtasks
 from june_agent.models_v2.pydantic_models import TaskCreate, TaskSchema
+from june_agent.request_factory import RequestFactory # Import RequestFactory
 
 logger = logging.getLogger(__name__)
 
@@ -25,50 +26,71 @@ class Agent:
     executes their current phase logic (using domain Task objects),
     and saves their updated state back through the model service.
     It also handles creation of subtasks if suggested by task assessment.
+    A `RequestFactory` is used to create `APIRequest` instances for tasks.
     """
-    def __init__(self, model_service: ModelServiceAbc, run_interval_seconds: int = 10):
+    def __init__(self,
+                 model_service: ModelServiceAbc,
+                 request_factory: RequestFactory,
+                 run_interval_seconds: int = 10):
         """
         Initializes the Agent.
+
         Args:
-            model_service: An instance of a class implementing ModelServiceAbc, used for all data operations.
-            run_interval_seconds: The time interval (in seconds) between agent processing cycles.
+            model_service: An instance of a class implementing `ModelServiceAbc`,
+                           used for all data persistence and retrieval operations.
+            request_factory: An instance of `RequestFactory`, used by tasks to obtain
+                             `APIRequest` objects for external API calls (e.g., to AI models).
+            run_interval_seconds: The time interval (in seconds) between the start
+                                  of each agent processing cycle.
         """
         self.model_service: ModelServiceAbc = model_service
+        self.request_factory: RequestFactory = request_factory
         self.run_interval_seconds: int = run_interval_seconds
-        self._running: bool = False  # Flag to control the agent's processing loop.
-        self._thread: Optional[threading.Thread] = None # Holds the background processing thread.
-        logger.info("Agent initialized.")
+        self._running: bool = False  # Controls the execution of the agent's main loop.
+        self._thread: Optional[threading.Thread] = None # Stores the agent's background processing thread.
+        logger.info(f"Agent initialized with ModelService: {type(model_service).__name__} and RequestFactory: {type(request_factory).__name__}.")
 
-    def _log_activity(self, message: str):
+    def _log_activity(self, message: str) -> None:
         """
-        Logs a message to both the standard logger and a shared list for UI display.
+        Logs a message to the standard Python logger and appends it to a shared
+        `agent_logs` list (intended for UI display). Manages log list size.
+
         Args:
-            message: The message string to log.
+            message: The message to log.
         """
         log_entry = f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {message}"
 
-        # Uses the agent_logs list imported from __main__ (or its fallback).
+        # This relies on agent_logs being a globally accessible list (imported or fallback).
+        # Consider making agent_logs an instance variable or passed in if more encapsulation is desired.
         agent_logs.append(log_entry)
         if len(agent_logs) > MAX_LOG_ENTRIES:
-            agent_logs.pop(0)
+            agent_logs.pop(0) # Keep the list size bounded.
 
-        logger.info(message) # Also log to standard logger
+        logger.info(message)
 
 
     def run_single_cycle(self) -> None:
         """
-        Executes a single processing cycle of the agent.
-        Fetches processable tasks, advances their phase using domain object logic,
-        handles subtask creation if indicated by assessment,
-        and saves their updated state back via the model service.
+        Executes one full processing cycle of the agent. This involves:
+        1. Fetching all tasks deemed "processable" from the model service.
+        2. For each processable task (domain object):
+           a. Instructing the task to process its current phase (e.g., assess, execute, reconcile).
+              The `RequestFactory` is passed to the task for this purpose.
+           b. If the task's assessment results in suggested subtasks:
+              i. The agent creates these subtasks via the model service.
+              ii. The parent task's `suggested_subtasks` list is cleared.
+           c. Saving the updated state of the original task (and any newly created subtasks,
+              which are saved by the model service during their creation) back to persistence.
+        Includes error handling for each step to make the cycle resilient.
         """
         logger.debug("Agent: Starting single processing cycle.")
         try:
-            # Fetch tasks that are ready for processing as domain objects.
+            # 1. Fetch processable tasks as domain objects.
+            # The model service is responsible for the query logic to find these.
             processable_tasks: List[DomainTask] = self.model_service.get_processable_tasks_domain_objects()
 
             if not processable_tasks:
-                # logger.debug("Agent: No tasks requiring active processing in this cycle.")
+                # logger.debug("Agent: No tasks found requiring active processing in this cycle.") # Can be noisy
                 return
 
             self._log_activity(f"Agent: Found {len(processable_tasks)} tasks for processing.")
@@ -83,7 +105,8 @@ class Agent:
                     f"(Status: {original_status_for_log}, Phase: {original_phase_for_log})"
                 )
 
-                task.process_current_phase() # This modifies task in-memory
+                # Pass request_factory to process_current_phase, which will pass it to assess/execute
+                task.process_current_phase(self.request_factory)
 
                 # After processing, check if assessment resulted in subtask suggestions
                 if task.status == DomainTask.STATUS_PENDING_SUBTASKS and task.suggested_subtasks:
@@ -91,41 +114,71 @@ class Agent:
                         f"Task {task.id} requires subtask breakdown. "
                         f"Suggested subtasks: {len(task.suggested_subtasks)}"
                     )
-                    # created_subtask_ids = [] # Not strictly needed if not immediately re-populating parent's list
-                    for sub_desc in task.suggested_subtasks:
-                        if not task.initiative_id:
-                            logger.error(f"Parent task {task.id} is missing initiative_id. Cannot create subtask '{sub_desc}'.")
-                            # Fail the parent task if it's essential for subtasks to have an initiative ID
-                            # and the parent is supposed to provide it.
-                            task.status = DomainTask.STATUS_FAILED
-                            task.error_message = (task.error_message or "") + f"Missing initiative_id; cannot create subtask '{sub_desc}'. "
-                            break # Stop processing further subtasks for this parent
+                return
 
+            self._log_activity(f"Agent: Found {len(processable_tasks)} tasks for processing.")
+
+            for task in processable_tasks: # Iterate over DomainTask instances
+                task_id_for_log = task.id
+                original_status_for_log = task.status
+                original_phase_for_log = task.phase
+
+                self._log_activity(
+                    f"Considering task: {task_id_for_log} - '{task.description[:30]}' "
+                    f"(Status: {original_status_for_log}, Phase: {original_phase_for_log})"
+                )
+
+                # 2a. Instruct the task to process its current phase.
+                # This call modifies the task object in-memory.
+                # The RequestFactory is passed for the task to create APIRequest objects if needed (e.g., in assess or execute).
+                task.process_current_phase(self.request_factory)
+
+                # 2b. Handle subtask creation if assessment suggested it.
+                if task.status == DomainTask.STATUS_PENDING_SUBTASKS and task.suggested_subtasks:
+                    self._log_activity(
+                        f"Task {task.id} requires subtask breakdown by AI assessment. "
+                        f"Number of suggested subtasks: {len(task.suggested_subtasks)}"
+                    )
+
+                    for sub_desc in task.suggested_subtasks:
+                        if not task.initiative_id: # Should always have initiative_id if it's a persisted task.
+                            logger.error(
+                                f"Parent task {task.id} is missing initiative_id. "
+                                f"Cannot create subtask with description: '{sub_desc}'. "
+                                "Parent task will be marked as FAILED."
+                            )
+                            task.status = DomainTask.STATUS_FAILED
+                            task.error_message = (task.error_message or "") + \
+                                                 f"Missing initiative_id; cannot create subtask '{sub_desc}'. "
+                            break # Stop trying to create more subtasks for this failed parent.
+
+                        # Prepare data for the new subtask using Pydantic model for validation.
                         subtask_create_dto = TaskCreate(
                             description=sub_desc,
-                            initiative_id=task.initiative_id, # Subtask belongs to the same initiative
-                            parent_task_id=task.id,          # Link to this parent task
-                            # Default status/phase (e.g., pending/assessment) will be set by TaskCreate Pydantic model or ORM defaults.
+                            initiative_id=task.initiative_id, # Subtasks inherit initiative from parent.
+                            parent_task_id=task.id,          # Link to this parent task.
+                            # Default status/phase (e.g., pending/assessment) are set by TaskCreate
+                            # or later by the ORM if not specified in TaskCreate.
                         )
                         try:
-                            # The IModelService create_task method takes initiative_id as a separate argument.
+                            # Use the model service to create the subtask in persistence.
                             created_sub_schema = self.model_service.create_task(
                                 subtask_create_dto,
-                                initiative_id=task.initiative_id # Pass initiative_id explicitly
+                                initiative_id=task.initiative_id # Passed separately to service method.
                             )
-                            self._log_activity(f"Created subtask {created_sub_schema.id} ('{sub_desc[:30]}...') for parent {task.id}.")
-                            # created_subtask_ids.append(created_sub_schema.id)
+                            self._log_activity(f"Successfully created subtask {created_sub_schema.id} ('{sub_desc[:30]}...') for parent {task.id}.")
                         except Exception as e_sub:
-                            logger.error(f"Failed to create subtask '{sub_desc}' for parent {task.id}: {e_sub}", exc_info=True)
-                            task.error_message = (task.error_message or "") + f"Failed to create subtask '{sub_desc}'. "
-                            # Optionally, parent task could be marked as FAILED here, or just log and continue.
-                            # Current behavior: Log error, parent task remains PENDING_SUBTASKS (or previous state if error occurred during subtask processing).
-                            # The parent will be saved with this error message.
+                            logger.error(f"Failed to create subtask '{sub_desc}' for parent {task.id} via model service: {e_sub}", exc_info=True)
+                            # Append error to parent task's error message.
+                            task.error_message = (task.error_message or "") + \
+                                                 f"Failed to create subtask '{sub_desc}'. "
+                            # Depending on desired robustness, could mark parent as FAILED here,
+                            # or allow it to be saved as PENDING_SUBTASKS with an error message,
+                            # for potential retry or manual review. For now, just log and append error.
 
-                    task.suggested_subtasks = None # Clear suggestions as they've been processed or attempted.
+                    task.suggested_subtasks = None # Clear suggestions after processing.
 
-                # Persist the (parent) task's state
-                # (e.g., status changed to PENDING_SUBTASKS, or COMPLETED by assessment, or FAILED, etc.)
+                # 2c. Save the updated task (parent task) state.
                 try:
                     updated_task_schema = self.model_service.save_task_domain_object(task)
                     self._log_activity(
@@ -138,89 +191,89 @@ class Agent:
                         )
                 except Exception as e:
                     logger.error(f"Agent: Failed to save task {task_id_for_log} after processing/subtask creation: {e}", exc_info=True)
-                    # If save failed, the task's state in the persistence layer is unchanged.
-                    # It will likely be picked up again in the next cycle if still processable.
-                    pass
+                    # Task state in persistence might be stale if save fails.
+                    # It will likely be picked up again in the next cycle if its persisted state is still 'processable'.
+                    pass # Continue to the next task.
 
         except Exception as e:
-            # This catches errors in fetching tasks or other unexpected issues within the cycle.
-            logger.error(f"Agent: Critical error during processing cycle: {e}", exc_info=True)
+            logger.error(f"Agent: Critical error occurred in processing cycle: {e}", exc_info=True)
 
     def _loop(self) -> None:
         """
-        The main internal loop executed by the agent's background thread.
-        Continuously calls `run_single_cycle` at the defined `run_interval_seconds`.
-        The loop can be stopped by setting `self._running` to False.
+        The main internal loop that drives the agent's operations.
+        It periodically calls `run_single_cycle()` and includes logic for
+        responsive stopping and consistent cycle intervals.
         """
         logger.info("Agent: Background processing loop started.")
         while self._running:
-            start_time = time.monotonic()
+            start_time = time.monotonic() # For precise interval timing.
             try:
                 self.run_single_cycle()
             except Exception as e:
-                # This is a safeguard against the loop itself crashing due to an error
-                # not caught within run_single_cycle().
-                logger.error(f"Agent: Unhandled exception in _loop (run_single_cycle), loop continuing: {e}", exc_info=True)
+                # Safeguard: Catch any unexpected errors from run_single_cycle to prevent the loop itself from crashing.
+                logger.error(f"Agent: Unhandled critical exception in _loop (during run_single_cycle), loop will continue: {e}", exc_info=True)
 
-            # Calculate elapsed time and sleep for the remainder of the interval.
-            # This ensures cycles start at consistent intervals.
             elapsed_time = time.monotonic() - start_time
             sleep_duration = self.run_interval_seconds - elapsed_time
 
-            # Responsive sleep: check for stop signal periodically.
             if sleep_duration > 0:
+                # Sleep responsively: break sleep into smaller chunks to check `_running` flag.
+                # This allows the agent to stop more quickly if requested.
                 for _ in range(int(sleep_duration / 0.1) +1): # Check roughly every 100ms
-                    if not self._running: break
+                    if not self._running: break # Exit sleep early if stop signal received.
+
                     # Calculate remaining sleep for this sub-interval to avoid oversleeping
-                    # if sleep_duration is not a multiple of 0.1
-                    current_loop_sleep = min(0.1, sleep_duration - (_ * 0.1))
-                    if current_loop_sleep <=0: break # Avoid negative sleep
+                    # if sleep_duration is not a perfect multiple of 0.1.
+                    time_slept_this_cycle = _ * 0.1
+                    remaining_sub_sleep = min(0.1, sleep_duration - time_slept_this_cycle)
+
+                    if remaining_sub_sleep <=0: break # Avoid negative or zero sleep.
                     time.sleep(current_loop_sleep)
-                    if (_ * 0.1) >= sleep_duration: break
+                    if time_slept_this_cycle + current_loop_sleep >= sleep_duration: break
             elif sleep_duration < 0:
-                logger.warning(f"Agent: Processing cycle took longer than interval. Elapsed: {elapsed_time:.2f}s, Interval: {self.run_interval_seconds}s")
-
-
+                # Log if a cycle takes longer than the configured interval.
+                logger.warning(f"Agent: Processing cycle duration ({elapsed_time:.2f}s) exceeded run interval ({self.run_interval_seconds}s).")
         logger.info("Agent: Background processing loop stopped.")
 
     def start(self) -> None:
         """
         Starts the agent's background processing loop in a new daemon thread.
-        If the agent is already running, this method does nothing.
+        If the agent is already running, this method logs a warning and returns.
         """
         if self._running:
-            logger.warning("Agent: Start called but agent is already running.")
+            logger.warning("Agent: Start called, but agent is already running.")
             return
 
         logger.info("Agent: Starting background processing...")
         self._running = True
 
-        # Create and start a new daemon thread for the processing loop.
-        # Daemon threads automatically exit when the main program exits.
+        # Daemon threads automatically exit when the main program (e.g., Flask server) exits.
         self._thread = threading.Thread(target=self._loop, daemon=True, name="AgentProcessingLoop")
         self._thread.start()
         logger.info("Agent: Background processing started successfully.")
 
     def stop(self, wait_for_thread: bool = True) -> None:
         """
-        Stops the agent's background processing loop.
+        Signals the agent's background processing loop to stop and optionally waits
+        for the thread to complete its current cycle and exit.
+
         Args:
-            wait_for_thread: If True, waits for the processing thread to finish
-                             its current cycle and exit.
+            wait_for_thread: If True (default), this method will block until the
+                             agent's processing thread has joined, or a timeout occurs.
         """
         if not self._running:
-            logger.warning("Agent: Stop called but agent is not running.")
+            logger.warning("Agent: Stop called, but agent is not currently running.")
             return
 
         logger.info("Agent: Stopping background processing...")
-        self._running = False # Signal the loop to stop.
+        self._running = False # Set flag to signal the _loop to terminate.
 
         if self._thread and self._thread.is_alive() and wait_for_thread:
             logger.info("Agent: Waiting for processing thread to complete current cycle...")
-            # Wait slightly longer than the run interval to allow a cycle to finish.
+            # Wait for the thread to finish, with a timeout slightly longer than the run interval.
             self._thread.join(timeout=self.run_interval_seconds + 2)
             if self._thread.is_alive():
-                logger.warning("Agent: Processing thread did not finish in the expected time.")
+                logger.warning("Agent: Processing thread did not finish in the expected time after stop signal.")
 
-        self._thread = None # Clear the thread reference.
+        self._thread = None # Clear the thread reference once stopped or if join timed out.
         logger.info("Agent: Background processing stopped successfully.")
