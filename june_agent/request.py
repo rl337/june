@@ -2,6 +2,7 @@ import abc
 import os
 import together
 import logging
+from .message import Message
 
 # Configure logging for this module if not configured globally elsewhere in a way that applies
 # For simplicity, using basicConfig here. If a more complex logging setup is in __main__.py,
@@ -16,12 +17,12 @@ class APIRequest(abc.ABC):
     Defines a common interface for different API request types.
     """
     @abc.abstractmethod
-    def execute(self, messages: list[dict[str, str]]) -> str:
+    def execute(self, messages: list[Message]) -> str:
         """
         Executes the API request with the given messages.
 
         Args:
-            messages (list[dict[str, str]]): A list of messages, where each message is a dictionary with "role" and "content" keys.
+            messages (list[Message]): A list of Message objects.
 
         Returns:
             str: The response text from the API or an error message string.
@@ -45,12 +46,12 @@ class TogetherAIRequest(APIRequest):
         # The API key is typically handled by the `together` library via the TOGETHER_API_KEY env var.
         # No explicit API key handling needed here unless overriding default behavior.
 
-    def execute(self, messages: list[dict[str, str]]) -> str:
+    def execute(self, messages: list[Message]) -> str:
         """
         Executes a request to the Together AI API using the configured model and messages.
 
         Args:
-            messages (list[dict[str, str]]): A list of messages, where each message is a dictionary with "role" and "content" keys.
+            messages (list[Message]): A list of Message objects.
 
         Returns:
             str: The AI's response text, or an error message if the request failed.
@@ -64,7 +65,7 @@ class TogetherAIRequest(APIRequest):
             # Make the API call
             response = client.chat.completions.create(
                 model=self.model,
-                messages=messages,
+                messages=[message.as_dict() for message in messages],
                 max_tokens=self.max_tokens,
             )
 

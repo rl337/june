@@ -1,5 +1,6 @@
 import pytest
 from june_agent.request import TogetherAIRequest
+from june_agent.message import Message
 import together # For together.APIError
 
 def test_together_request_successful(mocker):
@@ -26,7 +27,7 @@ def test_together_request_successful(mocker):
 
     # Instantiate the request handler
     request_handler = TogetherAIRequest(model="test-model", max_tokens=10)
-    messages = [{"role": "user", "content": "What is the capital of France?"}]
+    messages = [Message(role="user", content="What is the capital of France?")]
 
     # Execute the request
     response = request_handler.execute(messages)
@@ -37,7 +38,7 @@ def test_together_request_successful(mocker):
     # Check that client.chat.completions.create was called once with the correct arguments
     mock_create_method.assert_called_once_with(
         model="test-model",
-        messages=messages,
+        messages=[message.as_dict() for message in messages],
         max_tokens=10
     )
 
@@ -56,7 +57,7 @@ def test_together_request_generic_exception(mocker):
     mocker.patch('june_agent.request.together.Together', return_value=mock_together_client_instance)
 
     request_handler = TogetherAIRequest(model="test-model-generic-exc", max_tokens=15)
-    messages = [{"role": "user", "content": "This prompt will cause a generic exception"}]
+    messages = [Message(role="user", content="This prompt will cause a generic exception")]
 
     response = request_handler.execute(messages)
 
@@ -65,7 +66,7 @@ def test_together_request_generic_exception(mocker):
     assert "Error: Could not connect to or process response from Together AI. Details: Generic Test Error" in response
     mock_create_method.assert_called_once_with(
         model="test-model-generic-exc",
-        messages=messages,
+        messages=[message.as_dict() for message in messages],
         max_tokens=15
     )
 
@@ -85,7 +86,7 @@ def test_together_request_no_choices_in_response(mocker):
     mocker.patch('june_agent.request.together.Together', return_value=mock_together_client_instance)
 
     request_handler = TogetherAIRequest()
-    messages = [{"role": "user", "content": "A prompt that leads to an empty response"}]
+    messages = [Message(role="user", content="A prompt that leads to an empty response")]
     response = request_handler.execute(messages)
 
     assert "Error: No response or choices found from API." in response

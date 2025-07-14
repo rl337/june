@@ -1,6 +1,7 @@
 import uuid
 import logging
 from .request import APIRequest # Relative import for APIRequest from request.py within the same package
+from .message import Message
 
 # Configure logging for this module (similar note as in request.py regarding configuration)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(module)s - %(message)s')
@@ -66,7 +67,7 @@ class Task:
         try:
             logging.info(f"Executing request for task {self.id} with description: '{self.description[:50]}...'")
             # The description of the task is used as the prompt for the request.
-            messages = [{"role": "user", "content": self.description}]
+            messages = [Message(role="user", content=self.description)]
             api_result = current_request.execute(messages)
             self.result = api_result
 
