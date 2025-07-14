@@ -66,7 +66,8 @@ class Task:
         try:
             logging.info(f"Executing request for task {self.id} with description: '{self.description[:50]}...'")
             # The description of the task is used as the prompt for the request.
-            api_result = current_request.execute(self.description)
+            messages = [{"role": "user", "content": self.description}]
+            api_result = current_request.execute(messages)
             self.result = api_result
 
             # Check if the result string indicates an error (convention: starts with "Error:")
