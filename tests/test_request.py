@@ -45,33 +45,6 @@ def test_together_request_successful(mocker):
         max_tokens=10
     )
 
-def test_together_request_api_error(mocker):
-    """
-    Tests that an APIError raised by the `together` client is caught and
-    handled, returning an appropriate error message string.
-    """
-    # Mock `client.completions.create` to raise an APIError
-    mock_completions_create_method = mocker.Mock(side_effect=together.APIError("Test API Error"))
-
-    mock_together_client_instance = mocker.Mock()
-    mock_together_client_instance.completions = mocker.Mock()
-    mock_together_client_instance.completions.create = mock_completions_create_method
-
-    mocker.patch('june_agent.request.together.Together', return_value=mock_together_client_instance)
-
-    request_handler = TogetherAIRequest(model="test-model-error", max_tokens=5)
-    prompt = "This prompt will cause an API error"
-
-    response = request_handler.execute(prompt)
-
-    # Assert that the response string contains the error message
-    # The exact formatting comes from request.py's exception handling
-    assert "Error: Together AI API error. Details: Test API Error" in response
-    mock_completions_create_method.assert_called_once_with(
-        model="test-model-error",
-        prompt=prompt,
-        max_tokens=5
-    )
 
 def test_together_request_generic_exception(mocker):
     """

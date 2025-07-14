@@ -75,9 +75,6 @@ class TogetherAIRequest(APIRequest):
             else:
                 logging.error(f"No valid response or choices found in Together AI output for prompt: '{prompt[:50]}...'. Response: {response}")
                 return "Error: No response or choices found from API."
-        except together.APIError as e: # More specific exception for Together AI client errors
-            logging.error(f"Together AI API error for prompt '{prompt[:50]}...': {e}", exc_info=True)
-            return f"Error: Together AI API error. Details: {e}"
         except Exception as e:
             logging.error(f"An unexpected error occurred while calling Together AI for prompt '{prompt[:50]}...': {e}", exc_info=True)
             return f"Error: Could not connect to or process response from Together AI. Details: {e}"

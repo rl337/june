@@ -38,13 +38,13 @@ def create_app(tasks_list_ref: list, task_class_ref: type[Task], agent_logs_ref:
         # effectively pointing to 'june_agent/static/'.
         return app.send_static_file('index.html')
 
-@app.route('/logs')
-def get_agent_logs():
-    """API endpoint to get the agent's activity logs."""
-    logs = app.config.get('agent_logs_ref', [])
-    # Return logs, perhaps newest first if that's desired for display
-    # For now, returning in collected order (oldest first, newest last)
-    return jsonify(list(logs))
+    @app.route('/logs')
+    def get_agent_logs():
+        """API endpoint to get the agent's activity logs."""
+        logs = app.config.get('agent_logs_ref', [])
+        # Return logs, perhaps newest first if that's desired for display
+        # For now, returning in collected order (oldest first, newest last)
+        return jsonify(list(logs))
 
     @app.route('/status', methods=['GET'])
     def get_status():
