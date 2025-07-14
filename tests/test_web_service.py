@@ -8,8 +8,9 @@ from june_agent.task import Task # Using the actual Task class
 def app_instance(mocker):
     """Creates a Flask app instance for testing."""
     tasks_list = []  # Fresh list for each test run
+    agent_logs = []  # Fresh list for each test run
     # Pass the actual Task class to the factory
-    flask_app = create_app(tasks_list_ref=tasks_list, task_class_ref=Task)
+    flask_app = create_app(tasks_list_ref=tasks_list, task_class_ref=Task, agent_logs_ref=agent_logs)
     flask_app.config.update({"TESTING": True})
     # The tasks_list is now stored in app.config by the modified create_app
     return flask_app

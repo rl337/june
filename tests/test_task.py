@@ -111,7 +111,7 @@ def test_task_process_execute_method_raises_exception(mocker):
     assert exception_message in task.error_message # The exception message should be in error_message
     mock_api_request.execute.assert_called_once_with(task_description)
 
-def test_task_process_no_requests():
+def test_task_process_no_requests(mocker):
     """Tests processing a task that has no APIRequest objects added."""
     task = Task("Test no requests")
 
