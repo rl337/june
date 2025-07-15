@@ -33,16 +33,18 @@ class TogetherAIRequest(APIRequest):
     """
     Concrete implementation of APIRequest for interacting with the Together AI API.
     """
-    def __init__(self, model: str = 'togethercomputer/RedPajama-INCITE-7B-Instruct', max_tokens: int = 256):
+    def __init__(self, model: str = 'togethercomputer/RedPajama-INCITE-7B-Instruct', max_tokens: int = 256, tools: list = []):
         """
         Initializes the TogetherAIRequest.
 
         Args:
             model (str): The model to use for the API call.
             max_tokens (int): The maximum number of tokens for the response.
+            tools (list): A list of tools to make available to the model.
         """
         self.model = model
         self.max_tokens = max_tokens
+        self.tools = tools
         # The API key is typically handled by the `together` library via the TOGETHER_API_KEY env var.
         # No explicit API key handling needed here unless overriding default behavior.
 
@@ -66,13 +68,16 @@ class TogetherAIRequest(APIRequest):
             response = client.chat.completions.create(
                 model=self.model,
                 messages=[message.as_dict() for message in messages],
-                max_tokens=self.max_tokens,
+                tools=self.tools,
+                tool_choice="auto",
             )
 
             if response and response.choices:
-                text_response = response.choices[0].message.content.strip()
-                logging.info(f"Successfully received response from Together AI for messages: '{messages}'")
-                return text_response
+                choice = response.choices[0]
+                if choice.message.tool_calls:
+                    return choice.message.tool_calls
+                else:
+                    return choice.message.content.strip()
             else:
                 logging.error(f"No valid response or choices found in Together AI output for messages: '{messages}'. Response: {response}")
                 return "Error: No response or choices found from API."

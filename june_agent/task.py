@@ -2,8 +2,8 @@ import uuid
 import logging
 from .request import APIRequest # Relative import for APIRequest from request.py within the same package
 from .message import Message
-import subprocess
-import re
+from . import tools
+import json
 
 # Configure logging for this module (similar note as in request.py regarding configuration)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(module)s - %(message)s')
@@ -73,30 +73,40 @@ class Task:
             api_result = current_request.execute(messages)
             self.result = api_result
 
-            # Check if the result string indicates an error (convention: starts with "Error:")
-            if api_result and api_result.lower().startswith("error:"):
-                self.status = "failed"
-                self.error_message = api_result
-                logging.error(f"Task {self.id} failed. Error from API request: {self.error_message}")
-            else:
-                # Extract the code from the response
-                code_match = re.search(r"```python\n(.*)\n```", api_result, re.DOTALL)
-                if code_match:
-                    code = code_match.group(1)
+            # Check if the result is a tool call
+            if isinstance(api_result, list) and len(api_result) > 0 and api_result[0].type == "function":
+                tool_call = api_result[0]
+                function_name = tool_call.function.name
+                function_args = json.loads(tool_call.function.arguments)
+
+                if hasattr(tools, function_name):
+                    function_to_call = getattr(tools, function_name)
                     try:
-                        # Execute the code and capture the output
-                        process_result = subprocess.run(['python', '-c', code], capture_output=True, text=True)
-                        self.result = process_result.stdout
+                        result = function_to_call(**function_args)
+                        self.result = result
                         self.status = "completed"
                         logging.info(f"Task {self.id} completed successfully. Result: '{str(self.result)[:100]}...'")
                     except Exception as e:
                         self.status = "failed"
-                        self.error_message = f"Error executing code: {e}"
-                        logging.error(f"Task {self.id} failed. Error executing code: {self.error_message}")
+                        self.error_message = f"Error executing tool {function_name}: {e}"
+                        logging.error(f"Task {self.id} failed. Error executing tool: {self.error_message}")
                 else:
                     self.status = "failed"
-                    self.error_message = "No code found in the response."
-                    logging.error(f"Task {self.id} failed. No code found in the response.")
+                    self.error_message = f"Tool {function_name} not found."
+                    logging.error(f"Task {self.id} failed. Tool not found: {function_name}")
+            elif isinstance(api_result, str):
+                if api_result.lower().startswith("error:"):
+                    self.status = "failed"
+                    self.error_message = api_result
+                    logging.error(f"Task {self.id} failed. Error from API request: {self.error_message}")
+                else:
+                    self.result = api_result
+                    self.status = "completed"
+                    logging.info(f"Task {self.id} completed successfully. Result: '{str(self.result)[:100]}...'")
+            else:
+                self.status = "failed"
+                self.error_message = "Invalid response from API."
+                logging.error(f"Task {self.id} failed. Invalid response from API.")
 
         except Exception as e:
             logging.error(f"An unexpected error occurred while processing request for task {self.id}: {e}", exc_info=True)

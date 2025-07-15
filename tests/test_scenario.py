@@ -13,12 +13,34 @@ def test_hello_world_scenario(mocker):
     mock_subprocess_run.return_value.stdout = "hello world\n"
 
     # Mock the TogetherAIRequest.execute method
+    mock_tool_call = mocker.Mock()
+    mock_tool_call.type = "function"
+    mock_tool_call.function.name = "run_python"
+    mock_tool_call.function.arguments = '{"code": "print(\\"hello world\\")"}'
     mock_execute = mocker.patch('june_agent.request.TogetherAIRequest.execute')
-    mock_execute.return_value = '```python\nprint("hello world")\n```'
+    mock_execute.return_value = [mock_tool_call]
 
     # Create a task
     task = Task("create and run a program that prints “hello world”")
-    request = TogetherAIRequest()
+    request = TogetherAIRequest(tools=[
+        {
+            "type": "function",
+            "function": {
+                "name": "run_python",
+                "description": "Runs a Python script and returns the output.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "code": {
+                            "type": "string",
+                            "description": "The Python code to run."
+                        }
+                    },
+                    "required": ["code"]
+                }
+            }
+        }
+    ])
     task.add_request(request)
 
     # Process the task

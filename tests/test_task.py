@@ -65,13 +65,13 @@ def test_task_process_success(mocker):
 
     mock_api_request = mocker.Mock(spec=APIRequest)
     # Configure the mock's execute method to return a successful result
-    mock_api_request.execute.return_value = "```python\nprint('Successful API result')\n```"
+    mock_api_request.execute.return_value = "Successful API result"
 
     task.add_request(mock_api_request)
     task.process()
 
     assert task.status == "completed"
-    assert task.result == "Successful API result\n"
+    assert task.result == "Successful API result"
     assert task.error_message is None
     # Verify that the APIRequest's execute method was called with the task's description
     messages = [Message(role="user", content=task_description)]
