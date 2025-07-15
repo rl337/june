@@ -1,6 +1,7 @@
 import pytest
 from june_agent.task import Task
 from june_agent.request import APIRequest # For spec in mocker and isinstance checks
+from june_agent.message import Message
 
 def test_task_initialization():
     """Tests the initialization of a Task object."""
@@ -73,7 +74,8 @@ def test_task_process_success(mocker):
     assert task.result == "Successful API result"
     assert task.error_message is None
     # Verify that the APIRequest's execute method was called with the task's description
-    mock_api_request.execute.assert_called_once_with(task_description)
+    messages = [Message(role="user", content=task_description)]
+    mock_api_request.execute.assert_called_once_with(messages)
 
 def test_task_process_api_error_string_returned(mocker):
     """Tests task processing when the APIRequest's execute method returns an error string."""
@@ -91,7 +93,8 @@ def test_task_process_api_error_string_returned(mocker):
     assert task.status == "failed"
     assert task.result == error_string_from_api # Result should store the error string from APIRequest
     assert task.error_message == error_string_from_api # error_message should also store it
-    mock_api_request.execute.assert_called_once_with(task_description)
+    messages = [Message(role="user", content=task_description)]
+    mock_api_request.execute.assert_called_once_with(messages)
 
 def test_task_process_execute_method_raises_exception(mocker):
     """Tests task processing when the APIRequest's execute method itself raises an exception."""
@@ -109,7 +112,8 @@ def test_task_process_execute_method_raises_exception(mocker):
     assert task.status == "failed"
     assert task.result is None # Result should be None if process itself fails internally
     assert exception_message in task.error_message # The exception message should be in error_message
-    mock_api_request.execute.assert_called_once_with(task_description)
+    messages = [Message(role="user", content=task_description)]
+    mock_api_request.execute.assert_called_once_with(messages)
 
 def test_task_process_no_requests(mocker):
     """Tests processing a task that has no APIRequest objects added."""

@@ -2,6 +2,7 @@ import abc
 import os
 import together
 import logging
+from .message import Message
 
 # Configure logging for this module if not configured globally elsewhere in a way that applies
 # For simplicity, using basicConfig here. If a more complex logging setup is in __main__.py,
@@ -16,12 +17,12 @@ class APIRequest(abc.ABC):
     Defines a common interface for different API request types.
     """
     @abc.abstractmethod
-    def execute(self, prompt: str) -> str:
+    def execute(self, messages: list[Message]) -> str:
         """
-        Executes the API request with the given prompt.
+        Executes the API request with the given messages.
 
         Args:
-            prompt (str): The prompt or input for the API request.
+            messages (list[Message]): A list of Message objects.
 
         Returns:
             str: The response text from the API or an error message string.
@@ -45,36 +46,36 @@ class TogetherAIRequest(APIRequest):
         # The API key is typically handled by the `together` library via the TOGETHER_API_KEY env var.
         # No explicit API key handling needed here unless overriding default behavior.
 
-    def execute(self, prompt: str) -> str:
+    def execute(self, messages: list[Message]) -> str:
         """
-        Executes a request to the Together AI API using the configured model and prompt.
+        Executes a request to the Together AI API using the configured model and messages.
 
         Args:
-            prompt (str): The prompt to send to the AI.
+            messages (list[Message]): A list of Message objects.
 
         Returns:
             str: The AI's response text, or an error message if the request failed.
         """
-        logging.info(f"Executing Together AI request with model {self.model} for prompt: '{prompt[:50]}...'")
+        logging.info(f"Executing Together AI request with model {self.model} for messages: '{messages}'")
         try:
             # Initialize the Together client.
             # This will use the TOGETHER_API_KEY environment variable.
             client = together.Together()
 
             # Make the API call
-            response = client.completions.create(
+            response = client.chat.completions.create(
                 model=self.model,
-                prompt=prompt,
+                messages=[message.as_dict() for message in messages],
                 max_tokens=self.max_tokens,
             )
 
             if response and response.choices:
-                text_response = response.choices[0].text.strip()
-                logging.info(f"Successfully received response from Together AI for prompt: '{prompt[:50]}...'")
+                text_response = response.choices[0].message.content.strip()
+                logging.info(f"Successfully received response from Together AI for messages: '{messages}'")
                 return text_response
             else:
-                logging.error(f"No valid response or choices found in Together AI output for prompt: '{prompt[:50]}...'. Response: {response}")
+                logging.error(f"No valid response or choices found in Together AI output for messages: '{messages}'. Response: {response}")
                 return "Error: No response or choices found from API."
         except Exception as e:
-            logging.error(f"An unexpected error occurred while calling Together AI for prompt '{prompt[:50]}...': {e}", exc_info=True)
+            logging.error(f"An unexpected error occurred while calling Together AI for messages: '{messages}': {e}", exc_info=True)
             return f"Error: Could not connect to or process response from Together AI. Details: {e}"
