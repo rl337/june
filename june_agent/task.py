@@ -2,6 +2,8 @@ import uuid
 import logging
 from .request import APIRequest # Relative import for APIRequest from request.py within the same package
 from .message import Message
+import subprocess
+import re
 
 # Configure logging for this module (similar note as in request.py regarding configuration)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(module)s - %(message)s')
@@ -77,8 +79,24 @@ class Task:
                 self.error_message = api_result
                 logging.error(f"Task {self.id} failed. Error from API request: {self.error_message}")
             else:
-                self.status = "completed"
-                logging.info(f"Task {self.id} completed successfully. Result: '{str(self.result)[:100]}...'")
+                # Extract the code from the response
+                code_match = re.search(r"```python\n(.*)\n```", api_result, re.DOTALL)
+                if code_match:
+                    code = code_match.group(1)
+                    try:
+                        # Execute the code and capture the output
+                        process_result = subprocess.run(['python', '-c', code], capture_output=True, text=True)
+                        self.result = process_result.stdout
+                        self.status = "completed"
+                        logging.info(f"Task {self.id} completed successfully. Result: '{str(self.result)[:100]}...'")
+                    except Exception as e:
+                        self.status = "failed"
+                        self.error_message = f"Error executing code: {e}"
+                        logging.error(f"Task {self.id} failed. Error executing code: {self.error_message}")
+                else:
+                    self.status = "failed"
+                    self.error_message = "No code found in the response."
+                    logging.error(f"Task {self.id} failed. No code found in the response.")
 
         except Exception as e:
             logging.error(f"An unexpected error occurred while processing request for task {self.id}: {e}", exc_info=True)
