@@ -11,6 +11,7 @@ def test_together_request_successful(mocker):
     # Mock the response from client.chat.completions.create
     mock_choice = mocker.Mock()
     mock_choice.message.content = "Paris"
+    mock_choice.message.tool_calls = None
 
     mock_response = mocker.Mock()
     mock_response.choices = [mock_choice]
@@ -39,7 +40,8 @@ def test_together_request_successful(mocker):
     mock_create_method.assert_called_once_with(
         model="test-model",
         messages=[message.as_dict() for message in messages],
-        max_tokens=10
+        tools=[],
+        tool_choice="auto"
     )
 
 
@@ -67,7 +69,8 @@ def test_together_request_generic_exception(mocker):
     mock_create_method.assert_called_once_with(
         model="test-model-generic-exc",
         messages=[message.as_dict() for message in messages],
-        max_tokens=15
+        tools=[],
+        tool_choice="auto"
     )
 
 def test_together_request_no_choices_in_response(mocker):
