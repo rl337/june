@@ -62,61 +62,56 @@ class Task:
         self.status = "processing"
         logging.info(f"Task {self.id} status changed to 'processing'. Starting to process requests.")
 
-        # For now, we assume one primary request per task for simplicity.
-        # Future enhancements could involve handling multiple requests, sequences, or DAGs.
-        current_request = self.requests[0]
+        messages = [Message(role="user", content=self.description)]
 
-        try:
-            logging.info(f"Executing request for task {self.id} with description: '{self.description[:50]}...'")
-            # The description of the task is used as the prompt for the request.
-            messages = [Message(role="user", content=self.description)]
-            api_result = current_request.execute(messages)
-            self.result = api_result
+        while self.status == "processing":
+            current_request = self.requests[0]
 
-            # Check if the result is a tool call
-            if isinstance(api_result, list) and len(api_result) > 0 and api_result[0].type == "function":
-                tool_call = api_result[0]
-                function_name = tool_call.function.name
-                function_args = json.loads(tool_call.function.arguments)
+            try:
+                logging.info(f"Executing request for task {self.id} with messages: '{messages}'")
+                api_result = current_request.execute(messages)
 
-                if hasattr(tools, function_name):
-                    function_to_call = getattr(tools, function_name)
-                    try:
-                        result = function_to_call(**function_args)
-                        self.result = result
+                if isinstance(api_result, list) and len(api_result) > 0 and api_result[0].type == "function":
+                    tool_call = api_result[0]
+                    function_name = tool_call.function.name
+                    function_args = json.loads(tool_call.function.arguments)
+
+                    if hasattr(tools, function_name):
+                        function_to_call = getattr(tools, function_name)
+                        try:
+                            result = function_to_call(**function_args)
+                            messages.append(Message(role="tool", content=result, tool_call_id=tool_call.id))
+                        except Exception as e:
+                            self.status = "failed"
+                            self.error_message = f"Error executing tool {function_name}: {e}"
+                            logging.error(f"Task {self.id} failed. Error executing tool: {self.error_message}")
+                    else:
+                        self.status = "failed"
+                        self.error_message = f"Tool {function_name} not found."
+                        logging.error(f"Task {self.id} failed. Tool not found: {function_name}")
+                elif isinstance(api_result, str):
+                    if api_result.lower().startswith("error:"):
+                        self.status = "failed"
+                        self.error_message = api_result
+                        self.result = api_result
+                        logging.error(f"Task {self.id} failed. Error from API request: {self.error_message}")
+                    else:
+                        self.result = api_result
                         self.status = "completed"
                         logging.info(f"Task {self.id} completed successfully. Result: '{str(self.result)[:100]}...'")
-                    except Exception as e:
-                        self.status = "failed"
-                        self.error_message = f"Error executing tool {function_name}: {e}"
-                        logging.error(f"Task {self.id} failed. Error executing tool: {self.error_message}")
-                else:
-                    self.status = "failed"
-                    self.error_message = f"Tool {function_name} not found."
-                    logging.error(f"Task {self.id} failed. Tool not found: {function_name}")
-            elif isinstance(api_result, str):
-                if api_result.lower().startswith("error:"):
-                    self.status = "failed"
-                    self.error_message = api_result
-                    logging.error(f"Task {self.id} failed. Error from API request: {self.error_message}")
-                else:
-                    self.result = api_result
+                elif api_result is None:
                     self.status = "completed"
-                    logging.info(f"Task {self.id} completed successfully. Result: '{str(self.result)[:100]}...'")
-            else:
+                    logging.info(f"Task {self.id} completed successfully.")
+                else:
+                    self.status = "failed"
+                    self.error_message = "Invalid response from API."
+                    logging.error(f"Task {self.id} failed. Invalid response from API.")
+
+            except Exception as e:
+                logging.error(f"An unexpected error occurred while processing request for task {self.id}: {e}", exc_info=True)
                 self.status = "failed"
-                self.error_message = "Invalid response from API."
-                logging.error(f"Task {self.id} failed. Invalid response from API.")
-
-        except Exception as e:
-            logging.error(f"An unexpected error occurred while processing request for task {self.id}: {e}", exc_info=True)
-            self.status = "failed"
-            self.error_message = f"Unexpected error during task processing: {e}"
-            self.result = None # Ensure result is cleared if an unexpected processing error occurs
-
-        # Note: If multiple requests were to be processed, the logic for setting overall task status
-        # based on individual request outcomes would need to be more sophisticated.
-        # For now, we break after the first request (implicitly, as we only process self.requests[0]).
+                self.error_message = f"Unexpected error during task processing: {e}"
+                self.result = None # Ensure result is cleared if an unexpected processing error occurs
 
     def to_dict(self) -> dict:
         """
