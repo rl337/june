@@ -1,4 +1,5 @@
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
+from typing import Optional
 
 @dataclass
 class Message:
@@ -7,9 +8,10 @@ class Message:
     """
     role: str
     content: str
+    tool_call_id: Optional[str] = field(default=None, kw_only=True)
 
     def as_dict(self):
         """
         Returns a dictionary representation of the message.
         """
-        return asdict(self)
+        return {k: v for k, v in asdict(self).items() if v is not None}
