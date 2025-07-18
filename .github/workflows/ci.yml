@@ -21,8 +21,7 @@ jobs:
         poetry install
     - name: Install Playwright browsers
       run: |
-        PLAYWRIGHT_CMD=$(poetry env info --path)/bin/playwright
-        $PLAYWRIGHT_CMD install --with-deps
+        poetry run playwright install --with-deps
     - name: Run tests
       run: |
         poetry run pytest
