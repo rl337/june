@@ -139,5 +139,5 @@ def test_scenario(mocker, scenario):
     task.process()
 
     # Assert that the task is completed and the result is as expected
-    assert task.status == scenario["expected_status"]
-    assert task.result == scenario["expected_result"]
+    assert task.status == scenario["expected_status"], f"Scenario '{scenario['name']}' failed: status was '{task.status}' but expected '{scenario['expected_status']}'"
+    assert task.result == scenario["expected_result"], f"Scenario '{scenario['name']}' failed: result was '{task.result}' but expected '{scenario['expected_result']}'"
