@@ -1,4 +1,5 @@
 import subprocess
+import os
 
 def save_file(filename: str, content: str):
     """
@@ -21,3 +22,19 @@ def run_python(code: str):
     """
     result = subprocess.run(['python', '-c', code], capture_output=True, text=True)
     return result.stdout
+
+def list_files():
+    """
+    Lists the files in the current directory.
+    """
+    return "\n".join(os.listdir())
+
+def read_file(filename: str):
+    """
+    Reads the contents of a file.
+
+    Args:
+        filename (str): The name of the file to read.
+    """
+    with open(filename, 'r') as f:
+        return f.read()
