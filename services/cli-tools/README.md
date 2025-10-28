@@ -19,6 +19,23 @@ docker exec -it june-cli-tools bash
 - **Model validation** - Check model cache status
 - **Cache management** - Organize models by category
 
+### Audio Testing
+- **audio_test_suite.py** - Comprehensive audio testing with real datasets
+- **simple_audio_test.py** - Simple audio service testing
+- **Test data management** - LibriSpeech, LJSpeech, synthetic datasets
+- **Performance metrics** - WER, CER, MCD, MSE calculations
+
+```bash
+# Comprehensive audio testing suite
+python scripts/audio_test_suite.py --test-all
+
+# Simple audio service testing
+python scripts/simple_audio_test.py --test-all
+
+# Download test datasets
+python scripts/audio_test_suite.py --download
+```
+
 ### Development Tools
 - **Code formatting** - black, isort
 - **Linting** - flake8, mypy

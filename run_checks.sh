@@ -252,6 +252,94 @@ check_data_directory() {
     fi
 }
 
+# Check audio services (STT/TTS)
+check_audio_services() {
+    print_header "Checking Audio Services"
+    
+    local stt_url="localhost:50052"
+    local tts_url="localhost:50053"
+    local test_data_dir="${JUNE_DATA_DIR:-/home/rlee/june_data}/audio_tests"
+    
+    # Create test data directory
+    mkdir -p "$test_data_dir"
+    
+    # Test STT service
+    print_info "Testing STT service..."
+    if timeout 30 grpcurl -plaintext "$stt_url" grpc.health.v1.Health/Check > /dev/null 2>&1; then
+        print_success "STT service is responding"
+        
+        # Run simple STT test
+        if command -v python3 &> /dev/null; then
+            print_info "Running STT functionality test..."
+            if python3 -c "
+import sys
+sys.path.append('services/cli-tools/scripts')
+from simple_audio_test import AudioServiceTester
+tester = AudioServiceTester('$test_data_dir')
+result = tester.test_stt_service('$stt_url')
+if result['successful_tests'] > 0:
+    print(f'STT test passed: {result[\"successful_tests\"]}/{result[\"test_cases\"]} tests successful')
+    sys.exit(0)
+else:
+    print('STT test failed: No successful tests')
+    sys.exit(1)
+" 2>/dev/null; then
+                print_success "STT functionality test passed"
+            else
+                print_warning "STT functionality test failed"
+            fi
+        else
+            print_warning "Python3 not available for STT functionality test"
+        fi
+    else
+        print_error "STT service is not responding"
+        return 1
+    fi
+    
+    # Test TTS service
+    print_info "Testing TTS service..."
+    if timeout 30 grpcurl -plaintext "$tts_url" grpc.health.v1.Health/Check > /dev/null 2>&1; then
+        print_success "TTS service is responding"
+        
+        # Run simple TTS test
+        if command -v python3 &> /dev/null; then
+            print_info "Running TTS functionality test..."
+            if python3 -c "
+import sys
+sys.path.append('services/cli-tools/scripts')
+from simple_audio_test import AudioServiceTester
+tester = AudioServiceTester('$test_data_dir')
+result = tester.test_tts_service('$tts_url')
+if result['successful_tests'] > 0:
+    print(f'TTS test passed: {result[\"successful_tests\"]}/{result[\"test_cases\"]} tests successful')
+    sys.exit(0)
+else:
+    print('TTS test failed: No successful tests')
+    sys.exit(1)
+" 2>/dev/null; then
+                print_success "TTS functionality test passed"
+            else
+                print_warning "TTS functionality test failed"
+            fi
+        else
+            print_warning "Python3 not available for TTS functionality test"
+        fi
+    else
+        print_error "TTS service is not responding"
+        return 1
+    fi
+    
+    # Check audio test data
+    if [ -d "$test_data_dir" ]; then
+        local test_files=$(find "$test_data_dir" -name "*.json" -o -name "*.wav" | wc -l)
+        if [ "$test_files" -gt 0 ]; then
+            print_success "Audio test data available: $test_files files"
+        else
+            print_info "No audio test data found (this is normal for first run)"
+        fi
+    fi
+}
+
 # Check model cache
 check_model_cache() {
     print_header "Checking Model Cache"
@@ -490,6 +578,7 @@ main() {
     check_model_cache
     check_service_health
     check_grpc_services
+    check_audio_services
     check_gpu_status
     check_network_connectivity
     check_logs
