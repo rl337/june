@@ -41,6 +41,42 @@ We've created a complete testing framework that includes:
 - **Processing Time** - Time taken to transcribe audio
 - **Confidence Score** - Model confidence in transcription
 
+### STT (Speech-to-Text) Tests
+**Test Cases:**
+- "Hello, how are you today?"
+- "The quick brown fox jumps over the lazy dog."
+- "Artificial intelligence is transforming the world."
+- "Please call me at 555-123-4567."
+- "The weather is sunny with a temperature of 75 degrees."
+
+**Metrics:**
+- **Word Error Rate (WER)** - Percentage of words incorrectly transcribed
+- **Character Error Rate (CER)** - Percentage of characters incorrectly transcribed
+- **Processing Time** - Time taken to transcribe audio
+- **Confidence Score** - Model confidence in transcription
+
+### Round-Trip Tests (TTS→STT)
+**Concept:** Convert text to speech, then transcribe the audio back to text
+**Purpose:** Validate integrated performance of both services working together
+
+**Test Process:**
+1. Input text is converted to speech using TTS service
+2. Generated audio is transcribed using STT service
+3. Original text is compared with transcribed result
+4. Accuracy metrics are calculated
+
+**Metrics:**
+- **Exact Match Rate** - Percentage of exact matches
+- **Word Error Rate (WER)** - Errors in transcription
+- **Character Error Rate (CER)** - Character-level errors
+- **Match Percentage** - Overall accuracy score
+- **Processing Time** - Total TTS + STT time
+
+**Success Criteria:**
+- **Exact Match Rate:** ≥80% for quality validation
+- **WER:** < 10% for integrated system
+- **CER:** < 5% for integrated system
+
 ### TTS (Text-to-Speech) Tests
 **Test Cases:**
 - "Hello, this is a test of the text-to-speech system."
@@ -73,6 +109,9 @@ We've created a complete testing framework that includes:
 
 # Run comprehensive audio tests
 ./scripts/test_audio_services.sh
+
+# Run round-trip tests only
+python3 services/cli-tools/scripts/round_trip_test.py --test-cases 10
 
 # Run health checks
 ./run_checks.sh

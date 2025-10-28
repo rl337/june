@@ -151,6 +151,36 @@ print('Generated test audio file')
     fi
 }
 
+# Test round-trip audio (TTS→STT)
+test_round_trip() {
+    print_header "Testing Round-Trip Audio (TTS→STT)"
+    
+    # Check if Python is available
+    if command -v python3 &> /dev/null; then
+        print_info "Running round-trip audio tests..."
+        
+        if [ -f "services/cli-tools/scripts/round_trip_test.py" ]; then
+            python3 services/cli-tools/scripts/round_trip_test.py \
+                --tts-url "$TTS_URL" \
+                --stt-url "$STT_URL" \
+                --data-dir "$TEST_DATA_DIR" \
+                --output "$TEST_DATA_DIR/round_trip_report.json" 2>/dev/null || {
+                print_warning "Round-trip tests failed or not available"
+                return 1
+            }
+            
+            print_success "Round-trip audio tests completed"
+            return 0
+        else
+            print_warning "Round-trip test script not found"
+            return 1
+        fi
+    else
+        print_warning "Python3 not available for round-trip tests"
+        return 1
+    fi
+}
+
 # Test TTS service
 test_tts_service() {
     print_header "Testing TTS Service"
@@ -277,6 +307,7 @@ main() {
     # Run tests
     local stt_result=0
     local tts_result=0
+    local round_trip_result=0
     
     if test_stt_service; then
         stt_result=0
@@ -288,6 +319,13 @@ main() {
         tts_result=0
     else
         tts_result=1
+    fi
+    
+    # Run round-trip tests
+    if test_round_trip; then
+        round_trip_result=0
+    else
+        round_trip_result=1
     fi
     
     # Run comprehensive tests if available
@@ -304,8 +342,9 @@ main() {
     echo "Total test duration: ${duration}s"
     echo "STT service: $([ $stt_result -eq 0 ] && echo "PASS" || echo "FAIL")"
     echo "TTS service: $([ $tts_result -eq 0 ] && echo "PASS" || echo "FAIL")"
+    echo "Round-trip test: $([ $round_trip_result -eq 0 ] && echo "PASS" || echo "FAIL")"
     
-    if [ $stt_result -eq 0 ] && [ $tts_result -eq 0 ]; then
+    if [ $stt_result -eq 0 ] && [ $tts_result -eq 0 ] && [ $round_trip_result -eq 0 ]; then
         print_success "All audio service tests passed!"
         exit 0
     else
