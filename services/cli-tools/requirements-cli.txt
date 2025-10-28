@@ -1,0 +1,41 @@
+# CLI Tools Requirements for June Agent
+# This file contains dependencies for command-line tools and utilities
+
+# Core ML/AI libraries
+huggingface_hub>=0.20.0
+transformers>=4.35.0
+torch>=2.0.0
+torchaudio>=2.0.0
+
+# Speech processing
+openai-whisper>=20231117
+TTS>=0.22.0
+
+# Audio processing
+librosa>=0.10.0
+soundfile>=0.12.0
+
+# Utilities
+requests>=2.31.0
+tqdm>=4.65.0
+click>=8.1.0
+rich>=13.0.0
+
+# Development tools
+black>=23.0.0
+isort>=5.12.0
+flake8>=6.0.0
+mypy>=1.5.0
+
+# Data processing
+pandas>=2.0.0
+numpy>=1.24.0
+scipy>=1.11.0
+
+# Configuration
+python-dotenv>=1.0.0
+pyyaml>=6.0.0
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0

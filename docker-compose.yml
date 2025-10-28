@@ -1,0 +1,282 @@
+version: '3.8'
+
+services:
+  # PostgreSQL with pgvector extension for RAG
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: june-postgres
+    environment:
+      POSTGRES_DB: june
+      POSTGRES_USER: june
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    ports:
+      - "5432:5432"
+    volumes:
+      - ${JUNE_DATA_DIR:-/home/rlee/june_data}/postgres:/var/lib/postgresql/data
+      - ./config/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U june"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO for object storage (S3-compatible)
+  minio:
+    image: minio/minio:latest
+    container_name: june-minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-changeme}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - ${JUNE_DATA_DIR:-/home/rlee/june_data}/minio:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # NATS for pub/sub messaging
+  nats:
+    image: nats:latest
+    container_name: june-nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"  # HTTP monitoring
+    command: ["-js", "-m", "8222"]
+    volumes:
+      - ${JUNE_DATA_DIR:-/home/rlee/june_data}/nats/data:/data
+      - ${JUNE_DATA_DIR:-/home/rlee/june_data}/nats/jets_stream:/store
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Prometheus for metrics
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: june-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ${JUNE_DATA_DIR:-/home/rlee/june_data}/prometheus:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+
+  # Grafana for dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: june-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - ${JUNE_DATA_DIR:-/home/rlee/june_data}/grafana:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+
+  # Webapp Service (React Chat Interface)
+  webapp:
+    build:
+      context: ./services/webapp
+      dockerfile: Dockerfile
+    container_name: june-webapp
+    ports:
+      - "3001:3000"  # React dev server
+    environment:
+      - REACT_APP_GATEWAY_URL=http://localhost:8000
+      - REACT_APP_WS_URL=ws://localhost:8000
+    depends_on:
+      - gateway
+    volumes:
+      - ./services/webapp:/app
+      - /app/node_modules
+    networks:
+      - june_network
+
+  # Loki for log aggregation
+  loki:
+    image: grafana/loki:latest
+    container_name: june-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./config/loki-config.yml:/etc/loki/local-config.yaml
+      - ${JUNE_DATA_DIR:-/home/rlee/june_data}/loki:/loki
+
+  # Jaeger for distributed tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: june-jaeger
+    ports:
+      - "16686:16686"  # UI
+      - "14268:14268"  # Agent endpoint
+      - "6831:6831/udp"  # UDP agent
+      - "6832:6832/udp"
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+
+  # CLI Tools Container for development and maintenance
+  cli-tools:
+    build:
+      context: ./services/cli-tools
+      dockerfile: Dockerfile
+    container_name: june-cli-tools
+    environment:
+      - MODEL_CACHE_DIR=/models
+      - HUGGINGFACE_CACHE_DIR=/models/huggingface
+      - TRANSFORMERS_CACHE_DIR=/models/transformers
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+    volumes:
+      - ${MODEL_CACHE_DIR:-/home/rlee/models}:/models
+      - ${JUNE_DATA_DIR:-/home/rlee/june_data}:/data
+      - ./services/cli-tools/scripts:/app/scripts
+    networks:
+      - june_network
+    profiles:
+      - tools
+    command: ["bash", "-c", "echo 'CLI Tools container ready. Use: docker exec -it june-cli-tools bash' && tail -f /dev/null"]
+
+  # Gateway service (FastAPI + WebSocket)
+  gateway:
+    build:
+      context: ./services/gateway
+      dockerfile: Dockerfile
+    container_name: june-gateway
+    ports:
+      - "8000:8000"
+      - "8001:8001"  # WebSocket
+    environment:
+      - INFERENCE_API_URL=grpc://inference-api:50051
+      - STT_URL=grpc://stt:50052
+      - TTS_URL=grpc://tts:50053
+      - NATS_URL=nats://nats:4222
+      - POSTGRES_URL=postgresql://june:${POSTGRES_PASSWORD:-changeme}@postgres:5432/june
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-admin}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-changeme}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - JWT_SECRET=${JWT_SECRET:-change-this-secret}
+    depends_on:
+      - postgres
+      - minio
+      - nats
+      - inference-api
+    volumes:
+      - ./services/gateway:/app
+    networks:
+      - june_network
+
+  # Inference API Coordinator (Primary GPU workload)
+  inference-api:
+    build:
+      context: ./services/inference-api
+      dockerfile: Dockerfile
+    container_name: june-inference-api
+    ports:
+      - "50051:50051"  # gRPC
+    environment:
+      - MODEL_NAME=${MODEL_NAME:-Qwen/Qwen3-30B-A3B-Thinking-2507}
+      - MODEL_DEVICE=${MODEL_DEVICE:-cuda:0}
+      - MAX_CONTEXT_LENGTH=${MAX_CONTEXT_LENGTH:-131072}
+      - USE_YARN=${USE_YARN:-true}
+      - POSTGRES_URL=postgresql://june:${POSTGRES_PASSWORD:-changeme}@postgres:5432/june
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-admin}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-changeme}
+      - NATS_URL=nats://nats:4222
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+      - CUDA_VISIBLE_DEVICES=0
+      - CUDA_MPS_ENABLE_PER_CTX_SM_PARTITIONING=1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['0']
+              capabilities: [gpu]
+    depends_on:
+      - postgres
+      - minio
+      - nats
+    volumes:
+      - ${MODEL_CACHE_DIR:-/home/rlee/models}:/models
+      - ./services/inference-api:/app
+    networks:
+      - june_network
+
+  # STT Service (Speech-to-Text) - Shared GPU with MPS
+  stt:
+    build:
+      context: ./services/stt
+      dockerfile: Dockerfile
+    container_name: june-stt
+    ports:
+      - "50052:50052"  # gRPC
+    environment:
+      - MODEL_NAME=${STT_MODEL:-openai/whisper-large-v3}
+      - MODEL_DEVICE=${STT_DEVICE:-cuda:0}
+      - NATS_URL=nats://nats:4222
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+      - CUDA_VISIBLE_DEVICES=0
+      - CUDA_MPS_ENABLE_PER_CTX_SM_PARTITIONING=1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['0']
+              capabilities: [gpu]
+    depends_on:
+      - nats
+    volumes:
+      - ${MODEL_CACHE_DIR:-/home/rlee/models}:/models
+      - ./services/stt:/app
+    networks:
+      - june_network
+
+  # TTS Service (Text-to-Speech) - Shared GPU with MPS
+  tts:
+    build:
+      context: ./services/tts
+      dockerfile: Dockerfile
+    container_name: june-tts
+    ports:
+      - "50053:50053"  # gRPC
+    environment:
+      - MODEL_NAME=${TTS_MODEL:-facebook/fastspeech2-en-ljspeech}
+      - MODEL_DEVICE=${TTS_DEVICE:-cuda:0}
+      - NATS_URL=nats://nats:4222
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+      - CUDA_VISIBLE_DEVICES=0
+      - CUDA_MPS_ENABLE_PER_CTX_SM_PARTITIONING=1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['0']
+              capabilities: [gpu]
+    depends_on:
+      - nats
+    volumes:
+      - ${MODEL_CACHE_DIR:-/home/rlee/models}:/models
+      - ./services/tts:/app
+    networks:
+      - june_network
+
+networks:
+  june_network:
+    driver: bridge
+
+# All data volumes now use bind mounts to /home/rlee/june_data
+# Named volumes removed - data is stored in host filesystem
+
