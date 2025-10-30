@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import grpc
 import nats
-from prometheus_client import Counter, Histogram, Gauge, generate_latest
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CollectorRegistry
 from jose import JWTError, jwt
 import httpx
 
@@ -29,13 +29,11 @@ setup_logging(config.monitoring.log_level, "gateway")
 logger = logging.getLogger(__name__)
 
 # Prometheus metrics (guard against duplicate registration under dev servers)
-_metrics_inited = globals().get("_metrics_inited", False)
-if not _metrics_inited:
-    REQUEST_COUNT = Counter('gateway_requests_total', 'Total requests', ['method', 'endpoint', 'status'])
-    REQUEST_DURATION = Histogram('gateway_request_duration_seconds', 'Request duration')
-    ACTIVE_CONNECTIONS = Gauge('gateway_active_connections', 'Active WebSocket connections')
-    RATE_LIMIT_HITS = Counter('gateway_rate_limit_hits_total', 'Rate limit hits')
-    globals()["_metrics_inited"] = True
+REGISTRY = CollectorRegistry()
+REQUEST_COUNT = Counter('gateway_requests_total', 'Total requests', ['method', 'endpoint', 'status'], registry=REGISTRY)
+REQUEST_DURATION = Histogram('gateway_request_duration_seconds', 'Request duration', registry=REGISTRY)
+ACTIVE_CONNECTIONS = Gauge('gateway_active_connections', 'Active WebSocket connections', registry=REGISTRY)
+RATE_LIMIT_HITS = Counter('gateway_rate_limit_hits_total', 'Rate limit hits', registry=REGISTRY)
 
 # Security
 security = HTTPBearer()
@@ -108,7 +106,7 @@ class GatewayService:
         @self.app.get("/metrics")
         async def metrics():
             """Prometheus metrics endpoint."""
-            return generate_latest()
+            return generate_latest(REGISTRY)
         
         @self.app.get("/status")
         async def status():
