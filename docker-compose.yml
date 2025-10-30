@@ -1,4 +1,12 @@
 services:
+  # Base build image target (not a running service)
+  base:
+    build:
+      context: ./services/base
+      dockerfile: Dockerfile
+    image: june-base:latest
+    profiles:
+      - tools
   # PostgreSQL with pgvector extension for RAG
   postgres:
     image: pgvector/pgvector:pg16

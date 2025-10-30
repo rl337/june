@@ -22,9 +22,14 @@ audio = [
   "numpy>=1.24",
 ]
 
+[project.scripts]
+inference-core = "inference_core.cli:main"
+
 [tool.setuptools]
-package-dir = {"" = "inference_core"}
-packages = ["inference_core"]
+packages = [
+  "inference_core",
+  "inference_core.commands",
+]
 
 
 

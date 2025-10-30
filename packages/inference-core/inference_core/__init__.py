@@ -7,6 +7,7 @@ from .strategies import (
     InferenceResponse,
 )
 from .runtime import InferenceApp
+from .cli import main as cli_main, Command
 
 __all__ = [
     "InferenceStrategy",

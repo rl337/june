@@ -1,36 +1,20 @@
-FROM ubuntu:22.04
+FROM june-base:latest
 
 # Set working directory
 WORKDIR /app
 ENV PYTHONPATH="/app:/app/shared"
 
-# Install system dependencies
+# Install TTS-specific system deps
+USER root
 RUN apt-get update && apt-get install -y \
-    python3.10 \
-    python3.10-dev \
-    python3-pip \
-    git \
-    curl \
-    build-essential \
-    libffi-dev \
-    libssl-dev \
-    libsndfile1 \
-    ffmpeg \
     espeak \
     espeak-data \
     libespeak1 \
     libespeak-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Create symbolic link for python
-RUN ln -s /usr/bin/python3.10 /usr/bin/python
-
-# Upgrade pip
-RUN python -m pip install --upgrade pip
-
-# Copy requirements and install Python dependencies
-COPY pyproject.toml ./
-RUN pip install fastapi uvicorn grpcio nats-py sqlalchemy psycopg2-binary minio prometheus-client soundfile numpy
+# Install service-specific Python deps
+RUN pip install soundfile numpy
 
 # Copy shared modules
 COPY shared ./shared
@@ -38,12 +22,8 @@ COPY shared ./shared
 # Copy service code
 COPY services/tts .
 
-# Install june-grpc-api from prebuilt wheel
-COPY packages/june-grpc-api/dist/*.whl /tmp/
-RUN pip install /tmp/june_grpc_api-*.whl
-
-# Create non-root user
-RUN useradd -m -u 1000 june && chown -R june:june /app
+# Ensure permissions and switch back
+RUN chown -R june:june /app
 USER june
 
 # Expose gRPC port
