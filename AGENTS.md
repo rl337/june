@@ -98,6 +98,63 @@ python scripts/download_models.py --list
 
 **Important:** This directory will grow very large over time and is excluded from git.
 
+## 📦 Model Artifacts and Test Data Management
+
+### Model Artifacts
+
+All containers produce model artifacts (outputs, caches, generated content) that are mounted to the host filesystem:
+
+**Model Artifacts Directory:** `/home/rlee/june_data/model_artifacts/`
+- **STT:** `/home/rlee/june_data/model_artifacts/stt/`
+- **TTS:** `/home/rlee/june_data/model_artifacts/tts/`
+- **Inference API:** `/home/rlee/june_data/model_artifacts/inference-api/`
+- **Gateway:** `/home/rlee/june_data/model_artifacts/gateway/`
+
+These directories are mounted into containers at `/app/model_artifacts/` and persist across container restarts.
+
+**Docker Compose Configuration:**
+Each service has a volume mount:
+```yaml
+volumes:
+  - ${JUNE_DATA_DIR:-/home/rlee/june_data}/model_artifacts/<service>:/app/model_artifacts
+```
+
+### Test Artifacts
+
+Test runs create isolated test artifacts in timestamped directories:
+
+**Test Data Directory:** `/home/rlee/june_test_data/`
+- Individual test runs: `run_YYYYMMDD_HHMMSS/`
+  - `input_audio/` - TTS-generated input audio
+  - `output_audio/` - Gateway response audio
+  - `transcripts/` - Text transcripts
+  - `metadata/` - Test metadata JSON
+  - `container_artifacts/` - Artifacts copied from containers after tests
+
+### Test Orchestration
+
+The `scripts/run_tests_with_artifacts.sh` script provides full test orchestration:
+
+1. **Starts Fresh Containers** - Spins up a clean docker-compose environment
+2. **Runs Tests** - Executes Gateway round-trip tests
+3. **Collects Artifacts** - Copies model and test artifacts from containers
+4. **Shuts Down** - Tears down containers after completion
+
+**Usage:**
+```bash
+# Full test run with artifact collection
+./scripts/run_tests_with_artifacts.sh
+
+# With custom test limit
+TEST_LIMIT=5 ./scripts/run_tests_with_artifacts.sh
+```
+
+**Important Notes:**
+- Model artifacts persist in `june_data` and are shared across runs
+- Test artifacts are isolated per test run
+- All artifacts are excluded from git (see `.gitignore`)
+- Artifacts can be very large - monitor disk space
+
 ## 🐳 Container Environment
 
 ### Docker-First Development Strategy
@@ -122,6 +179,17 @@ python scripts/download_models.py --list
 - Development utilities (black, isort, flake8, mypy)
 - Testing tools (pytest, pytest-cov)
 - Audio processing (whisper, TTS, librosa)
+
+### Shared gRPC API Package (june-grpc-api)
+- Location: `dev/june/packages/june-grpc-api`
+- Contents: Only proto IDLs in `proto/` (e.g., `asr.proto`, `tts.proto`, `llm.proto`).
+- Build: Stubs are generated at image build time inside each service container; no generated code is checked in.
+- Install flow (each service Dockerfile):
+  - Generate stubs with `grpcio-tools` into `june_grpc_api/` inside the build context.
+  - Build a wheel (`python -m build`) and `pip install` the resulting wheel.
+- Imports in services:
+  - `from june_grpc_api import asr_pb2, asr_pb2_grpc`
+- Benefits: Single source of truth, no sys.path hacks, deterministic imports, faster builds, simpler CI.
 
 ### GPU Configuration
 - **Single GPU Sharing:** All services share GPU 0 via CUDA MPS
@@ -242,6 +310,38 @@ docker-compose logs -f
 docker-compose logs -f gateway
 docker-compose logs -f inference-api
 ```
+
+## 🎙️ STT Service Updates and Validation
+
+### Current STT Implementation
+- Model: Whisper `tiny.en` (CPU by default; can be set via `STT_DEVICE`).
+- Service: gRPC with unary `Recognize` and streaming `RecognizeStream` (IDL in `asr.proto`).
+- Container: Installs `openai-whisper`, `ffmpeg`, and the shared `june-grpc-api` package during build.
+
+### Validation Dataset
+- Source: Small subset of LibriSpeech (OpenSLR test-clean; capped to ~20 pairs for fast checks).
+- Download script (runs inside CLI tools): `services/cli-tools/scripts/download_librispeech_small.py`
+- Index output: `${JUNE_DATA_DIR}/datasets/librispeech_small/index.json` with `{id, audio, text}` pairs.
+
+### Validation Methods
+- Solo STT validation: `services/cli-tools/scripts/test_stt_validate.py`
+  - Reads FLAC, converts to WAV 16k PCM, calls STT gRPC, compares hypotheses.
+  - Quick metric: prefix-3 word match counts (sanity check). Example result: 10/20 (~50%).
+  - Extendable to WER/CER using `jiwer` if needed.
+
+### How to Run
+```
+# Start CLI tools and STT only
+docker compose --profile tools up -d cli-tools
+docker compose up -d stt
+
+# Download dataset and run validation (script orchestrates both steps)
+./scripts/validate_stt.sh
+```
+
+### Notes
+- All generated artifacts and datasets are stored under `${JUNE_DATA_DIR}` and excluded from git.
+- The STT container no longer bind-mounts service code to avoid masking generated gRPC stubs.
 
 ## 🛠️ Common Development Tasks
 

@@ -138,6 +138,76 @@ MINIO_ROOT_USER=admin
 MINIO_ROOT_PASSWORD=changeme
 ```
 
+## 🧪 Test Modes
+
+June Agent supports two test configurations for different testing scenarios:
+
+### 1. Full Mock Mode
+**Purpose:** Test deployment and connectivity between services
+- All services run in pass-through mode
+- No real model inference
+- Tests service communication and deployment
+- Fast execution, no model dependencies
+
+**Usage:**
+```bash
+# Set mock mode
+source ./scripts/set_test_mode.sh mock
+export $(grep -v '^#' .env | xargs)
+docker compose up -d
+
+# Run mock mode tests
+python scripts/comprehensive_pipeline_test.py
+```
+
+### 2. STT/TTS Round-Trip Mode
+**Purpose:** Test audio pipeline accuracy with real models via Gateway
+- TTS and STT services use real models (espeak/Whisper)
+- Gateway and Inference run in mock mode
+- Tests full user flow: **Text → TTS → Audio → Gateway → Audio → STT → Text**
+- **Two conversions tested:**
+  1. **Input:** Text → TTS → Audio (simulating user sending audio)
+  2. **Output:** Gateway Audio → STT → Text (validating Gateway response)
+- Validates complete end-to-end pipeline as real users would experience it
+
+**Usage:**
+```bash
+# Set round-trip mode
+source ./scripts/set_test_mode.sh stt_tts_roundtrip
+export $(grep -v '^#' .env | xargs)
+docker compose up -d
+
+# Generate Alice in Wonderland dataset (if needed)
+python scripts/generate_alice_dataset.py
+
+# Run Gateway round-trip tests
+python scripts/test_round_trip_gateway.py
+```
+
+### Mode Configuration
+
+The test mode is controlled by environment variables:
+- `JUNE_TEST_MODE` - Overall test mode (`mock` or `stt_tts_roundtrip`)
+- `STT_MODE` - STT service mode (`mock` or `real`)
+- `TTS_MODE` - TTS service mode (`mock` or `real`)
+- `GATEWAY_MODE` - Gateway service mode (`mock` or `real`)
+- `INFERENCE_MODE` - Inference service mode (`mock` or `real`)
+
+**Quick Mode Switch:**
+```bash
+# Use the mode switcher script
+./scripts/set_test_mode.sh mock              # Full mock
+./scripts/set_test_mode.sh stt_tts_roundtrip # STT/TTS round-trip
+
+# Check current configuration
+python scripts/test_pipeline_modes.py --show-config
+
+# Run tests for specific mode
+python scripts/test_pipeline_modes.py --mode mock
+python scripts/test_pipeline_modes.py --mode stt_tts_roundtrip
+python scripts/test_pipeline_modes.py --mode both  # Test both
+```
+
 ## 🔧 Service Details
 
 ### Gateway Service (Port 8000)

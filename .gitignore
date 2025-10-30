@@ -200,3 +200,8 @@ services/webapp/.env.local
 services/webapp/.env.development.local
 services/webapp/.env.test.local
 services/webapp/.env.production.local
+
+# Ignore ALL-CAPS markdown except README.md and AGENTS.md
+[A-Z]*.md
+!README.md
+!AGENTS.md
