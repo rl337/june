@@ -3,6 +3,7 @@ Gateway Service - Entry point for June Agent with auth, rate limiting, and strea
 """
 import asyncio
 import json
+import os
 import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
