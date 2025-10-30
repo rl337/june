@@ -30,11 +30,7 @@ RUN python -m pip install --upgrade pip
 
 # Copy requirements and install Python dependencies
 COPY pyproject.toml ./
-RUN pip install fastapi uvicorn grpcio grpcio-tools nats-py sqlalchemy psycopg2-binary minio prometheus-client soundfile numpy
-
-# Copy protobuf files
-# Copy protobuf files (not used directly once june-grpc-api is installed, kept for reference)
-COPY proto ./proto
+RUN pip install fastapi uvicorn grpcio nats-py sqlalchemy psycopg2-binary minio prometheus-client soundfile numpy
 
 # Copy shared modules
 COPY shared ./shared
@@ -42,17 +38,9 @@ COPY shared ./shared
 # Copy service code
 COPY services/tts .
 
-# Build and install shared gRPC API package
-COPY packages/june-grpc-api /tmp/june-grpc-api
-RUN pip install build grpcio-tools && \
-    python -m grpc_tools.protoc -I/tmp/june-grpc-api/proto \
-    --python_out=/tmp/june-grpc-api/june_grpc_api \
-    --grpc_python_out=/tmp/june-grpc-api/june_grpc_api \
-    /tmp/june-grpc-api/proto/asr.proto /tmp/june-grpc-api/proto/tts.proto /tmp/june-grpc-api/proto/llm.proto && \
-    sed -i "s/^import asr_pb2 /from . import asr_pb2 /" /tmp/june-grpc-api/june_grpc_api/asr_pb2_grpc.py && \
-    sed -i "s/^import tts_pb2 /from . import tts_pb2 /" /tmp/june-grpc-api/june_grpc_api/tts_pb2_grpc.py && \
-    sed -i "s/^import llm_pb2 /from . import llm_pb2 /" /tmp/june-grpc-api/june_grpc_api/llm_pb2_grpc.py && \
-    cd /tmp/june-grpc-api && python -m build && pip install dist/*.whl
+# Install june-grpc-api from prebuilt wheel
+COPY packages/june-grpc-api/dist/*.whl /tmp/
+RUN pip install /tmp/june_grpc_api-*.whl
 
 # Create non-root user
 RUN useradd -m -u 1000 june && chown -R june:june /app

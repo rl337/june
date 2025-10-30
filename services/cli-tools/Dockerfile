@@ -22,6 +22,10 @@ COPY requirements-cli.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements-cli.txt
 
+# Install june-grpc-api from prebuilt wheel
+COPY ../../packages/june-grpc-api/dist/*.whl /tmp/
+RUN pip install /tmp/june_grpc_api-*.whl
+
 # Copy CLI scripts
 COPY scripts/ /app/scripts/
 

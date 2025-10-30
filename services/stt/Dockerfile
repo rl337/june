@@ -26,20 +26,11 @@ RUN python -m pip install --upgrade pip
 
 # Copy requirements and install Python dependencies
 COPY pyproject.toml ./
-RUN pip install fastapi uvicorn grpcio grpcio-tools nats-py sqlalchemy psycopg2-binary minio prometheus-client numpy openai-whisper soundfile
+RUN pip install fastapi uvicorn grpcio nats-py sqlalchemy psycopg2-binary minio prometheus-client numpy openai-whisper soundfile
 
-# Copy protobuf files
-# Build and install june-grpc-api from local source
-COPY packages/june-grpc-api /tmp/june-grpc-api
-RUN pip install build grpcio-tools && \
-    python -m grpc_tools.protoc -I/tmp/june-grpc-api/proto \
-    --python_out=/tmp/june-grpc-api/june_grpc_api \
-    --grpc_python_out=/tmp/june-grpc-api/june_grpc_api \
-    /tmp/june-grpc-api/proto/asr.proto /tmp/june-grpc-api/proto/tts.proto /tmp/june-grpc-api/proto/llm.proto && \
-    sed -i "s/^import asr_pb2 /from . import asr_pb2 /" /tmp/june-grpc-api/june_grpc_api/asr_pb2_grpc.py && \
-    sed -i "s/^import tts_pb2 /from . import tts_pb2 /" /tmp/june-grpc-api/june_grpc_api/tts_pb2_grpc.py && \
-    sed -i "s/^import llm_pb2 /from . import llm_pb2 /" /tmp/june-grpc-api/june_grpc_api/llm_pb2_grpc.py && \
-    cd /tmp/june-grpc-api && python -m build && pip install dist/*.whl
+# Install june-grpc-api from prebuilt wheel
+COPY packages/june-grpc-api/dist/*.whl /tmp/
+RUN pip install /tmp/june_grpc_api-*.whl
 
 # Copy shared modules
 COPY shared ./shared
@@ -61,7 +52,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 # Run the Whisper-based STT application
 ENV STT_MODEL_NAME=tiny.en
 ENV STT_DEVICE=cpu
-ENV PYTHONPATH=/app/proto:/app
 CMD ["python", "main_whisper.py"]
 
 

@@ -148,7 +148,6 @@ services:
       - ./services/cli-tools/scripts:/app/scripts
       - ./scripts:/app/root_scripts
       - ./services/gateway/tests:/app/gateway_tests
-      - ./proto:/app/proto
     extra_hosts:
       - "host.docker.internal:host-gateway"
     networks:
@@ -199,7 +198,6 @@ services:
     volumes:
       - ${JUNE_DATA_DIR:-/home/rlee/june_data}/model_artifacts/gateway:/app/model_artifacts
       - ./services/gateway:/app
-      - ./proto:/app/proto
     networks:
       - june_network
 

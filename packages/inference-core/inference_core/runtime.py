@@ -25,3 +25,4 @@ class InferenceApp:
         return self.strategy.infer(request)
 
 
+

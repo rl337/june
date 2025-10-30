@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 BLUE='\033[0;34m'
@@ -17,22 +17,13 @@ docker_compose_cmd() {
 echo -e "${BLUE}Starting STT service validation...${NC}"
 cd /home/rlee/dev/june
 
-# Build and start STT only + CLI tools
-docker_compose_cmd --profile tools up -d cli-tools >/dev/null
-docker_compose_cmd up -d stt >/dev/null
+# Bring up stt and cli-tools
+sg docker -c "docker compose up -d stt cli-tools"
 
-echo -e "${BLUE}Waiting for STT to be ready...${NC}"
-sleep 8
+# Wait briefly for STT to start
+sleep 5
 
-echo -e "${BLUE}Download small LibriSpeech subset...${NC}"
-sg docker -c "docker exec -e JUNE_DATA_DIR=/data june-cli-tools python /app/scripts/download_librispeech_small.py"
-
-echo -e "${BLUE}Generate gRPC Python stubs for ASR proto...${NC}"
-sg docker -c "docker exec june-cli-tools python -m grpc_tools.protoc -I/app/proto --python_out=/app/proto --grpc_python_out=/app/proto /app/proto/asr.proto"
-
-echo -e "${BLUE}Run STT validation (via host.docker.internal:50052)...${NC}"
-sg docker -c "docker exec -e JUNE_DATA_DIR=/data -e STT_SERVICE_ADDRESS=host.docker.internal:50052 june-cli-tools python /app/scripts/test_stt_validate.py" || true
-
-echo -e "${GREEN}STT validation complete${NC}"
+# Run validation script inside CLI tools
+sg docker -c "docker exec june-cli-tools python /app/scripts/test_stt_validate.py"
 
 
