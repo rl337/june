@@ -1,13 +1,14 @@
 """
-TTS Service - Text-to-Speech with FastSpeech2/HiFi-GAN and streaming.
+TTS Service - Text-to-Speech with simple espeak implementation.
 """
 import asyncio
 import logging
 import io
 import base64
 import numpy as np
-import torch
-import torchaudio
+import subprocess
+import tempfile
+import os
 from typing import Dict, List, Optional, Any, AsyncGenerator
 from datetime import datetime
 import uuid
@@ -15,13 +16,12 @@ import uuid
 import grpc
 from grpc import aio
 import nats
-from TTS.api import TTS
 from prometheus_client import Counter, Histogram, Gauge, generate_latest
 import soundfile as sf
 
 # Import generated protobuf classes
 import sys
-sys.path.append('../../proto')
+sys.path.append('./proto')
 from tts_pb2 import (
     SynthesisRequest, SynthesisConfig, AudioChunk, AudioResponse,
     HealthRequest, HealthResponse
@@ -154,34 +154,21 @@ class TTSService(tts_pb2_grpc.TextToSpeechServicer):
         )
     
     async def _synthesize_text(self, text: str, voice_id: str, language: str, config: SynthesisConfig) -> Optional[np.ndarray]:
-        """Synthesize text to audio using TTS model."""
+        """Synthesize text to audio using espeak."""
         try:
             if not text.strip():
                 return None
             
             with Timer("audio_generation"):
-                # Use TTS model to generate audio
-                if hasattr(self.tts_model, 'tts'):
-                    # TTS library API
-                    audio_data = self.tts_model.tts(
-                        text=text,
-                        speaker=voice_id,
-                        language=language
-                    )
-                else:
-                    # Fallback to basic synthesis
-                    audio_data = await self._basic_synthesis(text, voice_id, language, config)
+                # Use espeak to generate audio
+                audio_data = await self._espeak_synthesis(text, voice_id, language, config)
                 
                 # Ensure audio is in the right format
-                if isinstance(audio_data, torch.Tensor):
-                    audio_data = audio_data.cpu().numpy()
-                
-                # Resample if necessary
-                if len(audio_data.shape) > 1:
+                if audio_data is not None and len(audio_data.shape) > 1:
                     audio_data = audio_data.flatten()
                 
                 # Normalize audio
-                if np.max(np.abs(audio_data)) > 0:
+                if audio_data is not None and np.max(np.abs(audio_data)) > 0:
                     audio_data = audio_data / np.max(np.abs(audio_data))
                 
                 # Record metrics
@@ -193,6 +180,47 @@ class TTSService(tts_pb2_grpc.TextToSpeechServicer):
         except Exception as e:
             logger.error(f"Text synthesis error: {e}")
             return None
+    
+    async def _espeak_synthesis(self, text: str, voice_id: str, language: str, config: SynthesisConfig) -> np.ndarray:
+        """Synthesize text using espeak."""
+        try:
+            # Use espeak to generate speech
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
+                temp_path = temp_file.name
+            
+            # Run espeak command
+            cmd = [
+                'espeak',
+                '-s', str(config.sample_rate),
+                '-w', temp_path,
+                text
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise Exception(f"espeak failed: {result.stderr}")
+            
+            # Read the generated audio file
+            audio_data, sample_rate = sf.read(temp_path)
+            
+            # Clean up temp file
+            os.unlink(temp_path)
+            
+            # Resample if needed
+            if sample_rate != config.sample_rate:
+                # Simple resampling (for now, just truncate/pad)
+                target_samples = int(len(audio_data) * config.sample_rate / sample_rate)
+                if len(audio_data) > target_samples:
+                    audio_data = audio_data[:target_samples]
+                else:
+                    audio_data = np.pad(audio_data, (0, target_samples - len(audio_data)))
+            
+            return audio_data.astype(np.float32)
+                
+        except Exception as e:
+            logger.error(f"espeak synthesis failed: {e}")
+            # Fallback to basic synthesis
+            return await self._basic_synthesis(text, voice_id, language, config)
     
     async def _basic_synthesis(self, text: str, voice_id: str, language: str, config: SynthesisConfig) -> np.ndarray:
         """Basic synthesis fallback (generates silence with configurable duration)."""
@@ -219,22 +247,21 @@ class TTSService(tts_pb2_grpc.TextToSpeechServicer):
         return audio_data
     
     async def _load_models(self):
-        """Load TTS model."""
+        """Load TTS model (espeak-based)."""
         with Timer("model_loading"):
-            logger.info(f"Loading TTS model: {config.tts.model_name}")
+            logger.info("Initializing espeak-based TTS")
             
             try:
-                # Initialize TTS model
-                self.tts_model = TTS(model_name=config.tts.model_name, progress_bar=False)
+                # Test espeak availability
+                result = subprocess.run(['espeak', '--version'], capture_output=True, text=True)
+                if result.returncode != 0:
+                    raise Exception("espeak not available")
                 
-                # Move to device if CUDA is available
-                if torch.cuda.is_available() and config.tts.device.startswith("cuda"):
-                    self.tts_model = self.tts_model.to(config.tts.device)
-                
-                logger.info("TTS model loaded successfully")
+                logger.info("espeak TTS initialized successfully")
+                self.tts_model = "espeak"  # Mark as available
                 
             except Exception as e:
-                logger.warning(f"Failed to load TTS model: {e}")
+                logger.warning(f"Failed to initialize espeak: {e}")
                 logger.info("Using basic synthesis fallback")
                 self.tts_model = None
     

@@ -62,3 +62,6 @@ CREATE INDEX IF NOT EXISTS idx_embeddings_vector ON embeddings USING hnsw (embed
 CREATE INDEX IF NOT EXISTS idx_document_embeddings_vector ON document_embeddings USING hnsw (embedding vector_cosine_ops);
 
 
+
+
+

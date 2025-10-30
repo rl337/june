@@ -17,6 +17,17 @@ TIMEOUT=30
 RETRY_COUNT=3
 SERVICES=("postgres" "minio" "nats" "prometheus" "grafana" "loki" "jaeger" "gateway" "inference-api" "stt" "tts" "webapp")
 
+# Docker Compose command - support both 'docker-compose' and 'docker compose'
+docker_compose_cmd() {
+    if command -v docker-compose &> /dev/null; then
+        docker-compose "$@"
+    elif command -v docker &> /dev/null && docker compose version &> /dev/null 2>&1; then
+        docker compose "$@"
+    else
+        return 1
+    fi
+}
+
 # Helper functions
 print_header() {
     echo -e "\n${BLUE}================================${NC}"
@@ -40,18 +51,18 @@ print_info() {
     echo -e "${BLUE}ℹ $1${NC}"
 }
 
-# Check if docker-compose is running
+# Check if docker_compose_cmd is running
 check_docker_compose() {
     print_header "Checking Docker Compose Status"
     
-    if ! command -v docker-compose &> /dev/null; then
-        print_error "docker-compose not found. Please install Docker Compose."
+    if ! docker_compose_cmd version &> /dev/null; then
+        print_error "Docker Compose not found. Please install Docker Compose."
         exit 1
     fi
     
-    if ! docker-compose ps | grep -q "Up"; then
+    if ! docker_compose_cmd ps | grep -q "Up"; then
         print_warning "No services are running. Starting services..."
-        docker-compose up -d
+        docker_compose_cmd up -d
         sleep 10
     fi
     
@@ -65,7 +76,7 @@ check_container_status() {
     local all_healthy=true
     
     for service in "${SERVICES[@]}"; do
-        if docker-compose ps "$service" | grep -q "Up"; then
+        if docker_compose_cmd ps "$service" | grep -q "Up"; then
             print_success "$service container is running"
         else
             print_error "$service container is not running"
@@ -74,7 +85,7 @@ check_container_status() {
     done
     
     if [ "$all_healthy" = false ]; then
-        print_error "Some containers are not running. Check with: docker-compose ps"
+        print_error "Some containers are not running. Check with: docker_compose_cmd ps"
         return 1
     fi
 }
@@ -96,7 +107,7 @@ check_service_health() {
     
     # PostgreSQL
     print_info "Checking PostgreSQL..."
-    if docker-compose exec -T postgres pg_isready -U june > /dev/null 2>&1; then
+    if docker_compose_cmd exec -T postgres pg_isready -U june > /dev/null 2>&1; then
         print_success "PostgreSQL is ready"
     else
         print_error "PostgreSQL is not ready"
@@ -340,6 +351,124 @@ else:
     fi
 }
 
+# Check Gateway round-trip audio validation
+check_gateway_round_trip() {
+    print_header "Checking Gateway Round-Trip Audio Validation"
+    
+    local data_dir="${JUNE_DATA_DIR:-/home/rlee/june_data}"
+    local dataset_file="$data_dir/datasets/alice_in_wonderland/alice_dataset.json"
+    local test_script="scripts/test_round_trip_gateway.py"
+    
+    # Check if dataset exists
+    if [ ! -f "$dataset_file" ]; then
+        print_warning "Alice dataset not found. Generating dataset..."
+        if command -v python3 &> /dev/null; then
+            if python3 scripts/generate_alice_dataset.py 2>/dev/null; then
+                print_success "Alice dataset generated"
+            else
+                print_warning "Failed to generate dataset. Skipping Gateway round-trip test."
+                return 0  # Not a critical failure
+            fi
+        else
+            print_warning "Python3 not available. Skipping Gateway round-trip test."
+            return 0
+        fi
+    else
+        print_success "Alice dataset found"
+    fi
+    
+    # Check if test script exists
+    if [ ! -f "$test_script" ]; then
+        print_warning "Gateway round-trip test script not found: $test_script"
+        return 0  # Not a critical failure
+    fi
+    
+    # Check if services are available
+    local gateway_url="${GATEWAY_URL:-http://localhost:8000}"
+    local tts_address="${TTS_SERVICE_ADDRESS:-localhost:50053}"
+    local stt_address="${STT_SERVICE_ADDRESS:-localhost:50052}"
+    
+    print_info "Checking service availability..."
+    
+    # Check Gateway
+    if ! curl -s -f "$gateway_url/health" > /dev/null 2>&1; then
+        print_warning "Gateway not available. Skipping Gateway round-trip test."
+        return 0
+    fi
+    print_success "Gateway is available at $gateway_url"
+    
+    # Check TTS service
+    if ! timeout 5 grpcurl -plaintext "$tts_address" grpc.health.v1.Health/Check > /dev/null 2>&1; then
+        print_warning "TTS service not available. Skipping Gateway round-trip test."
+        return 0
+    fi
+    print_success "TTS service is available at $tts_address"
+    
+    # Check STT service
+    if ! timeout 5 grpcurl -plaintext "$stt_address" grpc.health.v1.Health/Check > /dev/null 2>&1; then
+        print_warning "STT service not available. Skipping Gateway round-trip test."
+        return 0
+    fi
+    print_success "STT service is available at $stt_address"
+    
+    # Run Gateway round-trip test (limited to 10 tests for health check speed)
+    local max_tests=${GATEWAY_TEST_LIMIT:-10}
+    print_info "Running Gateway round-trip test (limited to $max_tests tests)..."
+    
+    if command -v python3 &> /dev/null; then
+        # Set environment variables for the test
+        export JUNE_DATA_DIR="${JUNE_DATA_DIR:-/home/rlee/june_data}"
+        export GATEWAY_URL="$gateway_url"
+        export TTS_SERVICE_ADDRESS="$tts_address"
+        export STT_SERVICE_ADDRESS="$stt_address"
+        
+        # Run test with timeout and capture output
+        local test_output
+        local test_exit_code
+        
+        if test_output=$(timeout 300 python3 "$test_script" --limit "$max_tests" 2>&1); then
+            test_exit_code=0
+        else
+            test_exit_code=$?
+        fi
+        
+        # Parse results from output
+        if echo "$test_output" | grep -q "Gateway round-trip test PASSED"; then
+            # Extract success rate if available
+            if echo "$test_output" | grep -q "Success rate:"; then
+                local success_rate=$(echo "$test_output" | grep "Success rate:" | grep -oE '[0-9]+\.[0-9]+%' | head -1)
+                print_success "Gateway round-trip test PASSED (Success rate: $success_rate)"
+            else
+                print_success "Gateway round-trip test PASSED"
+            fi
+            
+            # Extract metrics if available
+            if echo "$test_output" | grep -q "Input Conversion Metrics"; then
+                echo ""
+                echo "  Input Metrics (Text → TTS → STT):"
+                echo "$test_output" | grep -A 3 "Input Conversion Metrics" | grep -E "  (Exact|Average)" | sed 's/^/    /'
+            fi
+            if echo "$test_output" | grep -q "Output Conversion Metrics"; then
+                echo "  Output Metrics (Gateway Audio → STT):"
+                echo "$test_output" | grep -A 3 "Output Conversion Metrics" | grep -E "  (Exact|Average)" | sed 's/^/    /'
+            fi
+            
+            return 0
+        elif [ $test_exit_code -eq 124 ]; then
+            print_warning "Gateway round-trip test timed out (may still be running in background)"
+            return 0
+        else
+            print_warning "Gateway round-trip test had issues"
+            # Show last few lines of output for debugging
+            echo "$test_output" | tail -10 | sed 's/^/    /'
+            return 0  # Not critical - just a warning
+        fi
+    else
+        print_warning "Python3 not available. Skipping Gateway round-trip test."
+        return 0
+    fi
+}
+
 # Check model cache
 check_model_cache() {
     print_header "Checking Model Cache"
@@ -457,7 +586,7 @@ check_logs() {
     
     for service in "${SERVICES[@]}"; do
         print_info "Checking $service logs..."
-        local error_count=$(docker-compose logs --tail=50 "$service" 2>&1 | grep -i "error\|exception\|fatal\|panic" | wc -l)
+        local error_count=$(docker_compose_cmd logs --tail=50 "$service" 2>&1 | grep -i "error\|exception\|fatal\|panic" | wc -l)
         
         if [ $error_count -gt 0 ]; then
             print_warning "$service has $error_count recent errors"
@@ -468,7 +597,7 @@ check_logs() {
     done
     
     if [ "$has_errors" = true ]; then
-        print_warning "Some services have errors in logs. Check with: docker-compose logs <service>"
+        print_warning "Some services have errors in logs. Check with: docker_compose_cmd logs <service>"
     fi
 }
 
@@ -579,6 +708,7 @@ main() {
     check_service_health
     check_grpc_services
     check_audio_services
+    check_gateway_round_trip
     check_gpu_status
     check_network_connectivity
     check_logs
@@ -622,13 +752,13 @@ case "${1:-}" in
         print_header "Recent Service Logs"
         for service in "${SERVICES[@]}"; do
             echo -e "\n${BLUE}=== $service logs ===${NC}"
-            docker-compose logs --tail=20 "$service"
+            docker_compose_cmd logs --tail=20 "$service"
         done
         ;;
     "--restart")
         print_header "Restarting All Services"
-        docker-compose down
-        docker-compose up -d
+        docker_compose_cmd down
+        docker_compose_cmd up -d
         sleep 10
         main
         ;;

@@ -9,6 +9,8 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     ffmpeg \
     libsndfile1 \
+    rustc \
+    cargo \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -37,3 +39,5 @@ RUN chmod +x /app/scripts/*.py
 
 # Default command
 CMD ["bash"]
+
+

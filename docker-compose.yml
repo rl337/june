@@ -1,10 +1,9 @@
-version: '3.8'
-
 services:
   # PostgreSQL with pgvector extension for RAG
   postgres:
     image: pgvector/pgvector:pg16
     container_name: june-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: june
       POSTGRES_USER: june
@@ -24,6 +23,7 @@ services:
   minio:
     image: minio/minio:latest
     container_name: june-minio
+    restart: unless-stopped
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-changeme}
@@ -43,6 +43,7 @@ services:
   nats:
     image: nats:latest
     container_name: june-nats
+    restart: unless-stopped
     ports:
       - "4222:4222"
       - "8222:8222"  # HTTP monitoring
@@ -60,6 +61,7 @@ services:
   prometheus:
     image: prom/prometheus:latest
     container_name: june-prometheus
+    restart: unless-stopped
     ports:
       - "9090:9090"
     volumes:
@@ -73,6 +75,7 @@ services:
   grafana:
     image: grafana/grafana:latest
     container_name: june-grafana
+    restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
@@ -89,6 +92,7 @@ services:
       context: ./services/webapp
       dockerfile: Dockerfile
     container_name: june-webapp
+    restart: unless-stopped
     ports:
       - "3001:3000"  # React dev server
     environment:
@@ -106,6 +110,7 @@ services:
   loki:
     image: grafana/loki:latest
     container_name: june-loki
+    restart: unless-stopped
     ports:
       - "3100:3100"
     volumes:
@@ -116,6 +121,7 @@ services:
   jaeger:
     image: jaegertracing/all-in-one:latest
     container_name: june-jaeger
+    restart: unless-stopped
     ports:
       - "16686:16686"  # UI
       - "14268:14268"  # Agent endpoint
@@ -138,19 +144,42 @@ services:
     volumes:
       - ${MODEL_CACHE_DIR:-/home/rlee/models}:/models
       - ${JUNE_DATA_DIR:-/home/rlee/june_data}:/data
+      - ${JUNE_TEST_DATA_DIR:-/home/rlee/june_test_data}:/test_data
       - ./services/cli-tools/scripts:/app/scripts
+      - ./scripts:/app/root_scripts
+      - ./services/gateway/tests:/app/gateway_tests
+      - ./proto:/app/proto
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - june_network
     profiles:
       - tools
     command: ["bash", "-c", "echo 'CLI Tools container ready. Use: docker exec -it june-cli-tools bash' && tail -f /dev/null"]
 
+  # Mock Sink - records requests for downstream validation
+  mock-sink:
+    build:
+      context: ./services/mock-sink
+      dockerfile: Dockerfile
+    container_name: june-mock-sink
+    restart: unless-stopped
+    ports:
+      - "7000:7000"
+    volumes:
+      - ${JUNE_DATA_DIR:-/home/rlee/june_data}/model_artifacts/mock-sink:/app/model_artifacts
+    networks:
+      - june_network
+    profiles:
+      - tools
+
   # Gateway service (FastAPI + WebSocket)
   gateway:
     build:
-      context: ./services/gateway
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/gateway/Dockerfile
     container_name: june-gateway
+    restart: unless-stopped
     ports:
       - "8000:8000"
       - "8001:8001"  # WebSocket
@@ -166,21 +195,21 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - JWT_SECRET=${JWT_SECRET:-change-this-secret}
     depends_on:
-      - postgres
-      - minio
       - nats
-      - inference-api
     volumes:
+      - ${JUNE_DATA_DIR:-/home/rlee/june_data}/model_artifacts/gateway:/app/model_artifacts
       - ./services/gateway:/app
+      - ./proto:/app/proto
     networks:
       - june_network
 
   # Inference API Coordinator (Primary GPU workload)
   inference-api:
     build:
-      context: ./services/inference-api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/inference-api/Dockerfile
     container_name: june-inference-api
+    restart: unless-stopped
     ports:
       - "50051:50051"  # gRPC
     environment:
@@ -209,16 +238,17 @@ services:
       - nats
     volumes:
       - ${MODEL_CACHE_DIR:-/home/rlee/models}:/models
-      - ./services/inference-api:/app
+      - ${JUNE_DATA_DIR:-/home/rlee/june_data}/model_artifacts/inference-api:/app/model_artifacts
     networks:
       - june_network
 
   # STT Service (Speech-to-Text) - Shared GPU with MPS
   stt:
     build:
-      context: ./services/stt
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/stt/Dockerfile
     container_name: june-stt
+    restart: unless-stopped
     ports:
       - "50052:50052"  # gRPC
     environment:
@@ -239,16 +269,17 @@ services:
       - nats
     volumes:
       - ${MODEL_CACHE_DIR:-/home/rlee/models}:/models
-      - ./services/stt:/app
+      - ${JUNE_DATA_DIR:-/home/rlee/june_data}/model_artifacts/stt:/app/model_artifacts
     networks:
       - june_network
 
   # TTS Service (Text-to-Speech) - Shared GPU with MPS
   tts:
     build:
-      context: ./services/tts
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/tts/Dockerfile
     container_name: june-tts
+    restart: unless-stopped
     ports:
       - "50053:50053"  # gRPC
     environment:
@@ -269,6 +300,7 @@ services:
       - nats
     volumes:
       - ${MODEL_CACHE_DIR:-/home/rlee/models}:/models
+      - ${JUNE_DATA_DIR:-/home/rlee/june_data}/model_artifacts/tts:/app/model_artifacts
       - ./services/tts:/app
     networks:
       - june_network

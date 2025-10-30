@@ -295,3 +295,6 @@ trap 'print_warning "Script interrupted"; cleanup; exit 1' INT TERM
 
 # Run main function
 main "$@"
+
+
+

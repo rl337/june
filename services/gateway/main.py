@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 import uuid
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends, status
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends, status, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -19,6 +19,9 @@ from jose import JWTError, jwt
 import httpx
 
 from shared import config, setup_logging, Timer, RateLimiter, HealthChecker, CircularBuffer
+from june_grpc_api import asr_pb2, asr_pb2_grpc, tts_pb2, tts_pb2_grpc, llm_pb2, llm_pb2_grpc
+
+from june_grpc_api import asr_pb2, asr_pb2_grpc
 
 # Setup logging
 setup_logging(config.monitoring.log_level, "gateway")
@@ -113,6 +116,41 @@ class GatewayService:
                 "uptime": "N/A",  # TODO: Implement uptime tracking
                 "timestamp": datetime.now().isoformat()
             }
+
+        @self.app.post("/api/v1/audio/transcribe")
+        async def transcribe_audio(audio: UploadFile = File(...)):
+            data = await audio.read()
+            stt_url = os.getenv("STT_URL", "grpc://stt:50052").replace("grpc://", "")
+            async with grpc.aio.insecure_channel(stt_url) as channel:
+                stub = asr_pb2_grpc.SpeechToTextStub(channel)
+                cfg = asr_pb2.RecognitionConfig(language="en", interim_results=False)
+                req = asr_pb2.RecognitionRequest(audio_data=data, sample_rate=16000, encoding="wav", config=cfg)
+                resp = await stub.Recognize(req, timeout=30.0)
+                transcript = resp.results[0].transcript if resp.results else ""
+                return {"transcript": transcript}
+
+        @self.app.post("/api/v1/llm/generate")
+        async def llm_generate(payload: Dict[str, Any]):
+            text = payload.get("prompt", "")
+            llm_url = os.getenv("INFERENCE_API_URL", "grpc://inference-api:50051").replace("grpc://", "")
+            async with grpc.aio.insecure_channel(llm_url) as channel:
+                stub = llm_pb2_grpc.LLMServiceStub(channel)
+                req = llm_pb2.GenerateRequest(prompt=text)
+                resp = await stub.Generate(req, timeout=30.0)
+                return {"text": resp.text}
+
+        @self.app.post("/api/v1/tts/speak")
+        async def tts_speak(payload: Dict[str, Any]):
+            text = payload.get("text", "")
+            tts_url = os.getenv("TTS_URL", "grpc://tts:50053").replace("grpc://", "")
+            async with grpc.aio.insecure_channel(tts_url) as channel:
+                stub = tts_pb2_grpc.TextToSpeechStub(channel)
+                cfg = tts_pb2.SynthesisConfig(sample_rate=16000, speed=1.0, pitch=0.0)
+                req = tts_pb2.SynthesisRequest(text=text, config=cfg, voice_id="default", language="en")
+                resp = await stub.Synthesize(req, timeout=30.0)
+                import base64
+                b64 = base64.b64encode(resp.audio_data).decode("ascii")
+                return {"audio_b64": b64, "sample_rate": 16000}
         
         @self.app.post("/auth/token")
         async def create_token(user_id: str = "default"):

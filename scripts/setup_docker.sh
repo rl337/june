@@ -37,3 +37,6 @@ echo ""
 echo "🚀 Once Docker is working, you can:"
 echo "  docker compose --profile tools up -d cli-tools"
 echo "  docker exec -it june-cli-tools bash"
+
+
+

@@ -121,6 +121,15 @@ huggingface/
 /home/rlee/june_data/
 june_data/
 
+# Test data and artifacts (CRITICAL - Never commit test artifacts!)
+/home/rlee/june_test_data/
+june_test_data/
+test_data/
+test_artifacts/
+
+# Model artifacts from containers
+model_artifacts/
+
 # Database
 *.db
 *.sqlite

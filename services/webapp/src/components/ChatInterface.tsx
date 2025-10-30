@@ -240,3 +240,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({ user }) => {
 };
 
 export default ChatInterface;
+
+
+

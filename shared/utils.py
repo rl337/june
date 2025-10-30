@@ -4,6 +4,7 @@ Shared utilities and helpers for June Agent services.
 import asyncio
 import json
 import logging
+import os
 import time
 from typing import Any, Dict, List, Optional, Union
 from datetime import datetime, timezone
@@ -171,12 +172,16 @@ class HealthChecker:
 
 def setup_logging(level: str = "INFO", service_name: str = "june"):
     """Setup logging configuration."""
+    # Create logs directory if it doesn't exist
+    log_dir = f'{os.getenv("JUNE_DATA_DIR", "/tmp")}/logs'
+    os.makedirs(log_dir, exist_ok=True)
+    
     logging.basicConfig(
         level=getattr(logging, level.upper()),
         format=f'%(asctime)s - {service_name} - %(name)s - %(levelname)s - %(message)s',
         handlers=[
             logging.StreamHandler(),
-            logging.FileHandler(f'{os.getenv("JUNE_DATA_DIR", "/tmp")}/logs/{service_name}.log')
+            logging.FileHandler(f'{log_dir}/{service_name}.log')
         ]
     )
 

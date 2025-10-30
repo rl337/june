@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "june-grpc-api"
+version = "0.1.0"
+description = "June shared gRPC API (protos + generated Python stubs at build time)"
+authors = [{name = "June Team"}]
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "grpcio>=1.56.0",
+]
+
+[tool.setuptools]
+packages = ["june_grpc_api"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"june_grpc_api" = ["*.py"]
+
+

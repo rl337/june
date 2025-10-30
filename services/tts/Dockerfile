@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.1-devel-ubuntu22.04
+FROM ubuntu:22.04
 
 # Set working directory
 WORKDIR /app
@@ -28,19 +28,17 @@ RUN ln -s /usr/bin/python3.10 /usr/bin/python
 RUN python -m pip install --upgrade pip
 
 # Copy requirements and install Python dependencies
-COPY ../../pyproject.toml ../../poetry.lock ./
-RUN pip install poetry && \
-    poetry config virtualenvs.create false && \
-    poetry install --no-dev
+COPY pyproject.toml ./
+RUN pip install fastapi uvicorn grpcio grpcio-tools nats-py sqlalchemy psycopg2-binary minio prometheus-client soundfile numpy
 
 # Copy protobuf files
-COPY ../../proto ./proto
+COPY proto ./proto
 
 # Copy shared modules
-COPY ../../shared ./shared
+COPY shared ./shared
 
 # Copy service code
-COPY . .
+COPY services/tts .
 
 # Create non-root user
 RUN useradd -m -u 1000 june && chown -R june:june /app
