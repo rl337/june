@@ -28,11 +28,14 @@ from june_grpc_api import asr_pb2, asr_pb2_grpc
 setup_logging(config.monitoring.log_level, "gateway")
 logger = logging.getLogger(__name__)
 
-# Prometheus metrics
-REQUEST_COUNT = Counter('gateway_requests_total', 'Total requests', ['method', 'endpoint', 'status'])
-REQUEST_DURATION = Histogram('gateway_request_duration_seconds', 'Request duration')
-ACTIVE_CONNECTIONS = Gauge('gateway_active_connections', 'Active WebSocket connections')
-RATE_LIMIT_HITS = Counter('gateway_rate_limit_hits_total', 'Rate limit hits')
+# Prometheus metrics (guard against duplicate registration under dev servers)
+_metrics_inited = globals().get("_metrics_inited", False)
+if not _metrics_inited:
+    REQUEST_COUNT = Counter('gateway_requests_total', 'Total requests', ['method', 'endpoint', 'status'])
+    REQUEST_DURATION = Histogram('gateway_request_duration_seconds', 'Request duration')
+    ACTIVE_CONNECTIONS = Gauge('gateway_active_connections', 'Active WebSocket connections')
+    RATE_LIMIT_HITS = Counter('gateway_rate_limit_hits_total', 'Rate limit hits')
+    globals()["_metrics_inited"] = True
 
 # Security
 security = HTTPBearer()
