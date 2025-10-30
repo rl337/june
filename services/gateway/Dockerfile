@@ -19,7 +19,8 @@ RUN pip install --no-cache-dir fastapi uvicorn httpx pydantic grpcio nats-py pro
 
 # Install june-grpc-api from prebuilt wheel
 COPY packages/june-grpc-api/dist/*.whl /tmp/
-RUN pip install /tmp/june_grpc_api-*.whl
+COPY packages/inference-core/dist/*.whl /tmp/
+RUN pip install /tmp/june_grpc_api-*.whl /tmp/inference_core-*.whl
 
 # Copy service code
 COPY services/gateway/ .
