@@ -28,7 +28,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # Import protobuf classes from installed package
-from june_grpc_api import tts_pb2, tts_pb2_grpc, asr_pb2, asr_pb2_grpc
+from june_grpc_api import tts as tts_shim, asr as asr_shim
 
 class GatewayRoundTripTester:
     """Round-trip tester via Gateway simulating real user flow."""
@@ -74,27 +74,13 @@ class GatewayRoundTripTester:
         """TTS: Convert text to audio using real TTS gRPC service."""
         try:
             async with grpc.aio.insecure_channel(self.tts_address) as channel:
-                stub = tts_pb2_grpc.TextToSpeechStub(channel)
-                
-                config = tts_pb2.SynthesisConfig(
-                    sample_rate=self.sample_rate,
-                    speed=1.0,
-                    pitch=0.0
-                )
-                
-                request = tts_pb2.SynthesisRequest(
-                    text=text,
-                    config=config,
-                    voice_id="default",
-                    language="en"
-                )
-                
+                client = tts_shim.TextToSpeechClient(channel)
+                config = tts_shim.SynthesisConfig(sample_rate=self.sample_rate, speed=1.0, pitch=0.0)
                 logger.debug(f"TTS: Synthesizing '{text[:50]}...'")
-                response = await stub.Synthesize(request, timeout=30.0)
-                
-                if response.audio_data:
-                    logger.debug(f"TTS: Generated {len(response.audio_data)} bytes")
-                    return response.audio_data
+                audio = await client.synthesize(text=text, voice_id="default", language="en", config=config)
+                if audio:
+                    logger.debug(f"TTS: Generated {len(audio)} bytes")
+                    return audio
                 else:
                     logger.error("TTS: Empty audio response")
                     return b""
@@ -110,25 +96,13 @@ class GatewayRoundTripTester:
         """STT: Convert audio to text using real STT gRPC service."""
         try:
             async with grpc.aio.insecure_channel(self.stt_address) as channel:
-                stub = asr_pb2_grpc.SpeechToTextStub(channel)
-                
-                cfg = asr_pb2.RecognitionConfig(language="en", interim_results=False)
-                request = asr_pb2.RecognitionRequest(
-                    audio_data=audio_data,
-                    sample_rate=self.sample_rate,
-                    encoding="wav",
-                    config=cfg,
-                )
-                
+                client = asr_shim.SpeechToTextClient(channel)
+                cfg = asr_shim.RecognitionConfig(language="en", interim_results=False)
                 logger.debug(f"STT: Recognizing {len(audio_data)} bytes of audio")
-                response = await stub.Recognize(request, timeout=30.0)
-                
-                if response.results and len(response.results) > 0:
-                    result = response.results[0]
-                    transcript = result.transcript
-                    confidence = result.confidence
-                    logger.debug(f"STT: Recognized '{transcript}' (confidence: {confidence:.2f})")
-                    return transcript
+                result = await client.recognize(audio_data, sample_rate=self.sample_rate, encoding="wav", config=cfg)
+                if result.transcript:
+                    logger.debug(f"STT: Recognized '{result.transcript}' (confidence: {result.confidence:.2f})")
+                    return result.transcript
                 else:
                     logger.error("STT: No results returned")
                     return ""

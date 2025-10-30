@@ -20,9 +20,7 @@ from jose import JWTError, jwt
 import httpx
 
 from inference_core import config, setup_logging, Timer, RateLimiter, HealthChecker, CircularBuffer
-from june_grpc_api import asr_pb2, asr_pb2_grpc, tts_pb2, tts_pb2_grpc, llm_pb2, llm_pb2_grpc
-
-from june_grpc_api import asr_pb2, asr_pb2_grpc
+from june_grpc_api import asr as asr_shim, tts as tts_shim, llm as llm_shim
 
 # Setup logging
 setup_logging(config.monitoring.log_level, "gateway")
@@ -124,11 +122,10 @@ class GatewayService:
             data = await audio.read()
             stt_url = os.getenv("STT_URL", "grpc://stt:50052").replace("grpc://", "")
             async with grpc.aio.insecure_channel(stt_url) as channel:
-                stub = asr_pb2_grpc.SpeechToTextStub(channel)
-                cfg = asr_pb2.RecognitionConfig(language="en", interim_results=False)
-                req = asr_pb2.RecognitionRequest(audio_data=data, sample_rate=16000, encoding="wav", config=cfg)
-                resp = await stub.Recognize(req, timeout=30.0)
-                transcript = resp.results[0].transcript if resp.results else ""
+                client = asr_shim.SpeechToTextClient(channel)
+                cfg = asr_shim.RecognitionConfig(language="en", interim_results=False)
+                result = await client.recognize(data, sample_rate=16000, encoding="wav", config=cfg)
+                transcript = result.transcript
                 return {"transcript": transcript}
 
         @self.app.post("/api/v1/llm/generate")
@@ -136,22 +133,20 @@ class GatewayService:
             text = payload.get("prompt", "")
             llm_url = os.getenv("INFERENCE_API_URL", "grpc://inference-api:50051").replace("grpc://", "")
             async with grpc.aio.insecure_channel(llm_url) as channel:
-                stub = llm_pb2_grpc.LLMServiceStub(channel)
-                req = llm_pb2.GenerateRequest(prompt=text)
-                resp = await stub.Generate(req, timeout=30.0)
-                return {"text": resp.text}
+                client = llm_shim.LLMClient(channel)
+                out = await client.generate(text)
+                return {"text": out}
 
         @self.app.post("/api/v1/tts/speak")
         async def tts_speak(payload: Dict[str, Any]):
             text = payload.get("text", "")
             tts_url = os.getenv("TTS_URL", "grpc://tts:50053").replace("grpc://", "")
             async with grpc.aio.insecure_channel(tts_url) as channel:
-                stub = tts_pb2_grpc.TextToSpeechStub(channel)
-                cfg = tts_pb2.SynthesisConfig(sample_rate=16000, speed=1.0, pitch=0.0)
-                req = tts_pb2.SynthesisRequest(text=text, config=cfg, voice_id="default", language="en")
-                resp = await stub.Synthesize(req, timeout=30.0)
+                client = tts_shim.TextToSpeechClient(channel)
+                cfg = tts_shim.SynthesisConfig(sample_rate=16000, speed=1.0, pitch=0.0)
+                audio = await client.synthesize(text=text, voice_id="default", language="en", config=cfg)
                 import base64
-                b64 = base64.b64encode(resp.audio_data).decode("ascii")
+                b64 = base64.b64encode(audio).decode("ascii")
                 return {"audio_b64": b64, "sample_rate": 16000}
         
         @self.app.post("/auth/token")
