@@ -15,6 +15,7 @@ from .utils import (
     HealthChecker, setup_logging, get_timestamp, generate_id,
     CircularBuffer,
 )
+from .servers.stt_server import SttGrpcApp
 
 __all__ = [
     "InferenceStrategy",
