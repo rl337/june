@@ -380,7 +380,7 @@ if __name__ == "__main__":
         "main:app",
         host=os.getenv("GATEWAY_HOST", "0.0.0.0"),
         port=int(os.getenv("GATEWAY_PORT", "8000")),
-        reload=True,
+        reload=False,
         log_level=config.monitoring.log_level.lower()
     )
 

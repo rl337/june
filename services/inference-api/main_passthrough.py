@@ -6,11 +6,11 @@ from june_grpc_api import llm_pb2, llm_pb2_grpc
 
 
 class PassthroughLLM(llm_pb2_grpc.LLMInferenceServicer):
-    def Generate(self, request: llm_pb2.GenerateRequest, context) -> llm_pb2.GenerateResponse:
+    def Generate(self, request: llm_pb2.GenerationRequest, context) -> llm_pb2.GenerationResponse:
         prompt = request.prompt or ""
         # Passthrough: echo prompt or minimal transformation
         text = f"[passthrough] {prompt}"
-        return llm_pb2.GenerateResponse(text=text)
+        return llm_pb2.GenerationResponse(text=text)
 
     def HealthCheck(self, request: llm_pb2.HealthRequest, context) -> llm_pb2.HealthResponse:
         return llm_pb2.HealthResponse(healthy=True, model_name="passthrough")
