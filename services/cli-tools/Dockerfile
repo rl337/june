@@ -17,16 +17,17 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy requirements for CLI tools
-COPY requirements-cli.txt .
+COPY services/cli-tools/requirements-cli.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements-cli.txt
 
-# Install june-grpc-api from prebuilt wheel
-COPY ../../packages/june-grpc-api/dist/*.whl /tmp/
-RUN pip install /tmp/june_grpc_api-*.whl
+# Install june-grpc-api and inference-core from prebuilt wheels
+COPY packages/june-grpc-api/dist/*.whl /tmp/
+COPY packages/inference-core/dist/*.whl /tmp/
+RUN pip install /tmp/june_grpc_api-*.whl /tmp/inference_core-*.whl
 
-# Copy CLI scripts
+# Copy CLI scripts from repo root scripts
 COPY scripts/ /app/scripts/
 
 # Set environment variables

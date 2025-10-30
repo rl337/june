@@ -11,6 +11,7 @@ COPY shared ./shared
 COPY services/inference-api .
 
 # Ensure permissions
+USER root
 RUN chown -R june:june /app
 USER june
 

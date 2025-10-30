@@ -5,6 +5,7 @@ WORKDIR /app
 ENV PYTHONPATH="/app:/app/shared"
 
 # Install service-specific Python deps
+USER root
 RUN pip install numpy openai-whisper soundfile
 
 # Copy shared modules
@@ -14,6 +15,7 @@ COPY shared ./shared
 COPY services/stt .
 
 # Ensure permissions
+USER root
 RUN chown -R june:june /app
 USER june
 

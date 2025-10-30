@@ -2,8 +2,8 @@ services:
   # Base build image target (not a running service)
   base:
     build:
-      context: ./services/base
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/base/Dockerfile
     image: june-base:latest
     profiles:
       - tools
@@ -141,8 +141,8 @@ services:
   # CLI Tools Container for development and maintenance
   cli-tools:
     build:
-      context: ./services/cli-tools
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/cli-tools/Dockerfile
     container_name: june-cli-tools
     environment:
       - MODEL_CACHE_DIR=/models
