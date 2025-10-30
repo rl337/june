@@ -16,8 +16,7 @@ RUN apt-get update && apt-get install -y \
 # Install service-specific Python deps
 RUN pip install soundfile numpy
 
-# Copy shared modules
-COPY shared ./shared
+## shared module removed; use inference_core instead
 
 # Copy service code
 COPY services/tts .

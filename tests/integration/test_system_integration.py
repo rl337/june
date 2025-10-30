@@ -557,7 +557,7 @@ class TestConfigurationIntegration:
     def test_environment_variables(self):
         """Test environment variable handling."""
         import os
-        from shared.config import config
+        from inference_core.config import config
         
         # Test that configuration loads properly
         assert config.model.name is not None
@@ -570,7 +570,7 @@ class TestConfigurationIntegration:
         """Test service discovery and connection."""
         # This would test actual service connections in a real deployment
         # For now, we'll test the configuration
-        from shared.config import config
+        from inference_core.config import config
         
         assert config.inference_api_url is not None
         assert config.stt_url is not None

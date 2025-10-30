@@ -19,7 +19,7 @@ from prometheus_client import Counter, Histogram, Gauge, generate_latest, Collec
 from jose import JWTError, jwt
 import httpx
 
-from shared import config, setup_logging, Timer, RateLimiter, HealthChecker, CircularBuffer
+from inference_core import config, setup_logging, Timer, RateLimiter, HealthChecker, CircularBuffer
 from june_grpc_api import asr_pb2, asr_pb2_grpc, tts_pb2, tts_pb2_grpc, llm_pb2, llm_pb2_grpc
 
 from june_grpc_api import asr_pb2, asr_pb2_grpc

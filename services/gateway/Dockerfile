@@ -15,11 +15,7 @@ RUN apt-get update && apt-get install -y \
 # Install Python dependencies directly
 RUN pip install --no-cache-dir fastapi uvicorn httpx pydantic grpcio nats-py prometheus-client python-jose python-multipart
 
-# Copy shared modules
-COPY shared ./shared
-# Ensure shared package is importable even if PYTHONPATH is ignored
-RUN mkdir -p /usr/local/lib/python3.11/site-packages/shared && \
-    cp -r ./shared/* /usr/local/lib/python3.11/site-packages/shared/
+## shared module removed; use inference_core instead
 
 # Install june-grpc-api from prebuilt wheel
 COPY packages/june-grpc-api/dist/*.whl /tmp/

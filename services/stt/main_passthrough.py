@@ -25,7 +25,7 @@ from asr_pb2 import (
 )
 import asr_pb2_grpc
 
-from shared import config, setup_logging, Timer, HealthChecker, CircularBuffer
+from inference_core import config, setup_logging, Timer, HealthChecker, CircularBuffer
 
 # Setup logging
 setup_logging(config.monitoring.log_level, "stt")

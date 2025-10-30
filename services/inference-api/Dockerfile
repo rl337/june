@@ -4,8 +4,7 @@ FROM june-base:latest
 WORKDIR /app
 ENV PYTHONPATH="/app:/app/shared"
 
-# Copy shared modules
-COPY shared ./shared
+## shared module removed; use inference_core instead
 
 # Copy service code
 COPY services/inference-api .

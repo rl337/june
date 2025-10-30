@@ -8,8 +8,7 @@ ENV PYTHONPATH="/app:/app/shared"
 USER root
 RUN pip install numpy openai-whisper soundfile
 
-# Copy shared modules
-COPY shared ./shared
+## shared module removed; use inference_core instead
 
 # Copy service code
 COPY services/stt .

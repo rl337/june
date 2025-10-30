@@ -12,7 +12,7 @@ from fastapi import WebSocket
 import httpx
 
 from main import app, gateway_service, active_connections, rate_limiter
-from shared import config
+from inference_core import config
 from jose import jwt
 
 # Test configuration
