@@ -2,6 +2,7 @@ FROM ubuntu:22.04
 
 # Set working directory
 WORKDIR /app
+ENV PYTHONPATH="/app:/app/shared"
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -35,6 +36,9 @@ RUN pip install build grpcio-tools && \
     --python_out=/tmp/june-grpc-api/june_grpc_api \
     --grpc_python_out=/tmp/june-grpc-api/june_grpc_api \
     /tmp/june-grpc-api/proto/asr.proto /tmp/june-grpc-api/proto/tts.proto /tmp/june-grpc-api/proto/llm.proto && \
+    sed -i "s/^import asr_pb2/from . import asr_pb2/" /tmp/june-grpc-api/june_grpc_api/asr_pb2_grpc.py && \
+    sed -i "s/^import tts_pb2/from . import tts_pb2/" /tmp/june-grpc-api/june_grpc_api/tts_pb2_grpc.py && \
+    sed -i "s/^import llm_pb2/from . import llm_pb2/" /tmp/june-grpc-api/june_grpc_api/llm_pb2_grpc.py && \
     cd /tmp/june-grpc-api && python -m build && pip install dist/*.whl
 
 # Copy shared modules

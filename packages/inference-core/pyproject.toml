@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "inference-core"
+version = "0.1.0"
+description = "Shared inference core with Strategy-based backends for June services"
+authors = [{name = "June Agent Team"}]
+requires-python = ">=3.10"
+dependencies = [
+  "grpcio>=1.56.0",
+  "protobuf>=4.25.3",
+  "pydantic>=2.5.0",
+  "prometheus-client>=0.20.0",
+  "typing-extensions>=4.8.0",
+]
+
+[project.optional-dependencies]
+audio = [
+  "soundfile>=0.12.1",
+  "numpy>=1.24",
+]
+
+[tool.setuptools]
+package-dir = {"" = "inference_core"}
+packages = ["inference_core"]
+
+
