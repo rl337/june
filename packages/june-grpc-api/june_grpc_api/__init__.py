@@ -1,3 +1,11 @@
-# Generated gRPC stubs will be placed here during build.
+from . import generated  # Generated gRPC stubs live here
+from .shim import asr as asr, tts as tts, llm as llm
+
+__all__ = [
+    "generated",
+    "asr",
+    "tts",
+    "llm",
+]
 
 

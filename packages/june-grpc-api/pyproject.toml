@@ -14,11 +14,16 @@ dependencies = [
 ]
 
 [tool.setuptools]
-packages = ["june_grpc_api"]
+packages = [
+  "june_grpc_api",
+  "june_grpc_api.generated",
+  "june_grpc_api.shim",
+]
 include-package-data = true
 
 [tool.setuptools.package-data]
 "june_grpc_api" = ["*.py"]
+"june_grpc_api.generated" = ["*.py"]
 
 
 
