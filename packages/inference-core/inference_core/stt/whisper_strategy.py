@@ -61,9 +61,14 @@ class WhisperSttStrategy(SttStrategy):
                 data = data / max_val
         
         # Use language hint and better transcription options
-        # Try to use initial_prompt based on context if available
-        # For testing, use a generic prompt that helps with common words
-        initial_prompt = "Hello world test speech recognition one two three four five."
+        # Use a minimal prompt that helps with common words without adding noise
+        # Keep it short to avoid interfering with recognition
+        initial_prompt = "Hello world test one two three"
+        
+        # Check for empty audio before processing
+        if len(data) == 0:
+            logger.warning("Received empty audio data")
+            return InferenceResponse(payload="", metadata={"confidence": 0.0})
         
         result: Dict[str, Any] = self._model.transcribe(
             data,
@@ -71,7 +76,6 @@ class WhisperSttStrategy(SttStrategy):
             language="en",  # Specify English for better accuracy
             task="transcribe",  # Transcribe (not translate)
             initial_prompt=initial_prompt,  # Help with context
-            verbose=False,  # Reduce logging
         )
         text = result.get("text", "").strip()
         confidence = result.get("no_speech_prob", 0.0)

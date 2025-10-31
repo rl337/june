@@ -41,6 +41,20 @@ class EspeakTtsStrategy(TtsStrategy):
         if not text.strip():
             return InferenceResponse(payload=b"", metadata={"sample_rate": self.sample_rate, "duration_ms": 0})
         
+        text = text.strip()
+        word_count = len(text.split())
+        
+        # For single words, use slower speed and higher amplitude for better STT recognition
+        # Single words need more clarity without context
+        if word_count == 1:
+            speed = '100'  # Slower for single words (was 120)
+            amplitude = '170'  # Higher amplitude for clarity (was 160)
+            gap = '15'  # Slightly larger gap (was 10)
+        else:
+            speed = '120'
+            amplitude = '160'
+            gap = '10'
+        
         try:
             # Create temp file path (don't create file, espeak will create it)
             fd, temp_path = tempfile.mkstemp(suffix='.wav')
@@ -55,7 +69,7 @@ class EspeakTtsStrategy(TtsStrategy):
             # -p: pitch (50 = base, lower = clearer but robotic)
             # Sample rate is typically fixed by espeak, we'll resample if needed
             # Use slower speed and clearer settings for better STT recognition
-            cmd = ['espeak', '-s', '120', '-a', '160', '-g', '10', '-p', '50', '-v', 'en+f3', '-w', temp_path, text]
+            cmd = ['espeak', '-s', speed, '-a', amplitude, '-g', gap, '-p', '50', '-v', 'en+f3', '-w', temp_path, text]
             result = subprocess.run(cmd, capture_output=True, text=True, stdin=subprocess.DEVNULL)
             if result.returncode != 0:
                 if os.path.exists(temp_path):

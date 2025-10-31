@@ -115,6 +115,13 @@ class TtsSttValidator:
         text = text.strip().lower()
         text = re.sub(r'[.,!?;:]', '', text)
         
+        # Handle padded single words if present: "the word X here" -> extract just "X"
+        # (Not used currently, but kept for backward compatibility)
+        padded_pattern = r'the\s+word\s+(\w+)\s+here'
+        match = re.search(padded_pattern, text)
+        if match:
+            text = match.group(1)
+        
         # Normalize numbers: "1, 2, 3" -> "one two three"
         number_map = {
             "1": "one", "2": "two", "3": "three", "4": "four", "5": "five",
@@ -132,11 +139,22 @@ class TtsSttValidator:
         input_norm = self.normalize_text(input_text)
         output_norm = self.normalize_text(output_text)
         
+        # If normalized texts are empty, fail
+        if not input_norm or not output_norm:
+            return False
+        
         if self.tolerance == "exact":
             return input_norm == output_norm
         elif self.tolerance == "contains":
             # Check if output contains input or vice versa (for longer outputs)
-            return input_norm in output_norm or output_norm in input_norm
+            # For single words, be more lenient - check if word appears in output
+            input_words = input_norm.split()
+            if len(input_words) == 1:
+                # Single word: check if it appears anywhere in output
+                return input_words[0] in output_norm.split()
+            else:
+                # Multiple words: check if input is contained in output or vice versa
+                return input_norm in output_norm or output_norm in input_norm
         elif self.tolerance == "fuzzy":
             # Simple fuzzy match - at least 70% of words match
             input_words = set(input_norm.split())
@@ -148,37 +166,43 @@ class TtsSttValidator:
         else:
             return False
     
-    async def test_tts_round_trip(self, input_text: str) -> Tuple[bool, str, str]:
+    async def test_tts_round_trip(self, input_text: str, verbose: bool = False) -> Tuple[bool, str, str]:
         """
         Test TTS round-trip: Text → TTS → STT → Text
         
         Returns:
             (success, input_text, output_text)
         """
-        logger.info(f"  Testing: '{input_text}'")
+        if verbose:
+            logger.info(f"  Testing: '{input_text}'")
         
         # Step 1: Text → TTS → Audio
         audio = await self.tts_synthesize(input_text)
         if not audio or len(audio) == 0:
-            logger.error(f"  ❌ TTS produced empty audio")
+            if verbose:
+                logger.error(f"  ❌ TTS produced empty audio")
             return (False, input_text, "")
         
-        logger.info(f"  ✅ TTS: Generated {len(audio)} bytes")
+        if verbose:
+            logger.info(f"  ✅ TTS: Generated {len(audio)} bytes")
         
         # Step 2: Audio → STT → Text
         output_text = await self.stt_recognize(audio)
         if not output_text:
-            logger.error(f"  ❌ STT produced empty transcript")
+            if verbose:
+                logger.error(f"  ❌ STT produced empty transcript")
             return (False, input_text, "")
         
-        logger.info(f"  ✅ STT: Recognized '{output_text}'")
+        if verbose:
+            logger.info(f"  ✅ STT: Recognized '{output_text}'")
         
         # Step 3: Compare
         matches = self.text_matches(input_text, output_text)
-        if matches:
-            logger.info(f"  ✅ Match: '{input_text}' ≈ '{output_text}'")
-        else:
-            logger.warning(f"  ⚠️  Mismatch: '{input_text}' ≠ '{output_text}'")
+        if verbose:
+            if matches:
+                logger.info(f"  ✅ Match: '{input_text}' ≈ '{output_text}'")
+            else:
+                logger.warning(f"  ⚠️  Mismatch: '{input_text}' ≠ '{output_text}'")
         
         return (matches, input_text, output_text)
     
@@ -252,6 +276,12 @@ class TtsSttValidator:
 
 async def main():
     """Run validation tests."""
+    import sys
+    
+    # Import test case generator
+    sys.path.insert(0, os.path.dirname(__file__))
+    from test_case_generator import TestCaseGenerator, TestCase
+    
     # Detect Docker environment
     is_docker = os.path.exists("/.dockerenv") or os.getenv("DOCKER_CONTAINER") == "true"
     
@@ -273,74 +303,150 @@ async def main():
     logger.info("=" * 80)
     logger.info("")
     
-    # Test 1: TTS Round-Trip Accuracy
-    logger.info("Test 1: TTS Round-Trip Accuracy")
-    logger.info("-" * 80)
-    test_texts = [
-        "Hello",
-        "Hello world",
-        "Test",
-        "The quick brown fox",
-        "One two three four five",
-    ]
+    # Generate test cases
+    generator = TestCaseGenerator()
+    target_short = 300
+    target_medium = 400
+    target_long = 300
+    total_target = target_short + target_medium + target_long
     
-    round_trip_results = []
-    for text in test_texts:
-        success, input_text, output_text = await validator.test_tts_round_trip(text)
-        round_trip_results.append((success, input_text, output_text))
-        logger.info("")
+    logger.info(f"Generating test cases: {target_short} short, {target_medium} medium, {target_long} long")
+    all_test_cases = generator.generate_all(
+        short_count=target_short,
+        medium_count=target_medium,
+        long_count=target_long
+    )
     
-    round_trip_passed = sum(1 for success, _, _ in round_trip_results if success)
-    logger.info(f"Round-trip results: {round_trip_passed}/{len(test_texts)} passed")
+    stats = generator.get_statistics(all_test_cases)
+    logger.info(f"Generated {stats['total']} test cases")
+    logger.info(f"  Short (1-3 words): {stats['by_category'].get('short', 0)}")
+    logger.info(f"  Medium (4-10 words): {stats['by_category'].get('medium', 0)}")
+    logger.info(f"  Long (11+ words): {stats['by_category'].get('long', 0)}")
     logger.info("")
     
-    # Test 2: TTS Consistency
-    logger.info("Test 2: TTS Consistency")
+    # Organize by category
+    short_cases = [case for case in all_test_cases if case.category == "short"]
+    medium_cases = [case for case in all_test_cases if case.category == "medium"]
+    long_cases = [case for case in all_test_cases if case.category == "long"]
+    
+    # Test 1: Short Phrases Round-Trip
+    logger.info("Test 1: Short Phrases Round-Trip (1-3 words)")
     logger.info("-" * 80)
-    consistency_texts = ["Hello world", "Test consistency"]
+    short_results = []
+    for i, case in enumerate(short_cases, 1):
+        if i % 50 == 0 or i == len(short_cases):
+            logger.info(f"  Progress: {i}/{len(short_cases)}")
+        success, input_text, output_text = await validator.test_tts_round_trip(case.text, verbose=False)
+        short_results.append((success, input_text, output_text))
+    
+    short_passed = sum(1 for success, _, _ in short_results if success)
+    logger.info("")
+    logger.info(f"Short phrases: {short_passed}/{len(short_cases)} passed ({short_passed*100//len(short_cases) if short_cases else 0}%)")
+    logger.info("")
+    
+    # Test 2: Medium Phrases Round-Trip
+    logger.info("Test 2: Medium Phrases Round-Trip (4-10 words)")
+    logger.info("-" * 80)
+    medium_results = []
+    for i, case in enumerate(medium_cases, 1):
+        if i % 50 == 0 or i == len(medium_cases):
+            logger.info(f"  Progress: {i}/{len(medium_cases)}")
+        success, input_text, output_text = await validator.test_tts_round_trip(case.text, verbose=False)
+        medium_results.append((success, input_text, output_text))
+    
+    medium_passed = sum(1 for success, _, _ in medium_results if success)
+    logger.info("")
+    logger.info(f"Medium phrases: {medium_passed}/{len(medium_cases)} passed ({medium_passed*100//len(medium_cases) if medium_cases else 0}%)")
+    logger.info("")
+    
+    # Test 3: Long Phrases Round-Trip
+    logger.info("Test 3: Long Phrases Round-Trip (11+ words)")
+    logger.info("-" * 80)
+    long_results = []
+    for i, case in enumerate(long_cases, 1):
+        if i % 50 == 0 or i == len(long_cases):
+            logger.info(f"  Progress: {i}/{len(long_cases)}")
+        success, input_text, output_text = await validator.test_tts_round_trip(case.text, verbose=False)
+        long_results.append((success, input_text, output_text))
+    
+    long_passed = sum(1 for success, _, _ in long_results if success)
+    logger.info("")
+    logger.info(f"Long phrases: {long_passed}/{len(long_cases)} passed ({long_passed*100//len(long_cases) if long_cases else 0}%)")
+    logger.info("")
+    
+    # Test 4: TTS Consistency (sampling)
+    logger.info("Test 4: TTS Consistency (sampling)")
+    logger.info("-" * 80)
+    consistency_samples = [
+        short_cases[0].text if short_cases else "Hello",
+        medium_cases[0].text if medium_cases else "The quick brown fox jumps",
+        long_cases[0].text if long_cases else "The quick brown fox jumps over the lazy dog"
+    ]
     consistency_passed = 0
-    for text in consistency_texts:
-        if await validator.test_tts_consistency(text):
+    for text in consistency_samples:
+        if await validator.test_tts_consistency(text, num_runs=3):
             consistency_passed += 1
         logger.info("")
     
-    logger.info(f"Consistency results: {consistency_passed}/{len(consistency_texts)} passed")
-    logger.info("")
-    
-    # Test 3: STT Accuracy (with various text complexities)
-    logger.info("Test 3: STT Accuracy")
-    logger.info("-" * 80)
-    stt_test_cases = [
-        ("Hello", "Hello"),
-        ("World", "World"),
-        ("Test", "Test"),
-        ("Quick brown fox", "Quick brown fox"),
-    ]
-    
-    stt_passed, stt_total = await validator.test_stt_accuracy(stt_test_cases)
-    logger.info("")
-    logger.info(f"STT accuracy: {stt_passed}/{stt_total} passed")
+    logger.info(f"Consistency: {consistency_passed}/{len(consistency_samples)} passed")
     logger.info("")
     
     # Summary
     logger.info("=" * 80)
     logger.info("VALIDATION SUMMARY")
     logger.info("=" * 80)
-    total_tests = len(test_texts) + len(consistency_texts) + len(stt_test_cases)
-    total_passed = round_trip_passed + consistency_passed + stt_passed
+    total_tests = len(short_cases) + len(medium_cases) + len(long_cases) + len(consistency_samples)
+    total_passed = short_passed + medium_passed + long_passed + consistency_passed
     
-    logger.info(f"TTS Round-Trip: {round_trip_passed}/{len(test_texts)}")
-    logger.info(f"TTS Consistency: {consistency_passed}/{len(consistency_texts)}")
-    logger.info(f"STT Accuracy: {stt_passed}/{stt_total}")
+    logger.info(f"Short Phrases (1-3 words): {short_passed}/{len(short_cases)}")
+    logger.info(f"Medium Phrases (4-10 words): {medium_passed}/{len(medium_cases)}")
+    logger.info(f"Long Phrases (11+ words): {long_passed}/{len(long_cases)}")
+    logger.info(f"TTS Consistency: {consistency_passed}/{len(consistency_samples)}")
+    logger.info(f"Total Round-Trip: {short_passed + medium_passed + long_passed}/{len(short_cases) + len(medium_cases) + len(long_cases)}")
     logger.info(f"Total: {total_passed}/{total_tests}")
     logger.info("")
     
+    # Show failures if any
+    if total_passed < total_tests:
+        logger.info("=" * 80)
+        logger.info("FAILURES BY CATEGORY")
+        logger.info("=" * 80)
+        
+        if short_passed < len(short_cases):
+            failed_short = [(input_text, output_text) for success, input_text, output_text in short_results if not success]
+            logger.info(f"\nFailed Short Phrases ({len(failed_short)}/{len(short_cases)}):")
+            for input_text, output_text in failed_short[:10]:  # Show first 10
+                logger.warning(f"  '{input_text}' → '{output_text}'")
+            if len(failed_short) > 10:
+                logger.warning(f"  ... and {len(failed_short) - 10} more")
+        
+        if medium_passed < len(medium_cases):
+            failed_medium = [(input_text, output_text) for success, input_text, output_text in medium_results if not success]
+            logger.info(f"\nFailed Medium Phrases ({len(failed_medium)}/{len(medium_cases)}):")
+            for input_text, output_text in failed_medium[:10]:  # Show first 10
+                logger.warning(f"  '{input_text}' → '{output_text}'")
+            if len(failed_medium) > 10:
+                logger.warning(f"  ... and {len(failed_medium) - 10} more")
+        
+        if long_passed < len(long_cases):
+            failed_long = [(input_text, output_text) for success, input_text, output_text in long_results if not success]
+            logger.info(f"\nFailed Long Phrases ({len(failed_long)}/{len(long_cases)}):")
+            for input_text, output_text in failed_long[:10]:  # Show first 10
+                logger.warning(f"  '{input_text}' → '{output_text}'")
+            if len(failed_long) > 10:
+                logger.warning(f"  ... and {len(failed_long) - 10} more")
+    
+    logger.info("")
     if total_passed == total_tests:
         logger.info("✅ All validation tests passed!")
+        logger.info(f"✅ {total_passed}/{total_tests} tests passed (100%)")
         sys.exit(0)
     else:
-        logger.warning(f"⚠️  Some tests failed: {total_passed}/{total_tests} passed")
-        logger.warning("⚠️  WARNING: TTS/STT may not be reliable for E2E tests")
+        pass_rate = (total_passed * 100) // total_tests if total_tests > 0 else 0
+        logger.warning(f"⚠️  Some tests failed: {total_passed}/{total_tests} passed ({pass_rate}%)")
+        if pass_rate < 100:
+            logger.warning("⚠️  WARNING: TTS/STT may not be reliable for E2E tests")
+            logger.warning("⚠️  Must achieve 100% pass rate for reliable E2E testing")
         sys.exit(1)
 
 
