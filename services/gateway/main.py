@@ -118,7 +118,14 @@ class GatewayService:
             }
 
         @self.app.post("/api/v1/audio/transcribe")
-        async def transcribe_audio(audio: UploadFile = File(...)):
+        async def transcribe_audio(audio: UploadFile = File(...), full_round_trip: str = "false"):
+            """Transcribe audio and optionally return audio response via round-trip.
+            
+            If full_round_trip=True:
+            Audio → STT → Transcript → LLM → Text → TTS → Audio Response
+            Otherwise:
+            Audio → STT → Transcript
+            """
             data = await audio.read()
             stt_url = os.getenv("STT_URL", "grpc://stt:50052").replace("grpc://", "")
             async with grpc.aio.insecure_channel(stt_url) as channel:
@@ -126,7 +133,34 @@ class GatewayService:
                 cfg = asr_shim.RecognitionConfig(language="en", interim_results=False)
                 result = await client.recognize(data, sample_rate=16000, encoding="wav", config=cfg)
                 transcript = result.transcript
+                
+            # Parse full_round_trip from string
+            do_round_trip = full_round_trip.lower() in ("true", "1", "yes", "on")
+            if not do_round_trip:
                 return {"transcript": transcript}
+            
+            # Full round-trip: STT → LLM → TTS
+            # Step 2: Send transcript to LLM
+            llm_url = os.getenv("INFERENCE_API_URL", "grpc://inference-api:50051").replace("grpc://", "")
+            async with grpc.aio.insecure_channel(llm_url) as channel:
+                llm_client = llm_shim.LLMClient(channel)
+                llm_text = await llm_client.generate(transcript)
+            
+            # Step 3: Convert LLM response to audio via TTS
+            tts_url = os.getenv("TTS_URL", "grpc://tts:50053").replace("grpc://", "")
+            async with grpc.aio.insecure_channel(tts_url) as channel:
+                tts_client = tts_shim.TextToSpeechClient(channel)
+                tts_cfg = tts_shim.SynthesisConfig(sample_rate=16000, speed=1.0, pitch=0.0)
+                response_audio = await tts_client.synthesize(text=llm_text, voice_id="default", language="en", config=tts_cfg)
+            
+            # Return both transcript and audio response
+            import base64
+            return {
+                "transcript": transcript,
+                "llm_response": llm_text,
+                "audio_data": base64.b64encode(response_audio).decode("ascii"),
+                "sample_rate": 16000
+            }
 
         @self.app.post("/api/v1/llm/generate")
         async def llm_generate(payload: Dict[str, Any]):

@@ -75,9 +75,9 @@ class GatewayRoundTripTester:
         try:
             async with grpc.aio.insecure_channel(self.tts_address) as channel:
                 client = tts_shim.TextToSpeechClient(channel)
-                config = tts_shim.SynthesisConfig(sample_rate=self.sample_rate, speed=1.0, pitch=0.0)
+                cfg = tts_shim.SynthesisConfig(sample_rate=self.sample_rate, speed=1.0, pitch=0.0)
                 logger.debug(f"TTS: Synthesizing '{text[:50]}...'")
-                audio = await client.synthesize(text=text, voice_id="default", language="en", config=config)
+                audio = await client.synthesize(text=text, voice_id="default", language="en", config=cfg)
                 if audio:
                     logger.debug(f"TTS: Generated {len(audio)} bytes")
                     return audio
@@ -129,7 +129,8 @@ class GatewayRoundTripTester:
                     'audio': ('audio.wav', audio_data, 'audio/wav')
                 }
                 data = {
-                    'session_id': session_id
+                    'session_id': session_id,
+                    'full_round_trip': 'true'  # Request full round-trip: Audio → STT → LLM → TTS → Audio
                 }
                 
                 response = await client.post(url, files=files, data=data)
