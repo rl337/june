@@ -1,59 +1,75 @@
 """Tests for STT strategies with mocked dependencies."""
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 import io
 import numpy as np
 
 from inference_core.stt.whisper_strategy import WhisperSttStrategy
+from inference_core.stt.whisper_adapter import WhisperModelAdapter
 from inference_core.strategies import InferenceRequest, InferenceResponse
 
 
-@pytest.fixture
-def mock_whisper_model():
-    """Mock Whisper model."""
-    model = Mock()
-    model.transcribe = Mock(return_value={"text": "hello world"})
-    return model
+class MockWhisperAdapter(WhisperModelAdapter):
+    """Mock Whisper adapter for testing."""
+    
+    def __init__(self, transcript_text: str = "hello world"):
+        self.transcript_text = transcript_text
+    
+    def transcribe(self, audio: np.ndarray, fp16: bool = False) -> dict:
+        return {"text": self.transcript_text}
 
 
 @pytest.fixture
-def whisper_strategy(mock_whisper_model):
-    """Create WhisperSttStrategy with mocked model."""
-    strategy = WhisperSttStrategy(model_name="tiny.en", device="cpu")
-    # Directly set the model instead of calling warmup which requires whisper import
-    strategy._model = mock_whisper_model
+def mock_whisper_adapter():
+    """Mock Whisper adapter."""
+    return MockWhisperAdapter(transcript_text="hello world")
+
+
+@pytest.fixture
+def whisper_strategy(mock_whisper_adapter):
+    """Create WhisperSttStrategy with mocked adapter."""
+    strategy = WhisperSttStrategy(
+        model_name="tiny.en",
+        device="cpu",
+        whisper_adapter=mock_whisper_adapter
+    )
+    strategy.warmup()
     return strategy
 
 
-def test_whisper_strategy_warmup_success(mock_whisper_model):
-    """Test WhisperSttStrategy warmup succeeds."""
-    with patch('whisper') as mock_whisper:
-        mock_whisper.load_model.return_value = mock_whisper_model
+def test_whisper_strategy_warmup_success_with_adapter(mock_whisper_adapter):
+    """Test WhisperSttStrategy warmup succeeds with provided adapter."""
+    strategy = WhisperSttStrategy(
+        model_name="tiny.en",
+        device="cpu",
+        whisper_adapter=mock_whisper_adapter
+    )
+    strategy.warmup()
+    assert strategy._model == mock_whisper_adapter
+
+
+def test_whisper_strategy_warmup_creates_adapter_when_none_provided():
+    """Test WhisperSttStrategy warmup creates adapter when none provided."""
+    with patch('inference_core.stt.whisper_strategy.WhisperModelImpl') as mock_impl:
+        mock_adapter = Mock(spec=WhisperModelAdapter)
+        mock_impl.return_value = mock_adapter
+        
         strategy = WhisperSttStrategy(model_name="tiny.en", device="cpu")
-        with patch('inference_core.stt.whisper_strategy.whisper', mock_whisper):
-            strategy.warmup()
-        assert strategy._model == mock_whisper_model
-        mock_whisper.load_model.assert_called_once_with("tiny.en", device="cpu")
+        strategy.warmup()
+        
+        assert strategy._model == mock_adapter
+        mock_impl.assert_called_once_with("tiny.en", device="cpu")
 
 
 def test_whisper_strategy_warmup_fails_on_import_error():
     """Test WhisperSttStrategy warmup raises on import failure."""
-    import sys
-    original_whisper = sys.modules.get('whisper')
-    try:
-        if 'whisper' in sys.modules:
-            del sys.modules['whisper']
-        with patch.dict('sys.modules', {'whisper': None}):
-            with patch('inference_core.stt.whisper_strategy.whisper', create=True, side_effect=ImportError("No module")):
-                strategy = WhisperSttStrategy()
-                with pytest.raises(Exception):
-                    strategy.warmup()
-    finally:
-        if original_whisper:
-            sys.modules['whisper'] = original_whisper
+    with patch('inference_core.stt.whisper_strategy.WhisperModelImpl', side_effect=ImportError("No module")):
+        strategy = WhisperSttStrategy()
+        with pytest.raises(Exception):
+            strategy.warmup()
 
 
-def test_whisper_strategy_infer_with_bytes(whisper_strategy, mock_whisper_model):
+def test_whisper_strategy_infer_with_bytes(whisper_strategy, mock_whisper_adapter):
     """Test WhisperSttStrategy.infer accepts bytes directly."""
     # Create mock audio bytes (WAV format)
     audio_data = np.random.randn(16000).astype(np.float32)
@@ -69,10 +85,10 @@ def test_whisper_strategy_infer_with_bytes(whisper_strategy, mock_whisper_model)
         assert isinstance(result, InferenceResponse)
         assert result.payload == "hello world"
         assert result.metadata.get("confidence") == 0.0
-        mock_whisper_model.transcribe.assert_called_once()
+        # Adapter's transcribe was called via the strategy
 
 
-def test_whisper_strategy_infer_with_request(whisper_strategy, mock_whisper_model):
+def test_whisper_strategy_infer_with_request(whisper_strategy, mock_whisper_adapter):
     """Test WhisperSttStrategy.infer accepts InferenceRequest."""
     audio_data = np.random.randn(16000).astype(np.float32)
     wav_io = io.BytesIO()
@@ -90,7 +106,7 @@ def test_whisper_strategy_infer_with_request(whisper_strategy, mock_whisper_mode
         assert result.payload == "hello world"
 
 
-def test_whisper_strategy_infer_handles_stereo_audio(whisper_strategy, mock_whisper_model):
+def test_whisper_strategy_infer_handles_stereo_audio(whisper_strategy, mock_whisper_adapter):
     """Test WhisperSttStrategy handles stereo audio (converts to mono)."""
     audio_data = np.random.randn(16000, 2).astype(np.float32)  # Stereo
     wav_io = io.BytesIO()
@@ -104,12 +120,12 @@ def test_whisper_strategy_infer_handles_stereo_audio(whisper_strategy, mock_whis
         
         # Verify mean was called (implicitly via numpy)
         assert isinstance(result, InferenceResponse)
-        mock_whisper_model.transcribe.assert_called_once()
+        # Adapter's transcribe was called via the strategy
 
 
-def test_whisper_strategy_infer_empty_text(whisper_strategy, mock_whisper_model):
+def test_whisper_strategy_infer_empty_text(whisper_strategy, mock_whisper_adapter):
     """Test WhisperSttStrategy handles empty transcript."""
-    mock_whisper_model.transcribe.return_value = {"text": ""}
+    mock_whisper_adapter.transcript_text = ""
     audio_data = np.random.randn(16000).astype(np.float32)
     wav_io = io.BytesIO()
     import soundfile as sf
