@@ -206,6 +206,49 @@ class TtsSttValidator:
         
         return (matches, input_text, output_text)
     
+    async def test_batch_concurrent(
+        self, 
+        test_cases: List, 
+        max_concurrent: int = 10, 
+        verbose: bool = False
+    ) -> List[Tuple[bool, str, str]]:
+        """
+        Run multiple TTS round-trip tests concurrently.
+        
+        Args:
+            test_cases: List of test cases (TestCase objects or strings)
+            max_concurrent: Maximum number of concurrent tests
+            verbose: Whether to show detailed output
+            
+        Returns:
+            List of (success, input_text, output_text) tuples in original order
+        """
+        # Extract text from TestCase objects if needed
+        case_texts = [case.text if hasattr(case, 'text') else case for case in test_cases]
+        
+        # Create semaphore to limit concurrency
+        semaphore = asyncio.Semaphore(max_concurrent)
+        
+        async def run_with_semaphore(text: str) -> Tuple[bool, str, str]:
+            async with semaphore:
+                return await self.test_tts_round_trip(text, verbose=verbose)
+        
+        # Process in batches to maintain order and show progress
+        results = []
+        total = len(case_texts)
+        
+        for i in range(0, total, max_concurrent):
+            batch_texts = case_texts[i:i+max_concurrent]
+            batch_tasks = [run_with_semaphore(text) for text in batch_texts]
+            batch_results = await asyncio.gather(*batch_tasks)
+            results.extend(batch_results)
+            
+            completed = min(i + len(batch_texts), total)
+            if completed % 50 == 0 or completed == total:
+                logger.info(f"  Progress: {completed}/{total}")
+        
+        return results
+    
     async def test_tts_consistency(self, text: str, num_runs: int = 3) -> bool:
         """
         Test TTS consistency: Same text should produce similar audio lengths.
@@ -329,45 +372,30 @@ async def main():
     medium_cases = [case for case in all_test_cases if case.category == "medium"]
     long_cases = [case for case in all_test_cases if case.category == "long"]
     
-    # Test 1: Short Phrases Round-Trip
+    # Test 1: Short Phrases Round-Trip (with concurrency)
     logger.info("Test 1: Short Phrases Round-Trip (1-3 words)")
     logger.info("-" * 80)
-    short_results = []
-    for i, case in enumerate(short_cases, 1):
-        if i % 50 == 0 or i == len(short_cases):
-            logger.info(f"  Progress: {i}/{len(short_cases)}")
-        success, input_text, output_text = await validator.test_tts_round_trip(case.text, verbose=False)
-        short_results.append((success, input_text, output_text))
+    short_results = await validator.test_batch_concurrent(short_cases, max_concurrent=10, verbose=False)
     
     short_passed = sum(1 for success, _, _ in short_results if success)
     logger.info("")
     logger.info(f"Short phrases: {short_passed}/{len(short_cases)} passed ({short_passed*100//len(short_cases) if short_cases else 0}%)")
     logger.info("")
     
-    # Test 2: Medium Phrases Round-Trip
+    # Test 2: Medium Phrases Round-Trip (with concurrency)
     logger.info("Test 2: Medium Phrases Round-Trip (4-10 words)")
     logger.info("-" * 80)
-    medium_results = []
-    for i, case in enumerate(medium_cases, 1):
-        if i % 50 == 0 or i == len(medium_cases):
-            logger.info(f"  Progress: {i}/{len(medium_cases)}")
-        success, input_text, output_text = await validator.test_tts_round_trip(case.text, verbose=False)
-        medium_results.append((success, input_text, output_text))
+    medium_results = await validator.test_batch_concurrent(medium_cases, max_concurrent=10, verbose=False)
     
     medium_passed = sum(1 for success, _, _ in medium_results if success)
     logger.info("")
     logger.info(f"Medium phrases: {medium_passed}/{len(medium_cases)} passed ({medium_passed*100//len(medium_cases) if medium_cases else 0}%)")
     logger.info("")
     
-    # Test 3: Long Phrases Round-Trip
+    # Test 3: Long Phrases Round-Trip (with concurrency)
     logger.info("Test 3: Long Phrases Round-Trip (11+ words)")
     logger.info("-" * 80)
-    long_results = []
-    for i, case in enumerate(long_cases, 1):
-        if i % 50 == 0 or i == len(long_cases):
-            logger.info(f"  Progress: {i}/{len(long_cases)}")
-        success, input_text, output_text = await validator.test_tts_round_trip(case.text, verbose=False)
-        long_results.append((success, input_text, output_text))
+    long_results = await validator.test_batch_concurrent(long_cases, max_concurrent=10, verbose=False)
     
     long_passed = sum(1 for success, _, _ in long_results if success)
     logger.info("")
