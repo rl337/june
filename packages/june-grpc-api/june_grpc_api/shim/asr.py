@@ -33,3 +33,4 @@ class SpeechToTextClient:
         return RecognitionResult(transcript="", confidence=0.0)
 
 
+

@@ -6,12 +6,15 @@ from ..generated import tts_pb2, tts_pb2_grpc
 
 class SynthesisConfig:
     def __init__(self, sample_rate: int = 16000, speed: float = 1.0, pitch: float = 0.0):
-        self.sample_rate = sample_rate
+        # Note: sample_rate is not in proto, but kept for API compatibility
+        # Actual proto fields: speed, pitch, energy, prosody, enable_ssml
+        self.sample_rate = sample_rate  # Stored but not sent to proto
         self.speed = speed
-        self.pivot = pitch
+        self.pitch = pitch
 
     def to_proto(self) -> tts_pb2.SynthesisConfig:
-        return tts_pb2.SynthesisConfig(sample_rate=self.sample_rate, speed=self.speed, pitch=self.pivot)
+        # Proto only has: speed, pitch, energy, prosody, enable_ssml
+        return tts_pb2.SynthesisConfig(speed=self.speed, pitch=self.pitch)
 
 
 class TextToSpeechClient:
@@ -23,5 +26,6 @@ class TextToSpeechClient:
         request = tts_pb2.SynthesisRequest(text=text, config=cfg, voice_id=voice_id, language=language)
         response = await self._stub.Synthesize(request, timeout=timeout)
         return response.audio_data
+
 
 
