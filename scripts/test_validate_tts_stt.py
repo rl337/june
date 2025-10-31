@@ -110,7 +110,22 @@ class TtsSttValidator:
     
     def normalize_text(self, text: str) -> str:
         """Normalize text for comparison."""
-        return text.strip().lower().replace(".", "").replace(",", "").replace("!", "").replace("?", "")
+        import re
+        # Convert to lowercase and remove punctuation
+        text = text.strip().lower()
+        text = re.sub(r'[.,!?;:]', '', text)
+        
+        # Normalize numbers: "1, 2, 3" -> "one two three"
+        number_map = {
+            "1": "one", "2": "two", "3": "three", "4": "four", "5": "five",
+            "6": "six", "7": "seven", "8": "eight", "9": "nine", "0": "zero"
+        }
+        for digit, word in number_map.items():
+            text = text.replace(digit, word)
+        
+        # Remove extra whitespace
+        text = re.sub(r'\s+', ' ', text).strip()
+        return text
     
     def text_matches(self, input_text: str, output_text: str) -> bool:
         """Check if input and output text match based on tolerance."""

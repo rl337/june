@@ -21,7 +21,7 @@ RUN ln -s /usr/bin/python3.10 /usr/bin/python && \
     python -m pip install --upgrade pip
 
 # Install runtime libs common to services
-RUN pip install grpcio nats-py prometheus-client pydantic uvicorn fastapi
+RUN pip install grpcio nats-py prometheus-client pydantic uvicorn fastapi scipy
 
 # Install shared wheels: june-grpc-api and inference-core
 COPY ../../packages/june-grpc-api/dist/*.whl /tmp/

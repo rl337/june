@@ -26,7 +26,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD python -c "import grpc; grpc.insecure_channel('localhost:50052').check_connectivity_state(True)" || exit 1
 
 # Run the Whisper-based STT application
-ENV STT_MODEL_NAME=tiny.en
+ENV STT_MODEL_NAME=base.en
 ENV STT_DEVICE=cpu
 CMD ["python", "main_whisper.py"]
 

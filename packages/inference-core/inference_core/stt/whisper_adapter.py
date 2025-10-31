@@ -10,12 +10,15 @@ class WhisperModelAdapter(ABC):
     """Abstract interface for Whisper model operations."""
     
     @abstractmethod
-    def transcribe(self, audio: np.ndarray, fp16: bool = False) -> Dict[str, Any]:
+    def transcribe(self, audio: np.ndarray, fp16: bool = False, language: str = "en", task: str = "transcribe", initial_prompt: str | None = None) -> Dict[str, Any]:
         """Transcribe audio to text.
         
         Args:
             audio: Audio data as numpy array (float32, mono)
             fp16: Whether to use fp16 precision
+            language: Language code (e.g., "en")
+            task: "transcribe" or "translate"
+            initial_prompt: Optional prompt to guide transcription
             
         Returns:
             Dict with 'text' key containing transcript
@@ -45,7 +48,10 @@ class WhisperModelImpl(WhisperModelAdapter):
         
         self._model = whisper.load_model(model_name, device=device, download_root=download_root)
     
-    def transcribe(self, audio: np.ndarray, fp16: bool = False) -> Dict[str, Any]:
+    def transcribe(self, audio: np.ndarray, fp16: bool = False, language: str = "en", task: str = "transcribe", initial_prompt: str | None = None) -> Dict[str, Any]:
         """Transcribe audio using Whisper model."""
-        return self._model.transcribe(audio, fp16=fp16)
+        kwargs = {"fp16": fp16, "language": language, "task": task}
+        if initial_prompt:
+            kwargs["initial_prompt"] = initial_prompt
+        return self._model.transcribe(audio, **kwargs)
 

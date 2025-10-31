@@ -15,8 +15,8 @@ class MockWhisperAdapter(WhisperModelAdapter):
     def __init__(self, transcript_text: str = "hello world"):
         self.transcript_text = transcript_text
     
-    def transcribe(self, audio: np.ndarray, fp16: bool = False) -> dict:
-        return {"text": self.transcript_text}
+    def transcribe(self, audio: np.ndarray, fp16: bool = False, language: str = "en", task: str = "transcribe", initial_prompt: str | None = None) -> dict:
+        return {"text": self.transcript_text, "no_speech_prob": 0.0}
 
 
 @pytest.fixture

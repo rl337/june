@@ -47,10 +47,15 @@ class EspeakTtsStrategy(TtsStrategy):
             os.close(fd)  # Close file descriptor, espeak will create the file
             
             # espeak syntax: espeak [options] text
-            # -s: speed in words per minute (not sample rate!)
+            # -s: speed in words per minute (slower = clearer for STT)
             # -w: output WAV file
+            # -v: voice (en+f3 = English female voice 3, clearer)
+            # -a: amplitude (150-180, higher = clearer but may distort)
+            # -g: gap between words (10-15ms, helps STT separation)
+            # -p: pitch (50 = base, lower = clearer but robotic)
             # Sample rate is typically fixed by espeak, we'll resample if needed
-            cmd = ['espeak', '-s', '150', '-w', temp_path, text]
+            # Use slower speed and clearer settings for better STT recognition
+            cmd = ['espeak', '-s', '120', '-a', '160', '-g', '10', '-p', '50', '-v', 'en+f3', '-w', temp_path, text]
             result = subprocess.run(cmd, capture_output=True, text=True, stdin=subprocess.DEVNULL)
             if result.returncode != 0:
                 if os.path.exists(temp_path):
@@ -78,24 +83,42 @@ class EspeakTtsStrategy(TtsStrategy):
             if len(audio_data.shape) > 1:
                 audio_data = np.mean(audio_data, axis=1)
             
+            # Better resampling using scipy if available, otherwise linear interpolation
             if sr != self.sample_rate:
-                target_samples = int(len(audio_data) * self.sample_rate / sr)
-                if len(audio_data) > target_samples:
-                    audio_data = audio_data[:target_samples]
-                else:
-                    audio_data = np.pad(audio_data, (0, target_samples - len(audio_data)))
+                try:
+                    from scipy import signal
+                    # Use scipy's high-quality resampling
+                    num_samples = int(len(audio_data) * self.sample_rate / sr)
+                    audio_data = signal.resample(audio_data, num_samples)
+                except ImportError:
+                    # Fallback to linear interpolation
+                    target_samples = int(len(audio_data) * self.sample_rate / sr)
+                    if len(audio_data) > target_samples:
+                        # Downsample by taking every Nth sample (crude but works)
+                        step = len(audio_data) / target_samples
+                        indices = np.round(np.arange(0, len(audio_data), step)).astype(int)
+                        audio_data = audio_data[np.clip(indices, 0, len(audio_data) - 1)]
+                    else:
+                        # Upsample by linear interpolation
+                        indices = np.linspace(0, len(audio_data) - 1, target_samples)
+                        audio_data = np.interp(indices, np.arange(len(audio_data)), audio_data)
             
             audio_data = audio_data.astype(np.float32)
             
-            # Normalize audio (avoid division by zero)
+            # Normalize audio with better dynamic range
+            # Use RMS normalization for more consistent levels
             max_val = np.max(np.abs(audio_data))
             if max_val > 0:
-                audio_data = audio_data / max_val
+                # Normalize to 0.95 peak to avoid clipping
+                audio_data = audio_data / max_val * 0.95
             else:
                 logger.warning(f"Audio has zero amplitude for text: '{text[:50]}...'")
                 return InferenceResponse(payload=b"", metadata={"sample_rate": self.sample_rate, "duration_ms": 0})
             
-            audio_bytes = (audio_data * 32767).astype(np.int16).tobytes()
+            # Convert to int16 PCM with proper scaling
+            # Clamp values to prevent overflow
+            audio_data_clamped = np.clip(audio_data, -1.0, 1.0)
+            audio_bytes = (audio_data_clamped * 32767).astype(np.int16).tobytes()
             duration_ms = int(len(audio_data) / self.sample_rate * 1000)
             
             return InferenceResponse(
