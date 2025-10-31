@@ -2,6 +2,22 @@
 
 This document provides essential information for AI agents working on the June Agent project, including architecture details, development practices, and environment specifics.
 
+## 📋 Task Management
+
+**IMPORTANT:** Always check and update `TODO.md` before and after working on tasks.
+
+- **Before starting work:** Review `TODO.md` for current tasks and priorities
+- **After completing work:** Update `TODO.md` to mark completed tasks and add new tasks as needed
+- **Keep TODO.md current:** This is the single source of truth for what needs to be done
+
+The `TODO.md` file contains:
+- Detailed task breakdowns for major features
+- Implementation phases and dependencies
+- Technical specifications and requirements
+- Testing and deployment checklists
+
+See `TODO.md` for the current Telegram voice-to-text-to-voice service implementation plan.
+
 ## 🏗️ Architecture Overview
 
 June Agent is a microservices-based interactive autonomous agent system optimized for NVIDIA DGX Spark with the following architecture:

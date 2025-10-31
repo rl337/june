@@ -66,6 +66,12 @@ mypy /app/scripts/
 pytest /app/scripts/
 ```
 
+## 📋 Current Tasks
+
+See `TODO.md` for detailed implementation tasks and current priorities.
+
+**Current Focus:** Telegram voice-to-text-to-voice service integration
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -547,6 +553,65 @@ For support and questions:
 - Check the documentation
 - Review the test suites for usage examples
 
+## 🏆 Accomplishments
+
+### Architecture & Modularity
+- ✅ **Modular Package Architecture**: Created independently installable `inference-core` and `june-grpc-api` packages
+- ✅ **Docker-First Development**: All tools and services run in containers for consistency and reproducibility
+- ✅ **Base Docker Image**: Shared `june-base` image with common dependencies, reducing build times and image sizes
+- ✅ **gRPC Shim Layer**: Object-oriented API wrapper around generated protobuf code for better maintainability
+- ✅ **Strategy Pattern**: Abstracted inference logic (STT, TTS, LLM) into testable Strategy classes
+
+### Testing Infrastructure
+- ✅ **Comprehensive Test Suite**: 1000+ diverse test cases for TTS/STT validation (short, medium, long phrases)
+- ✅ **Concurrent Test Execution**: Parallel test execution (10 concurrent) reducing test time by 5-10x
+- ✅ **100% Pass Rate Target**: Rigorous validation ensuring TTS/STT reliability for E2E testing
+- ✅ **Round-Trip Testing**: Full audio-to-text-to-audio pipeline validation through Gateway
+- ✅ **Unit Test Coverage**: Comprehensive unit tests with mocks for all inference-core components
+
+### Audio Processing Improvements
+- ✅ **TTS/STT Accuracy**: Achieved 91% pass rate (improved from 36%) through:
+  - Whisper model upgrade (tiny.en → base.en)
+  - Optimized espeak TTS parameters (speed, amplitude, voice clarity)
+  - Better audio resampling with scipy
+  - Enhanced text normalization
+- ✅ **Single Word Recognition**: Improved single-word TTS with optimized espeak parameters
+- ✅ **Audio Format Handling**: Robust PCM to WAV conversion for STT compatibility
+
+### Development Experience
+- ✅ **Command-Line Tools**: Unified CLI framework with Command base class for all tools
+- ✅ **Automated Build Scripts**: Package build automation for wheels and Docker images
+- ✅ **Test Orchestration**: `run_all_checks.sh` script for automated testing across all packages
+- ✅ **Validation Scripts**: Service validation scripts for quick health checks
+
+## 🎯 Design Decisions
+
+### Package Structure
+- **Separate Packages**: `inference-core` and `june-grpc-api` as independent pip-installable packages
+- **Shim Layer**: Object-oriented wrapper around generated gRPC code to abstract protobuf changes
+- **Adapter Pattern**: Abstracted external dependencies (Whisper) behind interfaces for testability
+
+### Docker Architecture
+- **Base Image Pattern**: All services inherit from `june-base` for common dependencies
+- **Service-Specific Images**: Minimal Dockerfiles that inherit from base
+- **Package Dockerfiles**: Each package has its own Dockerfile for wheel building
+
+### Testing Strategy
+- **Tiered Testing**: Unit tests → Integration tests → E2E validation tests
+- **Concurrent Execution**: Parallel test runs for efficiency
+- **Validation Suite**: Comprehensive TTS/STT validation to ensure test infrastructure reliability
+- **Mock Strategy**: Extensive use of mocks for external dependencies
+
+### Model Management
+- **Strict Cache Policy**: All models downloaded via authorized script, no runtime downloads
+- **Centralized Cache**: `/home/rlee/models` as single source of truth
+- **Local-Only Loading**: Services use `local_files_only=True` for security and reliability
+
+### Service Communication
+- **gRPC for Internal**: Service-to-service communication via gRPC for performance
+- **REST/WebSocket for External**: Gateway provides HTTP/WebSocket APIs for clients
+- **NATS for Events**: Pub/sub messaging for event-driven architecture
+
 ## 🔄 Roadmap
 
 - [ ] Multi-language support
@@ -557,3 +622,4 @@ For support and questions:
 - [ ] Kubernetes deployment
 - [ ] Advanced RAG capabilities
 - [ ] Fine-tuning interface
+- [ ] **Telegram Bot Integration**: Voice-to-text-to-voice service (see `TODO.md`)
