@@ -30,11 +30,16 @@ def test_retry_sync_succeeds_after_failures():
 
 
 def test_health_checker():
+    import asyncio
     hc = HealthChecker()
     hc.add_check("ok", lambda: True)
-    import asyncio
-    results = asyncio.get_event_loop().run_until_complete(hc.check_all())
-    assert results["ok"] is True
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        results = loop.run_until_complete(hc.check_all())
+        assert results["ok"] is True
+    finally:
+        loop.close()
 
 
 def test_helpers():
