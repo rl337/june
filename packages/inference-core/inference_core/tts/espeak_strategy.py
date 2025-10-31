@@ -42,16 +42,41 @@ class EspeakTtsStrategy(TtsStrategy):
             return InferenceResponse(payload=b"", metadata={"sample_rate": self.sample_rate, "duration_ms": 0})
         
         try:
-            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_file:
-                temp_path = temp_file.name
+            # Create temp file path (don't create file, espeak will create it)
+            fd, temp_path = tempfile.mkstemp(suffix='.wav')
+            os.close(fd)  # Close file descriptor, espeak will create the file
             
-            cmd = ['espeak', '-s', str(self.sample_rate), '-w', temp_path, text]
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            # espeak syntax: espeak [options] text
+            # -s: speed in words per minute (not sample rate!)
+            # -w: output WAV file
+            # Sample rate is typically fixed by espeak, we'll resample if needed
+            cmd = ['espeak', '-s', '150', '-w', temp_path, text]
+            result = subprocess.run(cmd, capture_output=True, text=True, stdin=subprocess.DEVNULL)
             if result.returncode != 0:
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
                 raise Exception(f"espeak failed: {result.stderr}")
+            
+            # Wait a moment for file to be written
+            import time
+            time.sleep(0.1)
+            
+            if not os.path.exists(temp_path) or os.path.getsize(temp_path) == 0:
+                if os.path.exists(temp_path):
+                    os.unlink(temp_path)
+                raise Exception("espeak did not create output file or file is empty")
             
             audio_data, sr = sf.read(temp_path)
             os.unlink(temp_path)
+            
+            # Check if audio data is empty
+            if len(audio_data) == 0:
+                logger.warning(f"espeak produced empty audio for text: '{text[:50]}...'")
+                return InferenceResponse(payload=b"", metadata={"sample_rate": self.sample_rate, "duration_ms": 0})
+            
+            # Convert to mono if stereo
+            if len(audio_data.shape) > 1:
+                audio_data = np.mean(audio_data, axis=1)
             
             if sr != self.sample_rate:
                 target_samples = int(len(audio_data) * self.sample_rate / sr)
@@ -61,8 +86,14 @@ class EspeakTtsStrategy(TtsStrategy):
                     audio_data = np.pad(audio_data, (0, target_samples - len(audio_data)))
             
             audio_data = audio_data.astype(np.float32)
-            if np.max(np.abs(audio_data)) > 0:
-                audio_data = audio_data / np.max(np.abs(audio_data))
+            
+            # Normalize audio (avoid division by zero)
+            max_val = np.max(np.abs(audio_data))
+            if max_val > 0:
+                audio_data = audio_data / max_val
+            else:
+                logger.warning(f"Audio has zero amplitude for text: '{text[:50]}...'")
+                return InferenceResponse(payload=b"", metadata={"sample_rate": self.sample_rate, "duration_ms": 0})
             
             audio_bytes = (audio_data * 32767).astype(np.int16).tobytes()
             duration_ms = int(len(audio_data) / self.sample_rate * 1000)
