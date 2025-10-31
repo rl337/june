@@ -29,6 +29,10 @@ inference-core = "inference_core.cli:main"
 packages = [
   "inference_core",
   "inference_core.commands",
+  "inference_core.servers",
+  "inference_core.stt",
+  "inference_core.tts",
+  "inference_core.llm",
 ]
 
 

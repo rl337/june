@@ -16,6 +16,8 @@ from .utils import (
     CircularBuffer,
 )
 from .servers.stt_server import SttGrpcApp
+from .servers.tts_server import TtsGrpcApp
+from .servers.llm_server import LlmGrpcApp
 
 __all__ = [
     "InferenceStrategy",
@@ -25,6 +27,9 @@ __all__ = [
     "InferenceRequest",
     "InferenceResponse",
     "InferenceApp",
+    "SttGrpcApp",
+    "TtsGrpcApp",
+    "LlmGrpcApp",
 ]
 
 
