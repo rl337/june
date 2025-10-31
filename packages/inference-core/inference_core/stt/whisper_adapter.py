@@ -26,15 +26,24 @@ class WhisperModelAdapter(ABC):
 class WhisperModelImpl(WhisperModelAdapter):
     """Concrete implementation using OpenAI Whisper library."""
     
-    def __init__(self, model_name: str = "tiny.en", device: str = "cpu"):
+    def __init__(self, model_name: str = "tiny.en", device: str = "cpu", download_root: str | None = None):
         """Load Whisper model.
         
         Args:
             model_name: Whisper model name (e.g., "tiny.en", "base", "small")
             device: Device to run on ("cpu", "cuda")
+            download_root: Root directory for model cache (defaults to ~/.cache/whisper)
         """
         import whisper  # type: ignore
-        self._model = whisper.load_model(model_name, device=device)
+        import os
+        
+        # Use /models/whisper if MODEL_CACHE_DIR is set and download_root not specified
+        if download_root is None:
+            model_cache_dir = os.getenv("MODEL_CACHE_DIR", os.path.expanduser("~/.cache"))
+            download_root = os.path.join(model_cache_dir, "whisper")
+            os.makedirs(download_root, exist_ok=True)
+        
+        self._model = whisper.load_model(model_name, device=device, download_root=download_root)
     
     def transcribe(self, audio: np.ndarray, fp16: bool = False) -> Dict[str, Any]:
         """Transcribe audio using Whisper model."""
