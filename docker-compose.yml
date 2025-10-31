@@ -260,6 +260,7 @@ services:
     environment:
       - MODEL_NAME=${STT_MODEL:-openai/whisper-large-v3}
       - MODEL_DEVICE=${STT_DEVICE:-cuda:0}
+      - MODEL_CACHE_DIR=/models
       - NATS_URL=nats://nats:4222
       - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
       - CUDA_VISIBLE_DEVICES=0
