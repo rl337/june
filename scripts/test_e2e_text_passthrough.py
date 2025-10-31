@@ -118,10 +118,30 @@ class EndToEndTextPassthroughTest:
             logger.error(f"  ❌ Gateway request failed: {e}")
             raise
     
+    def pcm_to_wav(self, pcm_data: bytes, sample_rate: int = 16000, channels: int = 1, sample_width: int = 2) -> bytes:
+        """Convert raw PCM audio data to WAV format."""
+        import wave
+        import io
+        
+        wav_buffer = io.BytesIO()
+        with wave.open(wav_buffer, 'wb') as wav_file:
+            wav_file.setnchannels(channels)
+            wav_file.setsampwidth(sample_width)
+            wav_file.setframerate(sample_rate)
+            wav_file.writeframes(pcm_data)
+        
+        wav_buffer.seek(0)
+        return wav_buffer.read()
+    
     async def speech_to_text(self, audio_data: bytes) -> str:
         """Step 3: Convert audio to text using STT."""
         try:
             logger.info(f"Step 3: STT - Converting {len(audio_data)} bytes to text")
+            
+            # Convert PCM to WAV if needed (TTS returns raw PCM)
+            if len(audio_data) > 0 and not audio_data[:4] == b'RIFF':
+                audio_data = self.pcm_to_wav(audio_data, self.sample_rate, channels=1, sample_width=2)
+            
             async with grpc.aio.insecure_channel(self.stt_address) as channel:
                 client = asr_shim.SpeechToTextClient(channel)
                 cfg = asr_shim.RecognitionConfig(
