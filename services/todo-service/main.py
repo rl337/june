@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 
 from database import TodoDatabase, TaskType, TaskStatus, VerificationStatus, RelationshipType
 from mcp_api import MCPTodoAPI, MCP_FUNCTIONS
+from backup import BackupManager, BackupScheduler
 
 # Setup logging
 logging.basicConfig(
@@ -30,6 +31,15 @@ logger = logging.getLogger(__name__)
 # Initialize database
 db_path = os.getenv("TODO_DB_PATH", "/home/rlee/june_data/todo_service/todos.db")
 db = TodoDatabase(db_path)
+
+# Initialize backup manager
+backups_dir = os.getenv("TODO_BACKUPS_DIR", os.path.join(os.path.dirname(db_path), "backups"))
+backup_manager = BackupManager(db_path, backups_dir)
+
+# Initialize and start backup scheduler (nightly backups)
+backup_interval_hours = int(os.getenv("TODO_BACKUP_INTERVAL_HOURS", "24"))
+backup_scheduler = BackupScheduler(backup_manager, backup_interval_hours)
+backup_scheduler.start()
 
 # Create FastAPI app
 app = FastAPI(
@@ -454,6 +464,50 @@ async def mcp_get_agent_performance(
     """MCP: Get agent performance statistics."""
     stats = MCPTodoAPI.get_agent_performance(agent_id, task_type)
     return stats
+
+
+@app.post("/backup/create")
+async def create_backup():
+    """Create a manual backup snapshot (gzip archive)."""
+    try:
+        archive_path = backup_manager.create_backup_archive()
+        return {"success": True, "backup_path": archive_path}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Backup failed: {str(e)}")
+
+
+@app.get("/backup/list")
+async def list_backups():
+    """List all available backups."""
+    backups = backup_manager.list_backups()
+    return {"backups": backups, "count": len(backups)}
+
+
+@app.post("/backup/restore")
+async def restore_backup(
+    backup_path: str = Body(..., embed=True),
+    force: bool = Body(False, embed=True)
+):
+    """Restore database from a backup."""
+    try:
+        success = backup_manager.restore_from_backup(backup_path, force=force)
+        return {"success": success, "message": "Database restored successfully"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Restore failed: {str(e)}")
+
+
+@app.post("/backup/cleanup")
+async def cleanup_backups(keep_days: int = Body(30, embed=True)):
+    """Clean up old backups (keep only recent N days)."""
+    try:
+        deleted_count = backup_manager.cleanup_old_backups(keep_days=keep_days)
+        return {"success": True, "deleted_count": deleted_count}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")
 
 
 if __name__ == "__main__":

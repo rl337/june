@@ -667,6 +667,80 @@ test_api_functionality() {
     fi
 }
 
+# Check TODO service
+check_todo_service() {
+    print_header "Checking TODO Service"
+    
+    local todo_url="${TODO_SERVICE_URL:-http://localhost:8004}"
+    local todo_service_dir="services/todo-service"
+    
+    # Check if TODO service is running
+    print_info "Checking TODO service availability..."
+    if curl -s -f "$todo_url/health" > /dev/null 2>&1; then
+        print_success "TODO service is accessible at $todo_url"
+    else
+        print_warning "TODO service not accessible. It may be running externally."
+        print_info "TODO service is standalone - run with: cd $todo_service_dir && docker compose up -d"
+        return 0  # Not critical - service is standalone
+    fi
+    
+    # Run TODO service tests if service is available and tests exist
+    if [ -f "$todo_service_dir/tests/run_tests.sh" ]; then
+        print_info "Running TODO service tests..."
+        if bash "$todo_service_dir/tests/run_tests.sh" 2>&1 | tee /tmp/todo_tests.log; then
+            print_success "TODO service tests passed"
+        else
+            local test_exit_code=$?
+            if [ $test_exit_code -eq 0 ]; then
+                print_success "TODO service tests passed"
+            else
+                print_warning "TODO service tests had issues (exit code: $test_exit_code)"
+                print_info "Review test output above or check: tail /tmp/todo_tests.log"
+            fi
+        fi
+    else
+        print_warning "TODO service test script not found"
+    fi
+    
+    # Test backup functionality if service is running
+    if curl -s -f "$todo_url/health" > /dev/null 2>&1; then
+        print_info "Testing backup functionality..."
+        
+        # Create a test task first
+        local create_response=$(curl -s -X POST "$todo_url/tasks" \
+            -H "Content-Type: application/json" \
+            -d '{
+                "title": "Test Backup Task",
+                "task_type": "concrete",
+                "task_instruction": "Test task for backup",
+                "verification_instruction": "Verify backup works",
+                "agent_id": "test-agent"
+            }')
+        
+        if echo "$create_response" | grep -q '"id"'; then
+            print_success "Test task created for backup test"
+            
+            # Create backup
+            local backup_response=$(curl -s -X POST "$todo_url/backup/create")
+            if echo "$backup_response" | grep -q '"success".*true'; then
+                print_success "Backup creation test passed"
+                
+                # List backups
+                local list_response=$(curl -s "$todo_url/backup/list")
+                if echo "$list_response" | grep -q '"backups"'; then
+                    print_success "Backup listing test passed"
+                else
+                    print_warning "Backup listing test failed"
+                fi
+            else
+                print_warning "Backup creation test failed"
+            fi
+        else
+            print_warning "Could not create test task for backup test"
+        fi
+    fi
+}
+
 # Generate summary report
 generate_summary() {
     print_header "Health Check Summary"
@@ -714,6 +788,7 @@ main() {
     check_logs
     check_metrics
     test_api_functionality
+    check_todo_service
     
     local end_time=$(date +%s)
     local duration=$((end_time - start_time))
