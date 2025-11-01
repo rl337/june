@@ -105,12 +105,32 @@ class TodoDatabase:
                 )
             """)
             
+            # Change history table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS change_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id INTEGER NOT NULL,
+                    agent_id TEXT NOT NULL,
+                    change_type TEXT NOT NULL
+                        CHECK(change_type IN ('created', 'locked', 'unlocked', 'updated', 'completed', 'verified', 'status_changed', 'relationship_added')),
+                    field_name TEXT,
+                    old_value TEXT,
+                    new_value TEXT,
+                    notes TEXT,
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+                )
+            """)
+            
             # Indexes for performance
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(task_status)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_tasks_type ON tasks(task_type)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_agent)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_relationships_parent ON task_relationships(parent_task_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_relationships_child ON task_relationships(child_task_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_change_history_task ON change_history(task_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_change_history_agent ON change_history(agent_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_change_history_created ON change_history(created_at)")
             
             conn.commit()
             logger.info(f"Database schema initialized at {self.db_path}")
@@ -126,6 +146,7 @@ class TodoDatabase:
         task_type: str,
         task_instruction: str,
         verification_instruction: str,
+        agent_id: str,
         notes: Optional[str] = None
     ) -> int:
         """Create a new task and return its ID."""
@@ -137,8 +158,15 @@ class TodoDatabase:
                 VALUES (?, ?, ?, ?, ?)
             """, (title, task_type, task_instruction, verification_instruction, notes))
             task_id = cursor.lastrowid
+            
+            # Record creation in history
+            cursor.execute("""
+                INSERT INTO change_history (task_id, agent_id, change_type, notes)
+                VALUES (?, ?, 'created', ?)
+            """, (task_id, agent_id, notes))
+            
             conn.commit()
-            logger.info(f"Created task {task_id}: {title}")
+            logger.info(f"Created task {task_id}: {title} by agent {agent_id}")
             return task_id
         finally:
             conn.close()
@@ -191,9 +219,17 @@ class TodoDatabase:
     
     def lock_task(self, task_id: int, agent_id: str) -> bool:
         """Lock a task for an agent (set to in_progress). Returns True if successful."""
+        if not agent_id:
+            raise ValueError("agent_id is required for locking tasks")
+        
         conn = self._get_connection()
         try:
             cursor = conn.cursor()
+            # Get current status for history
+            cursor.execute("SELECT task_status, assigned_agent FROM tasks WHERE id = ?", (task_id,))
+            current = cursor.fetchone()
+            old_status = current["task_status"] if current else None
+            
             # Only lock if task is available
             cursor.execute("""
                 UPDATE tasks 
@@ -203,6 +239,14 @@ class TodoDatabase:
                 WHERE id = ? AND task_status = 'available'
             """, (agent_id, task_id))
             success = cursor.rowcount > 0
+            
+            if success:
+                # Record in history
+                cursor.execute("""
+                    INSERT INTO change_history (task_id, agent_id, change_type, field_name, old_value, new_value)
+                    VALUES (?, ?, 'locked', 'task_status', ?, 'in_progress')
+                """, (task_id, agent_id, old_status))
+            
             conn.commit()
             if success:
                 logger.info(f"Task {task_id} locked by agent {agent_id}")
@@ -210,11 +254,23 @@ class TodoDatabase:
         finally:
             conn.close()
     
-    def unlock_task(self, task_id: int):
+    def unlock_task(self, task_id: int, agent_id: str):
         """Unlock a task (set back to available)."""
+        if not agent_id:
+            raise ValueError("agent_id is required for unlocking tasks")
+        
         conn = self._get_connection()
         try:
             cursor = conn.cursor()
+            # Get current assigned agent for verification
+            cursor.execute("SELECT assigned_agent, task_status FROM tasks WHERE id = ?", (task_id,))
+            current = cursor.fetchone()
+            if not current:
+                raise ValueError(f"Task {task_id} not found")
+            
+            old_status = current["task_status"]
+            old_agent = current["assigned_agent"]
+            
             cursor.execute("""
                 UPDATE tasks 
                 SET task_status = 'available',
@@ -222,16 +278,31 @@ class TodoDatabase:
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             """, (task_id,))
+            
+            # Record in history
+            cursor.execute("""
+                INSERT INTO change_history (task_id, agent_id, change_type, field_name, old_value, new_value)
+                VALUES (?, ?, 'unlocked', 'task_status', ?, 'available')
+            """, (task_id, agent_id, old_status))
+            
             conn.commit()
-            logger.info(f"Task {task_id} unlocked")
+            logger.info(f"Task {task_id} unlocked by agent {agent_id}")
         finally:
             conn.close()
     
-    def complete_task(self, task_id: int, notes: Optional[str] = None):
+    def complete_task(self, task_id: int, agent_id: str, notes: Optional[str] = None):
         """Mark a task as complete."""
+        if not agent_id:
+            raise ValueError("agent_id is required for completing tasks")
+        
         conn = self._get_connection()
         try:
             cursor = conn.cursor()
+            # Get current status for history
+            cursor.execute("SELECT task_status FROM tasks WHERE id = ?", (task_id,))
+            current = cursor.fetchone()
+            old_status = current["task_status"] if current else None
+            
             cursor.execute("""
                 UPDATE tasks 
                 SET task_status = 'complete',
@@ -240,24 +311,46 @@ class TodoDatabase:
                     notes = COALESCE(?, notes)
                 WHERE id = ?
             """, (notes, task_id))
+            
+            # Record in history
+            cursor.execute("""
+                INSERT INTO change_history (task_id, agent_id, change_type, field_name, old_value, new_value, notes)
+                VALUES (?, ?, 'completed', 'task_status', ?, 'complete', ?)
+            """, (task_id, agent_id, old_status, notes))
+            
             conn.commit()
-            logger.info(f"Task {task_id} marked as complete")
+            logger.info(f"Task {task_id} marked as complete by agent {agent_id}")
         finally:
             conn.close()
     
-    def verify_task(self, task_id: int) -> bool:
+    def verify_task(self, task_id: int, agent_id: str) -> bool:
         """Mark a task as verified (verification check passed)."""
+        if not agent_id:
+            raise ValueError("agent_id is required for verifying tasks")
+        
         conn = self._get_connection()
         try:
             cursor = conn.cursor()
+            # Get current verification status for history
+            cursor.execute("SELECT verification_status FROM tasks WHERE id = ?", (task_id,))
+            current = cursor.fetchone()
+            old_status = current["verification_status"] if current else None
+            
             cursor.execute("""
                 UPDATE tasks 
                 SET verification_status = 'verified',
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             """, (task_id,))
+            
+            # Record in history
+            cursor.execute("""
+                INSERT INTO change_history (task_id, agent_id, change_type, field_name, old_value, new_value)
+                VALUES (?, ?, 'verified', 'verification_status', ?, 'verified')
+            """, (task_id, agent_id, old_status))
+            
             conn.commit()
-            logger.info(f"Task {task_id} verified")
+            logger.info(f"Task {task_id} verified by agent {agent_id}")
             return True
         finally:
             conn.close()
@@ -266,9 +359,13 @@ class TodoDatabase:
         self,
         parent_task_id: int,
         child_task_id: int,
-        relationship_type: str
+        relationship_type: str,
+        agent_id: str
     ) -> int:
         """Create a relationship between two tasks."""
+        if not agent_id:
+            raise ValueError("agent_id is required for creating relationships")
+        
         conn = self._get_connection()
         try:
             cursor = conn.cursor()
@@ -277,8 +374,12 @@ class TodoDatabase:
                 VALUES (?, ?, ?)
             """, (parent_task_id, child_task_id, relationship_type))
             rel_id = cursor.lastrowid
-            conn.commit()
-            logger.info(f"Created relationship {relationship_type} from task {parent_task_id} to {child_task_id}")
+            
+            # Record in history for both tasks
+            cursor.execute("""
+                INSERT INTO change_history (task_id, agent_id, change_type, field_name, new_value)
+                VALUES (?, ?, 'relationship_added', 'relationship', ?)
+            """, (parent_task_id, agent_id, f"{relationship_type}:{child_task_id}"))
             
             # Auto-update blocking status
             if relationship_type == "blocked_by":
@@ -286,9 +387,102 @@ class TodoDatabase:
                     UPDATE tasks SET task_status = 'blocked', updated_at = CURRENT_TIMESTAMP
                     WHERE id = ?
                 """, (parent_task_id,))
-                conn.commit()
             
+            conn.commit()
+            logger.info(f"Created relationship {relationship_type} from task {parent_task_id} to {child_task_id} by agent {agent_id}")
             return rel_id
+        finally:
+            conn.close()
+    
+    def get_change_history(
+        self,
+        task_id: Optional[int] = None,
+        agent_id: Optional[str] = None,
+        limit: int = 100
+    ) -> List[Dict[str, Any]]:
+        """Get change history with optional filters."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+            conditions = []
+            params = []
+            
+            if task_id:
+                conditions.append("task_id = ?")
+                params.append(task_id)
+            if agent_id:
+                conditions.append("agent_id = ?")
+                params.append(agent_id)
+            
+            where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+            query = f"SELECT * FROM change_history {where_clause} ORDER BY created_at DESC LIMIT ?"
+            params.append(limit)
+            
+            cursor.execute(query, params)
+            return [dict(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
+    
+    def get_agent_stats(
+        self,
+        agent_id: str,
+        task_type: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Get statistics for an agent's performance."""
+        conn = self._get_connection()
+        try:
+            cursor = conn.cursor()
+            
+            # Get completed tasks count
+            completed_query = """
+                SELECT COUNT(*) as count FROM change_history
+                WHERE agent_id = ? AND change_type = 'completed'
+            """
+            params = [agent_id]
+            if task_type:
+                completed_query = """
+                    SELECT COUNT(*) as count FROM change_history ch
+                    JOIN tasks t ON ch.task_id = t.id
+                    WHERE ch.agent_id = ? AND ch.change_type = 'completed' AND t.task_type = ?
+                """
+                params.append(task_type)
+            
+            cursor.execute(completed_query, params)
+            completed = cursor.fetchone()["count"]
+            
+            # Get verified tasks count
+            verified_query = """
+                SELECT COUNT(*) as count FROM change_history
+                WHERE agent_id = ? AND change_type = 'verified'
+            """
+            verified_params = [agent_id]
+            if task_type:
+                verified_query = """
+                    SELECT COUNT(*) as count FROM change_history ch
+                    JOIN tasks t ON ch.task_id = t.id
+                    WHERE ch.agent_id = ? AND ch.change_type = 'verified' AND t.task_type = ?
+                """
+                verified_params.append(task_type)
+            
+            cursor.execute(verified_query, verified_params)
+            verified = cursor.fetchone()["count"]
+            
+            # Get success rate (completed and verified)
+            cursor.execute("""
+                SELECT COUNT(DISTINCT ch1.task_id) as count FROM change_history ch1
+                JOIN change_history ch2 ON ch1.task_id = ch2.task_id
+                WHERE ch1.agent_id = ? AND ch1.change_type = 'completed'
+                    AND ch2.agent_id = ? AND ch2.change_type = 'verified'
+            """, (agent_id, agent_id))
+            success_count = cursor.fetchone()["count"]
+            
+            return {
+                "agent_id": agent_id,
+                "tasks_completed": completed,
+                "tasks_verified": verified,
+                "success_rate": (success_count / completed * 100) if completed > 0 else 0.0,
+                "task_type_filter": task_type
+            }
         finally:
             conn.close()
     

@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from database import TodoDatabase, TaskType, TaskStatus, VerificationStatus, RelationshipType
+from mcp_api import MCPTodoAPI, MCP_FUNCTIONS
 
 # Setup logging
 logging.basicConfig(
@@ -44,6 +45,7 @@ class TaskCreate(BaseModel):
     task_type: str = Field(..., description="Task type: concrete, abstract, or epic")
     task_instruction: str = Field(..., description="What to do")
     verification_instruction: str = Field(..., description="How to verify completion (idempotent)")
+    agent_id: str = Field(..., description="Agent ID creating this task")
     notes: Optional[str] = Field(None, description="Optional notes")
 
 
@@ -92,6 +94,7 @@ async def create_task(task: TaskCreate):
         task_type=task.task_type,
         task_instruction=task.task_instruction,
         verification_instruction=task.verification_instruction,
+        agent_id=task.agent_id,
         notes=task.notes
     )
     
@@ -136,6 +139,9 @@ async def query_tasks(
 @app.post("/tasks/{task_id}/lock")
 async def lock_task(task_id: int, agent_id: str = Body(..., embed=True)):
     """Lock a task for an agent (set to in_progress)."""
+    if not agent_id:
+        raise HTTPException(status_code=400, detail="agent_id is required")
+    
     success = db.lock_task(task_id, agent_id)
     if not success:
         raise HTTPException(
@@ -146,26 +152,35 @@ async def lock_task(task_id: int, agent_id: str = Body(..., embed=True)):
 
 
 @app.post("/tasks/{task_id}/unlock")
-async def unlock_task(task_id: int):
+async def unlock_task(task_id: int, agent_id: str = Body(..., embed=True)):
     """Unlock a task (set back to available)."""
-    db.unlock_task(task_id)
-    return {"message": f"Task {task_id} unlocked", "task_id": task_id}
+    if not agent_id:
+        raise HTTPException(status_code=400, detail="agent_id is required")
+    
+    db.unlock_task(task_id, agent_id)
+    return {"message": f"Task {task_id} unlocked by agent {agent_id}", "task_id": task_id}
 
 
 @app.post("/tasks/{task_id}/complete")
-async def complete_task(task_id: int, notes: Optional[str] = Body(None, embed=True)):
+async def complete_task(task_id: int, agent_id: str = Body(..., embed=True), notes: Optional[str] = Body(None, embed=True)):
     """Mark a task as complete."""
+    if not agent_id:
+        raise HTTPException(status_code=400, detail="agent_id is required")
+    
     task = db.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
     
-    db.complete_task(task_id, notes=notes)
-    return {"message": f"Task {task_id} marked as complete", "task_id": task_id}
+    db.complete_task(task_id, agent_id, notes=notes)
+    return {"message": f"Task {task_id} marked as complete by agent {agent_id}", "task_id": task_id}
 
 
 @app.post("/tasks/{task_id}/verify")
-async def verify_task(task_id: int):
+async def verify_task(task_id: int, agent_id: str = Body(..., embed=True)):
     """Mark a task as verified (verification check passed)."""
+    if not agent_id:
+        raise HTTPException(status_code=400, detail="agent_id is required")
+    
     task = db.get_task(task_id)
     if not task:
         raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
@@ -173,8 +188,8 @@ async def verify_task(task_id: int):
     if task["task_status"] != "complete":
         raise HTTPException(status_code=400, detail="Task must be complete before verification")
     
-    db.verify_task(task_id)
-    return {"message": f"Task {task_id} verified", "task_id": task_id}
+    db.verify_task(task_id, agent_id)
+    return {"message": f"Task {task_id} verified by agent {agent_id}", "task_id": task_id}
 
 
 @app.patch("/tasks/{task_id}", response_model=TaskResponse)
@@ -242,11 +257,21 @@ async def update_task(task_id: int, update: TaskUpdate):
     return TaskResponse(**updated_task)
 
 
+class RelationshipCreateWithAgent(BaseModel):
+    parent_task_id: int = Field(..., description="Parent task ID")
+    child_task_id: int = Field(..., description="Child task ID")
+    relationship_type: str = Field(..., description="Relationship type: subtask, blocking, blocked_by, followup, related")
+    agent_id: str = Field(..., description="Agent ID creating this relationship")
+
+
 @app.post("/relationships")
-async def create_relationship(relationship: RelationshipCreate):
+async def create_relationship(relationship: RelationshipCreateWithAgent):
     """Create a relationship between two tasks."""
     if relationship.relationship_type not in ["subtask", "blocking", "blocked_by", "followup", "related"]:
         raise HTTPException(status_code=400, detail="Invalid relationship_type")
+    
+    if not relationship.agent_id:
+        raise HTTPException(status_code=400, detail="agent_id is required")
     
     # Verify both tasks exist
     parent = db.get_task(relationship.parent_task_id)
@@ -260,7 +285,8 @@ async def create_relationship(relationship: RelationshipCreate):
         rel_id = db.create_relationship(
             parent_task_id=relationship.parent_task_id,
             child_task_id=relationship.child_task_id,
-            relationship_type=relationship.relationship_type
+            relationship_type=relationship.relationship_type,
+            agent_id=relationship.agent_id
         )
         return {"message": "Relationship created", "relationship_id": rel_id}
     except sqlite3.IntegrityError as e:
@@ -316,6 +342,7 @@ async def add_followup_task(task_id: int, followup: TaskCreate):
         task_type=followup.task_type,
         task_instruction=followup.task_instruction,
         verification_instruction=followup.verification_instruction,
+        agent_id=followup.agent_id,
         notes=followup.notes
     )
     
@@ -323,7 +350,8 @@ async def add_followup_task(task_id: int, followup: TaskCreate):
     db.create_relationship(
         parent_task_id=task_id,
         child_task_id=followup_id,
-        relationship_type="followup"
+        relationship_type="followup",
+        agent_id=followup.agent_id
     )
     
     return {
@@ -331,6 +359,101 @@ async def add_followup_task(task_id: int, followup: TaskCreate):
         "parent_task_id": task_id,
         "followup_task_id": followup_id
     }
+
+
+@app.get("/change-history")
+async def get_change_history(
+    task_id: Optional[int] = Query(None, description="Filter by task ID"),
+    agent_id: Optional[str] = Query(None, description="Filter by agent ID"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of results")
+):
+    """Get change history with optional filters."""
+    history = db.get_change_history(task_id=task_id, agent_id=agent_id, limit=limit)
+    return {"history": history}
+
+
+@app.get("/agents/{agent_id}/stats")
+async def get_agent_stats(
+    agent_id: str,
+    task_type: Optional[str] = Query(None, description="Filter by task type")
+):
+    """Get statistics for an agent's performance."""
+    stats = db.get_agent_stats(agent_id, task_type)
+    return stats
+
+
+@app.get("/mcp/functions")
+async def get_mcp_functions():
+    """Get MCP function definitions."""
+    return {"functions": MCP_FUNCTIONS}
+
+
+# MCP-compatible endpoints
+@app.post("/mcp/list_available_tasks")
+async def mcp_list_available_tasks(
+    agent_type: str = Body(..., embed=True),
+    limit: int = Body(10, embed=True)
+):
+    """MCP: List available tasks for an agent type."""
+    tasks = MCPTodoAPI.list_available_tasks(agent_type, limit)
+    return {"tasks": tasks}
+
+
+@app.post("/mcp/reserve_task")
+async def mcp_reserve_task(
+    task_id: int = Body(..., embed=True),
+    agent_id: str = Body(..., embed=True)
+):
+    """MCP: Reserve (lock) a task for an agent."""
+    result = MCPTodoAPI.reserve_task(task_id, agent_id)
+    return result
+
+
+@app.post("/mcp/complete_task")
+async def mcp_complete_task(
+    task_id: int = Body(..., embed=True),
+    agent_id: str = Body(..., embed=True),
+    notes: Optional[str] = Body(None, embed=True),
+    followup_title: Optional[str] = Body(None, embed=True),
+    followup_task_type: Optional[str] = Body(None, embed=True),
+    followup_instruction: Optional[str] = Body(None, embed=True),
+    followup_verification: Optional[str] = Body(None, embed=True)
+):
+    """MCP: Complete a task and optionally create followup."""
+    result = MCPTodoAPI.complete_task(
+        task_id, agent_id, notes,
+        followup_title, followup_task_type, followup_instruction, followup_verification
+    )
+    return result
+
+
+@app.post("/mcp/create_task")
+async def mcp_create_task(
+    title: str = Body(..., embed=True),
+    task_type: str = Body(..., embed=True),
+    task_instruction: str = Body(..., embed=True),
+    verification_instruction: str = Body(..., embed=True),
+    agent_id: str = Body(..., embed=True),
+    parent_task_id: Optional[int] = Body(None, embed=True),
+    relationship_type: Optional[str] = Body(None, embed=True),
+    notes: Optional[str] = Body(None, embed=True)
+):
+    """MCP: Create a new task."""
+    result = MCPTodoAPI.create_task(
+        title, task_type, task_instruction, verification_instruction, agent_id,
+        parent_task_id, relationship_type, notes
+    )
+    return result
+
+
+@app.post("/mcp/get_agent_performance")
+async def mcp_get_agent_performance(
+    agent_id: str = Body(..., embed=True),
+    task_type: Optional[str] = Body(None, embed=True)
+):
+    """MCP: Get agent performance statistics."""
+    stats = MCPTodoAPI.get_agent_performance(agent_id, task_type)
+    return stats
 
 
 if __name__ == "__main__":
