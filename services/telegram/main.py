@@ -9,11 +9,20 @@ import logging
 import os
 from typing import Optional
 
+import grpc.aio
+
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 
 from inference_core import config, setup_logging
 from june_grpc_api import asr as asr_shim, tts as tts_shim, llm as llm_shim
+
+from audio_utils import (
+    prepare_audio_for_stt,
+    AudioValidationError,
+    MAX_AUDIO_DURATION_SECONDS,
+    MAX_AUDIO_SIZE_BYTES
+)
 
 # Setup logging
 setup_logging(config.monitoring.log_level, "telegram")
@@ -102,18 +111,64 @@ class TelegramBotService:
         status_msg = await update.message.reply_text("🔄 Processing your voice message...")
         
         try:
-            # TODO: Implement full pipeline in next phases
-            # 1. Download voice file
-            # 2. Convert OGG to WAV
-            # 3. Send to STT
-            # 4. Send to LLM
-            # 5. Send to TTS
-            # 6. Convert to OGG
-            # 7. Send response
+            # Step 1: Download voice file from Telegram
+            file = await context.bot.get_file(voice.file_id)
+            audio_data = await file.download_as_bytearray()
+            audio_data_bytes = bytes(audio_data)
+            
+            logger.info(f"Downloaded voice file: {len(audio_data_bytes)} bytes")
+            
+            # Step 2: Convert OGG to WAV and prepare for STT (16kHz mono)
+            try:
+                stt_audio = prepare_audio_for_stt(audio_data_bytes, is_ogg=True)
+                logger.info(f"Prepared audio for STT: {len(stt_audio)} bytes")
+            except AudioValidationError as e:
+                await status_msg.edit_text(
+                    f"❌ Audio validation failed: {str(e)}\n\n"
+                    "Please ensure your voice message is:\n"
+                    f"• Under {MAX_AUDIO_DURATION_SECONDS} seconds\n"
+                    f"• Under {MAX_AUDIO_SIZE_BYTES / (1024 * 1024):.0f} MB"
+                )
+                return
+            except Exception as e:
+                logger.error(f"Error preparing audio: {e}", exc_info=True)
+                await status_msg.edit_text(
+                    f"❌ Error processing audio: {str(e)}\n\n"
+                    "Please try again."
+                )
+                return
+            
+            # Step 3: Send to STT
+            await status_msg.edit_text("🔄 Transcribing your voice message...")
+            try:
+                async with grpc.aio.insecure_channel(self.stt_address) as channel:
+                    stt_client = asr_shim.SpeechToTextClient(channel)
+                    cfg = asr_shim.RecognitionConfig(language="en", interim_results=False)
+                    result = await stt_client.recognize(
+                        stt_audio,
+                        sample_rate=16000,
+                        encoding="wav",
+                        config=cfg
+                    )
+                    transcript = result.transcript
+                logger.info(f"Transcription: {transcript}")
+            except Exception as e:
+                logger.error(f"STT error: {e}", exc_info=True)
+                await status_msg.edit_text(
+                    f"❌ Transcription failed: {str(e)}\n\n"
+                    "Please try again."
+                )
+                return
+            
+            # TODO: Steps 4-7 will be implemented in next phases
+            # Step 4: Send to LLM
+            # Step 5: Send to TTS
+            # Step 6: Convert to OGG
+            # Step 7: Send response
             
             await status_msg.edit_text(
-                "⚠️ Voice processing pipeline not yet implemented.\n\n"
-                "This will be completed in Phase 2-4."
+                f"📝 **Transcription:**\n\n{transcript}\n\n"
+                "⚠️ LLM and TTS processing will be implemented in Phase 3-4."
             )
         except Exception as e:
             logger.error(f"Error processing voice message: {e}", exc_info=True)
