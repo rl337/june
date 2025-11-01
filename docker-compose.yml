@@ -94,27 +94,8 @@ services:
     depends_on:
       - prometheus
 
-  # TODO Service (Task Management for Agents)
-  todo-service:
-    build:
-      context: .
-      dockerfile: ./services/todo-service/Dockerfile
-    container_name: june-todo-service
-    restart: unless-stopped
-    ports:
-      - "8004:8004"
-    environment:
-      - TODO_DB_PATH=/app/data/todos.db
-      - TODO_SERVICE_PORT=8004
-    volumes:
-      - ${JUNE_DATA_DIR:-/home/rlee/june_data}/todo_service:/app/data
-    networks:
-      - june_network
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health', timeout=5)"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+  # TODO Service is now external - see services/todo-service/README.md
+  # Run separately: docker compose -f services/todo-service/docker-compose.yml up -d
 
   # Webapp Service (React Chat Interface)
   webapp:

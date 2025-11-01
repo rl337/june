@@ -36,12 +36,15 @@ class Task:
 class TodoClient:
     """Client for interacting with TODO service."""
     
-    def __init__(self, base_url: str = "http://todo-service:8004"):
+    def __init__(self, base_url: Optional[str] = None):
         """Initialize TODO client.
         
         Args:
-            base_url: Base URL of TODO service
+            base_url: Base URL of TODO service (defaults to TODO_SERVICE_URL env var or http://localhost:8004)
         """
+        if base_url is None:
+            import os
+            base_url = os.getenv("TODO_SERVICE_URL", "http://localhost:8004")
         self.base_url = base_url.rstrip("/")
     
     def _request(
