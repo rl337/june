@@ -18,6 +18,200 @@ The `TODO.md` file contains:
 
 See `TODO.md` for the current Telegram voice-to-text-to-voice service implementation plan.
 
+### TODO MCP Service Integration (For Agentic Capabilities)
+
+When June agents are working with the TODO MCP Service (for autonomous task management), agents MUST check for previous work and continue existing tasks before starting new ones. See the "🔄 Resuming and Continuing Tasks" section below for detailed guidelines.
+
+## 🔄 Resuming and Continuing Tasks (CRITICAL)
+
+**Agents MUST check for previous work and continue existing tasks before starting new ones.**
+
+### Priority: Continue Your In-Progress Tasks First
+
+**Before picking up a new task, ALWAYS check if you already have tasks in progress:**
+
+```python
+# 1. First, check for tasks already assigned to you
+my_tasks = query_tasks(
+    agent_id=agent_id,
+    task_status="in_progress",
+    limit=10
+)
+
+if my_tasks:
+    # You have existing work - continue it first!
+    logger.info(f"Found {len(my_tasks)} task(s) already in progress")
+    for task in my_tasks:
+        logger.info(f"  - Task {task['id']}: {task['title']}")
+    
+    # Continue the first in-progress task
+    task_id = my_tasks[0]['id']
+    context = get_task_context(task_id=task_id)
+else:
+    # No existing tasks, can pick up a new one
+    tasks = list_available_tasks(agent_type="implementation", project_id=1)
+    if tasks:
+        task_id = tasks[0]['id']
+        context = reserve_task(task_id=task_id, agent_id=agent_id)
+```
+
+### The Problem
+
+Agents currently pick up new tasks without checking if they already have work in progress, leading to:
+- ❌ Duplicate work (re-doing what another agent already completed)
+- ❌ Ignoring previous progress and updates
+- ❌ Missing uncommitted changes in git
+- ❌ Not resuming where previous agent left off
+- ❌ No documentation of progress
+
+### Mandatory Workflow: Check Previous Work (TODO MCP Service)
+
+**When you pick up a task (new or existing), you MUST:**
+
+1. **Check for Previous Context After Reserving:**
+   ```python
+   # Immediately after reserving, get full context
+   context = get_task_context(task_id=task_id)
+   
+   # Check for:
+   # - Previous updates (context["updates"])
+   # - Recent changes (context["recent_changes"])
+   # - Stale warnings (context.get("stale_warning"))
+   # - Parent tasks and relationships (context["ancestry"])
+   # - Project information (context["project"])
+   ```
+
+2. **Check Git Status for Uncommitted Work (MANDATORY):**
+   ```python
+   # ALWAYS check git status before starting
+   import subprocess
+   
+   # Check for uncommitted changes in the project directory
+   project_path = context["project"]["local_path"]
+   git_status = subprocess.run(
+       ["git", "status", "--short"],
+       cwd=project_path,
+       capture_output=True,
+       text=True
+   ).stdout
+   
+   if git_status.strip():
+       # There are uncommitted changes - review them first!
+       # They might be work from a previous agent session
+       logger.info(f"Found uncommitted changes:\n{git_status}")
+       
+       # Show the diff to understand what was done
+       git_diff = subprocess.run(
+           ["git", "diff"],
+           cwd=project_path,
+           capture_output=True,
+           text=True
+       ).stdout
+       
+       # Review the changes and determine if work should continue
+   ```
+
+3. **Review Previous Updates (MANDATORY):**
+   ```python
+   # Check what the previous agent(s) documented
+   updates = context.get("updates", [])
+   
+   for update in updates:
+       logger.info(f"Previous update [{update['update_type']}]: {update['content']}")
+       # Understand what was tried, what worked, what failed
+       
+   # If there are blockers, address them
+   blockers = [u for u in updates if u["update_type"] == "blocker"]
+   if blockers:
+       logger.warning(f"Found {len(blockers)} blocker(s) from previous work")
+       # Address blockers before continuing
+   ```
+
+4. **Check for Stale Task Warnings (MANDATORY):**
+   ```python
+   # If task was previously abandoned, you MUST verify work
+   stale_warning = context.get("stale_warning")
+   if stale_warning:
+       logger.warning(f"⚠️ STALE TASK WARNING: {stale_warning['message']}")
+       logger.warning(f"Previous agent: {stale_warning['previous_agent']}")
+       logger.warning(f"Previously unlocked at: {stale_warning['unlocked_at']}")
+       
+       # MANDATORY: Verify all previous work before continuing
+       # - Check if any code changes are correct
+       # - Verify if tests pass
+       # - Confirm no regressions
+       # - Document your verification in an update
+       
+       add_task_update(
+           task_id=task_id,
+           agent_id=agent_id,
+           content=f"Verifying previous work by {stale_warning['previous_agent']}. Checking git status, reviewing changes, running tests.",
+           update_type="progress"
+       )
+   ```
+
+5. **Resume Where Previous Work Left Off:**
+   ```python
+   # Based on updates and git status, determine:
+   # - What was already implemented
+   # - What still needs to be done
+   # - What tests already pass
+   # - What needs to be fixed or completed
+   
+   # Create a plan that builds on previous work
+   # Don't start from scratch - continue the work
+   
+   add_task_update(
+       task_id=task_id,
+       agent_id=agent_id,
+       content="Resuming work. Reviewed previous updates and git status. Previous agent made progress on X, Y. Will continue with Z.",
+       update_type="progress"
+   )
+   ```
+
+6. **Document Your Progress Continuously:**
+   ```python
+   # As you work, add updates frequently:
+   add_task_update(
+       task_id=task_id,
+       agent_id=agent_id,
+       content="Completed step 1: Implemented X function with tests",
+       update_type="progress"
+   )
+   
+   add_task_update(
+       task_id=task_id,
+       agent_id=agent_id,
+       content="Found issue with Y - needs refactoring. Creating followup task.",
+       update_type="finding"
+   )
+   
+   # This helps the next agent understand what happened
+   ```
+
+### Benefits of Continuing Existing Tasks
+
+- ✅ **No duplicate work** - Agents build on previous progress
+- ✅ **Better continuity** - Work continues seamlessly across agent sessions
+- ✅ **Documented progress** - Updates show what was done and why
+- ✅ **Faster completion** - Don't re-do what's already done
+- ✅ **Better debugging** - Clear history of attempts and issues
+- ✅ **Resource efficiency** - Don't waste time on completed work
+
+### Common Mistakes to Avoid
+
+- ❌ Starting work without checking `get_task_context()`
+- ❌ Ignoring `stale_warning` - you MUST verify previous work
+- ❌ Not checking git status - uncommitted changes might be previous work
+- ❌ Not reading previous updates - you might repeat failed attempts
+- ❌ Starting from scratch when work was already done
+- ❌ Not documenting progress - next agent won't know what happened
+- ❌ Not checking for blockers - you might hit the same issues
+
+**This is CRITICAL for maintaining work continuity and preventing duplicate effort when using the TODO MCP Service for autonomous task management.**
+
+**Key Principle: Always check for your existing in-progress tasks before picking up new work. Continue what you started before starting something new.**
+
 ## 🧪 Test-First Development (CRITICAL)
 
 **MANDATORY:** All agents MUST follow test-first behavior.
