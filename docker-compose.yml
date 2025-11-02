@@ -119,6 +119,31 @@ services:
     networks:
       - june_network
 
+  # Orchestration Service (Agent orchestration and coordination)
+  orchestrator:
+    build:
+      context: ./services/orchestrator
+      dockerfile: Dockerfile
+    container_name: june-orchestrator
+    restart: unless-stopped
+    ports:
+      - "8005:8005"
+    environment:
+      - ORCHESTRATOR_PORT=8005
+      - TODO_SERVICE_URL=http://todo-mcp-service:8004
+      - GATEWAY_URL=http://gateway:8000
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      - todo-mcp-service
+      - gateway
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - june_network
+
   # Webapp Service (React Chat Interface)
   webapp:
     build:
