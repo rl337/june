@@ -671,8 +671,8 @@ test_api_functionality() {
 check_todo_service() {
     print_header "Checking TODO Service"
     
-    local todo_url="${TODO_SERVICE_URL:-http://localhost:8004}"
-    local todo_service_dir="services/todo-service"
+    local todo_url="${TODO_SERVICE_URL:-http://localhost:5080}"
+    local todo_service_dir="services/todo-mcp-service"
     
     # Check if TODO service is running
     print_info "Checking TODO service availability..."
@@ -684,22 +684,28 @@ check_todo_service() {
         return 0  # Not critical - service is standalone
     fi
     
-    # Run TODO service tests if service is available and tests exist
-    if [ -f "$todo_service_dir/tests/run_tests.sh" ]; then
-        print_info "Running TODO service tests..."
-        if bash "$todo_service_dir/tests/run_tests.sh" 2>&1 | tee /tmp/todo_tests.log; then
-            print_success "TODO service tests passed"
+    # Run TODO service checks if service is available
+    if [ -f "$todo_service_dir/run_checks.sh" ]; then
+        print_info "Running TODO MCP Service checks..."
+        if bash "$todo_service_dir/run_checks.sh" 2>&1 | tee /tmp/todo_tests.log; then
+            print_success "TODO MCP Service checks passed"
         else
             local test_exit_code=$?
             if [ $test_exit_code -eq 0 ]; then
-                print_success "TODO service tests passed"
+                print_success "TODO MCP Service checks passed"
             else
-                print_warning "TODO service tests had issues (exit code: $test_exit_code)"
+                print_warning "TODO MCP Service checks had issues (exit code: $test_exit_code)"
                 print_info "Review test output above or check: tail /tmp/todo_tests.log"
+                print_info "Run TODO service checks directly: cd $todo_service_dir && ./run_checks.sh"
             fi
         fi
     else
-        print_warning "TODO service test script not found"
+        print_warning "TODO MCP Service run_checks.sh not found at $todo_service_dir"
+        # Fallback to old location
+        if [ -f "services/todo-service/tests/run_tests.sh" ]; then
+            print_info "Found tests at old location, running..."
+            bash "services/todo-service/tests/run_tests.sh" 2>&1 | tee /tmp/todo_tests.log || true
+        fi
     fi
     
     # Test backup functionality if service is running

@@ -144,6 +144,335 @@ MINIO_ROOT_USER=admin
 MINIO_ROOT_PASSWORD=changeme
 ```
 
+## 🤖 Telegram Bot Setup
+
+June Agent includes a Telegram bot service that enables voice-to-text-to-voice interactions. Users can send voice messages, which are transcribed, processed by the LLM, and returned as voice responses.
+
+### Getting Started
+
+#### 1. Create a Telegram Bot
+
+1. Open Telegram and search for [@BotFather](https://t.me/botfather)
+2. Send `/newbot` command and follow the prompts to create your bot
+3. Copy the bot token provided by BotFather (format: `123456789:ABCdefGHIjklMNOpqrsTUVwxyz`)
+4. Save the token securely - you'll need it for configuration
+
+#### 2. Configure Environment Variables
+
+Add the following to your `.env` file:
+
+```bash
+# Telegram Bot Configuration (Required)
+TELEGRAM_BOT_TOKEN=your_bot_token_here
+
+# Service URLs (Optional - defaults shown)
+STT_URL=grpc://stt:50052          # STT service gRPC endpoint
+TTS_URL=grpc://tts:50053          # TTS service gRPC endpoint
+LLM_URL=grpc://inference-api:50051 # Inference API gRPC endpoint
+
+# Webhook Configuration (Optional - for production)
+TELEGRAM_USE_WEBHOOK=false        # Set to 'true' for webhook mode
+TELEGRAM_WEBHOOK_URL=https://your-domain.com/webhook  # Full webhook URL
+TELEGRAM_WEBHOOK_PORT=8443        # Port for webhook server
+
+# File Size Limits (Optional)
+TELEGRAM_MAX_FILE_SIZE=20971520   # Maximum voice file size in bytes (default: 20MB)
+```
+
+#### 3. Add Telegram Service to Docker Compose
+
+Add the following service to your `docker-compose.yml`:
+
+```yaml
+  # Telegram Bot Service
+  telegram:
+    build:
+      context: .
+      dockerfile: ./services/telegram/Dockerfile
+    container_name: june-telegram
+    restart: unless-stopped
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - STT_URL=${STT_URL:-grpc://stt:50052}
+      - TTS_URL=${TTS_URL:-grpc://tts:50053}
+      - LLM_URL=${LLM_URL:-grpc://inference-api:50051}
+      - TELEGRAM_USE_WEBHOOK=${TELEGRAM_USE_WEBHOOK:-false}
+      - TELEGRAM_WEBHOOK_URL=${TELEGRAM_WEBHOOK_URL}
+      - TELEGRAM_WEBHOOK_PORT=${TELEGRAM_WEBHOOK_PORT:-8443}
+      - TELEGRAM_MAX_FILE_SIZE=${TELEGRAM_MAX_FILE_SIZE:-20971520}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    depends_on:
+      - stt
+      - tts
+      - inference-api
+    networks:
+      - june_network
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "python.*main.py"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+```
+
+#### 4. Start the Service
+
+```bash
+# Start all services including Telegram bot
+docker-compose up -d
+
+# Check Telegram service status
+docker-compose logs -f telegram
+
+# Verify bot is running
+docker-compose ps telegram
+```
+
+### Usage
+
+#### Bot Commands
+
+- `/start` - Initialize the bot and get welcome message
+- `/help` - Display help information and usage instructions
+- `/status` - Check service health status (STT, TTS, LLM)
+
+#### Sending Voice Messages
+
+1. Open your Telegram bot conversation
+2. Tap the microphone icon (🎤) to record a voice message
+3. Send the voice message
+4. The bot will:
+   - Show "🔄 Processing your voice message..."
+   - Transcribe your voice using STT
+   - Process the text through the LLM
+   - Convert the response to speech using TTS
+   - Send back a voice response
+
+#### Voice Message Limits
+
+- **Maximum duration**: ~60 seconds
+- **Maximum file size**: 20 MB (configurable via `TELEGRAM_MAX_FILE_SIZE`)
+- **Supported formats**: OGG/OPUS (Telegram's native format)
+
+### Running Modes
+
+#### Development Mode (Polling)
+
+For local development, the bot uses polling mode (default):
+
+```bash
+# Ensure TELEGRAM_USE_WEBHOOK is not set or set to false
+TELEGRAM_USE_WEBHOOK=false
+
+# Start the service
+docker-compose up -d telegram
+```
+
+The bot will continuously poll Telegram's servers for updates.
+
+#### Production Mode (Webhook)
+
+For production deployments, use webhook mode for better performance and reliability:
+
+```bash
+# Configure webhook
+TELEGRAM_USE_WEBHOOK=true
+TELEGRAM_WEBHOOK_URL=https://your-domain.com/webhook
+TELEGRAM_WEBHOOK_PORT=8443
+
+# Ensure your server has:
+# 1. Valid SSL certificate (HTTPS required)
+# 2. Port 8443 accessible from internet
+# 3. Firewall rules allowing Telegram IP ranges
+
+# Start the service
+docker-compose up -d telegram
+```
+
+**Webhook Setup Requirements:**
+- Valid SSL/TLS certificate (Telegram requires HTTPS)
+- Publicly accessible domain/IP
+- Port forwarding or load balancer configured
+- Firewall allows connections from Telegram servers
+
+### Environment Variables Reference
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `TELEGRAM_BOT_TOKEN` | ✅ Yes | - | Bot token from BotFather |
+| `STT_URL` | No | `grpc://stt:50052` | STT service gRPC endpoint |
+| `TTS_URL` | No | `grpc://tts:50053` | TTS service gRPC endpoint |
+| `LLM_URL` | No | `grpc://inference-api:50051` | Inference API gRPC endpoint |
+| `TELEGRAM_USE_WEBHOOK` | No | `false` | Enable webhook mode |
+| `TELEGRAM_WEBHOOK_URL` | No* | - | Webhook URL (required if `TELEGRAM_USE_WEBHOOK=true`) |
+| `TELEGRAM_WEBHOOK_PORT` | No | `8443` | Webhook server port |
+| `TELEGRAM_MAX_FILE_SIZE` | No | `20971520` | Max voice file size in bytes (20MB) |
+| `LOG_LEVEL` | No | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR) |
+
+\* Required when `TELEGRAM_USE_WEBHOOK=true`
+
+### Troubleshooting
+
+#### Bot Not Responding
+
+1. **Check bot token:**
+   ```bash
+   # Verify token is set
+   docker-compose exec telegram env | grep TELEGRAM_BOT_TOKEN
+   
+   # Test token validity (run locally)
+   curl "https://api.telegram.org/bot<YOUR_TOKEN>/getMe"
+   ```
+
+2. **Check service logs:**
+   ```bash
+   docker-compose logs -f telegram
+   ```
+
+3. **Verify dependencies are running:**
+   ```bash
+   docker-compose ps stt tts inference-api
+   ```
+
+#### Voice Messages Not Processing
+
+1. **Check audio file size:**
+   - Ensure file is under 20MB (or your configured limit)
+   - Telegram has a ~1 minute duration limit
+
+2. **Check STT service:**
+   ```bash
+   # Test STT service connectivity
+   docker-compose exec telegram ping -c 3 stt
+   
+   # Check STT logs
+   docker-compose logs stt
+   ```
+
+3. **Check audio format:**
+   - Bot expects OGG/OPUS format from Telegram
+   - Conversion to WAV/PCM is handled automatically
+
+#### Webhook Issues
+
+1. **SSL Certificate:**
+   - Ensure valid HTTPS certificate (Let's Encrypt recommended)
+   - Certificate must be trusted by Telegram servers
+
+2. **Webhook URL:**
+   ```bash
+   # Verify webhook is set (replace YOUR_TOKEN)
+   curl "https://api.telegram.org/bot<YOUR_TOKEN>/getWebhookInfo"
+   
+   # Set webhook manually if needed
+   curl -X POST "https://api.telegram.org/bot<YOUR_TOKEN>/setWebhook" \
+     -H "Content-Type: application/json" \
+     -d '{"url": "https://your-domain.com/webhook"}'
+   ```
+
+3. **Firewall:**
+   - Allow inbound connections on port 8443
+   - Telegram IP ranges: https://core.telegram.org/bots/webhooks
+
+#### Service Connection Errors
+
+1. **Check network connectivity:**
+   ```bash
+   # Test internal service connections
+   docker-compose exec telegram ping -c 3 stt
+   docker-compose exec telegram ping -c 3 tts
+   docker-compose exec telegram ping -c 3 inference-api
+   ```
+
+2. **Verify gRPC endpoints:**
+   - Ensure services are running: `docker-compose ps`
+   - Check service ports are accessible within Docker network
+
+3. **Check service health:**
+   ```bash
+   # Test STT health
+   docker-compose exec stt grpc_health_probe -addr=:50052
+   
+   # Test TTS health  
+   docker-compose exec tts grpc_health_probe -addr=:50053
+   ```
+
+#### Common Error Messages
+
+- **"TELEGRAM_BOT_TOKEN environment variable is required"**
+  - Solution: Set `TELEGRAM_BOT_TOKEN` in `.env` file
+
+- **"Voice message too large"**
+  - Solution: Send shorter voice messages or increase `TELEGRAM_MAX_FILE_SIZE`
+
+- **"Transcription failed"**
+  - Solution: Check STT service is running and accessible
+  - Verify audio format is valid
+
+- **"Error processing audio"**
+  - Solution: Check audio format, file integrity, and service connectivity
+
+### Development
+
+#### Running Locally (Outside Docker)
+
+```bash
+# Navigate to telegram service
+cd services/telegram
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Set environment variables
+export TELEGRAM_BOT_TOKEN=your_token_here
+export STT_URL=grpc://localhost:50052
+export TTS_URL=grpc://localhost:50053
+export LLM_URL=grpc://localhost:50051
+
+# Run the bot
+python main.py
+```
+
+#### Testing
+
+```bash
+# Run unit tests
+cd services/telegram
+python -m pytest tests/ -v
+
+# Run with coverage
+python -m pytest tests/ --cov=. --cov-report=html
+```
+
+### Architecture
+
+The Telegram bot service acts as an integration layer:
+
+```
+User → Telegram (Voice Message)
+         ↓
+   Telegram Bot Service
+         ↓
+   [Download OGG] → [Convert to WAV] → [STT Service] → Transcript
+         ↓
+   [LLM Service] → Response Text
+         ↓
+   [TTS Service] → Audio (PCM/WAV)
+         ↓
+   [Convert to OGG] → [Upload to Telegram] → User receives Voice Response
+```
+
+**Service Dependencies:**
+- STT Service (Speech-to-Text) - transcribes voice messages
+- TTS Service (Text-to-Speech) - converts responses to audio
+- Inference API - processes text through LLM
+
+**Key Features:**
+- Automatic audio format conversion (OGG ↔ WAV/PCM)
+- Real-time status updates for users
+- Error handling and validation
+- Support for both polling and webhook modes
+
 ## 🧪 Test Modes
 
 June Agent supports two test configurations for different testing scenarios:

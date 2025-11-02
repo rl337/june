@@ -32,6 +32,16 @@ import asr_pb2_grpc
 
 from inference_core import config, setup_logging, Timer, HealthChecker, CircularBuffer
 
+# Import metrics storage
+try:
+    from stt_metrics import get_metrics_storage
+except ImportError:
+    # Fallback for different import paths
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent))
+    from stt_metrics import get_metrics_storage
+
 # Setup logging
 setup_logging(config.monitoring.log_level, "stt")
 logger = logging.getLogger(__name__)
@@ -106,26 +116,95 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
     async def Recognize(self, request: RecognitionRequest, context: grpc.aio.ServicerContext) -> RecognitionResponse:
         """One-shot speech recognition."""
         with Timer("recognition"):
+            start_time = datetime.now()
+            audio_format = request.encoding if request.encoding else "pcm"
+            audio_size = len(request.audio_data)
+            audio_duration = 0.0
+            transcript_length = 0
+            confidence = 0.0
+            error_message = None
+            
             try:
                 # Process audio data
                 audio_data = await self._process_audio_data(request.audio_data, request.sample_rate)
                 
+                # Calculate audio duration
+                audio_duration = len(audio_data) / request.sample_rate if request.sample_rate > 0 else 0.0
+                
                 # Transcribe
                 result = await self._transcribe_audio(audio_data, is_final=True)
                 
+                processing_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+                
                 if result:
+                    transcript_length = len(result.transcript)
+                    confidence = result.confidence
+                    
+                    # Record metrics
+                    try:
+                        metrics = get_metrics_storage()
+                        metrics.record_transcription(
+                            audio_format=audio_format,
+                            audio_duration_seconds=audio_duration,
+                            audio_size_bytes=audio_size,
+                            sample_rate=request.sample_rate,
+                            transcript_length=transcript_length,
+                            confidence=confidence,
+                            processing_time_ms=processing_time_ms,
+                            source="stt_service"
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to record metrics: {e}")
+                    
                     return RecognitionResponse(
                         results=[result],
-                        processing_time_ms=int(Timer("recognition").duration * 1000) if Timer("recognition").duration else 0
+                        processing_time_ms=processing_time_ms
                     )
                 else:
+                    # Record failed transcription
+                    try:
+                        metrics = get_metrics_storage()
+                        metrics.record_transcription(
+                            audio_format=audio_format,
+                            audio_duration_seconds=audio_duration,
+                            audio_size_bytes=audio_size,
+                            sample_rate=request.sample_rate,
+                            transcript_length=0,
+                            confidence=0.0,
+                            processing_time_ms=processing_time_ms,
+                            source="stt_service",
+                            error_message="Empty transcription result"
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to record metrics: {e}")
+                    
                     return RecognitionResponse(
                         results=[],
-                        processing_time_ms=0
+                        processing_time_ms=processing_time_ms
                     )
                     
             except Exception as e:
+                error_message = str(e)
                 logger.error(f"Recognition error: {e}")
+                
+                # Record error metrics
+                try:
+                    processing_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+                    metrics = get_metrics_storage()
+                    metrics.record_transcription(
+                        audio_format=audio_format,
+                        audio_duration_seconds=audio_duration,
+                        audio_size_bytes=audio_size,
+                        sample_rate=request.sample_rate if hasattr(request, "sample_rate") else 16000,
+                        transcript_length=0,
+                        confidence=0.0,
+                        processing_time_ms=processing_time_ms,
+                        source="stt_service",
+                        error_message=error_message
+                    )
+                except Exception as metrics_error:
+                    logger.warning(f"Failed to record error metrics: {metrics_error}")
+                
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(str(e))
                 return RecognitionResponse()

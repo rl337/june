@@ -18,6 +18,199 @@ The `TODO.md` file contains:
 
 See `TODO.md` for the current Telegram voice-to-text-to-voice service implementation plan.
 
+## 🧪 Test-First Development (CRITICAL)
+
+**MANDATORY:** All agents MUST follow test-first behavior.
+
+### Core Principles
+1. **Write tests BEFORE implementing features**
+   - Define test cases that describe expected behavior
+   - Tests should initially fail (red phase)
+   - Implement minimal code to make tests pass (green phase)
+   - Refactor while keeping tests green
+
+2. **Run checks before ANY commit or push**
+   - **ALWAYS** run `./run_checks.sh` before committing
+   - Never commit code that breaks existing tests
+   - Ensure all new tests pass before pushing
+   - Never skip tests for convenience
+
+3. **Test Coverage Requirements**
+   - All service endpoints must have tests
+   - All database operations must have tests
+   - Integration scenarios must be tested
+   - Error cases must be covered
+
+### Pre-Commit Workflow
+```bash
+# MANDATORY: Run before every commit
+./run_checks.sh
+
+# Only commit if all checks pass
+git add .
+
+# MANDATORY: Write meaningful commit messages
+git commit -m "Clear, descriptive commit message"
+git push
+```
+
+### Commit Message Requirements (CRITICAL)
+
+**All commits MUST have meaningful, descriptive commit messages.**
+
+#### Why Meaningful Commit Messages Matter
+- **History**: Makes project history readable and searchable
+- **Debugging**: Helps identify when/why bugs were introduced
+- **Collaboration**: Other agents understand what changed
+- **Documentation**: Commit history serves as project documentation
+
+#### Commit Message Format
+1. **Subject line** (first line, imperative mood, ~50-72 chars)
+   - Use imperative mood: "Add feature X" not "Added feature X" or "Adds feature X"
+   - Start with a capital letter
+   - No period at the end
+   - Be specific: What changed?
+
+2. **Body** (optional but recommended for complex changes)
+   - Explain WHAT changed and WHY
+   - Separate from subject with blank line
+   - Wrap lines at 72 characters
+   - Use bullet points for multiple changes
+
+#### Good Commit Message Examples
+
+```
+Add retry logic for transient STT errors
+
+Implements exponential backoff retry mechanism for STT service client.
+Handles network failures and temporary service unavailability with
+configurable retry attempts and backoff intervals. Updates error handling
+to distinguish transient vs permanent failures.
+
+Fixes issue where single network hiccup would fail entire voice message
+processing pipeline.
+```
+
+```
+Fix docker-compose.yml port mapping for STT service
+
+Updates STT service port from 50052 to 50053 to avoid conflict with
+TTS service. Also fixes health check endpoint path.
+```
+
+```
+Update AGENTS.md with commit message requirements
+
+Adds comprehensive guidelines for writing meaningful commit messages.
+Emphasizes imperative mood, descriptive subjects, and explanatory bodies
+for complex changes.
+```
+
+#### Bad Commit Message Examples (DON'T DO THIS)
+```
+❌ "fix"
+❌ "update"
+❌ "changes"
+❌ "wip"
+❌ "commit"
+❌ "asdf"
+❌ "test"
+❌ "."
+❌ "fix bug" (too vague - which bug?)
+❌ "update stuff" (too vague - what stuff?)
+```
+
+#### Multi-File Change Guidelines
+When committing changes across multiple files:
+- If changes are related to one feature/fix: Single commit with descriptive message explaining the feature/fix
+- If changes are unrelated: Separate commits for each logical change
+- Example of related changes in one commit:
+  ```
+  Implement stale task detection in MCP API
+  
+  Updates reserve_task() and get_task_context() to detect and surface
+  stale task information. Includes:
+  - Detection logic for stale "finding" updates
+  - stale_warning field in reserve_task response
+  - stale_info field in get_task_context response
+  - Warning messages for agents picking up abandoned tasks
+  
+  Related files:
+  - src/mcp_api.py: Added stale detection logic
+  - tests/test_mcp_api.py: Added tests for stale detection
+  ```
+
+#### Before Pushing
+1. **Review your commit history**: `git log --oneline -10`
+   - Verify all commit messages are meaningful
+   - Identify related commits that should be combined
+
+2. **Rebase repeated check-ins into feature-based commits** (MANDATORY)
+   - **DO NOT push multiple small commits that are part of one feature**
+   - Use interactive rebase to squash related commits together: `git rebase -i HEAD~N`
+   - Group commits by feature/bug fix, not by "time of commit"
+   
+   **Example workflow:**
+   ```bash
+   # Check recent commits
+   git log --oneline -8
+   # Output might look like:
+   # abc123 "Add retry logic to STT client"
+   # def456 "Fix backoff calculation"
+   # ghi789 "Add error handling for retry"
+   # jkl012 "Add tests for retry logic"
+   # mno345 "Fix typo in test name"
+   # pqr678 "Add documentation for retry"
+   
+   # These 6 commits should be ONE feature commit
+   git rebase -i HEAD~6
+   # In editor: change "pick" to "squash" (or "s") for commits 2-6
+   # Save and write comprehensive commit message:
+   # "Add retry logic for transient STT errors
+   #
+   # Implements exponential backoff retry mechanism for STT service.
+   # Includes error handling, comprehensive tests, and documentation."
+   
+   # Final result: ONE clean commit instead of 6 scattered ones
+   ```
+
+   **When to rebase/squash:**
+   - Multiple commits implementing one feature (e.g., "Add feature" + "Fix bug in feature" + "Add tests for feature")
+   - Multiple commits fixing one bug (e.g., "Fix bug" + "Fix typo" + "Add test")
+   - WIP commits that are part of the same work
+   - Typo/formatting fixes that belong with the original feature
+   - Documentation updates that go with the feature
+   
+   **When NOT to rebase:**
+   - Commits that are already pushed to shared branches (unless on your own feature branch)
+   - Unrelated changes that should remain separate (different features, different bugs)
+   - Commits from other people (never rewrite shared history)
+
+   **Interactive Rebase Commands:**
+   - `pick` (or `p`): Keep commit as-is
+   - `squash` (or `s`): Combine with previous commit
+   - `fixup` (or `f`): Like squash but discard commit message
+   - `edit` (or `e`): Pause to modify commit
+   - `drop` (or `d`): Remove commit entirely
+
+3. **Fix poor commit messages**:
+   - Use `git commit --amend` to fix the last commit
+   - Use `git rebase -i HEAD~N` to fix multiple recent commits
+   - **Never push commits with meaningless messages**
+
+**Goal**: Each pushed commit should represent a complete, logical unit of work (one feature, one bug fix, one refactor, etc.), not just "what I committed at 2pm" vs "what I committed at 3pm".
+
+### What run_checks.sh Validates
+- Docker Compose configuration
+- Container health and connectivity
+- Service endpoints and gRPC services
+- Database connectivity
+- Model cache integrity
+- TODO MCP Service integration
+- System-wide health checks
+
+**If run_checks.sh fails, DO NOT commit or push. Fix issues first.**
+
 ## 🏗️ Architecture Overview
 
 June Agent is a microservices-based interactive autonomous agent system optimized for NVIDIA DGX Spark with the following architecture:
@@ -259,6 +452,158 @@ dev/june/
 - **TypeScript/React:** ESLint, Prettier formatting
 - **Testing:** Comprehensive test suites for all services
 - **Documentation:** Inline docstrings, README updates
+- **Logging:** Use logging module, never print() statements
+
+## 📝 Logging Standards (CRITICAL)
+
+**MANDATORY:** All agents MUST use proper logging instead of print statements.
+
+### Core Rules
+1. **NEVER use print() for application output**
+   - Use `logging` module for all output
+   - Print statements should only appear in tests or one-off scripts
+   - Print statements are not captured by log aggregation systems (Loki)
+
+2. **Set up logging in all service entrypoints**
+   - Configure logging at application startup
+   - Use appropriate log levels
+   - Include context in log messages
+   - Integrate with centralized logging (Loki)
+
+### Logging Setup in Entrypoints
+
+**For June services, use the shared logging setup:**
+```python
+import logging
+from inference_core import setup_logging, config
+
+# Use centralized logging setup
+setup_logging(config.monitoring.log_level, "service-name")
+logger = logging.getLogger(__name__)
+
+logger.info("Service starting...")
+```
+
+**Example for standalone services:**
+```python
+import logging
+import os
+from logging.handlers import RotatingFileHandler
+
+# Configure logging
+log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(
+    level=getattr(logging, log_level),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+logger = logging.getLogger(__name__)
+```
+
+**Example for service modules:**
+```python
+import logging
+
+# Get logger for this module
+logger = logging.getLogger(__name__)
+
+# Use appropriate log levels
+logger.debug("Detailed debugging information")
+logger.info("General informational message")
+logger.warning("Warning message")
+logger.error("Error occurred", exc_info=True)
+logger.critical("Critical error")
+```
+
+### Log Levels
+- **DEBUG**: Detailed diagnostic information (development only)
+- **INFO**: General informational messages (service startup, operations)
+- **WARNING**: Unusual situations that don't stop execution
+- **ERROR**: Errors that don't stop the service
+- **CRITICAL**: Critical errors that may stop the service
+
+### Best Practices
+1. **Use structured logging with context**
+   ```python
+   logger.info("Request processed", extra={
+       "request_id": request_id,
+       "user_id": user_id,
+       "duration_ms": duration
+   })
+   ```
+
+2. **Include exception information**
+   ```python
+   try:
+       operation()
+   except Exception as e:
+       logger.error("Operation failed", exc_info=True)
+       # or
+       logger.exception("Operation failed")  # Includes traceback
+   ```
+
+3. **Log service lifecycle events**
+   ```python
+   logger.info("Service starting", extra={"version": __version__})
+   logger.info("Service ready", extra={"port": port})
+   logger.info("Service shutting down gracefully")
+   ```
+
+4. **Never log sensitive data**
+   - No passwords, tokens, API keys
+   - Redact PII when necessary
+   - Use log masking for sensitive fields
+
+5. **Use appropriate log levels**
+   - DEBUG: Verbose debugging (disable in production)
+   - INFO: Normal operations, state changes
+   - WARNING: Recoverable issues
+   - ERROR: Failures that don't stop the service
+   - CRITICAL: System-stopping errors
+
+### Centralized Logging (Loki)
+All services should log to stdout/stderr for Loki collection:
+- Logs are automatically collected by Loki
+- Use structured JSON format for complex logs
+- Include correlation IDs for request tracing
+
+### Environment Configuration
+Set log level in docker-compose.yml:
+```yaml
+environment:
+  - LOG_LEVEL=${LOG_LEVEL:-INFO}
+```
+
+Or use inference_core config:
+```python
+from inference_core import config
+setup_logging(config.monitoring.log_level, "service-name")
+```
+
+### Common Mistakes to Avoid
+1. ❌ Using print() instead of logger
+2. ❌ Not configuring logging in entrypoints
+3. ❌ Logging sensitive information
+4. ❌ Using wrong log levels
+5. ❌ Creating loggers without module names
+6. ❌ Logging without context
+
+### Examples
+
+**Good:**
+```python
+logger.info("User authenticated", extra={"user_id": user_id})
+logger.error("Database connection failed", exc_info=True)
+logger.warning("Rate limit approaching", extra={"current": rate, "limit": limit})
+```
+
+**Bad:**
+```python
+print("User authenticated")  # ❌ Use logger
+print(f"Error: {error}")     # ❌ No exception info
+logger.info(f"Error: {error}")  # ❌ Should be logger.error
+```
 
 ### Testing Strategy
 Each service includes:

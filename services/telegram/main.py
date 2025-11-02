@@ -8,6 +8,7 @@ import asyncio
 import logging
 import os
 from typing import Optional
+from datetime import datetime
 
 import grpc.aio
 
@@ -23,6 +24,12 @@ from audio_utils import (
     MAX_AUDIO_DURATION_SECONDS,
     MAX_AUDIO_SIZE_BYTES
 )
+import sys
+from pathlib import Path
+# Add parent directory to path to import stt_metrics
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from stt.stt_metrics import get_metrics_storage
+import librosa
 
 # Setup logging
 setup_logging(config.monitoring.log_level, "telegram")
@@ -140,6 +147,10 @@ class TelegramBotService:
             
             # Step 3: Send to STT
             await status_msg.edit_text("🔄 Transcribing your voice message...")
+            start_time = datetime.now()
+            original_audio_size = len(audio_data_bytes)
+            original_audio_format = "ogg"  # Telegram sends OGG/OPUS
+            
             try:
                 async with grpc.aio.insecure_channel(self.stt_address) as channel:
                     stt_client = asr_shim.SpeechToTextClient(channel)
@@ -151,8 +162,64 @@ class TelegramBotService:
                         config=cfg
                     )
                     transcript = result.transcript
+                
+                # Calculate processing time and audio duration
+                processing_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+                
+                # Calculate audio duration from the prepared audio
+                try:
+                    import io
+                    audio_array, sr = librosa.load(io.BytesIO(stt_audio), sr=16000)
+                    audio_duration = len(audio_array) / sr
+                except Exception:
+                    # Fallback: estimate from size (rough approximation)
+                    audio_duration = len(stt_audio) / (16000 * 2)  # 16kHz, 16-bit = 2 bytes/sample
+                
+                # Record metrics
+                try:
+                    metrics = get_metrics_storage()
+                    metrics.record_transcription(
+                        audio_format=original_audio_format,
+                        audio_duration_seconds=audio_duration,
+                        audio_size_bytes=original_audio_size,
+                        sample_rate=16000,
+                        transcript_length=len(transcript),
+                        confidence=getattr(result, "confidence", 0.9),
+                        processing_time_ms=processing_time_ms,
+                        source="telegram",
+                        metadata={
+                            "telegram_file_id": voice.file_id,
+                            "telegram_duration": getattr(voice, "duration", None),
+                            "prepared_audio_size": len(stt_audio)
+                        }
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to record transcription metrics: {e}")
+                
                 logger.info(f"Transcription: {transcript}")
             except Exception as e:
+                # Record error metrics
+                try:
+                    processing_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+                    metrics = get_metrics_storage()
+                    metrics.record_transcription(
+                        audio_format=original_audio_format,
+                        audio_duration_seconds=0.0,  # Unknown due to error
+                        audio_size_bytes=original_audio_size,
+                        sample_rate=16000,
+                        transcript_length=0,
+                        confidence=0.0,
+                        processing_time_ms=processing_time_ms,
+                        source="telegram",
+                        error_message=str(e),
+                        metadata={
+                            "telegram_file_id": voice.file_id,
+                            "telegram_duration": getattr(voice, "duration", None)
+                        }
+                    )
+                except Exception as metrics_error:
+                    logger.warning(f"Failed to record error metrics: {metrics_error}")
+                
                 logger.error(f"STT error: {e}", exc_info=True)
                 await status_msg.edit_text(
                     f"❌ Transcription failed: {str(e)}\n\n"

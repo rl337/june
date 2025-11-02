@@ -94,8 +94,30 @@ services:
     depends_on:
       - prometheus
 
-  # TODO Service is now external - see services/todo-service/README.md
-  # Run separately: docker compose -f services/todo-service/docker-compose.yml up -d
+  # TODO MCP Service (Standalone task management service)
+  todo-mcp-service:
+    build:
+      context: ./services/todo-mcp-service
+      dockerfile: Dockerfile
+    container_name: june-todo-mcp-service
+    restart: unless-stopped
+    ports:
+      - "5080:8004"
+    environment:
+      - TODO_DB_PATH=/app/data/todos.db
+      - TODO_BACKUPS_DIR=/app/backups
+      - TODO_SERVICE_PORT=8004
+      - TODO_BACKUP_INTERVAL_HOURS=24
+    volumes:
+      - ${JUNE_DATA_DIR:-/home/rlee/june_data}/todo-mcp-service/data:/app/data
+      - ${JUNE_DATA_DIR:-/home/rlee/june_data}/todo-mcp-service/backups:/app/backups
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - june_network
 
   # Webapp Service (React Chat Interface)
   webapp:

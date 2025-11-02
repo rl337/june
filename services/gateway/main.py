@@ -9,18 +9,23 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 import uuid
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends, status, UploadFile, File
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends, status, UploadFile, File, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST
 import grpc
 import nats
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, CollectorRegistry
 from jose import JWTError, jwt
 import httpx
 
 from inference_core import config, setup_logging, Timer, RateLimiter, HealthChecker, CircularBuffer
 from june_grpc_api import asr as asr_shim, tts as tts_shim, llm as llm_shim
+import sys
+from pathlib import Path
+# Add services directory to path to import stt_metrics
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from stt.stt_metrics import get_metrics_storage
 
 # Setup logging
 setup_logging(config.monitoring.log_level, "gateway")
@@ -104,7 +109,60 @@ class GatewayService:
         @self.app.get("/metrics")
         async def metrics():
             """Prometheus metrics endpoint."""
-            return generate_latest(REGISTRY)
+            return Response(generate_latest(REGISTRY), media_type=CONTENT_TYPE_LATEST)
+        
+        @self.app.get("/api/v1/stt/analytics")
+        async def stt_analytics(
+            start_date: Optional[str] = Query(None, description="Start date filter (ISO format)"),
+            end_date: Optional[str] = Query(None, description="End date filter (ISO format)"),
+            audio_format: Optional[str] = Query(None, description="Filter by audio format"),
+            source: Optional[str] = Query(None, description="Filter by source service")
+        ):
+            """
+            Get STT transcription quality analytics.
+            
+            Query parameters:
+            - start_date: Start date filter (ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)
+            - end_date: End date filter (ISO format: YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)
+            - audio_format: Filter by audio format (e.g., 'ogg', 'wav', 'pcm')
+            - source: Filter by source service (e.g., 'telegram', 'gateway', 'stt_service')
+            """
+            try:
+                # Parse dates if provided
+                parsed_start_date = None
+                parsed_end_date = None
+                
+                if start_date:
+                    try:
+                        parsed_start_date = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                    except ValueError:
+                        # Try just date format
+                        parsed_start_date = datetime.fromisoformat(f"{start_date}T00:00:00")
+                
+                if end_date:
+                    try:
+                        parsed_end_date = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                    except ValueError:
+                        # Try just date format
+                        parsed_end_date = datetime.fromisoformat(f"{end_date}T23:59:59")
+                
+                # Get metrics summary
+                metrics_storage = get_metrics_storage()
+                summary = metrics_storage.get_metrics_summary(
+                    start_date=parsed_start_date,
+                    end_date=parsed_end_date,
+                    audio_format=audio_format,
+                    source=source
+                )
+                
+                return summary
+                
+            except Exception as e:
+                logger.error(f"Failed to get STT analytics: {e}", exc_info=True)
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to retrieve analytics: {str(e)}"
+                )
         
         @self.app.get("/status")
         async def status():
