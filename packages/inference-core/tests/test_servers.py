@@ -140,6 +140,96 @@ class TestLlmServicer:
         assert isinstance(call_args, InferenceRequest)
         assert call_args.payload["prompt"] == "hello"
         assert call_args.payload["params"]["max_tokens"] == 100
+    
+    def test_generate_stream_success(self, mock_llm_strategy):
+        """Test _LlmServicer.GenerateStream returns chunks."""
+        servicer = _LlmServicer(mock_llm_strategy)
+        
+        from june_grpc_api.generated import llm_pb2
+        request = llm_pb2.GenerationRequest()
+        request.prompt = "hello"
+        request.params.max_tokens = 100
+        
+        chunks = list(servicer.GenerateStream(request, None))
+        
+        assert len(chunks) > 0
+        assert all(chunk.token for chunk in chunks[:-1])  # All but last should have tokens
+        assert chunks[-1].is_final
+        mock_llm_strategy.infer.assert_called_once()
+    
+    def test_chat_success(self, mock_llm_strategy):
+        """Test _LlmServicer.Chat returns correct response."""
+        servicer = _LlmServicer(mock_llm_strategy)
+        
+        from june_grpc_api.generated import llm_pb2
+        request = llm_pb2.ChatRequest()
+        user_message = request.messages.add()
+        user_message.role = "user"
+        user_message.content = "hello"
+        request.params.max_tokens = 100
+        request.params.temperature = 0.7
+        
+        response = servicer.Chat(request, None)
+        
+        assert response.message.role == "assistant"
+        assert response.message.content == "generated text"
+        mock_llm_strategy.infer.assert_called_once()
+        call_args = mock_llm_strategy.infer.call_args[0][0]
+        assert isinstance(call_args, InferenceRequest)
+        # Check that prompt includes formatted messages
+        assert "hello" in call_args.payload["prompt"]
+        assert "Human:" in call_args.payload["prompt"]
+    
+    def test_chat_stream_success(self, mock_llm_strategy):
+        """Test _LlmServicer.ChatStream returns chunks."""
+        servicer = _LlmServicer(mock_llm_strategy)
+        
+        from june_grpc_api.generated import llm_pb2
+        request = llm_pb2.ChatRequest()
+        user_message = request.messages.add()
+        user_message.role = "user"
+        user_message.content = "hello"
+        request.params.max_tokens = 100
+        
+        chunks = list(servicer.ChatStream(request, None))
+        
+        assert len(chunks) > 0
+        assert all(chunk.content_delta for chunk in chunks[:-1])  # All but last should have content
+        assert chunks[-1].is_final
+        assert chunks[-1].role == "assistant"
+        mock_llm_strategy.infer.assert_called_once()
+    
+    def test_chat_formatting(self, mock_llm_strategy):
+        """Test Chat endpoint formats messages correctly."""
+        servicer = _LlmServicer(mock_llm_strategy)
+        
+        from june_grpc_api.generated import llm_pb2
+        request = llm_pb2.ChatRequest()
+        
+        # Add system message
+        system_msg = request.messages.add()
+        system_msg.role = "system"
+        system_msg.content = "You are helpful."
+        
+        # Add user message
+        user_msg = request.messages.add()
+        user_msg.role = "user"
+        user_msg.content = "What is 2+2?"
+        
+        # Add assistant message
+        assistant_msg = request.messages.add()
+        assistant_msg.role = "assistant"
+        assistant_msg.content = "4"
+        
+        response = servicer.Chat(request, None)
+        
+        # Verify infer was called with formatted prompt
+        call_args = mock_llm_strategy.infer.call_args[0][0]
+        prompt = call_args.payload["prompt"]
+        assert "System: You are helpful." in prompt
+        assert "Human: What is 2+2?" in prompt
+        assert "Assistant: 4" in prompt
+        assert prompt.endswith("Assistant:")
 
 
 class TestSttGrpcApp:
