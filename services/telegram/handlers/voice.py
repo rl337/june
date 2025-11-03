@@ -165,9 +165,71 @@ async def handle_voice_message(
             
             llm_address = get_llm_address()
             
+            # Initialize conversation storage for maintaining history via HTTP API
+            # Try to use conversation API if available, otherwise fall back to simple prompt
+            conversation_api_url = os.getenv("CONVERSATION_API_URL", "http://gateway:8080")
+            user_id = str(update.effective_user.id)
+            chat_id = str(update.effective_chat.id)
+            messages = []
+            
+            try:
+                import httpx
+                
+                # Get or create conversation and retrieve history
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    # Get conversation with history (last 20 messages or up to 4000 tokens)
+                    response = await client.get(
+                        f"{conversation_api_url}/conversations/{user_id}/{chat_id}",
+                        params={"limit": 20, "max_tokens": 4000}
+                    )
+                    
+                    if response.status_code == 200:
+                        conversation = response.json()
+                        messages = conversation.get('messages', [])
+                        logger.info(f"Retrieved {len(messages)} messages from conversation history")
+                    elif response.status_code == 404:
+                        # Conversation doesn't exist yet, create it
+                        create_response = await client.post(
+                            f"{conversation_api_url}/conversations/{user_id}/{chat_id}"
+                        )
+                        if create_response.status_code == 200:
+                            conversation = create_response.json()
+                            messages = conversation.get('messages', [])
+                            logger.info(f"Created new conversation, retrieved {len(messages)} messages")
+                    else:
+                        logger.warning(f"Failed to get conversation: {response.status_code}, using simple prompt")
+                        
+            except Exception as conv_error:
+                # If conversation API fails, fall back to simple prompt
+                logger.warning(f"Failed to load conversation history: {conv_error}, using simple prompt")
+            
+            # Format conversation history into prompt string
+            if messages:
+                prompt_parts = []
+                for msg in messages:
+                    role = msg.get('role', 'user')
+                    content = msg.get('content', '')
+                    if role == 'user':
+                        prompt_parts.append(f"User: {content}")
+                    elif role == 'assistant':
+                        prompt_parts.append(f"Assistant: {content}")
+                    elif role == 'system':
+                        prompt_parts.append(f"System: {content}")
+                
+                # Add new user message (transcript)
+                prompt_parts.append(f"User: {transcript}")
+                prompt_parts.append("Assistant:")
+                
+                # Combine into single prompt
+                llm_prompt = "\n\n".join(prompt_parts)
+                logger.info(f"LLM prompt with {len(messages)} previous messages")
+            else:
+                # No conversation history available, use simple prompt
+                llm_prompt = transcript
+            
             async with grpc.aio.insecure_channel(llm_address) as channel:
                 llm_client = LLMClient(channel)
-                llm_response = await llm_client.generate(transcript)
+                llm_response = await llm_client.generate(llm_prompt)
                 
             if not llm_response or not llm_response.strip():
                 await status_msg.edit_text(
@@ -175,6 +237,31 @@ async def handle_voice_message(
                     "?? LLM returned an empty response. Please try again."
                 )
                 return
+            
+            # Add messages to conversation history via HTTP API
+            try:
+                import httpx
+                conversation_api_url = os.getenv("CONVERSATION_API_URL", "http://gateway:8080")
+                
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    # Add user message (transcript)
+                    user_msg_response = await client.post(
+                        f"{conversation_api_url}/conversations/{user_id}/{chat_id}/messages",
+                        json={"role": "user", "content": transcript}
+                    )
+                    
+                    # Add assistant message (LLM response)
+                    assistant_msg_response = await client.post(
+                        f"{conversation_api_url}/conversations/{user_id}/{chat_id}/messages",
+                        json={"role": "assistant", "content": llm_response}
+                    )
+                    
+                    if user_msg_response.status_code in (200, 201) and assistant_msg_response.status_code in (200, 201):
+                        logger.info(f"Added user and assistant messages to conversation {user_id}/{chat_id}")
+                    else:
+                        logger.warning(f"Failed to save messages: user={user_msg_response.status_code}, assistant={assistant_msg_response.status_code}")
+            except Exception as save_error:
+                logger.warning(f"Failed to save conversation history: {save_error}")
             
             logger.info(f"LLM response: {llm_response}")
         except Exception as e:
