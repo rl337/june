@@ -4,32 +4,20 @@ Telegram Bot Service - Voice-to-Text-to-Voice integration.
 Receives voice messages from Telegram users, transcribes them using STT,
 processes through LLM, converts response to speech using TTS, and sends back.
 """
-import asyncio
 import logging
 import os
 from typing import Optional
-from datetime import datetime
-
-import grpc.aio
 
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
 from inference_core import config, setup_logging
-from june_grpc_api import asr as asr_shim, tts as tts_shim, llm as llm_shim
-
-from audio_utils import (
-    prepare_audio_for_stt,
-    AudioValidationError,
-    MAX_AUDIO_DURATION_SECONDS,
-    MAX_AUDIO_SIZE_BYTES
+from handlers import start_command, help_command, status_command, handle_voice_message
+from dependencies.config import (
+    get_service_config,
+    get_stt_address,
+    get_metrics_storage
 )
-import sys
-from pathlib import Path
-# Add parent directory to path to import stt_metrics
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from stt.stt_metrics import get_metrics_storage
-import librosa
 
 # Setup logging
 setup_logging(config.monitoring.log_level, "telegram")
@@ -41,10 +29,8 @@ class TelegramBotService:
     
     def __init__(self):
         """Initialize the Telegram bot service."""
-        self.config = config.telegram
-        self.stt_address = os.getenv("STT_URL", "stt:50052").replace("grpc://", "")
-        self.tts_address = os.getenv("TTS_URL", "tts:50053").replace("grpc://", "")
-        self.llm_address = os.getenv("LLM_URL", "inference-api:50051").replace("grpc://", "")
+        self.config = get_service_config()
+        self.stt_address = get_stt_address()
         
         if not self.config.bot_token:
             raise ValueError("TELEGRAM_BOT_TOKEN environment variable is required")
@@ -57,192 +43,29 @@ class TelegramBotService:
     
     def _register_handlers(self):
         """Register command and message handlers."""
-        # Command handlers
-        self.application.add_handler(CommandHandler("start", self.start_command))
-        self.application.add_handler(CommandHandler("help", self.help_command))
-        self.application.add_handler(CommandHandler("status", self.status_command))
+        # Command handlers - wrap to pass config
+        async def start_wrapper(update, context):
+            await start_command(update, context, self.config)
         
-        # Voice message handler
-        self.application.add_handler(MessageHandler(filters.VOICE, self.handle_voice_message))
-    
-    async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /start command."""
-        await update.message.reply_text(
-            "👋 Hello! I'm June, your voice assistant.\n\n"
-            "Send me a voice message and I'll:\n"
-            "1️⃣ Transcribe it\n"
-            "2️⃣ Process it with AI\n"
-            "3️⃣ Send back a voice response\n\n"
-            "Use /help for more information."
-        )
-    
-    async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /help command."""
-        await update.message.reply_text(
-            "📖 **June Voice Assistant Help**\n\n"
-            "**Commands:**\n"
-            "/start - Start interacting with June\n"
-            "/help - Show this help message\n"
-            "/status - Check service status\n\n"
-            "**Usage:**\n"
-            "Just send me a voice message (🎤) and I'll respond with a voice message!\n\n"
-            "**Limits:**\n"
-            f"• Maximum file size: {self.config.max_file_size / (1024 * 1024):.1f} MB\n"
-            "• Maximum duration: ~1 minute"
-        )
-    
-    async def status_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /status command."""
-        # TODO: Check service health
-        await update.message.reply_text(
-            "✅ **Service Status**\n\n"
-            "🤖 Bot: Online\n"
-            "🎤 STT: Checking...\n"
-            "🗣️ TTS: Checking...\n"
-            "🧠 LLM: Checking...\n\n"
-            "(Status checks will be implemented in next phase)"
-        )
-    
-    async def handle_voice_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle incoming voice messages."""
-        voice = update.message.voice
+        async def help_wrapper(update, context):
+            await help_command(update, context, self.config)
         
-        # Check file size
-        if voice.file_size and voice.file_size > self.config.max_file_size:
-            await update.message.reply_text(
-                f"❌ Voice message too large. Maximum size: {self.config.max_file_size / (1024 * 1024):.1f} MB"
+        async def status_wrapper(update, context):
+            await status_command(update, context, self.config)
+        
+        async def voice_wrapper(update, context):
+            await handle_voice_message(
+                update,
+                context,
+                self.config,
+                self.stt_address,
+                get_metrics_storage
             )
-            return
         
-        # Send processing status
-        status_msg = await update.message.reply_text("🔄 Processing your voice message...")
-        
-        try:
-            # Step 1: Download voice file from Telegram
-            file = await context.bot.get_file(voice.file_id)
-            audio_data = await file.download_as_bytearray()
-            audio_data_bytes = bytes(audio_data)
-            
-            logger.info(f"Downloaded voice file: {len(audio_data_bytes)} bytes")
-            
-            # Step 2: Convert OGG to WAV and prepare for STT (16kHz mono)
-            try:
-                stt_audio = prepare_audio_for_stt(audio_data_bytes, is_ogg=True)
-                logger.info(f"Prepared audio for STT: {len(stt_audio)} bytes")
-            except AudioValidationError as e:
-                await status_msg.edit_text(
-                    f"❌ Audio validation failed: {str(e)}\n\n"
-                    "Please ensure your voice message is:\n"
-                    f"• Under {MAX_AUDIO_DURATION_SECONDS} seconds\n"
-                    f"• Under {MAX_AUDIO_SIZE_BYTES / (1024 * 1024):.0f} MB"
-                )
-                return
-            except Exception as e:
-                logger.error(f"Error preparing audio: {e}", exc_info=True)
-                await status_msg.edit_text(
-                    f"❌ Error processing audio: {str(e)}\n\n"
-                    "Please try again."
-                )
-                return
-            
-            # Step 3: Send to STT
-            await status_msg.edit_text("🔄 Transcribing your voice message...")
-            start_time = datetime.now()
-            original_audio_size = len(audio_data_bytes)
-            original_audio_format = "ogg"  # Telegram sends OGG/OPUS
-            
-            try:
-                async with grpc.aio.insecure_channel(self.stt_address) as channel:
-                    stt_client = asr_shim.SpeechToTextClient(channel)
-                    cfg = asr_shim.RecognitionConfig(language="en", interim_results=False)
-                    result = await stt_client.recognize(
-                        stt_audio,
-                        sample_rate=16000,
-                        encoding="wav",
-                        config=cfg
-                    )
-                    transcript = result.transcript
-                
-                # Calculate processing time and audio duration
-                processing_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
-                
-                # Calculate audio duration from the prepared audio
-                try:
-                    import io
-                    audio_array, sr = librosa.load(io.BytesIO(stt_audio), sr=16000)
-                    audio_duration = len(audio_array) / sr
-                except Exception:
-                    # Fallback: estimate from size (rough approximation)
-                    audio_duration = len(stt_audio) / (16000 * 2)  # 16kHz, 16-bit = 2 bytes/sample
-                
-                # Record metrics
-                try:
-                    metrics = get_metrics_storage()
-                    metrics.record_transcription(
-                        audio_format=original_audio_format,
-                        audio_duration_seconds=audio_duration,
-                        audio_size_bytes=original_audio_size,
-                        sample_rate=16000,
-                        transcript_length=len(transcript),
-                        confidence=getattr(result, "confidence", 0.9),
-                        processing_time_ms=processing_time_ms,
-                        source="telegram",
-                        metadata={
-                            "telegram_file_id": voice.file_id,
-                            "telegram_duration": getattr(voice, "duration", None),
-                            "prepared_audio_size": len(stt_audio)
-                        }
-                    )
-                except Exception as e:
-                    logger.warning(f"Failed to record transcription metrics: {e}")
-                
-                logger.info(f"Transcription: {transcript}")
-            except Exception as e:
-                # Record error metrics
-                try:
-                    processing_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
-                    metrics = get_metrics_storage()
-                    metrics.record_transcription(
-                        audio_format=original_audio_format,
-                        audio_duration_seconds=0.0,  # Unknown due to error
-                        audio_size_bytes=original_audio_size,
-                        sample_rate=16000,
-                        transcript_length=0,
-                        confidence=0.0,
-                        processing_time_ms=processing_time_ms,
-                        source="telegram",
-                        error_message=str(e),
-                        metadata={
-                            "telegram_file_id": voice.file_id,
-                            "telegram_duration": getattr(voice, "duration", None)
-                        }
-                    )
-                except Exception as metrics_error:
-                    logger.warning(f"Failed to record error metrics: {metrics_error}")
-                
-                logger.error(f"STT error: {e}", exc_info=True)
-                await status_msg.edit_text(
-                    f"❌ Transcription failed: {str(e)}\n\n"
-                    "Please try again."
-                )
-                return
-            
-            # TODO: Steps 4-7 will be implemented in next phases
-            # Step 4: Send to LLM
-            # Step 5: Send to TTS
-            # Step 6: Convert to OGG
-            # Step 7: Send response
-            
-            await status_msg.edit_text(
-                f"📝 **Transcription:**\n\n{transcript}\n\n"
-                "⚠️ LLM and TTS processing will be implemented in Phase 3-4."
-            )
-        except Exception as e:
-            logger.error(f"Error processing voice message: {e}", exc_info=True)
-            await status_msg.edit_text(
-                f"❌ Error processing voice message: {str(e)}\n\n"
-                "Please try again later."
-            )
+        self.application.add_handler(CommandHandler("start", start_wrapper))
+        self.application.add_handler(CommandHandler("help", help_wrapper))
+        self.application.add_handler(CommandHandler("status", status_wrapper))
+        self.application.add_handler(MessageHandler(filters.VOICE, voice_wrapper))
     
     def run(self, use_webhook: bool = False, webhook_url: Optional[str] = None):
         """Run the Telegram bot (polling or webhook)."""
@@ -272,4 +95,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
