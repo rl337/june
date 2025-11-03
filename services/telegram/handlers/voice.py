@@ -1,11 +1,14 @@
 """Voice message handler for Telegram bot."""
 import io
 import logging
+import tempfile
+import os
 from datetime import datetime
 from typing import TYPE_CHECKING
 
 import grpc.aio
 import librosa
+from pydub import AudioSegment
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -154,16 +157,144 @@ async def handle_voice_message(
             )
             return
         
-        # TODO: Steps 4-7 will be implemented in next phases
-        # Step 4: Send to LLM
-        # Step 5: Send to TTS
-        # Step 6: Convert to OGG
-        # Step 7: Send response
+        # Step 4: Send transcript to LLM service
+        await status_msg.edit_text("?? Processing with LLM...")
+        try:
+            from june_grpc_api.shim.llm import LLMClient
+            from dependencies.config import get_llm_address
+            
+            llm_address = get_llm_address()
+            
+            async with grpc.aio.insecure_channel(llm_address) as channel:
+                llm_client = LLMClient(channel)
+                llm_response = await llm_client.generate(transcript)
+                
+            if not llm_response or not llm_response.strip():
+                await status_msg.edit_text(
+                    f"?? **Transcription:**\n\n{transcript}\n\n"
+                    "?? LLM returned an empty response. Please try again."
+                )
+                return
+            
+            logger.info(f"LLM response: {llm_response}")
+        except Exception as e:
+            logger.error(f"LLM error: {e}", exc_info=True)
+            await status_msg.edit_text(
+                f"?? **Transcription:**\n\n{transcript}\n\n"
+                f"? LLM processing failed: {str(e)}\n\n"
+                "Please try again."
+            )
+            return
         
-        await status_msg.edit_text(
-            f"?? **Transcription:**\n\n{transcript}\n\n"
-            "?? LLM and TTS processing will be implemented in Phase 3-4."
-        )
+        # Step 5: Send LLM response to TTS service
+        await status_msg.edit_text("?? Generating voice response...")
+        try:
+            from june_grpc_api.shim.tts import TextToSpeechClient
+            from dependencies.config import get_tts_address
+            
+            tts_address = get_tts_address()
+            
+            async with grpc.aio.insecure_channel(tts_address) as channel:
+                tts_client = TextToSpeechClient(channel)
+                tts_audio_bytes = await tts_client.synthesize(
+                    llm_response,
+                    voice_id="default",
+                    language="en"
+                )
+            
+            if not tts_audio_bytes or len(tts_audio_bytes) == 0:
+                await status_msg.edit_text(
+                    f"?? **Transcription:**\n\n{transcript}\n\n"
+                    "? TTS returned empty audio. Please try again."
+                )
+                return
+            
+            logger.info(f"TTS generated audio: {len(tts_audio_bytes)} bytes")
+        except Exception as e:
+            logger.error(f"TTS error: {e}", exc_info=True)
+            await status_msg.edit_text(
+                f"?? **Transcription:**\n\n{transcript}\n\n"
+                f"? TTS processing failed: {str(e)}\n\n"
+                "Please try again."
+            )
+            return
+        
+        # Step 6: Convert TTS audio to OGG format (Telegram voice message format)
+        await status_msg.edit_text("?? Preparing audio for delivery...")
+        ogg_audio_path = None
+        try:
+            # Load TTS audio bytes - try multiple formats (pydub auto-detects)
+            try:
+                # Try WAV first (most common)
+                tts_audio = AudioSegment.from_wav(io.BytesIO(tts_audio_bytes))
+            except Exception:
+                # Fallback to auto-detection (pydub tries multiple formats)
+                try:
+                    tts_audio = AudioSegment.from_file(io.BytesIO(tts_audio_bytes))
+                except Exception as e:
+                    raise ValueError(f"Could not decode TTS audio data: {e}")
+            
+            # Create temporary OGG file
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.ogg') as temp_file:
+                ogg_audio_path = temp_file.name
+            
+            # Export to OGG format (OPUS codec)
+            tts_audio.export(ogg_audio_path, format="ogg", codec="libopus")
+            
+            logger.info(f"Converted TTS audio to OGG: {ogg_audio_path}")
+        except Exception as e:
+            logger.error(f"Audio conversion error: {e}", exc_info=True)
+            # Clean up temp file if created
+            if ogg_audio_path and os.path.exists(ogg_audio_path):
+                try:
+                    os.unlink(ogg_audio_path)
+                except Exception:
+                    pass
+            
+            await status_msg.edit_text(
+                f"?? **Transcription:**\n\n{transcript}\n\n"
+                f"? Audio conversion failed: {str(e)}\n\n"
+                "Please try again."
+            )
+            return
+        
+        # Step 7: Send voice response back to Telegram
+        try:
+            await status_msg.edit_text("?? Sending voice response...")
+            
+            with open(ogg_audio_path, 'rb') as audio_file:
+                await update.message.reply_voice(
+                    voice=audio_file,
+                    caption=f"Response to: {transcript[:100]}..."
+                )
+            
+            logger.info("Voice response sent successfully")
+            
+            # Delete temporary OGG file
+            try:
+                os.unlink(ogg_audio_path)
+            except Exception as e:
+                logger.warning(f"Failed to delete temp file {ogg_audio_path}: {e}")
+            
+            # Update status message to indicate success
+            await status_msg.edit_text("? Voice response sent!")
+            
+        except Exception as e:
+            logger.error(f"Telegram API error: {e}", exc_info=True)
+            
+            # Clean up temp file
+            if ogg_audio_path and os.path.exists(ogg_audio_path):
+                try:
+                    os.unlink(ogg_audio_path)
+                except Exception:
+                    pass
+            
+            await status_msg.edit_text(
+                f"?? **Transcription:**\n\n{transcript}\n\n"
+                f"? Failed to send voice response: {str(e)}\n\n"
+                "Please try again."
+            )
+            return
     except Exception as e:
         logger.error(f"Error processing voice message: {e}", exc_info=True)
         await status_msg.edit_text(
