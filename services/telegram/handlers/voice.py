@@ -203,33 +203,32 @@ async def handle_voice_message(
                 # If conversation API fails, fall back to simple prompt
                 logger.warning(f"Failed to load conversation history: {conv_error}, using simple prompt")
             
-            # Format conversation history into prompt string
+            # Prepare messages for chat API
+            # Convert conversation history to chat message format
+            chat_messages = []
             if messages:
-                prompt_parts = []
+                # Add existing conversation history
                 for msg in messages:
                     role = msg.get('role', 'user')
                     content = msg.get('content', '')
-                    if role == 'user':
-                        prompt_parts.append(f"User: {content}")
-                    elif role == 'assistant':
-                        prompt_parts.append(f"Assistant: {content}")
-                    elif role == 'system':
-                        prompt_parts.append(f"System: {content}")
-                
-                # Add new user message (transcript)
-                prompt_parts.append(f"User: {transcript}")
-                prompt_parts.append("Assistant:")
-                
-                # Combine into single prompt
-                llm_prompt = "\n\n".join(prompt_parts)
-                logger.info(f"LLM prompt with {len(messages)} previous messages")
-            else:
-                # No conversation history available, use simple prompt
-                llm_prompt = transcript
+                    # Only include valid roles
+                    if role in ('system', 'user', 'assistant', 'tool'):
+                        chat_messages.append({
+                            'role': role,
+                            'content': content
+                        })
+                logger.info(f"Using {len(chat_messages)} messages from conversation history")
             
+            # Add new user message (transcript)
+            chat_messages.append({
+                'role': 'user',
+                'content': transcript
+            })
+            
+            # Use chat() method for conversation-aware generation
             async with grpc.aio.insecure_channel(llm_address) as channel:
                 llm_client = LLMClient(channel)
-                llm_response = await llm_client.generate(llm_prompt)
+                llm_response = await llm_client.chat(chat_messages)
                 
             if not llm_response or not llm_response.strip():
                 await status_msg.edit_text(

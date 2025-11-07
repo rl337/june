@@ -6,8 +6,12 @@ processes through LLM, converts response to speech using TTS, and sends back.
 """
 import logging
 import os
+import threading
 from typing import Optional
 
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+import uvicorn
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
@@ -38,8 +42,25 @@ class TelegramBotService:
         # Initialize Telegram application
         self.application = Application.builder().token(self.config.bot_token).build()
         
+        # Initialize health check server
+        self.health_app = FastAPI()
+        self._setup_health_endpoint()
+        
         # Register handlers
         self._register_handlers()
+    
+    def _setup_health_endpoint(self):
+        """Setup health check endpoint."""
+        @self.health_app.get("/health")
+        async def health_check():
+            """Health check endpoint for Docker health checks."""
+            return JSONResponse(
+                content={
+                    "status": "healthy",
+                    "service": "telegram-bot"
+                },
+                status_code=200
+            )
     
     def _register_handlers(self):
         """Register command and message handlers."""
@@ -67,8 +88,20 @@ class TelegramBotService:
         self.application.add_handler(CommandHandler("status", status_wrapper))
         self.application.add_handler(MessageHandler(filters.VOICE, voice_wrapper))
     
+    def _run_health_server(self):
+        """Run health check HTTP server in a separate thread."""
+        port = int(os.getenv("TELEGRAM_SERVICE_PORT", "8080"))
+        logger.info(f"Starting health check server on port {port}")
+        uvicorn.run(self.health_app, host="0.0.0.0", port=port, log_level="error")
+    
     def run(self, use_webhook: bool = False, webhook_url: Optional[str] = None):
-        """Run the Telegram bot (polling or webhook)."""
+        """Run the Telegram bot (polling or webhook) and health check server."""
+        # Start health check server in a separate thread
+        health_thread = threading.Thread(target=self._run_health_server, daemon=True)
+        health_thread.start()
+        logger.info("Health check server started")
+        
+        # Run Telegram bot
         if use_webhook and webhook_url:
             logger.info(f"Starting bot in webhook mode: {webhook_url}")
             # TODO: Implement webhook setup

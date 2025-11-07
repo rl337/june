@@ -383,7 +383,7 @@ services:
       - tts
       - inference-api
     healthcheck:
-      test: ["CMD", "pgrep", "-f", "python.*main.py"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       start_period: 30s
