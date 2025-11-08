@@ -13,14 +13,138 @@ import pytest
 import asyncio
 import io
 import os
+import sys
 from unittest.mock import AsyncMock, MagicMock, patch, Mock
-from pydub.generators import Sine
 
+# Fix import conflict: ensure we import from installed python-telegram-bot, not local telegram dir
+# The local services/telegram/__init__.py shadows the installed package when pytest runs from root
+# Strategy: Remove local telegram from module cache, import from installed package, then restore path
+import importlib
+import site
+import os.path
+
+# Find site-packages directory with telegram (check both system and user)
+_site_packages = None
+for sp_dir in list(site.getsitepackages()) + [site.getusersitepackages()]:
+    if sp_dir and 'site-packages' in sp_dir:
+        _telegram_pkg_path = os.path.join(sp_dir, 'telegram', '__init__.py')
+        if os.path.exists(_telegram_pkg_path):
+            _site_packages = sp_dir
+            break
+
+# Find local services/telegram directory
+_local_telegram_dir = None
+_current_dir = os.path.dirname(os.path.abspath(__file__))  # tests/ directory
+_parent_dir = os.path.dirname(_current_dir)  # services/telegram/ directory
+if os.path.basename(_parent_dir) == 'telegram':
+    _local_telegram_dir = _parent_dir
+
+# Clear local telegram from module cache if it was imported
+if 'telegram' in sys.modules:
+    mod = sys.modules['telegram']
+    if hasattr(mod, '__file__') and mod.__file__:
+        if _local_telegram_dir and _local_telegram_dir in mod.__file__:
+            del sys.modules['telegram']
+            if 'telegram.ext' in sys.modules:
+                del sys.modules['telegram.ext']
+
+# Save original sys.path and remove local telegram directory from path to prevent shadowing
+_original_sys_path = sys.path[:]
+if _local_telegram_dir and _local_telegram_dir in sys.path:
+    sys.path.remove(_local_telegram_dir)
+
+# Temporarily move site-packages to front of sys.path for telegram import
+if _site_packages and _site_packages in sys.path:
+    sys.path.remove(_site_packages)
+sys.path.insert(0, _site_packages) if _site_packages else None
+
+# Now import telegram from installed package
 from telegram import Update, Message, Voice, File, User, Chat
 from telegram.ext import ContextTypes
 
+# Restore original sys.path and ensure parent directory (services/telegram) is in path for local imports
+sys.path[:] = _original_sys_path
+if _local_telegram_dir and _local_telegram_dir not in sys.path:
+    sys.path.insert(0, _local_telegram_dir)
+
+# Mock inference_core and other dependencies before importing main
+# (main.py and handlers have top-level imports that need to be mocked)
+sys.modules['inference_core'] = MagicMock()
+sys.modules['inference_core.config'] = MagicMock()
+sys.modules['inference_core.setup_logging'] = MagicMock()
+
+# Mock grpc (needed by handlers/voice.py)
+sys.modules['grpc'] = MagicMock()
+sys.modules['grpc.aio'] = MagicMock()
+
+# Mock asr_shim (needed by handlers/voice.py)
+sys.modules['asr_shim'] = MagicMock()
+sys.modules['asr_shim.SpeechToTextClient'] = MagicMock()
+
+# Mock june_grpc_api (needed by handlers/voice.py)
+# Create a simple object for june_grpc_api (not MagicMock, so attributes work correctly)
+class MockJuneGrpcApi:
+    pass
+mock_june_grpc_api = MockJuneGrpcApi()
+
+# Create a simple object for the asr module (not MagicMock, so attributes work correctly)
+class MockAsrModule:
+    RecognitionConfig = MagicMock
+    SpeechToTextClient = None  # Will be set in individual tests
+mock_asr_module = MockAsrModule()
+mock_june_grpc_api.asr = mock_asr_module
+
+# Create shim module
+class MockShimModule:
+    pass
+mock_shim_module = MockShimModule()
+
+# Create llm and tts submodules
+class MockLlmModule:
+    LLMClient = None  # Will be set in tests
+class MockTtsModule:
+    TextToSpeechClient = None  # Will be set in tests
+
+mock_llm_module = MockLlmModule()
+mock_tts_module = MockTtsModule()
+mock_shim_module.llm = mock_llm_module
+mock_shim_module.tts = mock_tts_module
+mock_june_grpc_api.shim = mock_shim_module
+
+sys.modules['june_grpc_api'] = mock_june_grpc_api
+sys.modules['june_grpc_api.asr'] = mock_asr_module
+sys.modules['june_grpc_api.shim'] = mock_shim_module
+sys.modules['june_grpc_api.shim.llm'] = mock_llm_module
+sys.modules['june_grpc_api.shim.tts'] = mock_tts_module
+
+# Mock librosa (needed by handlers/voice.py)
+sys.modules['librosa'] = MagicMock()
+
+# Mock httpx (needed by handlers/voice.py)
+sys.modules['httpx'] = MagicMock()
+
+# Mock fastapi and uvicorn (needed by main.py)
+mock_fastapi = MagicMock()
+mock_fastapi.FastAPI = MagicMock
+sys.modules['fastapi'] = mock_fastapi
+sys.modules['fastapi.responses'] = MagicMock()
+sys.modules['uvicorn'] = MagicMock()
+
+# Mock dependencies.config before importing (to avoid ServiceConfig import issue)
+sys.modules['dependencies'] = MagicMock()
+sys.modules['dependencies.config'] = MagicMock()
+mock_deps_config = MagicMock()
+mock_deps_config.get_service_config = MagicMock()
+mock_deps_config.get_stt_address = MagicMock()
+mock_deps_config.get_llm_address = MagicMock(return_value="llm:50052")
+mock_deps_config.get_tts_address = MagicMock(return_value="tts:50052")
+mock_deps_config.get_metrics_storage = MagicMock()
+sys.modules['dependencies.config'] = mock_deps_config
+
 from main import TelegramBotService
 from audio_utils import AudioValidationError, prepare_audio_for_stt
+from handlers.commands import start_command, help_command, status_command
+from handlers.voice import handle_voice_message
 
 
 # Test fixtures
@@ -45,25 +169,18 @@ def mock_inference_config():
 
 @pytest.fixture
 def sample_audio_data():
-    """Create sample audio data for testing."""
-    audio = Sine(440).to_audio_segment(duration=1000)  # 1 second
-    audio = audio.set_frame_rate(16000)
-    audio = audio.set_channels(1)
-    
-    buffer = io.BytesIO()
-    audio.export(buffer, format="wav")
-    buffer.seek(0)
-    return buffer.read()
+    """Create sample audio data for testing (mock to avoid ffmpeg dependency)."""
+    # Return mock WAV data - just enough bytes to simulate a WAV file
+    # Real WAV files start with "RIFF" header, but for testing we just need bytes
+    return b'RIFF' + b'\x00' * 1000  # "RIFF" header + padding
 
 
 @pytest.fixture
 def sample_ogg_audio():
-    """Create sample OGG audio data for testing."""
-    audio = Sine(440).to_audio_segment(duration=1000)
-    buffer = io.BytesIO()
-    audio.export(buffer, format="ogg", codec="libvorbis")
-    buffer.seek(0)
-    return buffer.read()
+    """Create sample OGG audio data for testing (mock to avoid ffmpeg dependency)."""
+    # Return mock OGG data - just enough bytes to simulate an OGG file
+    # Real OGG files start with "OggS" header, but for testing we just need bytes
+    return b'\x4f\x67\x67\x53' + b'\x00' * 1000  # "OggS" header + padding
 
 
 @pytest.fixture
@@ -99,41 +216,60 @@ def mock_telegram_file():
 class TestTelegramBotServiceInitialization:
     """Tests for TelegramBotService initialization."""
     
-    @patch('main.config')
+    @patch('main.get_service_config')
+    @patch('main.get_stt_address')
     @patch('main.Application')
     @patch.dict(os.environ, {'TELEGRAM_BOT_TOKEN': 'test-token'})
-    def test_init_success(self, mock_app_class, mock_config):
+    def test_init_success(self, mock_app_class, mock_get_stt_address, mock_get_service_config):
         """Test successful initialization."""
-        mock_config.telegram.bot_token = "test-token"
-        mock_config.telegram.max_file_size = 20 * 1024 * 1024
+        mock_config = MagicMock()
+        mock_config.bot_token = "test-token"
+        mock_config.max_file_size = 20 * 1024 * 1024
+        mock_get_service_config.return_value = mock_config
+        mock_get_stt_address.return_value = "stt:50052"
+        
+        mock_app = MagicMock()
+        mock_app_class.builder.return_value.token.return_value.build.return_value = mock_app
         
         service = TelegramBotService()
         
         assert service.config is not None
         assert service.application is not None
+        assert service.config.bot_token == "test-token"
         mock_app_class.builder.assert_called_once()
     
-    @patch('main.config')
+    @patch('main.get_service_config')
+    @patch('main.get_stt_address')
     @patch('main.Application')
     @patch.dict(os.environ, {}, clear=True)
-    def test_init_missing_token(self, mock_app_class, mock_config):
+    def test_init_missing_token(self, mock_app_class, mock_get_stt_address, mock_get_service_config):
         """Test initialization fails without bot token."""
-        mock_config.telegram.bot_token = None
+        mock_config = MagicMock()
+        mock_config.bot_token = None
+        mock_get_service_config.return_value = mock_config
+        mock_get_stt_address.return_value = "stt:50052"
         
         with pytest.raises(ValueError, match="TELEGRAM_BOT_TOKEN"):
             TelegramBotService()
     
-    @patch('main.config')
+    @patch('main.get_service_config')
+    @patch('main.get_stt_address')
     @patch('main.Application')
     @patch.dict(os.environ, {'TELEGRAM_BOT_TOKEN': 'test-token', 'STT_URL': 'grpc://custom-stt:50052'})
-    def test_init_custom_service_urls(self, mock_app_class, mock_config):
+    def test_init_custom_service_urls(self, mock_app_class, mock_get_stt_address, mock_get_service_config):
         """Test initialization with custom service URLs."""
-        mock_config.telegram.bot_token = "test-token"
-        mock_config.telegram.max_file_size = 20 * 1024 * 1024
+        mock_config = MagicMock()
+        mock_config.bot_token = "test-token"
+        mock_config.max_file_size = 20 * 1024 * 1024
+        mock_get_service_config.return_value = mock_config
+        mock_get_stt_address.return_value = "custom-stt:50052"
+        
+        mock_app = MagicMock()
+        mock_app_class.builder.return_value.token.return_value.build.return_value = mock_app
         
         service = TelegramBotService()
         
-        # Should strip grpc:// prefix
+        # Should have stt_address from get_stt_address
         assert service.stt_address == "custom-stt:50052"
         assert "grpc://" not in service.stt_address
 
@@ -142,25 +278,18 @@ class TestCommandHandlers:
     """Tests for command handlers (start, help, status)."""
     
     @pytest.fixture
-    def service(self):
-        """Create a TelegramBotService instance for testing."""
-        with patch('main.config') as mock_config, \
-             patch('main.Application') as mock_app_class, \
-             patch.dict(os.environ, {'TELEGRAM_BOT_TOKEN': 'test-token'}):
-            mock_config.telegram.bot_token = "test-token"
-            mock_config.telegram.max_file_size = 20 * 1024 * 1024
-            mock_config.monitoring.log_level = "INFO"
-            mock_app = MagicMock()
-            mock_app_class.builder.return_value.token.return_value.build.return_value = mock_app
-            
-            service = TelegramBotService()
-            service.application = mock_app
-            return service
+    def mock_config(self):
+        """Create a mock config object."""
+        config = MagicMock()
+        config.bot_token = "test-token"
+        config.max_file_size = 20 * 1024 * 1024
+        config.monitoring.log_level = "INFO"
+        return config
     
     @pytest.mark.asyncio
-    async def test_start_command(self, service, mock_update):
+    async def test_start_command(self, mock_update, mock_config):
         """Test /start command handler."""
-        await service.start_command(mock_update, None)
+        await start_command(mock_update, None, mock_config)
         
         mock_update.message.reply_text.assert_called_once()
         call_args = mock_update.message.reply_text.call_args[0][0]
@@ -169,9 +298,9 @@ class TestCommandHandlers:
         assert "voice message" in call_args.lower()
     
     @pytest.mark.asyncio
-    async def test_help_command(self, service, mock_update):
+    async def test_help_command(self, mock_update, mock_config):
         """Test /help command handler."""
-        await service.help_command(mock_update, None)
+        await help_command(mock_update, None, mock_config)
         
         mock_update.message.reply_text.assert_called_once()
         call_args = mock_update.message.reply_text.call_args[0][0]
@@ -181,9 +310,9 @@ class TestCommandHandlers:
         assert "/status" in call_args
     
     @pytest.mark.asyncio
-    async def test_status_command(self, service, mock_update):
+    async def test_status_command(self, mock_update, mock_config):
         """Test /status command handler."""
-        await service.status_command(mock_update, None)
+        await status_command(mock_update, None, mock_config)
         
         mock_update.message.reply_text.assert_called_once()
         call_args = mock_update.message.reply_text.call_args[0][0]
@@ -195,28 +324,28 @@ class TestVoiceMessageHandling:
     """Tests for voice message handling."""
     
     @pytest.fixture
-    def service(self):
-        """Create a TelegramBotService instance for testing."""
-        with patch('main.config') as mock_config, \
-             patch('main.Application') as mock_app_class, \
-             patch.dict(os.environ, {'TELEGRAM_BOT_TOKEN': 'test-token'}):
-            mock_config.telegram.bot_token = "test-token"
-            mock_config.telegram.max_file_size = 20 * 1024 * 1024
-            mock_config.monitoring.log_level = "INFO"
-            mock_app = MagicMock()
-            mock_app_class.builder.return_value.token.return_value.build.return_value = mock_app
-            
-            service = TelegramBotService()
-            service.application = mock_app
-            return service
+    def mock_config(self):
+        """Create a mock config object."""
+        config = MagicMock()
+        config.bot_token = "test-token"
+        config.max_file_size = 20 * 1024 * 1024
+        config.monitoring.log_level = "INFO"
+        return config
+    
+    @pytest.fixture
+    def mock_get_metrics_storage(self):
+        """Create a mock metrics storage getter."""
+        metrics_storage = MagicMock()
+        metrics_storage.record_transcription = MagicMock()
+        return lambda: metrics_storage
     
     @pytest.mark.asyncio
-    async def test_handle_voice_message_file_too_large(self, service, mock_update, mock_context):
+    async def test_handle_voice_message_file_too_large(self, mock_update, mock_context, mock_config, mock_get_metrics_storage):
         """Test voice message rejection when file is too large."""
         # Set voice file size to exceed limit
-        mock_update.message.voice.file_size = service.config.max_file_size + 1
+        mock_update.message.voice.file_size = mock_config.max_file_size + 1
         
-        await service.handle_voice_message(mock_update, mock_context)
+        await handle_voice_message(mock_update, mock_context, mock_config, "stt:50052", mock_get_metrics_storage)
         
         # Should reply with error message
         mock_update.message.reply_text.assert_called_once()
@@ -225,7 +354,7 @@ class TestVoiceMessageHandling:
     
     @pytest.mark.asyncio
     async def test_handle_voice_message_success(
-        self, service, mock_update, mock_context, mock_telegram_file, sample_ogg_audio
+        self, mock_update, mock_context, mock_telegram_file, sample_ogg_audio, mock_config, mock_get_metrics_storage
     ):
         """Test successful voice message processing."""
         # Setup mocks
@@ -243,33 +372,88 @@ class TestVoiceMessageHandling:
         mock_stt_result = MagicMock()
         mock_stt_result.transcript = "Hello, this is a test transcription"
         
-        mock_stt_client = MagicMock()
-        mock_stt_client.recognize = AsyncMock(return_value=mock_stt_result)
+        # Create mock STT client with recognize as AsyncMock
+        # The handler imports: from june_grpc_api import asr as asr_shim
+        # Then calls: asr_shim.SpeechToTextClient(channel)
+        # Create a proper mock class to avoid MagicMock attribute issues
+        class MockSTTClient:
+            def __init__(self, channel):
+                self.channel = channel
+            async def recognize(self, *args, **kwargs):
+                return mock_stt_result
         
-        with patch('main.grpc.aio.insecure_channel') as mock_channel, \
-             patch('main.asr_shim.SpeechToTextClient', return_value=mock_stt_client), \
-             patch('main.prepare_audio_for_stt') as mock_prepare:
+        # Create mock classes for LLM and TTS clients
+        class MockLLMClient:
+            def __init__(self, channel):
+                self.channel = channel
+            async def chat(self, *args, **kwargs):
+                return "Mock LLM response"
+        
+        class MockTTSClient:
+            def __init__(self, channel):
+                self.channel = channel
+            async def synthesize(self, *args, **kwargs):
+                return b'mock_tts_audio'
+        
+        # Set mock clients on the modules (similar to SpeechToTextClient)
+        sys.modules['june_grpc_api.asr'].SpeechToTextClient = MockSTTClient
+        sys.modules['june_grpc_api.shim.llm'].LLMClient = MockLLMClient
+        sys.modules['june_grpc_api.shim.tts'].TextToSpeechClient = MockTTSClient
+        
+        with patch('grpc.aio.insecure_channel') as mock_channel, \
+             patch('handlers.voice.prepare_audio_for_stt') as mock_prepare, \
+             patch('june_grpc_api.asr.RecognitionConfig', MagicMock), \
+             patch('handlers.voice.AudioSegment') as mock_audio_segment:
             
             # Mock audio preparation (conversion)
-            prepared_audio = prepare_audio_for_stt(sample_ogg_audio, is_ogg=True)
-            mock_prepare.return_value = prepared_audio
+            mock_prepare.return_value = b'mock_prepared_audio'
             
             # Mock async context manager for channel
             mock_channel.return_value.__aenter__ = AsyncMock(return_value=MagicMock())
             mock_channel.return_value.__aexit__ = AsyncMock(return_value=False)
             
-            await service.handle_voice_message(mock_update, mock_context)
+            # Note: LLM and TTS clients are now set directly on modules above
+            # No need for additional mocking since MockLLMClient and MockTTSClient are used
             
-            # Verify status messages were sent
-            assert mock_update.message.reply_text.call_count >= 1
-            # Verify STT was called
-            mock_stt_client.recognize.assert_called_once()
-            # Verify final status was updated
-            assert mock_status_msg.edit_text.call_count >= 1
+            # Mock AudioSegment
+            mock_audio = MagicMock()
+            mock_audio.export = MagicMock()
+            mock_audio_segment.from_wav.return_value = mock_audio
+            
+            # Mock httpx for conversation API (httpx is imported inside the handler)
+            mock_response = MagicMock()
+            mock_response.status_code = 404  # Conversation doesn't exist
+            mock_response.json.return_value = {"messages": []}
+            mock_client = AsyncMock()
+            mock_client.get = AsyncMock(return_value=mock_response)
+            mock_client.post = AsyncMock(return_value=mock_response)
+            mock_httpx_module = sys.modules['httpx']
+            mock_httpx_module.AsyncClient = MagicMock()
+            mock_httpx_module.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_httpx_module.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            
+            # Mock tempfile and file operations
+            with patch('handlers.voice.tempfile.NamedTemporaryFile') as mock_tempfile, \
+                 patch('handlers.voice.os.unlink') as mock_unlink, \
+                 patch('builtins.open', create=True):
+                mock_tempfile.return_value.__enter__ = lambda self: self
+                mock_tempfile.return_value.__exit__ = lambda *args: None
+                mock_tempfile.return_value.name = '/tmp/test.ogg'
+                mock_update.message.reply_voice = AsyncMock()
+                
+                await handle_voice_message(mock_update, mock_context, mock_config, "stt:50052", mock_get_metrics_storage)
+                
+                # Verify status messages were sent
+                assert mock_update.message.reply_text.call_count >= 1
+                # Verify final status was updated
+                assert mock_status_msg.edit_text.call_count >= 1
+                # Verify reply_voice was called (indicates successful completion)
+                # This verifies the full flow worked, including STT recognition
+                mock_update.message.reply_voice.assert_called_once()
     
     @pytest.mark.asyncio
     async def test_handle_voice_message_audio_validation_error(
-        self, service, mock_update, mock_context, mock_telegram_file, sample_ogg_audio
+        self, mock_update, mock_context, mock_telegram_file, sample_ogg_audio, mock_config, mock_get_metrics_storage
     ):
         """Test handling of audio validation errors."""
         # Setup mocks
@@ -284,8 +468,8 @@ class TestVoiceMessageHandling:
         mock_update.message.reply_text.return_value = mock_status_msg
         
         # Mock audio validation to raise error
-        with patch('main.prepare_audio_for_stt', side_effect=AudioValidationError("Audio too long")):
-            await service.handle_voice_message(mock_update, mock_context)
+        with patch('handlers.voice.prepare_audio_for_stt', side_effect=AudioValidationError("Audio too long")):
+            await handle_voice_message(mock_update, mock_context, mock_config, "stt:50052", mock_get_metrics_storage)
             
             # Should show validation error
             mock_status_msg.edit_text.assert_called()
@@ -294,7 +478,7 @@ class TestVoiceMessageHandling:
     
     @pytest.mark.asyncio
     async def test_handle_voice_message_stt_error(
-        self, service, mock_update, mock_context, mock_telegram_file, sample_ogg_audio
+        self, mock_update, mock_context, mock_telegram_file, sample_ogg_audio, mock_config, mock_get_metrics_storage
     ):
         """Test handling of STT service errors."""
         # Setup mocks
@@ -309,21 +493,21 @@ class TestVoiceMessageHandling:
         mock_update.message.reply_text.return_value = mock_status_msg
         
         # Mock audio preparation
-        prepared_audio = prepare_audio_for_stt(sample_ogg_audio, is_ogg=True)
+        mock_prepare = patch('handlers.voice.prepare_audio_for_stt', return_value=b'mock_prepared_audio')
         
         # Mock STT to raise error
         mock_stt_client = MagicMock()
         mock_stt_client.recognize = AsyncMock(side_effect=Exception("STT service unavailable"))
         
-        with patch('main.grpc.aio.insecure_channel') as mock_channel, \
-             patch('main.asr_shim.SpeechToTextClient', return_value=mock_stt_client), \
-             patch('main.prepare_audio_for_stt', return_value=prepared_audio):
+        with patch('grpc.aio.insecure_channel') as mock_channel, \
+             patch('june_grpc_api.asr.SpeechToTextClient', return_value=mock_stt_client), \
+             mock_prepare:
             
             # Mock async context manager for channel
             mock_channel.return_value.__aenter__ = AsyncMock(return_value=MagicMock())
             mock_channel.return_value.__aexit__ = AsyncMock(return_value=False)
             
-            await service.handle_voice_message(mock_update, mock_context)
+            await handle_voice_message(mock_update, mock_context, mock_config, "stt:50052", mock_get_metrics_storage)
             
             # Should show STT error
             mock_status_msg.edit_text.assert_called()
@@ -332,7 +516,7 @@ class TestVoiceMessageHandling:
     
     @pytest.mark.asyncio
     async def test_handle_voice_message_download_error(
-        self, service, mock_update, mock_context
+        self, mock_update, mock_context, mock_config, mock_get_metrics_storage
     ):
         """Test handling of file download errors."""
         # Setup mocks
@@ -345,7 +529,7 @@ class TestVoiceMessageHandling:
         mock_status_msg.edit_text = AsyncMock()
         mock_update.message.reply_text.return_value = mock_status_msg
         
-        await service.handle_voice_message(mock_update, mock_context)
+        await handle_voice_message(mock_update, mock_context, mock_config, "stt:50052", mock_get_metrics_storage)
         
         # Should show error message
         mock_status_msg.edit_text.assert_called()
@@ -354,7 +538,7 @@ class TestVoiceMessageHandling:
     
     @pytest.mark.asyncio
     async def test_handle_voice_message_audio_preparation_error(
-        self, service, mock_update, mock_context, mock_telegram_file, sample_ogg_audio
+        self, mock_update, mock_context, mock_telegram_file, sample_ogg_audio, mock_config, mock_get_metrics_storage
     ):
         """Test handling of audio preparation/conversion errors."""
         # Setup mocks
@@ -369,8 +553,8 @@ class TestVoiceMessageHandling:
         mock_update.message.reply_text.return_value = mock_status_msg
         
         # Mock audio preparation to raise ValueError
-        with patch('main.prepare_audio_for_stt', side_effect=ValueError("Invalid audio format")):
-            await service.handle_voice_message(mock_update, mock_context)
+        with patch('handlers.voice.prepare_audio_for_stt', side_effect=ValueError("Invalid audio format")):
+            await handle_voice_message(mock_update, mock_context, mock_config, "stt:50052", mock_get_metrics_storage)
             
             # Should show error message
             mock_status_msg.edit_text.assert_called()
@@ -382,24 +566,24 @@ class TestErrorHandlingPaths:
     """Tests for various error handling paths."""
     
     @pytest.fixture
-    def service(self):
-        """Create a TelegramBotService instance for testing."""
-        with patch('main.config') as mock_config, \
-             patch('main.Application') as mock_app_class, \
-             patch.dict(os.environ, {'TELEGRAM_BOT_TOKEN': 'test-token'}):
-            mock_config.telegram.bot_token = "test-token"
-            mock_config.telegram.max_file_size = 20 * 1024 * 1024
-            mock_config.monitoring.log_level = "INFO"
-            mock_app = MagicMock()
-            mock_app_class.builder.return_value.token.return_value.build.return_value = mock_app
-            
-            service = TelegramBotService()
-            service.application = mock_app
-            return service
+    def mock_config(self):
+        """Create a mock config object."""
+        config = MagicMock()
+        config.bot_token = "test-token"
+        config.max_file_size = 20 * 1024 * 1024
+        config.monitoring.log_level = "INFO"
+        return config
+    
+    @pytest.fixture
+    def mock_get_metrics_storage(self):
+        """Create a mock metrics storage getter."""
+        metrics_storage = MagicMock()
+        metrics_storage.record_transcription = MagicMock()
+        return lambda: metrics_storage
     
     @pytest.mark.asyncio
     async def test_handle_voice_message_generic_exception(
-        self, service, mock_update, mock_context
+        self, mock_update, mock_context, mock_config, mock_get_metrics_storage
     ):
         """Test handling of generic exceptions."""
         # Setup to raise exception early
@@ -411,14 +595,14 @@ class TestErrorHandlingPaths:
         mock_status_msg.edit_text = AsyncMock()
         mock_update.message.reply_text.return_value = mock_status_msg
         
-        await service.handle_voice_message(mock_update, mock_context)
+        await handle_voice_message(mock_update, mock_context, mock_config, "stt:50052", mock_get_metrics_storage)
         
         # Should handle gracefully and show error
         mock_status_msg.edit_text.assert_called()
     
     @pytest.mark.asyncio
     async def test_handle_voice_message_no_file_size(
-        self, service, mock_update, mock_context, mock_telegram_file, sample_ogg_audio
+        self, mock_update, mock_context, mock_telegram_file, sample_ogg_audio, mock_config, mock_get_metrics_storage
     ):
         """Test handling when voice message has no file_size attribute."""
         # Setup mocks - file_size is None
@@ -438,45 +622,79 @@ class TestErrorHandlingPaths:
         mock_stt_client = MagicMock()
         mock_stt_client.recognize = AsyncMock(return_value=mock_stt_result)
         
-        with patch('main.grpc.aio.insecure_channel') as mock_channel, \
-             patch('main.asr_shim.SpeechToTextClient', return_value=mock_stt_client), \
-             patch('main.prepare_audio_for_stt') as mock_prepare:
-            
-            prepared_audio = prepare_audio_for_stt(sample_ogg_audio, is_ogg=True)
-            mock_prepare.return_value = prepared_audio
+        with patch('grpc.aio.insecure_channel') as mock_channel, \
+             patch('june_grpc_api.asr.SpeechToTextClient', return_value=mock_stt_client), \
+             patch('handlers.voice.prepare_audio_for_stt', return_value=b'mock_prepared_audio'), \
+             patch('june_grpc_api.shim.llm.LLMClient') as mock_llm_client_class, \
+             patch('june_grpc_api.shim.tts.TextToSpeechClient') as mock_tts_client_class, \
+             patch('handlers.voice.AudioSegment') as mock_audio_segment:
             
             mock_channel.return_value.__aenter__ = AsyncMock(return_value=MagicMock())
             mock_channel.return_value.__aexit__ = AsyncMock(return_value=False)
             
-            # Should proceed (file_size check only runs if file_size is not None)
-            await service.handle_voice_message(mock_update, mock_context)
+            # Mock LLM and TTS clients (simplified - just enough to get past errors)
+            mock_llm_client = MagicMock()
+            mock_llm_client.chat = AsyncMock(return_value="Mock LLM response")
+            mock_llm_client_class.return_value.__aenter__ = AsyncMock(return_value=mock_llm_client)
+            mock_llm_client_class.return_value.__aexit__ = AsyncMock(return_value=False)
             
-            # Should have processed the message
-            assert mock_update.message.reply_text.call_count >= 1
+            mock_tts_client = MagicMock()
+            mock_tts_client.synthesize = AsyncMock(return_value=b'mock_tts_audio')
+            mock_tts_client_class.return_value.__aenter__ = AsyncMock(return_value=mock_tts_client)
+            mock_tts_client_class.return_value.__aexit__ = AsyncMock(return_value=False)
+            
+            mock_audio = MagicMock()
+            mock_audio.export = MagicMock()
+            mock_audio_segment.from_wav.return_value = mock_audio
+            
+            mock_response = MagicMock()
+            mock_response.status_code = 404
+            mock_response.json.return_value = {"messages": []}
+            mock_client = AsyncMock()
+            mock_client.get.return_value = mock_response
+            mock_client.post.return_value = mock_response
+            mock_httpx_module = sys.modules['httpx']
+            mock_httpx_module.AsyncClient = MagicMock()
+            mock_httpx_module.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_httpx_module.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            
+            with patch('handlers.voice.tempfile.NamedTemporaryFile') as mock_tempfile, \
+                 patch('handlers.voice.os.unlink') as mock_unlink, \
+                 patch('builtins.open', create=True):
+                mock_tempfile.return_value.__enter__ = lambda self: self
+                mock_tempfile.return_value.__exit__ = lambda *args: None
+                mock_tempfile.return_value.name = '/tmp/test.ogg'
+                mock_update.message.reply_voice = AsyncMock()
+                
+                # Should proceed (file_size check only runs if file_size is not None)
+                await handle_voice_message(mock_update, mock_context, mock_config, "stt:50052", mock_get_metrics_storage)
+                
+                # Should have processed the message
+                assert mock_update.message.reply_text.call_count >= 1
 
 
 class TestAudioFormatConversionIntegration:
     """Tests for audio format conversion integration with voice handling."""
     
     @pytest.fixture
-    def service(self):
-        """Create a TelegramBotService instance for testing."""
-        with patch('main.config') as mock_config, \
-             patch('main.Application') as mock_app_class, \
-             patch.dict(os.environ, {'TELEGRAM_BOT_TOKEN': 'test-token'}):
-            mock_config.telegram.bot_token = "test-token"
-            mock_config.telegram.max_file_size = 20 * 1024 * 1024
-            mock_config.monitoring.log_level = "INFO"
-            mock_app = MagicMock()
-            mock_app_class.builder.return_value.token.return_value.build.return_value = mock_app
-            
-            service = TelegramBotService()
-            service.application = mock_app
-            return service
+    def mock_config(self):
+        """Create a mock config object."""
+        config = MagicMock()
+        config.bot_token = "test-token"
+        config.max_file_size = 20 * 1024 * 1024
+        config.monitoring.log_level = "INFO"
+        return config
+    
+    @pytest.fixture
+    def mock_get_metrics_storage(self):
+        """Create a mock metrics storage getter."""
+        metrics_storage = MagicMock()
+        metrics_storage.record_transcription = MagicMock()
+        return lambda: metrics_storage
     
     @pytest.mark.asyncio
     async def test_audio_conversion_in_voice_processing(
-        self, service, mock_update, mock_context, mock_telegram_file, sample_ogg_audio
+        self, mock_update, mock_context, mock_telegram_file, sample_ogg_audio, mock_config, mock_get_metrics_storage
     ):
         """Test that audio conversion is properly integrated in voice processing."""
         # Setup mocks
@@ -496,29 +714,57 @@ class TestAudioFormatConversionIntegration:
         mock_stt_client = MagicMock()
         mock_stt_client.recognize = AsyncMock(return_value=mock_stt_result)
         
-        with patch('main.grpc.aio.insecure_channel') as mock_channel, \
-             patch('main.asr_shim.SpeechToTextClient', return_value=mock_stt_client):
+        with patch('grpc.aio.insecure_channel') as mock_channel, \
+             patch('june_grpc_api.asr.SpeechToTextClient', return_value=mock_stt_client), \
+             patch('handlers.voice.prepare_audio_for_stt', return_value=b'mock_prepared_audio') as mock_prepare, \
+             patch('june_grpc_api.shim.llm.LLMClient') as mock_llm_client_class, \
+             patch('june_grpc_api.shim.tts.TextToSpeechClient') as mock_tts_client_class, \
+             patch('handlers.voice.AudioSegment') as mock_audio_segment:
             
             mock_channel.return_value.__aenter__ = AsyncMock(return_value=MagicMock())
             mock_channel.return_value.__aexit__ = AsyncMock(return_value=False)
             
-            # Capture the audio passed to STT
-            captured_audio = None
+            # Mock LLM and TTS
+            mock_llm_client = MagicMock()
+            mock_llm_client.chat = AsyncMock(return_value="Mock LLM response")
+            mock_llm_client_class.return_value.__aenter__ = AsyncMock(return_value=mock_llm_client)
+            mock_llm_client_class.return_value.__aexit__ = AsyncMock(return_value=False)
             
-            async def capture_audio(*args, **kwargs):
-                nonlocal captured_audio
-                if args:
-                    captured_audio = args[0]
-                return mock_stt_result
+            mock_tts_client = MagicMock()
+            mock_tts_client.synthesize = AsyncMock(return_value=b'mock_tts_audio')
+            mock_tts_client_class.return_value.__aenter__ = AsyncMock(return_value=mock_tts_client)
+            mock_tts_client_class.return_value.__aexit__ = AsyncMock(return_value=False)
             
-            mock_stt_client.recognize = capture_audio
+            mock_audio = MagicMock()
+            mock_audio.export = MagicMock()
+            mock_audio_segment.from_wav.return_value = mock_audio
             
-            await service.handle_voice_message(mock_update, mock_context)
+            mock_response = MagicMock()
+            mock_response.status_code = 404
+            mock_response.json.return_value = {"messages": []}
+            mock_client = AsyncMock()
+            mock_client.get.return_value = mock_response
+            mock_client.post.return_value = mock_response
+            mock_httpx_module = sys.modules['httpx']
+            mock_httpx_module.AsyncClient = MagicMock()
+            mock_httpx_module.AsyncClient.return_value.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_httpx_module.AsyncClient.return_value.__aexit__ = AsyncMock(return_value=False)
             
-            # Verify audio was prepared (converted)
-            # The actual conversion happens in prepare_audio_for_stt
-            # We verify that STT was called with prepared audio
-            assert mock_update.message.reply_text.call_count >= 1
+            with patch('handlers.voice.tempfile.NamedTemporaryFile') as mock_tempfile, \
+                 patch('handlers.voice.os.unlink') as mock_unlink, \
+                 patch('builtins.open', create=True):
+                mock_tempfile.return_value.__enter__ = lambda self: self
+                mock_tempfile.return_value.__exit__ = lambda *args: None
+                mock_tempfile.return_value.name = '/tmp/test.ogg'
+                mock_update.message.reply_voice = AsyncMock()
+                
+                await handle_voice_message(mock_update, mock_context, mock_config, "stt:50052", mock_get_metrics_storage)
+                
+                # Verify audio was prepared (converted)
+                # The actual conversion happens in prepare_audio_for_stt
+                # We verify that prepare_audio_for_stt was called
+                mock_prepare.assert_called_once()
+                assert mock_update.message.reply_text.call_count >= 1
 
 
 class TestServiceRun:

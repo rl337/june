@@ -3,14 +3,25 @@ import io
 import logging
 import tempfile
 import os
+import sys
 from datetime import datetime
 from typing import TYPE_CHECKING
+from pathlib import Path
 
 import grpc.aio
 import librosa
 from pydub import AudioSegment
 from telegram import Update
 from telegram.ext import ContextTypes
+
+# Add parent directory to path to import language_preferences
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from language_preferences import (
+    get_language_preference,
+    set_language_preference,
+    DEFAULT_LANGUAGE
+)
 
 from audio_utils import (
     prepare_audio_for_stt,
@@ -73,11 +84,21 @@ async def handle_voice_message(
             )
             return
         
-        # Step 3: Send to STT
+        # Step 3: Get language preference and send to STT
         await status_msg.edit_text("?? Transcribing your voice message...")
         start_time = datetime.now()
         original_audio_size = len(audio_data_bytes)
         original_audio_format = "ogg"  # Telegram sends OGG/OPUS
+        
+        # Get user language preference
+        user_id = str(update.effective_user.id)
+        chat_id = str(update.effective_chat.id)
+        preferred_language = get_language_preference(user_id, chat_id)
+        
+        # Initialize detected_language to preferred_language (will be updated if STT detects different language)
+        detected_language = preferred_language
+        
+        logger.info(f"Processing voice message for user {user_id}, chat {chat_id}, preferred language: {preferred_language}")
         
         try:
             # Import here to avoid circular dependencies
@@ -85,7 +106,12 @@ async def handle_voice_message(
             
             async with grpc.aio.insecure_channel(stt_address) as channel:
                 stt_client = asr_shim.SpeechToTextClient(channel)
-                cfg = asr_shim.RecognitionConfig(language="en", interim_results=False)
+                # Use preferred_language for STT
+                # TODO: Support language=None for auto-detection when STT service supports it
+                cfg = asr_shim.RecognitionConfig(
+                    language=preferred_language,  # TODO: Support None for auto-detection
+                    interim_results=False
+                )
                 result = await stt_client.recognize(
                     stt_audio,
                     sample_rate=16000,
@@ -93,6 +119,17 @@ async def handle_voice_message(
                     config=cfg
                 )
                 transcript = result.transcript
+                
+                # If STT service returns detected language, use it
+                # Otherwise, we'll use the preferred language
+                stt_detected_language = getattr(result, "detected_language", None)
+                if stt_detected_language:
+                    detected_language = stt_detected_language
+                    # Update language preference if detected language differs from preference
+                    # This allows the system to learn user's actual language usage
+                    if detected_language != preferred_language:
+                        logger.info(f"STT detected language {detected_language} differs from preference {preferred_language}, updating preference")
+                        set_language_preference(user_id, chat_id, detected_language)
             
             # Calculate processing time and audio duration
             processing_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
@@ -282,10 +319,12 @@ async def handle_voice_message(
             
             async with grpc.aio.insecure_channel(tts_address) as channel:
                 tts_client = TextToSpeechClient(channel)
+                # Use detected/preferred language for TTS
+                logger.info(f"Using language {detected_language} for TTS")
                 tts_audio_bytes = await tts_client.synthesize(
                     llm_response,
                     voice_id="default",
-                    language="en"
+                    language=detected_language
                 )
             
             if not tts_audio_bytes or len(tts_audio_bytes) == 0:

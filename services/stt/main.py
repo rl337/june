@@ -131,8 +131,16 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
                 # Calculate audio duration
                 audio_duration = len(audio_data) / request.sample_rate if request.sample_rate > 0 else 0.0
                 
-                # Transcribe
-                result = await self._transcribe_audio(audio_data, is_final=True)
+                # Extract language from config (if provided)
+                language = None
+                if request.config and hasattr(request.config, "language") and request.config.language:
+                    language = request.config.language
+                    # Use None for auto-detection if language is empty string
+                    if language.strip() == "":
+                        language = None
+                
+                # Transcribe with language (None = auto-detect)
+                result = await self._transcribe_audio(audio_data, is_final=True, language=language)
                 
                 processing_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
                 
@@ -276,8 +284,18 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
             logger.error(f"Audio resampling error: {e}")
             return audio_data
     
-    async def _transcribe_audio(self, audio_data: List[float], is_final: bool = True) -> Optional[RecognitionResult]:
-        """Transcribe audio using Whisper."""
+    async def _transcribe_audio(self, audio_data: List[float], is_final: bool = True, language: Optional[str] = None) -> Optional[RecognitionResult]:
+        """
+        Transcribe audio using Whisper.
+        
+        Args:
+            audio_data: Audio data as list of floats
+            is_final: Whether this is the final chunk
+            language: Language code (ISO 639-1) or None for auto-detection
+            
+        Returns:
+            RecognitionResult or None if transcription fails
+        """
         try:
             if not audio_data or len(audio_data) < self.sample_rate * 0.1:  # Less than 100ms
                 return None
@@ -290,12 +308,16 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
                 audio_array = audio_array.reshape(1, -1)
             
             # Transcribe with Whisper
+            # If language is None, Whisper will auto-detect the language
             with Timer("whisper_transcription"):
-                result = self.whisper_model.transcribe(
-                    audio_array,
-                    language="en",  # TODO: Make configurable
-                    fp16=torch.cuda.is_available()
-                )
+                transcribe_kwargs = {
+                    "fp16": torch.cuda.is_available()
+                }
+                if language:
+                    transcribe_kwargs["language"] = language
+                # If language is None, don't pass it - Whisper will auto-detect
+                
+                result = self.whisper_model.transcribe(audio_array, **transcribe_kwargs)
             
             # Extract transcription details
             transcript = result["text"].strip()

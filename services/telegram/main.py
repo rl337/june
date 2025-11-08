@@ -16,7 +16,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
 from inference_core import config, setup_logging
-from handlers import start_command, help_command, status_command, handle_voice_message
+from handlers import start_command, help_command, status_command, language_command, handle_voice_message
 from dependencies.config import (
     get_service_config,
     get_stt_address,
@@ -74,6 +74,9 @@ class TelegramBotService:
         async def status_wrapper(update, context):
             await status_command(update, context, self.config)
         
+        async def language_wrapper(update, context):
+            await language_command(update, context, self.config)
+        
         async def voice_wrapper(update, context):
             await handle_voice_message(
                 update,
@@ -86,6 +89,7 @@ class TelegramBotService:
         self.application.add_handler(CommandHandler("start", start_wrapper))
         self.application.add_handler(CommandHandler("help", help_wrapper))
         self.application.add_handler(CommandHandler("status", status_wrapper))
+        self.application.add_handler(CommandHandler("language", language_wrapper))
         self.application.add_handler(MessageHandler(filters.VOICE, voice_wrapper))
     
     def _run_health_server(self):
