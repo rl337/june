@@ -3,6 +3,8 @@
 
 python-telegram-bot[webhooks]>=20.7
 pydub>=0.25.1
+httpx>=0.24.0
+psycopg2-binary>=2.9.0
 
 # Audio processing (for format conversion)
 # ffmpeg is installed in base image
