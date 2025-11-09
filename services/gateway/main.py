@@ -241,6 +241,38 @@ class GatewayService:
                 b64 = base64.b64encode(audio).decode("ascii")
                 return {"audio_b64": b64, "sample_rate": 16000}
         
+        @self.app.post("/voice/quality")
+        async def voice_quality(audio: UploadFile = File(...)):
+            """
+            Analyze voice message quality and provide feedback.
+            
+            Accepts audio file uploads (WAV, FLAC, OGG, etc.) and returns:
+            - Quality scores (overall, volume, clarity, noise)
+            - Textual feedback
+            - Improvement suggestions
+            """
+            try:
+                # Import voice quality scorer
+                sys.path.insert(0, str(Path(__file__).parent.parent / "telegram"))
+                from voice_quality import VoiceQualityScorer, VoiceQualityError
+                
+                # Read audio data
+                audio_data = await audio.read()
+                audio_format = audio.filename.split('.')[-1].lower() if audio.filename else None
+                
+                # Score the voice message
+                scorer = VoiceQualityScorer()
+                result = scorer.score_voice_message(audio_data, audio_format=audio_format)
+                
+                return result
+                
+            except Exception as e:
+                logger.error(f"Voice quality analysis failed: {e}", exc_info=True)
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to analyze voice quality: {str(e)}"
+                )
+        
         @self.app.post("/auth/token")
         async def create_token(user_id: str = "default"):
             """Create JWT token for authentication."""

@@ -1,48 +1,110 @@
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+  external_labels:
+    cluster: 'june'
+    environment: 'production'
 
 rule_files:
   # - "first_rules.yml"
   # - "second_rules.yml"
 
 scrape_configs:
+  # Prometheus self-monitoring
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+          component: 'monitoring'
 
+  # System resources (CPU, memory, disk)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: 'node-exporter'
+          component: 'system'
+    scrape_interval: 15s
+
+  # Application Services
   - job_name: 'gateway'
     static_configs:
       - targets: ['gateway:8000']
+        labels:
+          service: 'gateway'
+          component: 'api'
+          tier: 'frontend'
     metrics_path: '/metrics'
     scrape_interval: 10s
 
   - job_name: 'inference-api'
     static_configs:
       - targets: ['inference-api:8001']
+        labels:
+          service: 'inference-api'
+          component: 'ml'
+          tier: 'backend'
     metrics_path: '/metrics'
     scrape_interval: 10s
 
   - job_name: 'stt'
     static_configs:
       - targets: ['stt:8002']
+        labels:
+          service: 'stt'
+          component: 'ml'
+          tier: 'backend'
     metrics_path: '/metrics'
     scrape_interval: 10s
 
   - job_name: 'tts'
     static_configs:
       - targets: ['tts:8003']
+        labels:
+          service: 'tts'
+          component: 'ml'
+          tier: 'backend'
     metrics_path: '/metrics'
     scrape_interval: 10s
 
-  - job_name: 'postgres'
+  - job_name: 'orchestrator'
     static_configs:
-      - targets: ['postgres:5432']
+      - targets: ['orchestrator:8005']
+        labels:
+          service: 'orchestrator'
+          component: 'orchestration'
+          tier: 'backend'
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  - job_name: 'todo-mcp-service'
+    static_configs:
+      - targets: ['todo-mcp-service:8004']
+        labels:
+          service: 'todo-mcp-service'
+          component: 'task-management'
+          tier: 'backend'
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # Infrastructure Services
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+        labels:
+          service: 'postgres'
+          component: 'database'
+          tier: 'infrastructure'
     scrape_interval: 30s
 
   - job_name: 'nats'
     static_configs:
       - targets: ['nats:8222']
+        labels:
+          service: 'nats'
+          component: 'messaging'
+          tier: 'infrastructure'
     metrics_path: '/metrics'
     scrape_interval: 30s
 

@@ -130,6 +130,24 @@ sys.modules['fastapi'] = mock_fastapi
 sys.modules['fastapi.responses'] = MagicMock()
 sys.modules['uvicorn'] = MagicMock()
 
+# Mock psycopg2 (needed by admin_auth.py and admin_db.py)
+sys.modules['psycopg2'] = MagicMock()
+sys.modules['psycopg2.pool'] = MagicMock()
+sys.modules['psycopg2.extras'] = MagicMock()
+mock_psycopg2_extras = MagicMock()
+mock_psycopg2_extras.RealDictCursor = MagicMock()
+sys.modules['psycopg2.extras'] = mock_psycopg2_extras
+
+# Mock admin_db (needed by handlers/admin_commands.py)
+sys.modules['admin_db'] = MagicMock()
+
+# Mock admin_auth (needed by handlers/admin_commands.py)
+sys.modules['admin_auth'] = MagicMock()
+mock_admin_auth = MagicMock()
+mock_admin_auth.require_admin = lambda func: func  # Decorator that returns function as-is
+mock_admin_auth.is_admin = MagicMock(return_value=False)
+sys.modules['admin_auth'] = mock_admin_auth
+
 # Mock dependencies.config before importing (to avoid ServiceConfig import issue)
 sys.modules['dependencies'] = MagicMock()
 sys.modules['dependencies.config'] = MagicMock()
@@ -401,12 +419,25 @@ class TestVoiceMessageHandling:
         sys.modules['june_grpc_api.shim.tts'].TextToSpeechClient = MockTTSClient
         
         with patch('grpc.aio.insecure_channel') as mock_channel, \
+             patch('handlers.voice.enhance_audio_for_stt') as mock_enhance, \
              patch('handlers.voice.prepare_audio_for_stt') as mock_prepare, \
              patch('june_grpc_api.asr.RecognitionConfig', MagicMock), \
-             patch('handlers.voice.AudioSegment') as mock_audio_segment:
+             patch('handlers.voice.AudioSegment') as mock_audio_segment, \
+             patch('handlers.voice.export_audio_to_ogg_optimized') as mock_export_ogg, \
+             patch('handlers.voice.find_optimal_compression') as mock_find_compression:
             
-            # Mock audio preparation (conversion)
+            # Mock audio enhancement (the handler now uses enhance_audio_for_stt)
+            mock_enhance.return_value = b'mock_prepared_audio'
+            # Also mock prepare_audio_for_stt for backward compatibility
             mock_prepare.return_value = b'mock_prepared_audio'
+            
+            # Mock OGG export functions
+            mock_find_compression.return_value = ('medium', {'bitrate': 64})
+            mock_export_ogg.return_value = {
+                'compressed_size': 1000,
+                'compression_ratio': 1.5,
+                'preset': 'medium'
+            }
             
             # Mock async context manager for channel
             mock_channel.return_value.__aenter__ = AsyncMock(return_value=MagicMock())
@@ -415,10 +446,20 @@ class TestVoiceMessageHandling:
             # Note: LLM and TTS clients are now set directly on modules above
             # No need for additional mocking since MockLLMClient and MockTTSClient are used
             
-            # Mock AudioSegment
+            # Mock AudioSegment with proper attributes
             mock_audio = MagicMock()
-            mock_audio.export = MagicMock()
+            # Mock export to actually write a file (for export_audio_to_ogg_optimized)
+            def mock_export(path, format='ogg', **kwargs):
+                # Create the file so the code can verify it exists
+                with open(path, 'wb') as f:
+                    f.write(b'mock_ogg_audio_data')
+            mock_audio.export = MagicMock(side_effect=mock_export)
+            mock_audio.channels = 1  # Mono audio
+            mock_audio.frame_rate = 16000  # 16kHz sample rate
+            mock_audio.duration_seconds = 1.0  # 1 second duration
+            mock_audio.frame_width = 2  # 16-bit = 2 bytes
             mock_audio_segment.from_wav.return_value = mock_audio
+            mock_audio_segment.from_file.return_value = mock_audio  # For fallback format detection
             
             # Mock httpx for conversation API (httpx is imported inside the handler)
             mock_response = MagicMock()
@@ -716,13 +757,24 @@ class TestAudioFormatConversionIntegration:
         
         with patch('grpc.aio.insecure_channel') as mock_channel, \
              patch('june_grpc_api.asr.SpeechToTextClient', return_value=mock_stt_client), \
+             patch('handlers.voice.enhance_audio_for_stt', return_value=b'mock_prepared_audio') as mock_enhance, \
              patch('handlers.voice.prepare_audio_for_stt', return_value=b'mock_prepared_audio') as mock_prepare, \
              patch('june_grpc_api.shim.llm.LLMClient') as mock_llm_client_class, \
              patch('june_grpc_api.shim.tts.TextToSpeechClient') as mock_tts_client_class, \
-             patch('handlers.voice.AudioSegment') as mock_audio_segment:
+             patch('handlers.voice.AudioSegment') as mock_audio_segment, \
+             patch('handlers.voice.export_audio_to_ogg_optimized') as mock_export_ogg, \
+             patch('handlers.voice.find_optimal_compression') as mock_find_compression:
             
             mock_channel.return_value.__aenter__ = AsyncMock(return_value=MagicMock())
             mock_channel.return_value.__aexit__ = AsyncMock(return_value=False)
+            
+            # Mock OGG export functions
+            mock_find_compression.return_value = ('medium', {'bitrate': 64})
+            mock_export_ogg.return_value = {
+                'compressed_size': 1000,
+                'compression_ratio': 1.5,
+                'preset': 'medium'
+            }
             
             # Mock LLM and TTS
             mock_llm_client = MagicMock()
@@ -736,8 +788,16 @@ class TestAudioFormatConversionIntegration:
             mock_tts_client_class.return_value.__aexit__ = AsyncMock(return_value=False)
             
             mock_audio = MagicMock()
-            mock_audio.export = MagicMock()
+            def mock_export(path, format='ogg', **kwargs):
+                with open(path, 'wb') as f:
+                    f.write(b'mock_ogg_audio_data')
+            mock_audio.export = MagicMock(side_effect=mock_export)
+            mock_audio.channels = 1
+            mock_audio.frame_rate = 16000
+            mock_audio.duration_seconds = 1.0
+            mock_audio.frame_width = 2
             mock_audio_segment.from_wav.return_value = mock_audio
+            mock_audio_segment.from_file.return_value = mock_audio
             
             mock_response = MagicMock()
             mock_response.status_code = 404
@@ -760,10 +820,10 @@ class TestAudioFormatConversionIntegration:
                 
                 await handle_voice_message(mock_update, mock_context, mock_config, "stt:50052", mock_get_metrics_storage)
                 
-                # Verify audio was prepared (converted)
-                # The actual conversion happens in prepare_audio_for_stt
-                # We verify that prepare_audio_for_stt was called
-                mock_prepare.assert_called_once()
+                # Verify audio was enhanced (the handler now uses enhance_audio_for_stt)
+                # The actual conversion happens in enhance_audio_for_stt
+                # We verify that enhance_audio_for_stt was called
+                mock_enhance.assert_called_once()
                 assert mock_update.message.reply_text.call_count >= 1
 
 

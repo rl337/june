@@ -78,6 +78,50 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
+    depends_on:
+      - node-exporter
+      - postgres-exporter
+    networks:
+      - june_network
+
+  # Node Exporter for system metrics (CPU, memory, disk)
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: june-node-exporter
+    restart: unless-stopped
+    ports:
+      - "9100:9100"
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+      - '--collector.netstat'
+      - '--collector.network'
+      - '--collector.cpu'
+      - '--collector.meminfo'
+      - '--collector.diskstats'
+      - '--collector.filesystem'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - june_network
+
+  # PostgreSQL Exporter for database metrics
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:latest
+    container_name: june-postgres-exporter
+    restart: unless-stopped
+    ports:
+      - "9187:9187"
+    environment:
+      DATA_SOURCE_NAME: "postgresql://june:${POSTGRES_PASSWORD:-changeme}@postgres:5432/june?sslmode=disable"
+    depends_on:
+      - postgres
+    networks:
+      - june_network
 
   # Grafana for dashboards
   grafana:

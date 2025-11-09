@@ -24,10 +24,13 @@ from language_preferences import (
 )
 
 from audio_utils import (
-    prepare_audio_for_stt,
+    enhance_audio_for_stt,
+    prepare_audio_for_stt,  # Keep for backward compatibility
     AudioValidationError,
     MAX_AUDIO_DURATION_SECONDS,
-    MAX_AUDIO_SIZE_BYTES
+    MAX_AUDIO_SIZE_BYTES,
+    export_audio_to_ogg_optimized,
+    find_optimal_compression
 )
 
 if TYPE_CHECKING:
@@ -64,10 +67,18 @@ async def handle_voice_message(
         
         logger.info(f"Downloaded voice file: {len(audio_data_bytes)} bytes")
         
-        # Step 2: Convert OGG to WAV and prepare for STT (16kHz mono)
+        # Step 2: Enhance audio quality and prepare for STT
+        # Apply noise reduction and volume normalization to improve transcription accuracy
         try:
-            stt_audio = prepare_audio_for_stt(audio_data_bytes, is_ogg=True)
-            logger.info(f"Prepared audio for STT: {len(stt_audio)} bytes")
+            stt_audio = enhance_audio_for_stt(
+                audio_data_bytes,
+                is_ogg=True,
+                enable_noise_reduction=True,
+                enable_volume_normalization=True,
+                noise_reduction_strength=0.5,  # Moderate noise reduction
+                target_volume_db=-20.0  # Normal volume level
+            )
+            logger.info(f"Enhanced audio for STT: {len(stt_audio)} bytes")
         except AudioValidationError as e:
             await status_msg.edit_text(
                 f"? Audio validation failed: {str(e)}\n\n"
@@ -344,7 +355,7 @@ async def handle_voice_message(
             )
             return
         
-        # Step 6: Convert TTS audio to OGG format (Telegram voice message format)
+        # Step 6: Convert TTS audio to OGG format (Telegram voice message format) with compression optimization
         await status_msg.edit_text("?? Preparing audio for delivery...")
         ogg_audio_path = None
         try:
@@ -363,10 +374,26 @@ async def handle_voice_message(
             with tempfile.NamedTemporaryFile(delete=False, suffix='.ogg') as temp_file:
                 ogg_audio_path = temp_file.name
             
-            # Export to OGG format (OPUS codec)
-            tts_audio.export(ogg_audio_path, format="ogg", codec="libopus")
+            # Find optimal compression preset based on audio characteristics
+            optimal_preset, preset_info = find_optimal_compression(
+                tts_audio,
+                max_file_size=config.max_file_size if hasattr(config, 'max_file_size') else 20 * 1024 * 1024,
+                quality_threshold=0.7  # Accept quality down to 70% of max bitrate
+            )
             
-            logger.info(f"Converted TTS audio to OGG: {ogg_audio_path}")
+            # Export to OGG format with optimized compression
+            compression_info = export_audio_to_ogg_optimized(
+                tts_audio,
+                ogg_audio_path,
+                preset=optimal_preset
+            )
+            
+            logger.info(
+                f"Converted TTS audio to OGG with compression: {ogg_audio_path}, "
+                f"preset: {optimal_preset}, "
+                f"size: {compression_info['compressed_size'] / 1024:.1f} KB, "
+                f"compression ratio: {compression_info['compression_ratio']:.2f}x"
+            )
         except Exception as e:
             logger.error(f"Audio conversion error: {e}", exc_info=True)
             # Clean up temp file if created

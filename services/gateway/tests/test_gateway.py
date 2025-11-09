@@ -408,6 +408,101 @@ class TestGatewayIntegration:
                 data = response.json()
                 assert "timestamp" in data
 
+class TestVoiceQualityEndpoint:
+    """Test voice quality analysis endpoint."""
+    
+    def test_voice_quality_endpoint_success(self, client):
+        """Test voice quality endpoint with valid audio."""
+        from pydub import AudioSegment
+        from pydub.generators import Sine
+        import io
+        
+        # Create a sample WAV file
+        audio = Sine(440).to_audio_segment(duration=1000)  # 1 second
+        audio = audio.set_frame_rate(16000)
+        audio = audio.set_channels(1)
+        audio = audio.normalize(headroom=0.1)
+        
+        buffer = io.BytesIO()
+        audio.export(buffer, format="wav")
+        buffer.seek(0)
+        audio_data = buffer.read()
+        
+        # Create a file-like object for upload
+        files = {"audio": ("test.wav", audio_data, "audio/wav")}
+        
+        response = client.post("/voice/quality", files=files)
+        
+        assert response.status_code == 200
+        data = response.json()
+        
+        # Check response structure
+        assert "overall_score" in data
+        assert "volume_score" in data
+        assert "clarity_score" in data
+        assert "noise_score" in data
+        assert "feedback" in data
+        assert "suggestions" in data
+        assert "analysis_details" in data
+        
+        # Check score ranges
+        assert 0 <= data["overall_score"] <= 100
+        assert 0 <= data["volume_score"] <= 100
+        assert 0 <= data["clarity_score"] <= 100
+        assert 0 <= data["noise_score"] <= 100
+        
+        # Check analysis details
+        assert "rms_level" in data["analysis_details"]
+        assert "peak_level" in data["analysis_details"]
+        assert "snr_estimate" in data["analysis_details"]
+        assert "duration_seconds" in data["analysis_details"]
+    
+    def test_voice_quality_endpoint_invalid_audio(self, client):
+        """Test voice quality endpoint with invalid audio."""
+        # Send invalid audio data
+        files = {"audio": ("test.wav", b"invalid audio data", "audio/wav")}
+        
+        response = client.post("/voice/quality", files=files)
+        
+        # Should return 500 error
+        assert response.status_code == 500
+        assert "Failed to analyze voice quality" in response.json()["detail"]
+    
+    def test_voice_quality_endpoint_empty_file(self, client):
+        """Test voice quality endpoint with empty file."""
+        files = {"audio": ("test.wav", b"", "audio/wav")}
+        
+        response = client.post("/voice/quality", files=files)
+        
+        # Should return 500 error
+        assert response.status_code == 500
+    
+    def test_voice_quality_endpoint_ogg_format(self, client):
+        """Test voice quality endpoint with OGG format."""
+        from pydub import AudioSegment
+        from pydub.generators import Sine
+        import io
+        
+        # Create OGG audio
+        audio = Sine(440).to_audio_segment(duration=1000)
+        audio = audio.set_frame_rate(16000)
+        audio = audio.set_channels(1)
+        audio = audio.normalize(headroom=0.1)
+        
+        buffer = io.BytesIO()
+        audio.export(buffer, format="ogg", codec="libopus")
+        buffer.seek(0)
+        audio_data = buffer.read()
+        
+        files = {"audio": ("test.ogg", audio_data, "audio/ogg")}
+        
+        response = client.post("/voice/quality", files=files)
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "overall_score" in data
+        assert 0 <= data["overall_score"] <= 100
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
 
