@@ -49,6 +49,7 @@ message RecognitionResult {
   int64 start_time_us = 5;
   int64 end_time_us = 6;
   string speaker_id = 7;  // If diarization enabled
+  string detected_language = 8;  // ISO 639-1 code of detected language (when auto-detection is used)
 }
 
 // Word-level information

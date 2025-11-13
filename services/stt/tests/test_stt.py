@@ -11,13 +11,19 @@ from grpc import aio
 
 # Import generated protobuf classes
 import sys
-sys.path.append('../../proto')
+import os
+# Add path to generated protobuf files
+proto_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../packages/june-grpc-api/june_grpc_api/generated'))
+if os.path.exists(proto_path):
+    sys.path.insert(0, proto_path)
 from asr_pb2 import (
     AudioChunk, RecognitionRequest, RecognitionResponse, RecognitionResult,
     RecognitionConfig, WordInfo, HealthRequest, HealthResponse
 )
 import asr_pb2_grpc
 
+# Add parent directory to path to import main
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from main import STTService, stt_service
 
 @pytest.fixture
@@ -26,6 +32,7 @@ def mock_whisper_model():
     mock_model = MagicMock()
     mock_model.transcribe = MagicMock(return_value={
         "text": "Hello world",
+        "language": "en",  # Detected language
         "segments": [
             {
                 "start": 0.0,
@@ -188,6 +195,7 @@ class TestRecognitionOneShot:
         assert response.results[0].transcript == "Hello world"
         assert response.results[0].is_final is True
         assert response.results[0].confidence > 0
+        assert response.results[0].detected_language == "en"  # Should return detected language
         assert response.processing_time_ms >= 0
     
     @pytest.mark.asyncio
@@ -615,6 +623,109 @@ class TestSTTIntegration:
         
         # Should have processed both chunks
         assert len(results) > 0
+    
+    @pytest.mark.asyncio
+    async def test_language_detection_auto(self, service_instance, sample_audio_data, mock_whisper_model):
+        """Test automatic language detection when language is None."""
+        # Mock Whisper to return Spanish as detected language
+        mock_whisper_model.transcribe.return_value = {
+            "text": "Hola mundo",
+            "language": "es",  # Auto-detected Spanish
+            "segments": [
+                {
+                    "start": 0.0,
+                    "end": 1.0,
+                    "words": [
+                        {"word": "Hola", "start": 0.0, "end": 0.5, "probability": 0.95},
+                        {"word": "mundo", "start": 0.5, "end": 1.0, "probability": 0.90}
+                    ]
+                }
+            ]
+        }
+        service_instance.whisper_model = mock_whisper_model
+        
+        request = RecognitionRequest(
+            audio_data=sample_audio_data,
+            sample_rate=16000,
+            encoding="pcm",
+            config=RecognitionConfig(
+                language="",  # Empty string should trigger auto-detection
+                interim_results=False
+            )
+        )
+        
+        response = await service_instance.Recognize(request, None)
+        
+        assert len(response.results) == 1
+        result = response.results[0]
+        assert result.transcript == "Hola mundo"
+        # Should return the auto-detected language
+        assert result.detected_language == "es"
+        # Verify Whisper was called without language parameter (auto-detect)
+        call_args = mock_whisper_model.transcribe.call_args
+        assert "language" not in call_args.kwargs or call_args.kwargs.get("language") is None
+    
+    @pytest.mark.asyncio
+    async def test_language_detection_explicit(self, service_instance, sample_audio_data, mock_whisper_model):
+        """Test language detection when language is explicitly provided."""
+        service_instance.whisper_model = mock_whisper_model
+        
+        request = RecognitionRequest(
+            audio_data=sample_audio_data,
+            sample_rate=16000,
+            encoding="pcm",
+            config=RecognitionConfig(
+                language="en",  # Explicitly provided
+                interim_results=False
+            )
+        )
+        
+        response = await service_instance.Recognize(request, None)
+        
+        assert len(response.results) == 1
+        result = response.results[0]
+        assert result.transcript == "Hello world"
+        # When language is explicitly provided, detected_language should match
+        assert result.detected_language == "en"
+        # Verify Whisper was called with language parameter
+        call_args = mock_whisper_model.transcribe.call_args
+        assert call_args.kwargs.get("language") == "en"
+    
+    @pytest.mark.asyncio
+    async def test_language_detection_none(self, service_instance, sample_audio_data, mock_whisper_model):
+        """Test automatic language detection when language is not provided in config."""
+        # Mock Whisper to return French as detected language
+        mock_whisper_model.transcribe.return_value = {
+            "text": "Bonjour le monde",
+            "language": "fr",  # Auto-detected French
+            "segments": [
+                {
+                    "start": 0.0,
+                    "end": 1.0,
+                    "words": [
+                        {"word": "Bonjour", "start": 0.0, "end": 0.5, "probability": 0.95},
+                        {"word": "le", "start": 0.5, "end": 0.7, "probability": 0.90},
+                        {"word": "monde", "start": 0.7, "end": 1.0, "probability": 0.90}
+                    ]
+                }
+            ]
+        }
+        service_instance.whisper_model = mock_whisper_model
+        
+        request = RecognitionRequest(
+            audio_data=sample_audio_data,
+            sample_rate=16000,
+            encoding="pcm",
+            config=None  # No config, should trigger auto-detection
+        )
+        
+        response = await service_instance.Recognize(request, None)
+        
+        assert len(response.results) == 1
+        result = response.results[0]
+        assert result.transcript == "Bonjour le monde"
+        # Should return the auto-detected language
+        assert result.detected_language == "fr"
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

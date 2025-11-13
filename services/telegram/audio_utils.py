@@ -460,35 +460,37 @@ def prepare_audio_for_stt(audio_data: bytes, is_ogg: bool = False) -> bytes:
     """
     Prepare audio data for STT service (convenience function).
     
-    If audio is OGG, converts to WAV first.
-    Then converts to 16kHz mono format.
-    Finally validates the audio.
+    Applies comprehensive audio preprocessing to improve transcription accuracy:
+    1. Format conversion (OGG to WAV, 16kHz, mono)
+    2. Noise reduction (using spectral gating)
+    3. Volume normalization (to target level)
+    4. Validation
     
-    Note: For enhanced audio quality, use enhance_audio_for_stt() instead,
-    which includes noise reduction and volume normalization.
+    This function now includes noise reduction and volume normalization
+    to improve STT transcription accuracy. For more control over enhancement
+    settings, use enhance_audio_for_stt() directly.
     
     Args:
         audio_data: Audio data as bytes (OGG or WAV)
         is_ogg: If True, treat input as OGG format
         
     Returns:
-        WAV audio data at 16kHz, mono, validated
+        WAV audio data at 16kHz, mono, validated and enhanced
         
     Raises:
         ValueError: If conversion fails
         AudioValidationError: If validation fails
     """
-    # Convert OGG to WAV if needed
-    if is_ogg:
-        audio_data = convert_ogg_to_wav(audio_data)
-    
-    # Convert to 16kHz mono
-    audio_data = convert_to_16khz_mono(audio_data)
-    
-    # Validate
-    validate_audio(audio_data, require_16khz=True, require_mono=True)
-    
-    return audio_data
+    # Use enhance_audio_for_stt() with default settings to include
+    # noise reduction and volume normalization
+    return enhance_audio_for_stt(
+        audio_data,
+        is_ogg=is_ogg,
+        enable_noise_reduction=True,
+        enable_volume_normalization=True,
+        noise_reduction_strength=0.5,  # Moderate noise reduction
+        target_volume_db=-20.0  # Normal volume level
+    )
 
 
 def compress_audio_for_telegram(

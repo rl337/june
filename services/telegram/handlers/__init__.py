@@ -7,6 +7,7 @@ from .commands import (
     language_command
 )
 from .voice import handle_voice_message
+from .text import handle_text_message
 
 __all__ = [
     "start_command",
@@ -14,4 +15,5 @@ __all__ = [
     "status_command",
     "language_command",
     "handle_voice_message",
+    "handle_text_message",
 ]

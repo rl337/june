@@ -6,8 +6,7 @@ global:
     environment: 'production'
 
 rule_files:
-  # - "first_rules.yml"
-  # - "second_rules.yml"
+  - "prometheus-alerts.yml"
 
 scrape_configs:
   # Prometheus self-monitoring
@@ -75,6 +74,16 @@ scrape_configs:
           service: 'orchestrator'
           component: 'orchestration'
           tier: 'backend'
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  - job_name: 'telegram'
+    static_configs:
+      - targets: ['telegram:8080']
+        labels:
+          service: 'telegram'
+          component: 'bot'
+          tier: 'frontend'
     metrics_path: '/metrics'
     scrape_interval: 10s
 

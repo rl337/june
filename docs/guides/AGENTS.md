@@ -631,12 +631,18 @@ dev/june/
 │   ├── prometheus.yml        # Metrics config
 │   ├── loki-config.yml       # Logging config
 │   └── grafana/              # Dashboard configs
+├── docs/                     # Comprehensive documentation
+│   ├── README.md            # Documentation index
+│   ├── API/                 # API documentation
+│   ├── guides/              # User and developer guides
+│   │   └── AGENTS.md        # This file
+│   └── architecture/        # Architecture documentation
 ├── tests/integration/        # System integration tests
 ├── docker-compose.yml        # Service orchestration
 ├── .env.example             # Environment template
 ├── pyproject.toml           # Python dependencies
-├── README.md                # User documentation
-└── AGENTS.md                # This file
+├── README.md                # Project overview and quick start
+└── TODO.md                  # Task tracking
 ```
 
 ## 🔧 Development Practices
@@ -815,6 +821,192 @@ Each service includes:
 
 ## 🚀 Deployment Commands
 
+### Standalone Service Build and Deploy (Non-Container Services)
+
+Some services (Telegram and Discord bots) are deployed as standalone processes without Docker containers. This allows direct access to the host system and is required for services that run `cursor-agent` processes.
+
+#### Building a Service
+
+**Process:**
+1. Create a pristine virtual environment
+2. Install all dependencies from `essence/pyproject.toml`
+3. Copy essence module and service code
+4. Package into a tarball
+
+**Command:**
+```bash
+# Build a service
+./scripts/build.sh <service-name>
+
+# Examples
+./scripts/build.sh telegram
+./scripts/build.sh discord
+```
+
+**Output:**
+- Tarball: `build/june-<service-name>-<timestamp>.tar.gz`
+- Checksum: `build/june-<service-name>-<timestamp>.tar.gz.sha256`
+
+**What Gets Built:**
+- Pristine Python virtual environment with all dependencies
+- Complete `essence` module
+- Service-specific code from `services/<service-name>/`
+- Shared dependencies (chat-service-base, packages, proto)
+- Run script (`run.sh`) that executes `python -m essence <service-name>-service`
+
+#### Testing Services
+
+**Before deploying, test services using HTTP endpoints:**
+
+**Telegram Service (Port 8080):**
+```bash
+# Health check
+curl http://localhost:8080/health | jq
+
+# Test agent message processing
+curl -X POST http://localhost:8080/api/agent/message \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hello, this is a test"}' | jq
+
+# Metrics
+curl http://localhost:8080/metrics
+```
+
+**Discord Service (Port 8081):**
+```bash
+# Health check
+curl http://localhost:8081/health | jq
+
+# Metrics
+curl http://localhost:8081/metrics
+```
+
+**Expected Results:**
+- Health endpoint returns `{"status": "healthy", ...}`
+- Agent message endpoint returns `{"success": true, "message": "..."}`
+- Metrics endpoint returns Prometheus format metrics
+
+#### Deploying a Service
+
+**Process:**
+1. Verify tarball checksum
+2. Stop previous version if running
+3. Remove old deployment from `/var/run/june/<service-name>`
+4. Extract new tarball
+5. Start service with logging
+
+**Command:**
+```bash
+# Deploy a service (requires sudo for /var/run and /var/log)
+sudo ./scripts/deploy.sh <service-name> <tarball-name>
+
+# Examples
+sudo ./scripts/deploy.sh telegram june-telegram-20240101-120000.tar.gz
+sudo ./scripts/deploy.sh discord june-discord-20240101-120000.tar.gz
+```
+
+**Service Locations:**
+- Runtime: `/var/run/june/<service-name>/`
+- Console logs: `/var/log/june/<service-name>.console`
+- Application logs: `/var/log/june/<service-name>.log`
+
+**Environment Configuration:**
+Before deploying, ensure `/var/run/june/<service-name>/.env` contains required variables:
+- `SERVICE_NAME=<service-name>`
+- Service-specific tokens and configuration
+- Port numbers and other settings
+
+#### Service Management
+
+**View Logs:**
+```bash
+# Console output
+tail -f /var/log/june/<service-name>.console
+
+# Application logs
+tail -f /var/log/june/<service-name>.log
+```
+
+**Stop Service:**
+```bash
+kill $(cat /var/run/june/<service-name>/service.pid)
+```
+
+**Restart Service:**
+```bash
+# Stop
+kill $(cat /var/run/june/<service-name>/service.pid)
+sleep 2
+
+# Start manually (or redeploy)
+cd /var/run/june/<service-name>
+./run.sh >> /var/log/june/<service-name>.console 2>&1 &
+echo $! > service.pid
+```
+
+#### Command Pattern Architecture
+
+All services use the `essence.command.Command` pattern:
+
+**Base Command Interface:**
+- `get_name()` - Command name (e.g., "telegram-service")
+- `get_description()` - Command description
+- `add_args(parser)` - Add command-specific arguments
+- `init()` - Initialize service (setup, configuration)
+- `run()` - Run service main loop (blocking)
+- `cleanup()` - Clean up resources on shutdown
+
+**Execution Flow:**
+```bash
+# Services are invoked via:
+poetry run -m essence <service-name>-service [args...]
+
+# Or directly:
+python -m essence <service-name>-service [args...]
+```
+
+**Lifecycle:**
+1. `essence.__main__.py` parses arguments and selects command
+2. Command class instantiated with parsed args
+3. `command.execute()` called:
+   - Calls `init()` - Initialize resources
+   - Calls `run()` - Main service loop (blocks)
+   - Calls `cleanup()` - Clean up on exit/error
+
+**Available Commands:**
+- `telegram-service` - Telegram bot service
+- `discord-service` - Discord bot service
+- `tts` - Text-to-Speech service (future)
+- `stt` - Speech-to-Text service (future)
+
+#### Best Practices
+
+1. **Always test before deploying:**
+   - Build the service
+   - Test HTTP endpoints if available
+   - Verify health checks pass
+
+2. **Use checksums:**
+   - Deploy script verifies tarball checksum automatically
+   - Never skip checksum verification
+
+3. **Monitor logs after deployment:**
+   - Check console logs for startup errors
+   - Verify service is responding to health checks
+   - Monitor application logs for runtime issues
+
+4. **Graceful shutdown:**
+   - Services handle SIGTERM/SIGINT for graceful shutdown
+   - Always use PID file to stop services
+   - Wait for shutdown before redeploying
+
+5. **Environment variables:**
+   - Keep `.env` files secure (600 permissions)
+   - Never commit `.env` files to git
+   - Document required variables in service README
+
+## 🚀 Deployment Commands (Docker)
+
 ### Start Full System
 ```bash
 cd dev/june
@@ -977,20 +1169,65 @@ docker exec -it june-cli-tools pytest /app/scripts/
 
 ## 🔐 Security Considerations
 
+### Security Overview
+
+June Agent implements comprehensive security measures. All agents working on the project must be aware of and follow security best practices.
+
+**For comprehensive security documentation, see:**
+- **[Security Documentation](../SECURITY.md)** - Complete security guide covering architecture, practices, and procedures
+- **[Security Runbook](../SECURITY_RUNBOOK.md)** - Operational security procedures and incident response
+- **[Security Audit Report](../SECURITY_AUDIT_REPORT.md)** - Security audit findings and recommendations
+- **[Security Headers](../SECURITY_HEADERS.md)** - Security headers configuration
+- **[Rate Limiting](../RATE_LIMITING.md)** - Rate limiting implementation details
+- **[june-security Package](../../packages/june-security/README.md)** - Security package documentation
+
 ### Authentication
-- JWT tokens for API access
-- Rate limiting to prevent abuse
-- Input validation and sanitization
+- JWT tokens for API access with access and refresh tokens
+- Service-to-service authentication tokens
+- Strong password requirements (minimum 12 characters, complexity)
+- Token expiration and rotation
 
 ### Network Security
-- Internal service communication over gRPC
+- Internal service communication over gRPC (TLS in production)
 - External access through Gateway only
-- CORS configuration for webapp
+- CORS configuration for webapp (not `*` in production)
+- Security headers (CSP, HSTS, X-Frame-Options, etc.)
 
 ### Data Protection
-- Environment variables for secrets
+- Environment variables for secrets (never commit secrets)
 - Secure storage of audio/text data
 - User session management
+- Encryption at rest (PostgreSQL, MinIO) - see Security Audit Report
+- Encryption in transit (TLS/HTTPS)
+
+### Input Validation
+- Comprehensive input sanitization using june-security package
+- Parameterized queries for SQL injection prevention
+- File upload validation (type, size, content)
+- Path traversal prevention
+
+### Rate Limiting
+- Per-user, per-IP, and per-endpoint rate limits
+- Redis-based sliding window algorithm
+- In-memory fallback if Redis unavailable
+- Rate limit headers in responses
+
+### Security Monitoring
+- Threat detection via june-security package
+- Audit logging of all security-relevant operations
+- Prometheus metrics for security events
+- Grafana dashboards for security monitoring
+
+### Security Best Practices for Agents
+
+1. **Never commit secrets** to version control
+2. **Use strong, random secrets** (minimum 32 characters for JWT)
+3. **Validate all inputs** at service boundaries
+4. **Use parameterized queries** for database operations
+5. **Follow security configuration** guidelines
+6. **Review security documentation** before making security-related changes
+7. **Test security features** when implementing or modifying them
+8. **Report security vulnerabilities** privately (not in public issues)
 
 ## 📊 Performance Characteristics
 

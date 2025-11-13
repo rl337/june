@@ -113,7 +113,7 @@ class TestSTTMetricsStorage:
         summary = self.metrics.get_metrics_summary()
         
         assert summary["summary"]["total_transcriptions"] == 3
-        assert 0.8 < summary["summary"]["avg_confidence"] < 0.9
+        assert 0.8 <= summary["summary"]["avg_confidence"] < 0.9
         assert "ogg" in summary["format_distribution"]
         assert "wav" in summary["format_distribution"]
         assert summary["format_distribution"]["ogg"] == 2

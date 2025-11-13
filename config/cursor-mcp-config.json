@@ -1,0 +1,31 @@
+{
+  "mcpServers": {
+    "todo-service": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-fetch",
+        "http://todo-mcp-service:8004/mcp"
+      ],
+      "env": {}
+    },
+    "knowledge-graph": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-fetch",
+        "http://knowledge-graph:8006/mcp"
+      ],
+      "env": {}
+    },
+    "document-manager": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-fetch",
+        "http://document-manager:8007/mcp"
+      ],
+      "env": {}
+    }
+  }
+}

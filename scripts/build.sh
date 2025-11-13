@@ -1,0 +1,251 @@
+#!/bin/bash
+#
+# Build script for June services
+# Creates a tarball of a pristine virtual environment and resources
+#
+# Usage: ./scripts/build.sh <service-name>
+# Example: ./scripts/build.sh telegram
+#
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+BUILD_DIR="${PROJECT_ROOT}/build"
+SERVICE_NAME="${1:-}"
+
+if [ -z "${SERVICE_NAME}" ]; then
+    echo "Error: Service name is required"
+    echo "Usage: $0 <service-name>"
+    echo "Example: $0 telegram"
+    exit 1
+fi
+
+# Validate service exists
+SERVICE_DIR="${PROJECT_ROOT}/services/${SERVICE_NAME}"
+if [ ! -d "${SERVICE_DIR}" ]; then
+    echo "Error: Service directory not found: ${SERVICE_DIR}"
+    exit 1
+fi
+
+echo "Building ${SERVICE_NAME} service..."
+
+# Create build directory
+mkdir -p "${BUILD_DIR}"
+BUILD_TEMP_DIR=$(mktemp -d -t "june-${SERVICE_NAME}-build-XXXXXX")
+trap "rm -rf ${BUILD_TEMP_DIR}" EXIT
+
+echo "Using temporary build directory: ${BUILD_TEMP_DIR}"
+
+# Create directory structure
+DEPLOY_DIR="${BUILD_TEMP_DIR}/june-${SERVICE_NAME}"
+mkdir -p "${DEPLOY_DIR}"
+
+# Create pristine virtual environment
+echo "Creating pristine virtual environment..."
+cd "${PROJECT_ROOT}"
+
+# Check if poetry is available, try to find it in common locations
+if ! command -v poetry &> /dev/null; then
+    # Try to find poetry in user local bin
+    if [ -f "$HOME/.local/bin/poetry" ]; then
+        export PATH="$HOME/.local/bin:$PATH"
+    elif [ -f "$HOME/.poetry/bin/poetry" ]; then
+        export PATH="$HOME/.poetry/bin:$PATH"
+    else
+        echo "Error: poetry is not installed. Please install poetry first."
+        echo "Run: pip install poetry --user"
+        exit 1
+    fi
+fi
+
+# Create a temporary directory for the build venv
+BUILD_VENV_DIR=$(mktemp -d -t "june-build-venv-XXXXXX")
+trap "rm -rf ${BUILD_VENV_DIR}" EXIT
+
+# Create virtual environment in temporary location
+VENV_DIR="${DEPLOY_DIR}/venv"
+echo "Creating virtual environment in ${BUILD_VENV_DIR}..."
+python3 -m venv "${BUILD_VENV_DIR}"
+
+# Activate and install dependencies
+echo "Installing dependencies..."
+source "${BUILD_VENV_DIR}/bin/activate"
+
+# Upgrade pip and install build tools
+pip install --upgrade pip setuptools wheel build
+
+# Install dependencies - use minimal chat dependencies for chat services
+echo "Installing dependencies..."
+cd "${PROJECT_ROOT}/essence"
+
+# For chat services (telegram, discord), use minimal dependencies
+# For other services, use full dependencies
+if [ "${SERVICE_NAME}" = "telegram" ] || [ "${SERVICE_NAME}" = "discord" ]; then
+    echo "Using minimal chat dependencies..."
+    # Install minimal dependencies directly
+    pip install \
+        "fastapi>=0.104.1" \
+        "uvicorn[standard]>=0.24.0" \
+        "python-telegram-bot[webhooks]>=20.7" \
+        "discord.py>=2.3.0" \
+        "pydantic>=2.5.0" \
+        "pydantic-settings>=2.1.0" \
+        "python-dotenv>=1.0.0" \
+        "httpx>=0.25.0" \
+        "aiofiles>=23.2.1" \
+        "prometheus-client>=0.19.0" || {
+        echo "Error: Failed to install minimal dependencies"
+        exit 1
+    }
+else
+    # For other services, try poetry install
+    poetry config virtualenvs.create false || true
+    poetry config virtualenvs.in-project false || true
+    poetry install --no-dev --no-interaction || {
+        echo "Warning: poetry install failed for ${SERVICE_NAME}"
+        exit 1
+    }
+fi
+
+# Copy the virtual environment
+echo "Copying virtual environment to deployment directory..."
+cp -r "${BUILD_VENV_DIR}" "${VENV_DIR}"
+
+# Copy essence module and pyproject.toml
+echo "Copying essence module..."
+mkdir -p "${DEPLOY_DIR}/essence"
+cp -r "${PROJECT_ROOT}/essence"/* "${DEPLOY_DIR}/essence/"
+cp "${PROJECT_ROOT}/essence/pyproject.toml" "${DEPLOY_DIR}/essence/"
+
+# Copy service-specific code
+echo "Copying service code..."
+mkdir -p "${DEPLOY_DIR}/services/${SERVICE_NAME}"
+cp -r "${SERVICE_DIR}"/* "${DEPLOY_DIR}/services/${SERVICE_NAME}/"
+
+# Copy shared dependencies if they exist
+if [ -d "${PROJECT_ROOT}/services/chat-service-base" ]; then
+    echo "Copying shared chat-service-base..."
+    mkdir -p "${DEPLOY_DIR}/services/chat-service-base"
+    cp -r "${PROJECT_ROOT}/services/chat-service-base"/* "${DEPLOY_DIR}/services/chat-service-base/"
+fi
+
+# Copy packages if they exist
+if [ -d "${PROJECT_ROOT}/packages" ]; then
+    echo "Copying packages..."
+    mkdir -p "${DEPLOY_DIR}/packages"
+    cp -r "${PROJECT_ROOT}/packages"/* "${DEPLOY_DIR}/packages/"
+fi
+
+# Copy proto files if they exist
+if [ -d "${PROJECT_ROOT}/proto" ] && [ "$(ls -A ${PROJECT_ROOT}/proto 2>/dev/null)" ]; then
+    echo "Copying proto files..."
+    mkdir -p "${DEPLOY_DIR}/proto"
+    cp -r "${PROJECT_ROOT}/proto"/* "${DEPLOY_DIR}/proto/" 2>/dev/null || true
+fi
+
+# Create run script
+echo "Creating run script..."
+cat > "${DEPLOY_DIR}/run.sh" << 'RUNSCRIPTEOF'
+#!/bin/bash
+# Run script for June service
+# This script is generated by build.sh
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV_DIR="${SCRIPT_DIR}/venv"
+SERVICE_NAME="${SERVICE_NAME:-}"
+
+if [ -z "${SERVICE_NAME}" ]; then
+    echo "Error: SERVICE_NAME environment variable must be set"
+    exit 1
+fi
+
+# Source ENV_SH if provided (points to repo .env file)
+# This allows the deploy script to pass environment variables from the repo
+if [ -n "${ENV_SH:-}" ] && [ -f "${ENV_SH}" ]; then
+    echo "Sourcing environment from: ${ENV_SH}"
+    # Source the file, handling both KEY=value and export KEY=value formats
+    set -a  # Automatically export all variables
+    source "${ENV_SH}"
+    set +a
+elif [ -f "${SCRIPT_DIR}/.env" ]; then
+    # Fallback to local .env if ENV_SH not set
+    echo "Sourcing local .env file"
+    set -a
+    source "${SCRIPT_DIR}/.env"
+    set +a
+fi
+
+# Activate virtual environment
+source "${VENV_DIR}/bin/activate"
+
+# Verify we're using the venv's python
+if [ -z "${VIRTUAL_ENV:-}" ]; then
+    echo "Error: Virtual environment not activated properly"
+    exit 1
+fi
+
+# Set PYTHONPATH to include the directory containing essence (not essence itself)
+# essence needs to be importable as a module, so we add its parent directory
+export PYTHONPATH="${SCRIPT_DIR}:${SCRIPT_DIR}/services:${SCRIPT_DIR}/packages:${PYTHONPATH:-}"
+
+# Stay in SCRIPT_DIR so essence can be imported as a module
+cd "${SCRIPT_DIR}"
+
+# Use the venv's python directly (python3 symlink in venv/bin)
+# After activation, venv/bin should be first in PATH
+exec "${VENV_DIR}/bin/python3" -m essence "${SERVICE_NAME}-service" "$@"
+RUNSCRIPTEOF
+chmod +x "${DEPLOY_DIR}/run.sh"
+
+# Create metadata file
+echo "Creating metadata file..."
+cat > "${DEPLOY_DIR}/metadata.json" << EOF
+{
+    "service": "${SERVICE_NAME}",
+    "build_date": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+    "build_host": "$(hostname)",
+    "git_commit": "$(git rev-parse HEAD 2>/dev/null || echo 'unknown')",
+    "git_branch": "$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'unknown')"
+}
+EOF
+
+# Create tarball
+TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
+TARBALL_NAME="june-${SERVICE_NAME}-${TIMESTAMP}.tar.gz"
+TARBALL_PATH="${BUILD_DIR}/${TARBALL_NAME}"
+
+echo "Creating tarball: ${TARBALL_PATH}"
+cd "${BUILD_TEMP_DIR}"
+tar -czf "${TARBALL_PATH}" "june-${SERVICE_NAME}"
+
+# Calculate checksum
+echo "Calculating checksum..."
+cd "${BUILD_DIR}"
+sha256sum "${TARBALL_NAME}" > "${TARBALL_NAME}.sha256"
+
+# Clean up old builds - keep only the last 3 for this service
+echo "Cleaning up old builds (keeping last 3)..."
+cd "${BUILD_DIR}"
+# Find all tarballs for this service, sort by modification time (newest first), skip first 3, delete rest
+find . -maxdepth 1 -name "june-${SERVICE_NAME}-*.tar.gz" -type f -printf '%T@ %p\n' | \
+    sort -rn | \
+    tail -n +4 | \
+    cut -d' ' -f2- | \
+    while read -r old_build; do
+        if [ -f "${old_build}" ]; then
+            echo "Removing old build: $(basename ${old_build})"
+            rm -f "${old_build}" "${old_build}.sha256"
+        fi
+    done
+
+echo ""
+echo "Build complete!"
+echo "Tarball: ${TARBALL_PATH}"
+echo "Checksum: ${TARBALL_PATH}.sha256"
+echo ""
+echo "To deploy, run:"
+echo "  ./scripts/deploy.sh ${SERVICE_NAME} ${TARBALL_NAME}"
+

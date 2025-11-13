@@ -1,0 +1,138 @@
+{
+  "dashboard": {
+    "title": "Request Metrics",
+    "tags": ["june", "requests", "metrics"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 0,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Request Rate by Service",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "sum(rate(gateway_requests_total[5m])) by (job)",
+            "refId": "A",
+            "legendFormat": "Gateway"
+          },
+          {
+            "expr": "sum(rate(inference_requests_total[5m])) by (job)",
+            "refId": "B",
+            "legendFormat": "Inference API"
+          },
+          {
+            "expr": "sum(rate(stt_requests_total[5m])) by (job)",
+            "refId": "C",
+            "legendFormat": "STT"
+          },
+          {
+            "expr": "sum(rate(tts_requests_total[5m])) by (job)",
+            "refId": "D",
+            "legendFormat": "TTS"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "decimals": 2,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Request Latency (p95)",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(gateway_request_duration_seconds_bucket[5m]))",
+            "refId": "A",
+            "legendFormat": "Gateway p95"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(inference_request_duration_seconds_bucket[5m]))",
+            "refId": "B",
+            "legendFormat": "Inference API p95"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(stt_request_duration_seconds_bucket[5m]))",
+            "refId": "C",
+            "legendFormat": "STT p95"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "decimals": 3,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Request Latency (p50)",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(gateway_request_duration_seconds_bucket[5m]))",
+            "refId": "A",
+            "legendFormat": "Gateway p50"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(inference_request_duration_seconds_bucket[5m]))",
+            "refId": "B",
+            "legendFormat": "Inference API p50"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(stt_request_duration_seconds_bucket[5m]))",
+            "refId": "C",
+            "legendFormat": "STT p50"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "decimals": 3,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Request Throughput",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(gateway_requests_total[5m])) by (method, endpoint)",
+            "refId": "A",
+            "legendFormat": "{{method}} {{endpoint}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "decimals": 2,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "templating": {
+      "list": []
+    },
+    "annotations": {
+      "list": []
+    }
+  }
+}

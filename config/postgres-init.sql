@@ -172,10 +172,12 @@ CREATE TABLE IF NOT EXISTS blocked_users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Admin users table - stores admin user IDs
+-- Admin users table - stores admin user IDs and credentials
 CREATE TABLE IF NOT EXISTS admin_users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id VARCHAR(255) NOT NULL UNIQUE,
+    username VARCHAR(255) UNIQUE, -- Admin username for login (optional, can use user_id)
+    password_hash VARCHAR(255), -- Hashed password (bcrypt)
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -200,5 +202,150 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_actor_user_id ON audit_logs(actor_user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_target_user_id ON audit_logs(target_user_id) WHERE target_user_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at);
+
+-- Prompt Templates Table - stores custom LLM prompt templates
+CREATE TABLE IF NOT EXISTS prompt_templates (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id VARCHAR(255), -- NULL for global templates, user_id for per-user templates
+    conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE, -- NULL unless per-conversation
+    name VARCHAR(255) NOT NULL, -- Template name/identifier
+    template_text TEXT NOT NULL, -- Template content with {variable} placeholders
+    description TEXT, -- Optional description
+    is_active BOOLEAN DEFAULT TRUE, -- Whether template is active
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    -- Ensure only one template per user/conversation combination
+    UNIQUE(user_id, conversation_id, name),
+    -- Ensure conversation_id is only set when user_id is also set
+    CHECK ((conversation_id IS NULL) OR (user_id IS NOT NULL))
+);
+
+-- Indexes for prompt templates
+CREATE INDEX IF NOT EXISTS idx_prompt_templates_user_id ON prompt_templates(user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_prompt_templates_conversation_id ON prompt_templates(conversation_id) WHERE conversation_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_prompt_templates_name ON prompt_templates(name);
+CREATE INDEX IF NOT EXISTS idx_prompt_templates_is_active ON prompt_templates(is_active) WHERE is_active = TRUE;
+
+-- A/B Testing Tables
+-- A/B tests table - stores A/B test configurations
+CREATE TABLE IF NOT EXISTS ab_tests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
+    variants JSONB NOT NULL, -- Array of variant configs: [{"name": "A", "model": "...", "temperature": 0.7, "system_prompt": "..."}, ...]
+    traffic_split REAL DEFAULT 1.0 CHECK (traffic_split >= 0.0 AND traffic_split <= 1.0), -- Fraction of traffic to include (0.0-1.0)
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- A/B test assignments table - tracks which variant each conversation is assigned to
+CREATE TABLE IF NOT EXISTS ab_test_assignments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ab_test_id UUID NOT NULL REFERENCES ab_tests(id) ON DELETE CASCADE,
+    conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    variant_name VARCHAR(255) NOT NULL, -- Name of the variant assigned (e.g., "A", "B")
+    assigned_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(ab_test_id, conversation_id) -- One variant per conversation per test
+);
+
+-- A/B test metrics table - tracks metrics for each variant
+CREATE TABLE IF NOT EXISTS ab_test_metrics (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ab_test_id UUID NOT NULL REFERENCES ab_tests(id) ON DELETE CASCADE,
+    variant_name VARCHAR(255) NOT NULL,
+    conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
+    metric_type VARCHAR(100) NOT NULL, -- e.g., 'response_time', 'tokens', 'satisfaction', 'error'
+    metric_value REAL, -- Numeric value for the metric
+    metadata JSONB DEFAULT '{}'::jsonb, -- Additional metric data
+    recorded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Indexes for A/B testing tables
+CREATE INDEX IF NOT EXISTS idx_ab_tests_is_active ON ab_tests(is_active) WHERE is_active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_ab_tests_name ON ab_tests(name);
+CREATE INDEX IF NOT EXISTS idx_ab_test_assignments_test_id ON ab_test_assignments(ab_test_id);
+CREATE INDEX IF NOT EXISTS idx_ab_test_assignments_conversation_id ON ab_test_assignments(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_ab_test_assignments_variant ON ab_test_assignments(ab_test_id, variant_name);
+CREATE INDEX IF NOT EXISTS idx_ab_test_metrics_test_id ON ab_test_metrics(ab_test_id);
+CREATE INDEX IF NOT EXISTS idx_ab_test_metrics_variant ON ab_test_metrics(ab_test_id, variant_name);
+CREATE INDEX IF NOT EXISTS idx_ab_test_metrics_type ON ab_test_metrics(metric_type);
+CREATE INDEX IF NOT EXISTS idx_ab_test_metrics_recorded_at ON ab_test_metrics(recorded_at);
+
+-- Cost Tracking Table - tracks costs for STT, TTS, and LLM usage
+CREATE TABLE IF NOT EXISTS cost_tracking (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    service VARCHAR(50) NOT NULL CHECK (service IN ('stt', 'tts', 'llm')),
+    user_id VARCHAR(255) NOT NULL,
+    conversation_id UUID REFERENCES conversations(id) ON DELETE SET NULL,
+    cost DECIMAL(10, 6) NOT NULL DEFAULT 0.0, -- Cost in USD, 6 decimal places
+    metadata JSONB DEFAULT '{}'::jsonb, -- Additional metadata (duration, tokens, etc.)
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Indexes for cost tracking
+CREATE INDEX IF NOT EXISTS idx_cost_tracking_user_id ON cost_tracking(user_id);
+CREATE INDEX IF NOT EXISTS idx_cost_tracking_conversation_id ON cost_tracking(conversation_id) WHERE conversation_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_cost_tracking_service ON cost_tracking(service);
+CREATE INDEX IF NOT EXISTS idx_cost_tracking_created_at ON cost_tracking(created_at);
+CREATE INDEX IF NOT EXISTS idx_cost_tracking_user_service ON cost_tracking(user_id, service);
+CREATE INDEX IF NOT EXISTS idx_cost_tracking_user_date ON cost_tracking(user_id, created_at);
+
+-- Bot Configuration Table - stores Telegram bot configuration
+CREATE TABLE IF NOT EXISTS bot_config (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    bot_token VARCHAR(500), -- Telegram bot token (encrypted in production)
+    webhook_url VARCHAR(1000), -- Webhook URL for Telegram updates
+    max_file_size_mb INTEGER DEFAULT 50, -- Maximum file size in MB
+    max_duration_seconds INTEGER DEFAULT 60, -- Maximum voice message duration in seconds
+    is_active BOOLEAN DEFAULT TRUE, -- Whether bot is active
+    last_activity TIMESTAMP WITH TIME ZONE, -- Last activity timestamp
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(id) -- Only one bot config record
+);
+
+-- Bot Commands Table - stores Telegram bot commands
+CREATE TABLE IF NOT EXISTS bot_commands (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    command VARCHAR(100) NOT NULL UNIQUE, -- Command name (e.g., 'start', 'help')
+    description TEXT NOT NULL, -- Command description shown in Telegram menu
+    is_active BOOLEAN DEFAULT TRUE, -- Whether command is active
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Bot Statistics Table - tracks bot usage statistics
+CREATE TABLE IF NOT EXISTS bot_statistics (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    date DATE NOT NULL DEFAULT CURRENT_DATE,
+    total_messages INTEGER DEFAULT 0, -- Total messages processed
+    active_conversations INTEGER DEFAULT 0, -- Active conversations
+    error_count INTEGER DEFAULT 0, -- Number of errors
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(date) -- One record per day
+);
+
+-- Indexes for bot management tables
+CREATE INDEX IF NOT EXISTS idx_bot_config_is_active ON bot_config(is_active) WHERE is_active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_bot_commands_is_active ON bot_commands(is_active) WHERE is_active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_bot_commands_command ON bot_commands(command);
+CREATE INDEX IF NOT EXISTS idx_bot_statistics_date ON bot_statistics(date);
+
+-- System Configuration Table - stores system configuration settings
+CREATE TABLE IF NOT EXISTS system_config (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    config_data JSONB NOT NULL, -- Configuration data organized by category
+    category VARCHAR(100), -- Optional category name (e.g., 'model_settings', 'service_settings', 'security_settings', 'feature_flags')
+    updated_by VARCHAR(255) NOT NULL, -- Admin user_id who made the change
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Indexes for system configuration
+CREATE INDEX IF NOT EXISTS idx_system_config_category ON system_config(category) WHERE category IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_system_config_created_at ON system_config(created_at);
+CREATE INDEX IF NOT EXISTS idx_system_config_updated_by ON system_config(updated_by);
 
 

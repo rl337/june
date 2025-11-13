@@ -37,17 +37,18 @@ class _TtsServicer(tts_pb2_grpc.TextToSpeechServicer):
 
 
 class TtsGrpcApp:
-    def __init__(self, strategy: TtsStrategy, port: Optional[int] = None) -> None:
+    def __init__(self, strategy: TtsStrategy, port: Optional[int] = None, interceptors: Optional[list] = None) -> None:
         self.strategy = strategy
         self.port = port or int(os.getenv("TTS_PORT", "50053"))
         self._server: Optional[aio.Server] = None
+        self.interceptors = interceptors or []
 
     def initialize(self) -> None:
         setup_logging(config.monitoring.log_level, "tts")
         self.strategy.warmup()
 
     async def _run_async(self) -> None:
-        server = aio.server()
+        server = aio.server(interceptors=self.interceptors if self.interceptors else None)
         tts_pb2_grpc.add_TextToSpeechServicer_to_server(_TtsServicer(self.strategy), server)
         server.add_insecure_port(f"[::]:{self.port}")
         await server.start()

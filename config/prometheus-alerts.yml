@@ -1,0 +1,249 @@
+groups:
+  - name: june_service_alerts
+    interval: 30s
+    rules:
+      # Service Down Alerts
+      - alert: ServiceDown
+        expr: up{job=~"gateway|inference-api|stt|tts|telegram|orchestrator|todo-mcp-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "Service {{ $labels.job }} has been down for more than 1 minute."
+
+      # High Error Rate Alerts
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(gateway_requests_total{status=~"5.."}[5m])) > 0.1
+            or
+            sum(rate(inference_errors_total[5m])) > 0.1
+            or
+            sum(rate(stt_errors_total[5m])) > 0.1
+            or
+            sum(rate(tts_errors_total[5m])) > 0.1
+            or
+            sum(rate(telegram_errors_total[5m])) > 0.1
+          )
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate detected"
+          description: "One or more services are experiencing high error rates (>0.1 errors/sec) for more than 5 minutes."
+
+      # Resource Exhaustion Alerts
+      - alert: HighCPUUsage
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is above 90% for more than 5 minutes on {{ $labels.instance }}."
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is above 90% for more than 5 minutes."
+
+      - alert: HighGPUUsage
+        expr: DCGM_FI_DEV_GPU_UTIL > 95
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High GPU usage detected"
+          description: "GPU {{ $labels.gpu }} utilization is above 95% for more than 5 minutes."
+
+      # Request Latency Alerts
+      - alert: HighRequestLatency
+        expr: |
+          (
+            histogram_quantile(0.95, rate(gateway_request_duration_seconds_bucket[5m])) > 2
+            or
+            histogram_quantile(0.95, rate(inference_request_duration_seconds_bucket[5m])) > 10
+            or
+            histogram_quantile(0.95, rate(stt_request_duration_seconds_bucket[5m])) > 30
+          )
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High request latency detected"
+          description: "One or more services are experiencing high request latency (p95) for more than 5 minutes."
+
+      # Service-Specific Alerts
+      - alert: STTHighTranscriptionTime
+        expr: histogram_quantile(0.95, rate(stt_transcription_time_seconds_bucket[5m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "STT high transcription time"
+          description: "STT service transcription time (p95) is above 10 seconds for more than 5 minutes."
+
+      - alert: TTSHighSynthesisTime
+        expr: histogram_quantile(0.95, rate(tts_synthesis_time_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "TTS high synthesis time"
+          description: "TTS service synthesis time (p95) is above 5 seconds for more than 5 minutes."
+
+      - alert: LLMLowTokenGenerationRate
+        expr: histogram_quantile(0.50, rate(inference_token_generation_rate_bucket[5m])) < 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "LLM low token generation rate"
+          description: "LLM service token generation rate (p50) is below 10 tokens/second for more than 5 minutes."
+
+      - alert: GatewayHighRateLimitHits
+        expr: sum(rate(gateway_rate_limit_hits_total[5m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Gateway high rate limit hits"
+          description: "Gateway service is experiencing high rate limit hits (>10/sec) for more than 5 minutes."
+
+      # Database Performance Alerts
+      - alert: HighDatabaseQueryTime
+        expr: |
+          histogram_quantile(0.95, sum(rate(gateway_db_query_duration_seconds_bucket[5m])) by (le)) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High database query time detected"
+          description: "Database queries are taking longer than 1 second (p95) for more than 5 minutes."
+
+      - alert: HighSlowQueryRate
+        expr: sum(rate(gateway_db_slow_queries_total[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High slow query rate"
+          description: "More than 5 slow database queries (>1s) per second for more than 5 minutes."
+
+      - alert: DatabasePoolExhaustion
+        expr: gateway_db_pool_utilization > 0.9
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection pool near exhaustion"
+          description: "Database connection pool utilization is above 90% for more than 5 minutes."
+
+      # Cache Performance Alerts
+      - alert: LowCacheHitRate
+        expr: |
+          (
+            sum(rate(cache_hits_total[5m])) by (cache_type) /
+            (sum(rate(cache_hits_total[5m])) by (cache_type) + sum(rate(cache_misses_total[5m])) by (cache_type))
+          ) < 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low cache hit rate"
+          description: "Cache hit rate is below 50% for more than 10 minutes. Consider cache warming or tuning."
+
+      # GPU Performance Alerts
+      - alert: GPULowUtilization
+        expr: inference_api_gpu_utilization_percent < 20
+        for: 15m
+        labels:
+          severity: info
+        annotations:
+          summary: "GPU underutilized"
+          description: "GPU {{ $labels.gpu_id }} utilization is below 20% for more than 15 minutes."
+
+      - alert: GPUHighTemperature
+        expr: inference_api_gpu_temperature_celsius > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "GPU high temperature"
+          description: "GPU {{ $labels.gpu_id }} temperature is above 85°C for more than 5 minutes."
+
+      - alert: GPUHighMemoryUsage
+        expr: |
+          (inference_api_gpu_memory_used_bytes / inference_api_gpu_memory_total_bytes) > 0.95
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "GPU memory near exhaustion"
+          description: "GPU {{ $labels.gpu_id }} memory usage is above 95% for more than 5 minutes."
+
+      # Queue Performance Alerts
+      - alert: HighQueueDepth
+        expr: telegram_queue_depth > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High queue depth detected"
+          description: "Queue {{ $labels.queue_name }} has more than 50 items waiting for more than 5 minutes."
+
+      - alert: HighQueueProcessingTime
+        expr: |
+          histogram_quantile(0.95, sum(rate(telegram_queue_processing_time_seconds_bucket[5m])) by (le, queue_name)) > 30
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High queue processing time"
+          description: "Queue {{ $labels.queue_name }} processing time (p95) is above 30 seconds for more than 5 minutes."
+
+      # Service Resource Alerts
+      - alert: ServiceHighMemoryUsage
+        expr: |
+          (
+            gateway_memory_usage_bytes > 2147483648 or
+            inference_api_memory_usage_bytes > 4294967296 or
+            stt_memory_usage_bytes > 2147483648 or
+            tts_memory_usage_bytes > 2147483648
+          )
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Service high memory usage"
+          description: "One or more services are using excessive memory (>2GB for most services, >4GB for inference-api) for more than 10 minutes."
+
+      - alert: ServiceHighCPUUsage
+        expr: |
+          (
+            gateway_cpu_usage_percent > 80 or
+            inference_api_cpu_usage_percent > 90 or
+            stt_cpu_usage_percent > 80 or
+            tts_cpu_usage_percent > 80
+          )
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Service high CPU usage"
+          description: "One or more services are using excessive CPU (>80% for most services, >90% for inference-api) for more than 10 minutes."
+
+      # Throughput Alerts
+      - alert: LowRequestThroughput
+        expr: sum(rate(gateway_requests_total[5m])) < 0.1
+        for: 15m
+        labels:
+          severity: info
+        annotations:
+          summary: "Low request throughput"
+          description: "Request throughput is below 0.1 requests/second for more than 15 minutes."

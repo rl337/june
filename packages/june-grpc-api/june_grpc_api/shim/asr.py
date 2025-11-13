@@ -29,9 +29,14 @@ class STTServiceError(STTError):
 
 
 class RecognitionResult:
-    def __init__(self, transcript: str, confidence: float):
+    def __init__(self, transcript: str, confidence: float, is_final: bool = True, detected_language: Optional[str] = None):
         self.transcript = transcript
         self.confidence = confidence
+        self.is_final = is_final
+        self.detected_language = detected_language
+        self.start_time_us = 0
+        self.end_time_us = 0
+        self.words = []
 
 
 class RecognitionConfig:
@@ -169,6 +174,7 @@ class SpeechToTextClient:
                     r = response.results[0]
                     transcript = r.transcript if r.transcript else ""
                     confidence = r.confidence if r.confidence >= 0 else 0.0
+                    detected_language = getattr(r, "detected_language", None) or None
                     
                     if attempt > 0:
                         logger.info(
@@ -181,11 +187,20 @@ class SpeechToTextClient:
                             f"confidence={confidence:.2f}"
                         )
                     
-                    return RecognitionResult(transcript=transcript, confidence=confidence)
+                    result = RecognitionResult(
+                        transcript=transcript,
+                        confidence=confidence,
+                        is_final=True,
+                        detected_language=detected_language
+                    )
+                    result.start_time_us = getattr(r, "start_time_us", 0)
+                    result.end_time_us = getattr(r, "end_time_us", 0)
+                    result.words = list(getattr(r, "words", []))
+                    return result
                 else:
                     # Empty response - no transcription available
                     logger.warning("STT service returned empty results")
-                    return RecognitionResult(transcript="", confidence=0.0)
+                    return RecognitionResult(transcript="", confidence=0.0, is_final=True, detected_language=None)
                     
             except grpc.RpcError as e:
                 # Handle gRPC errors
@@ -251,6 +266,132 @@ class SpeechToTextClient:
         
         # Fallback (should not reach here)
         raise STTError("STT recognition failed unexpectedly")
+    
+    async def recognize_stream(
+        self,
+        audio_chunks,
+        sample_rate: int = 16000,
+        encoding: str = "pcm",
+        config: Optional[RecognitionConfig] = None,
+        timeout: Optional[float] = 30.0
+    ):
+        """
+        Stream audio chunks to STT RecognizeStream endpoint and yield transcription results.
+        
+        This method provides real-time transcription feedback as audio is processed.
+        Results are yielded as they become available, with interim results for long audio.
+        
+        Args:
+            audio_chunks: Async generator or iterable of audio data bytes
+            sample_rate: Audio sample rate (default: 16000 Hz)
+            encoding: Audio encoding format (default: "pcm")
+            config: Optional recognition configuration
+            timeout: Request timeout in seconds (default: 30.0)
+        
+        Yields:
+            RecognitionResult objects with transcript, is_final flag, and confidence
+        
+        Raises:
+            STTError: Base exception for STT errors
+            STTTimeoutError: When request times out
+            STTConnectionError: When unable to connect to service
+            STTServiceError: When service returns an error
+            ValueError: When input validation fails
+        """
+        # Input validation
+        if sample_rate <= 0:
+            raise ValueError(f"sample_rate must be positive, got {sample_rate}")
+        
+        if timeout is not None and timeout <= 0:
+            raise ValueError(f"timeout must be positive, got {timeout}")
+        
+        # Note: RecognizeStream doesn't support config in chunks yet
+        # Config will be ignored for streaming (language detection happens automatically)
+        
+        # Create async generator for audio chunks
+        async def audio_chunk_generator():
+            timestamp_us = 0
+            chunk_duration_us = int((1.0 / sample_rate) * 1_000_000)  # Duration per sample in microseconds
+            
+            async for chunk_data in audio_chunks:
+                if not chunk_data:
+                    continue
+                
+                chunk = asr_pb2.AudioChunk(
+                    audio_data=chunk_data,
+                    sample_rate=sample_rate,
+                    channels=1,
+                    encoding=encoding,
+                    timestamp_us=timestamp_us
+                )
+                timestamp_us += len(chunk_data) // 2 * chunk_duration_us  # Approximate timestamp
+                yield chunk
+        
+        try:
+            logger.debug(
+                f"Starting STT streaming recognition: sample_rate={sample_rate}, "
+                f"encoding={encoding}, timeout={timeout}"
+            )
+            
+            # Stream audio chunks and receive results
+            async for result_proto in self._stub.RecognizeStream(
+                audio_chunk_generator(),
+                timeout=timeout
+            ):
+                # Convert proto result to RecognitionResult
+                result = RecognitionResult(
+                    transcript=result_proto.transcript if result_proto.transcript else "",
+                    confidence=result_proto.confidence if result_proto.confidence >= 0 else 0.0,
+                    is_final=result_proto.is_final,
+                    detected_language=getattr(result_proto, "detected_language", None) or None
+                )
+                # Add additional fields from proto
+                result.start_time_us = result_proto.start_time_us
+                result.end_time_us = result_proto.end_time_us
+                result.words = result_proto.words
+                
+                logger.debug(
+                    f"STT streaming result: transcript='{result.transcript[:50]}...', "
+                    f"is_final={result.is_final}, confidence={result.confidence:.2f}"
+                )
+                
+                yield result
+                
+        except grpc.RpcError as e:
+            # Handle gRPC errors
+            error_code = e.code()
+            error_details = e.details()
+            
+            logger.error(
+                f"STT streaming gRPC error: {error_code} - {error_details}",
+                exc_info=True
+            )
+            
+            # Map gRPC error codes to custom exceptions
+            if error_code == grpc.StatusCode.DEADLINE_EXCEEDED:
+                raise STTTimeoutError(
+                    f"STT streaming request timed out after {timeout}s: {error_details}"
+                ) from e
+            elif error_code in (
+                grpc.StatusCode.UNAVAILABLE,
+                grpc.StatusCode.CANCELLED,
+            ):
+                raise STTConnectionError(
+                    f"Unable to connect to STT service ({error_code}): {error_details}"
+                ) from e
+            elif error_code == grpc.StatusCode.INVALID_ARGUMENT:
+                raise ValueError(
+                    f"Invalid request to STT service: {error_details}"
+                ) from e
+            else:
+                raise STTServiceError(
+                    f"STT service error ({error_code}): {error_details}"
+                ) from e
+                
+        except Exception as e:
+            # Handle unexpected errors
+            logger.error(f"Unexpected error in STT recognize_stream: {e}", exc_info=True)
+            raise STTError(f"Unexpected error during STT streaming: {str(e)}") from e
 
 
 

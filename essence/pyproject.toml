@@ -1,0 +1,167 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "essence"
+version = "0.1.0"
+description = "June's core reusable codebase - the essence of all services"
+authors = [{name = "June Agent Team"}]
+requires-python = ">=3.10"
+readme = "README.md"
+license = {text = "MIT"}
+
+dependencies = [
+    # Web framework and API
+    "fastapi>=0.104.1",
+    "uvicorn[standard]>=0.24.0",
+    "websockets>=12.0",
+    
+    # gRPC and protobuf
+    "grpcio>=1.59.0",
+    "grpcio-tools>=1.59.0",
+    "protobuf>=4.25.0",
+    
+    # Database and storage
+    "sqlalchemy>=2.0.23",
+    "asyncpg>=0.29.0",
+    "psycopg2-binary>=2.9.9",
+    "pgvector>=0.2.4",
+    "minio>=7.2.0",
+    
+    # Messaging
+    "nats-py>=2.3.0",
+    
+    # Machine Learning and AI
+    "torch>=2.1.0",
+    "transformers>=4.35.0",
+    "accelerate>=0.24.0",
+    "bitsandbytes>=0.41.0",
+    "optimum>=1.14.0",
+    "openai-whisper>=20231117",
+    "TTS>=0.20.0",
+    "speechrecognition>=3.10.0",
+    "pyaudio>=0.2.11",
+    
+    # Audio processing
+    "librosa>=0.10.1",
+    "soundfile>=0.12.1",
+    "webrtcvad>=2.0.10",
+    "pydub>=0.25.1",
+    "numpy>=1.24.0",
+    
+    # Chat platforms
+    "python-telegram-bot[webhooks]>=20.7",
+    "discord.py>=2.3.0",
+    
+    # Authentication and security
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "python-multipart>=0.0.6",
+    
+    # Monitoring and observability
+    "prometheus-client>=0.19.0",
+    "opentelemetry-api>=1.21.0",
+    "opentelemetry-sdk>=1.21.0",
+    "opentelemetry-instrumentation-fastapi>=0.42b0",
+    "opentelemetry-instrumentation-grpc>=0.42b0",
+    "opentelemetry-exporter-jaeger>=1.21.0",
+    
+    # Utilities
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "python-dotenv>=1.0.0",
+    "httpx>=0.25.0",
+    "aiofiles>=23.2.1",
+    "pillow>=10.1.0",
+    "scipy>=1.11.0",
+    "python-dateutil>=2.8.0",
+    
+    # PDF generation
+    "reportlab>=4.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.5",
+    "pytest-asyncio>=0.21.1",
+    "pytest-mock>=3.14.1",
+    "pytest-cov>=4.1.0",
+    "black>=23.11.0",
+    "isort>=5.12.0",
+    "flake8>=6.1.0",
+    "mypy>=1.7.0",
+    "pre-commit>=3.6.0",
+]
+
+[tool.setuptools]
+packages = [
+    "essence",
+    "essence.chat",
+    "essence.chat.agent",
+    "essence.chat.storage",
+    "essence.chat.utils",
+    "essence.audio",
+    "essence.gateway",
+    "essence.agent",
+    "essence.storage",
+    "essence.utils",
+    "essence.config",
+    "essence.command",
+    "essence.commands",
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py310']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+line_length = 88
+known_first_party = ["essence"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[tool.pytest.ini_options]
+testpaths = ["../tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short --strict-markers"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "chat: marks tests related to chat functionality",
+    "audio: marks tests related to audio processing",
+    "agent: marks tests related to agent execution",
+]
+

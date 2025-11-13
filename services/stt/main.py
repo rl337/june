@@ -3,6 +3,7 @@ STT Service - Speech-to-Text with Whisper, VAD, and gRPC streaming.
 """
 import asyncio
 import logging
+import os
 import io
 import base64
 import numpy as np
@@ -17,7 +18,8 @@ from grpc import aio
 import nats
 import whisper
 import webrtcvad
-from prometheus_client import Counter, Histogram, Gauge, generate_latest
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST
+from prometheus_client.exposition import start_http_server
 import librosa
 import soundfile as sf
 
@@ -31,6 +33,24 @@ from asr_pb2 import (
 import asr_pb2_grpc
 
 from inference_core import config, setup_logging, Timer, HealthChecker, CircularBuffer
+
+# Import rate limiting
+try:
+    from june_rate_limit import RateLimitInterceptor, RateLimitConfig
+    RATE_LIMIT_AVAILABLE = True
+except ImportError:
+    RATE_LIMIT_AVAILABLE = False
+    RateLimitInterceptor = None
+    RateLimitConfig = None
+
+# Import input validation
+try:
+    from june_security import get_input_validator, InputValidationError
+    input_validator = get_input_validator()
+    VALIDATION_AVAILABLE = True
+except ImportError:
+    VALIDATION_AVAILABLE = False
+    input_validator = None
 
 # Import metrics storage
 try:
@@ -47,11 +67,15 @@ setup_logging(config.monitoring.log_level, "stt")
 logger = logging.getLogger(__name__)
 
 # Prometheus metrics
-REQUEST_COUNT = Counter('stt_requests_total', 'Total requests', ['method', 'status'])
-REQUEST_DURATION = Histogram('stt_request_duration_seconds', 'Request duration')
-AUDIO_PROCESSING_TIME = Histogram('stt_audio_processing_seconds', 'Audio processing time')
-VAD_DETECTIONS = Counter('stt_vad_detections_total', 'VAD detections', ['action'])
-MODEL_LOAD_TIME = Histogram('stt_model_load_seconds', 'Model loading time')
+REGISTRY = CollectorRegistry()
+REQUEST_COUNT = Counter('stt_requests_total', 'Total requests', ['method', 'status'], registry=REGISTRY)
+REQUEST_DURATION = Histogram('stt_request_duration_seconds', 'Request duration', registry=REGISTRY)
+AUDIO_PROCESSING_TIME = Histogram('stt_audio_processing_seconds', 'Audio processing time', registry=REGISTRY)
+VAD_DETECTIONS = Counter('stt_vad_detections_total', 'VAD detections', ['action'], registry=REGISTRY)
+MODEL_LOAD_TIME = Histogram('stt_model_load_seconds', 'Model loading time', registry=REGISTRY)
+TRANSCRIPTION_TIME = Histogram('stt_transcription_time_seconds', 'Transcription time', registry=REGISTRY)
+ACTIVE_CONNECTIONS = Gauge('stt_active_connections', 'Active gRPC connections', registry=REGISTRY)
+ERROR_COUNT = Counter('stt_errors_total', 'Total errors', ['error_type'], registry=REGISTRY)
 
 class STTService(asr_pb2_grpc.SpeechToTextServicer):
     """Main STT service class."""
@@ -117,6 +141,43 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
         """One-shot speech recognition."""
         with Timer("recognition"):
             start_time = datetime.now()
+            
+            # Validate audio data
+            if VALIDATION_AVAILABLE and input_validator:
+                try:
+                    # Validate audio data size
+                    if len(request.audio_data) > input_validator.MAX_AUDIO_FILE_SIZE:
+                        context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                        context.set_details(f"Audio file size ({len(request.audio_data)} bytes) exceeds maximum allowed size ({input_validator.MAX_AUDIO_FILE_SIZE} bytes)")
+                        return RecognitionResponse()
+                    
+                    # Validate sample rate
+                    if request.sample_rate <= 0 or request.sample_rate > 48000:
+                        context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                        context.set_details(f"Invalid sample rate: {request.sample_rate}. Must be between 1 and 48000")
+                        return RecognitionResponse()
+                    
+                    # Validate encoding if provided
+                    if request.encoding:
+                        allowed_encodings = ['pcm', 'wav', 'ogg', 'flac', 'mp3']
+                        try:
+                            validated_encoding = input_validator.validate_enum(
+                                request.encoding,
+                                allowed_encodings,
+                                field_name="encoding",
+                                case_sensitive=False
+                            )
+                            request.encoding = validated_encoding
+                        except InputValidationError as e:
+                            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                            context.set_details(f"Invalid encoding: {str(e)}")
+                            return RecognitionResponse()
+                except Exception as e:
+                    logger.error(f"Input validation error: {e}")
+                    context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                    context.set_details(f"Input validation failed: {str(e)}")
+                    return RecognitionResponse()
+            
             audio_format = request.encoding if request.encoding else "pcm"
             audio_size = len(request.audio_data)
             audio_duration = 0.0
@@ -324,6 +385,15 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
             if not transcript:
                 return None
             
+            # Extract detected language from Whisper result
+            # Whisper always returns the language code in result["language"], even when auto-detecting
+            detected_language = result.get("language", None)
+            # If language was explicitly provided, use it; otherwise use detected language
+            if language:
+                # Language was explicitly provided, so detected_language should match
+                detected_language = language
+            # If language was None (auto-detect), detected_language will be the auto-detected language
+            
             # Calculate confidence (Whisper doesn't provide per-word confidence)
             confidence = 0.9  # Default confidence for Whisper
             
@@ -352,7 +422,8 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
                 words=words,
                 start_time_us=start_time_us,
                 end_time_us=end_time_us,
-                speaker_id=""  # TODO: Implement speaker diarization
+                speaker_id="",  # TODO: Implement speaker diarization
+                detected_language=detected_language or ""  # ISO 639-1 code of detected language
             )
             
         except Exception as e:
@@ -432,8 +503,28 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
 stt_service = STTService()
 
 async def serve():
-    """Start the gRPC server."""
-    server = aio.server()
+    """Start the gRPC server and HTTP metrics server."""
+    # Start HTTP server for Prometheus metrics
+    metrics_port = int(os.getenv("STT_METRICS_PORT", "8002"))
+    try:
+        start_http_server(metrics_port, registry=REGISTRY)
+        logger.info(f"Started Prometheus metrics server on port {metrics_port}")
+    except Exception as e:
+        logger.warning(f"Failed to start metrics server on port {metrics_port}: {e}")
+    
+    interceptors = []
+    
+    # Add rate limiting interceptor if available
+    if RATE_LIMIT_AVAILABLE:
+        rate_limit_config = RateLimitConfig(
+            default_per_minute=int(os.getenv("RATE_LIMIT_STT_PER_MINUTE", "60")),
+            default_per_hour=int(os.getenv("RATE_LIMIT_STT_PER_HOUR", "1000")),
+        )
+        rate_limit_interceptor = RateLimitInterceptor(config=rate_limit_config)
+        interceptors.append(rate_limit_interceptor)
+        logger.info("Rate limiting enabled for STT service")
+    
+    server = aio.server(interceptors=interceptors if interceptors else None)
     
     # Add the service to the server
     asr_pb2_grpc.add_SpeechToTextServicer_to_server(stt_service, server)

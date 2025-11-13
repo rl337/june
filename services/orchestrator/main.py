@@ -18,14 +18,20 @@ from enum import Enum
 from dataclasses import dataclass, field, asdict
 import uuid
 
-from fastapi import FastAPI, HTTPException, Depends, status, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends, status, BackgroundTasks, Query, Path
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST
 from pydantic import BaseModel, Field
 import httpx
+import sys
+from pathlib import Path
 
-# Setup logging
+# Add june-agent-state package to path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root / "packages" / "june-agent-state"))
+
+# Setup logging first (before imports that might log)
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL),
@@ -34,6 +40,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Try to import monitoring infrastructure
+try:
+    from june_agent_state.monitoring import AgentMonitor
+    from june_agent_state.registry import AgentRegistry
+    from june_agent_state.storage import AgentStateStorage
+except ImportError as e:
+    logger.warning(f"Could not import june-agent-state monitoring: {e}. Monitoring endpoints will be disabled.")
+    AgentMonitor = None
+    AgentRegistry = None
+    AgentStateStorage = None
+
 # Prometheus metrics
 REGISTRY = CollectorRegistry()
 AGENT_START_COUNT = Counter('orchestrator_agent_starts_total', 'Total agent starts', ['agent_id'], registry=REGISTRY)
@@ -41,6 +58,13 @@ AGENT_STOP_COUNT = Counter('orchestrator_agent_stops_total', 'Total agent stops'
 TASK_ASSIGN_COUNT = Counter('orchestrator_task_assignments_total', 'Task assignments', ['agent_id', 'status'], registry=REGISTRY)
 ACTIVE_AGENTS = Gauge('orchestrator_active_agents', 'Currently active agents', registry=REGISTRY)
 PENDING_TASKS = Gauge('orchestrator_pending_tasks', 'Pending tasks awaiting assignment', registry=REGISTRY)
+
+# Agent monitoring metrics
+AGENT_TASKS_COMPLETED = Counter('agent_tasks_completed_total', 'Total tasks completed per agent', ['agent_id'], registry=REGISTRY)
+AGENT_TASKS_FAILED = Counter('agent_tasks_failed_total', 'Total tasks failed per agent', ['agent_id'], registry=REGISTRY)
+AGENT_SUCCESS_RATE = Gauge('agent_success_rate', 'Success rate per agent (0.0-1.0)', ['agent_id'], registry=REGISTRY)
+AGENT_AVG_EXECUTION_TIME = Histogram('agent_avg_execution_time_seconds', 'Average execution time per agent', ['agent_id'], registry=REGISTRY)
+AGENT_UPTIME = Gauge('agent_uptime_seconds', 'Agent uptime in seconds', ['agent_id'], registry=REGISTRY)
 
 
 class AgentStatus(str, Enum):
@@ -136,6 +160,12 @@ class OrchestrationService:
         # MCP client for TODO service
         self.mcp_client: Optional[httpx.AsyncClient] = None
         
+        # Monitoring infrastructure
+        self.monitor: Optional[AgentMonitor] = None
+        self.registry: Optional[AgentRegistry] = None
+        self.storage: Optional[AgentStateStorage] = None
+        self._monitoring_enabled = AgentMonitor is not None
+        
         self._setup_middleware()
         self._setup_routes()
         self._start_background_tasks()
@@ -172,6 +202,117 @@ class OrchestrationService:
                 content=generate_latest(REGISTRY),
                 media_type=CONTENT_TYPE_LATEST
             )
+        
+        # Monitoring API endpoints
+        if self._monitoring_enabled:
+            @self.app.get("/monitoring/agents/{agent_id}/activity")
+            async def get_agent_activity(
+                agent_id: str = Path(..., description="Agent ID"),
+                time_range_hours: Optional[int] = Query(None, description="Time range in hours (default: 24)")
+            ):
+                """Get agent activity within a time range."""
+                if not self.monitor:
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        detail="Monitoring not initialized"
+                    )
+                
+                time_range = timedelta(hours=time_range_hours) if time_range_hours else timedelta(hours=24)
+                activity = await self.monitor.get_agent_activity(agent_id, time_range=time_range)
+                
+                return {
+                    "agent_id": agent_id,
+                    "time_range_hours": time_range_hours or 24,
+                    "activity": activity,
+                    "count": len(activity)
+                }
+            
+            @self.app.get("/monitoring/agents/{agent_id}/metrics")
+            async def get_agent_metrics(agent_id: str = Path(..., description="Agent ID")):
+                """Get performance metrics for an agent."""
+                if not self.monitor:
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        detail="Monitoring not initialized"
+                    )
+                
+                metrics_data = await self.monitor.get_agent_metrics(agent_id)
+                
+                if not metrics_data:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=f"Agent {agent_id} not found or has no metrics"
+                    )
+                
+                return metrics_data
+            
+            @self.app.get("/monitoring/agents/{agent_id}/health")
+            async def get_agent_health(agent_id: str = Path(..., description="Agent ID")):
+                """Get agent health status."""
+                if not self.monitor:
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        detail="Monitoring not initialized"
+                    )
+                
+                health = await self.monitor.get_agent_health(agent_id)
+                return health
+            
+            @self.app.get("/monitoring/agents/status")
+            async def list_all_agent_status():
+                """List status for all agents."""
+                if not self.monitor:
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        detail="Monitoring not initialized"
+                    )
+                
+                statuses = await self.monitor.list_all_agent_status()
+                return {
+                    "agents": statuses,
+                    "count": len(statuses)
+                }
+            
+            @self.app.post("/monitoring/alerts/check-failures")
+            async def check_failure_alerts(
+                threshold: int = Query(3, ge=1, description="Failure threshold"),
+                time_range_hours: Optional[int] = Query(None, description="Time range in hours (default: 1)")
+            ):
+                """Check for agent failures and generate alerts."""
+                if not self.monitor:
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        detail="Monitoring not initialized"
+                    )
+                
+                time_range = timedelta(hours=time_range_hours) if time_range_hours else timedelta(hours=1)
+                alerts = await self.monitor.alert_on_failures(threshold=threshold, time_range=time_range)
+                
+                return {
+                    "alerts": alerts,
+                    "count": len(alerts),
+                    "threshold": threshold,
+                    "time_range_hours": time_range_hours or 1
+                }
+            
+            @self.app.post("/monitoring/alerts/check-degradation")
+            async def check_performance_degradation_alerts(
+                threshold_decrease: float = Query(0.2, ge=0.0, le=1.0, description="Minimum success rate decrease to trigger alert")
+            ):
+                """Check for agent performance degradation and generate alerts."""
+                if not self.monitor:
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        detail="Monitoring not initialized"
+                    )
+                
+                alerts = await self.monitor.get_performance_degradation_alerts(threshold_decrease=threshold_decrease)
+                
+                return {
+                    "alerts": alerts,
+                    "count": len(alerts),
+                    "threshold_decrease": threshold_decrease
+                }
         
         @self.app.post("/agents/register")
         async def register_agent(request: AgentRegistrationRequest):
@@ -497,6 +638,44 @@ class OrchestrationService:
                 timeout=30.0
             )
             logger.info("MCP client initialized")
+            
+            # Initialize monitoring infrastructure if available
+            if self._monitoring_enabled:
+                try:
+                    # Get PostgreSQL connection details from environment
+                    db_host = os.getenv("POSTGRES_HOST", "localhost")
+                    db_port = int(os.getenv("POSTGRES_PORT", "5432"))
+                    db_name = os.getenv("POSTGRES_DB", "june")
+                    db_user = os.getenv("POSTGRES_USER", "postgres")
+                    db_password = os.getenv("POSTGRES_PASSWORD", "")
+                    
+                    # Initialize storage
+                    self.storage = AgentStateStorage(
+                        host=db_host,
+                        port=db_port,
+                        database=db_name,
+                        user=db_user,
+                        password=db_password if db_password else None
+                    )
+                    await self.storage.connect()
+                    logger.info("Agent state storage connected")
+                    
+                    # Initialize registry
+                    self.registry = AgentRegistry(self.storage)
+                    logger.info("Agent registry initialized")
+                    
+                    # Initialize monitor
+                    self.monitor = AgentMonitor(self.registry, self.storage)
+                    logger.info("Agent monitor initialized")
+                    
+                    logger.info("Monitoring infrastructure ready")
+                except Exception as e:
+                    logger.error(f"Failed to initialize monitoring infrastructure: {e}", exc_info=True)
+                    logger.warning("Monitoring endpoints will be unavailable")
+                    self._monitoring_enabled = False
+                    self.monitor = None
+                    self.registry = None
+                    self.storage = None
         
         @self.app.on_event("shutdown")
         async def shutdown():
@@ -504,6 +683,9 @@ class OrchestrationService:
             logger.info("Orchestration service shutting down...")
             if self.mcp_client:
                 await self.mcp_client.aclose()
+            if self.storage:
+                await self.storage.disconnect()
+                logger.info("Agent state storage disconnected")
         
         # Background task: Check agent health
         async def check_agent_health():

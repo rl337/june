@@ -158,7 +158,8 @@ User → Telegram (Voice)
 
 ## 🔗 Related Documentation
 - See `README.md` for architecture overview
-- See `AGENTS.md` for development guidelines
+- See `docs/guides/AGENTS.md` for development guidelines
+- See `docs/README.md` for comprehensive documentation index
 - See service-specific READMEs for API details
 
 

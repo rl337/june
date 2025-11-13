@@ -1,0 +1,109 @@
+{
+  "dashboard": {
+    "title": "Resource Usage",
+    "tags": ["june", "resources", "system"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 0,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "CPU Usage",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+            "refId": "A",
+            "legendFormat": "CPU Usage %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 1,
+            "min": 0,
+            "max": 100,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Memory Usage",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100",
+            "refId": "A",
+            "legendFormat": "Memory Usage %"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 1,
+            "min": 0,
+            "max": 100,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "GPU Utilization",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "DCGM_FI_DEV_GPU_UTIL",
+            "refId": "A",
+            "legendFormat": "GPU {{gpu}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 1,
+            "min": 0,
+            "max": 100,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Disk I/O",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "targets": [
+          {
+            "expr": "rate(node_disk_io_time_seconds_total[5m]) * 100",
+            "refId": "A",
+            "legendFormat": "{{device}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "decimals": 1,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "templating": {
+      "list": []
+    },
+    "annotations": {
+      "list": []
+    }
+  }
+}

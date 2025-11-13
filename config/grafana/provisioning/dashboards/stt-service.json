@@ -1,0 +1,152 @@
+{
+  "dashboard": {
+    "title": "STT Service",
+    "tags": ["june", "stt", "service"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 0,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "STT Request Rate",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "sum(rate(stt_requests_total[5m])) by (status)",
+            "refId": "A",
+            "legendFormat": "{{status}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "decimals": 2,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Transcription Time",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(stt_transcription_time_seconds_bucket[5m]))",
+            "refId": "A",
+            "legendFormat": "p95"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(stt_transcription_time_seconds_bucket[5m]))",
+            "refId": "B",
+            "legendFormat": "p50"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "decimals": 3,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Audio Processing Time",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 6},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(stt_audio_processing_seconds_bucket[5m]))",
+            "refId": "A",
+            "legendFormat": "p95"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(stt_audio_processing_seconds_bucket[5m]))",
+            "refId": "B",
+            "legendFormat": "p50"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "decimals": 3,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "VAD Detections",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 6},
+        "targets": [
+          {
+            "expr": "sum(rate(stt_vad_detections_total[5m])) by (action)",
+            "refId": "A",
+            "legendFormat": "{{action}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ops",
+            "decimals": 2,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "STT Errors",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 12},
+        "targets": [
+          {
+            "expr": "sum(rate(stt_errors_total[5m])) by (error_type)",
+            "refId": "A",
+            "legendFormat": "{{error_type}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ops",
+            "decimals": 2,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Active Connections",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 12},
+        "targets": [
+          {
+            "expr": "stt_active_connections",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 0,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "templating": {
+      "list": []
+    },
+    "annotations": {
+      "list": []
+    }
+  }
+}

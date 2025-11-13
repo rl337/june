@@ -4,7 +4,9 @@ version = "0.1.0"
 description = "Comprehensive security and safety measures for June agent execution"
 readme = "README.md"
 requires-python = ">=3.8"
-dependencies = []
+dependencies = [
+    "cryptography>=41.0.0",
+]
 
 [project.optional-dependencies]
 dev = [

@@ -3,6 +3,7 @@ Inference API Service - LLM orchestration with RAG and tool invocation.
 """
 import asyncio
 import logging
+import os
 import json
 import uuid
 from typing import Dict, List, Optional, Any, AsyncGenerator
@@ -14,15 +15,16 @@ from grpc import aio
 import nats
 import torch
 from transformers import (
-    AutoTokenizer, AutoModelForCausalLM, 
-    BitsAndBytesConfig, TextStreamer
+    AutoTokenizer, AutoModelForCausalLM
 )
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import text
 import asyncpg
 from minio import Minio
-from prometheus_client import Counter, Histogram, Gauge, generate_latest
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST
+from prometheus_client.exposition import start_http_server
+from pathlib import Path
 
 # Import generated protobuf classes
 import sys
@@ -37,25 +39,55 @@ from llm_pb2 import (
 )
 import llm_pb2_grpc
 
-from inference_core import config, setup_logging, Timer, HealthChecker, CircularBuffer
+# Import gRPC authentication
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "packages" / "june-grpc-api"))
+from grpc_auth import create_auth_interceptor, get_user_from_metadata, is_service_request
 
-# Setup logging
+# Import rate limiting
+try:
+    from june_rate_limit import RateLimitInterceptor, RateLimitConfig
+    RATE_LIMIT_AVAILABLE = True
+except ImportError:
+    logger.warning("june-rate-limit package not available, rate limiting disabled for gRPC")
+    RATE_LIMIT_AVAILABLE = False
+    RateLimitInterceptor = None
+    RateLimitConfig = None
+
+from inference_core import config, setup_logging, Timer, HealthChecker, CircularBuffer
+from inference_core.llm.qwen3_strategy import Qwen3LlmStrategy
+from inference_core.strategies import InferenceRequest, InferenceResponse
+
+# Setup logging first
 setup_logging(config.monitoring.log_level, "inference-api")
 logger = logging.getLogger(__name__)
 
+# Import input validation
+try:
+    from june_security import get_input_validator, InputValidationError
+    input_validator = get_input_validator()
+    VALIDATION_AVAILABLE = True
+except ImportError:
+    logger.warning("june-security input validation not available")
+    input_validator = None
+    VALIDATION_AVAILABLE = False
+
 # Prometheus metrics
-REQUEST_COUNT = Counter('inference_requests_total', 'Total requests', ['method', 'status'])
-REQUEST_DURATION = Histogram('inference_request_duration_seconds', 'Request duration')
-TOKEN_COUNT = Counter('inference_tokens_total', 'Total tokens generated', ['model'])
-MODEL_LOAD_TIME = Histogram('inference_model_load_seconds', 'Model loading time')
-RAG_RETRIEVAL_TIME = Histogram('inference_rag_retrieval_seconds', 'RAG retrieval time')
+REGISTRY = CollectorRegistry()
+REQUEST_COUNT = Counter('inference_requests_total', 'Total requests', ['method', 'status'], registry=REGISTRY)
+REQUEST_DURATION = Histogram('inference_request_duration_seconds', 'Request duration', registry=REGISTRY)
+TOKEN_COUNT = Counter('inference_tokens_total', 'Total tokens generated', ['model'], registry=REGISTRY)
+TOKEN_GENERATION_RATE = Histogram('inference_token_generation_rate', 'Token generation rate (tokens/second)', registry=REGISTRY)
+MODEL_LOAD_TIME = Histogram('inference_model_load_seconds', 'Model loading time', registry=REGISTRY)
+RAG_RETRIEVAL_TIME = Histogram('inference_rag_retrieval_seconds', 'RAG retrieval time', registry=REGISTRY)
+CONTEXT_USAGE = Gauge('inference_context_usage_tokens', 'Context usage in tokens', registry=REGISTRY)
+ACTIVE_CONNECTIONS = Gauge('inference_active_connections', 'Active gRPC connections', registry=REGISTRY)
+ERROR_COUNT = Counter('inference_errors_total', 'Total errors', ['error_type'], registry=REGISTRY)
 
 class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
     """Main inference API service class."""
     
     def __init__(self):
-        self.model = None
-        self.tokenizer = None
+        self.llm_strategy = None  # Qwen3LlmStrategy instance
         self.embedding_model = None
         self.embedding_tokenizer = None
         self.db_engine = None
@@ -75,6 +107,27 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
         """Streaming text generation."""
         with Timer("generation_stream"):
             try:
+                # Validate input
+                if VALIDATION_AVAILABLE and input_validator:
+                    try:
+                        validated_prompt = input_validator.validate_string(
+                            request.prompt,
+                            field_name="prompt",
+                            max_length=100000,
+                            sanitize=True
+                        )
+                        request.prompt = validated_prompt
+                    except InputValidationError as e:
+                        context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                        context.set_details(f"Invalid prompt: {str(e)}")
+                        error_chunk = GenerationChunk(
+                            token="",
+                            is_final=True,
+                            finish_reason=FinishReason.ERROR
+                        )
+                        yield error_chunk
+                        return
+                
                 # Prepare context
                 context_data = await self._prepare_context(request.context)
                 
@@ -99,6 +152,21 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
         """One-shot text generation."""
         with Timer("generation"):
             try:
+                # Validate input
+                if VALIDATION_AVAILABLE and input_validator:
+                    try:
+                        validated_prompt = input_validator.validate_string(
+                            request.prompt,
+                            field_name="prompt",
+                            max_length=100000,
+                            sanitize=True
+                        )
+                        request.prompt = validated_prompt
+                    except InputValidationError as e:
+                        context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                        context.set_details(f"Invalid prompt: {str(e)}")
+                        return GenerationResponse()
+                
                 # Prepare context
                 context_data = await self._prepare_context(request.context)
                 
@@ -127,6 +195,30 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
         """Streaming chat with conversation history."""
         with Timer("chat_stream"):
             try:
+                # Validate input messages
+                if VALIDATION_AVAILABLE and input_validator:
+                    try:
+                        for message in request.messages:
+                            if message.content:
+                                validated_content = input_validator.validate_string(
+                                    message.content,
+                                    field_name="message.content",
+                                    max_length=100000,
+                                    sanitize=True
+                                )
+                                message.content = validated_content
+                    except InputValidationError as e:
+                        context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                        context.set_details(f"Invalid message content: {str(e)}")
+                        error_chunk = ChatChunk(
+                            content_delta="",
+                            role="assistant",
+                            is_final=True,
+                            finish_reason=FinishReason.ERROR
+                        )
+                        yield error_chunk
+                        return
+                
                 # Prepare context
                 context_data = await self._prepare_context(request.context)
                 
@@ -161,6 +253,23 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
         """One-shot chat with conversation history."""
         with Timer("chat"):
             try:
+                # Validate input messages
+                if VALIDATION_AVAILABLE and input_validator:
+                    try:
+                        for message in request.messages:
+                            if message.content:
+                                validated_content = input_validator.validate_string(
+                                    message.content,
+                                    field_name="message.content",
+                                    max_length=100000,
+                                    sanitize=True
+                                )
+                                message.content = validated_content
+                    except InputValidationError as e:
+                        context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                        context.set_details(f"Invalid message content: {str(e)}")
+                        return ChatResponse()
+                
                 # Prepare context
                 context_data = await self._prepare_context(request.context)
                 
@@ -197,6 +306,24 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
         """Generate embeddings for text."""
         with Timer("embedding"):
             try:
+                # Validate input texts
+                if VALIDATION_AVAILABLE and input_validator:
+                    try:
+                        validated_texts = []
+                        for text in request.texts:
+                            validated_text = input_validator.validate_string(
+                                text,
+                                field_name="text",
+                                max_length=100000,
+                                sanitize=True
+                            )
+                            validated_texts.append(validated_text)
+                        request.texts[:] = validated_texts
+                    except InputValidationError as e:
+                        context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                        context.set_details(f"Invalid text input: {str(e)}")
+                        return EmbeddingResponse()
+                
                 embeddings = await self._generate_embeddings(request.texts)
                 
                 return EmbeddingResponse(
@@ -244,7 +371,25 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
     async def _retrieve_rag_documents(self, document_ids: List[str]) -> List[Dict[str, Any]]:
         """Retrieve documents for RAG."""
         try:
+            # Validate document IDs to prevent SQL injection
+            if VALIDATION_AVAILABLE and input_validator:
+                validated_ids = []
+                for doc_id in document_ids:
+                    try:
+                        validated_id = input_validator.validate_string(
+                            doc_id,
+                            field_name="document_id",
+                            max_length=255,
+                            sanitize=True
+                        )
+                        validated_ids.append(validated_id)
+                    except InputValidationError:
+                        logger.warning(f"Invalid document ID skipped: {doc_id}")
+                        continue
+                document_ids = validated_ids
+            
             async with self.db_engine.begin() as conn:
+                # Use parameterized query to prevent SQL injection
                 query = text("""
                     SELECT d.id, d.title, d.content, d.source_url, d.metadata
                     FROM documents d
@@ -298,28 +443,28 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
     async def _generate_tokens_stream(self, prompt: str, params: GenerationParameters, context_data: Dict[str, Any]) -> AsyncGenerator[GenerationChunk, None]:
         """Generate tokens with streaming."""
         try:
-            # Tokenize input
-            inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
+            # Use strategy to generate text
+            request = InferenceRequest(
+                payload={
+                    "prompt": prompt,
+                    "params": {
+                        "temperature": params.temperature,
+                        "max_tokens": params.max_tokens,
+                        "top_p": params.top_p,
+                        "top_k": params.top_k if params.top_k > 0 else None,
+                        "repetition_penalty": params.repetition_penalty,
+                    }
+                },
+                metadata={}
+            )
             
-            # Generate with streaming
-            with torch.no_grad():
-                generated = self.model.generate(
-                    inputs.input_ids,
-                    max_new_tokens=params.max_tokens,
-                    temperature=params.temperature,
-                    top_p=params.top_p,
-                    top_k=int(params.top_k) if params.top_k > 0 else None,
-                    repetition_penalty=params.repetition_penalty,
-                    do_sample=params.temperature > 0,
-                    pad_token_id=self.tokenizer.eos_token_id,
-                    streamer=None,  # TODO: Implement proper streaming
-                    return_dict_in_generate=True,
-                    output_scores=False
-                )
+            response = self.llm_strategy.infer(request)
             
-            # Decode tokens
-            generated_text = self.tokenizer.decode(generated.sequences[0], skip_special_tokens=True)
-            response_text = generated_text[len(prompt):]
+            # Extract generated text from response
+            if isinstance(response.payload, dict):
+                response_text = response.payload.get("text", "")
+            else:
+                response_text = str(response.payload)
             
             # Yield tokens (simplified - in real implementation, use proper streaming)
             tokens = response_text.split()
@@ -347,30 +492,37 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
     async def _generate_text(self, prompt: str, params: GenerationParameters, context_data: Dict[str, Any]) -> tuple[str, UsageStats]:
         """Generate text without streaming."""
         try:
-            # Tokenize input
-            inputs = self.tokenizer(prompt, return_tensors="pt").to(self.device)
-            input_tokens = inputs.input_ids.shape[1]
+            # Use strategy to generate text
+            request = InferenceRequest(
+                payload={
+                    "prompt": prompt,
+                    "params": {
+                        "temperature": params.temperature,
+                        "max_tokens": params.max_tokens,
+                        "top_p": params.top_p,
+                        "top_k": params.top_k if params.top_k > 0 else None,
+                        "repetition_penalty": params.repetition_penalty,
+                    }
+                },
+                metadata={}
+            )
             
-            # Generate
-            with torch.no_grad():
-                generated = self.model.generate(
-                    inputs.input_ids,
-                    max_new_tokens=params.max_tokens,
-                    temperature=params.temperature,
-                    top_p=params.top_p,
-                    top_k=int(params.top_k) if params.top_k > 0 else None,
-                    repetition_penalty=params.repetition_penalty,
-                    do_sample=params.temperature > 0,
-                    pad_token_id=self.tokenizer.eos_token_id,
-                    return_dict_in_generate=True
-                )
+            response = self.llm_strategy.infer(request)
             
-            # Decode response
-            generated_text = self.tokenizer.decode(generated.sequences[0], skip_special_tokens=True)
-            response_text = generated_text[len(prompt):]
+            # Extract generated text and token counts from response
+            if isinstance(response.payload, dict):
+                response_text = response.payload.get("text", "")
+                completion_tokens = response.payload.get("tokens", 0)
+            else:
+                response_text = str(response.payload)
+                completion_tokens = 0
             
-            # Calculate usage stats
-            completion_tokens = generated.sequences.shape[1] - input_tokens
+            # Get input token count from metadata if available
+            input_tokens = response.metadata.get("input_tokens", 0)
+            if input_tokens == 0:
+                # Fallback: estimate input tokens (rough approximation)
+                input_tokens = len(prompt.split())
+            
             usage_stats = UsageStats(
                 prompt_tokens=input_tokens,
                 completion_tokens=completion_tokens,
@@ -411,54 +563,55 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
     async def _load_models(self):
         """Load the main LLM and embedding models."""
         with Timer("model_loading"):
-            logger.info(f"Loading model: {config.model.name}")
+            logger.info(f"Loading LLM model using Qwen3LlmStrategy: {config.model.name}")
             
-            # Load main model with quantization if needed
-            if config.model.device.startswith("cuda"):
-                # Use 4-bit quantization for memory efficiency
-                quantization_config = BitsAndBytesConfig(
-                    load_in_4bit=True,
-                    bnb_4bit_quant_type="nf4",
-                    bnb_4bit_compute_dtype=torch.float16,
-                    bnb_4bit_use_double_quant=True
-                )
-                
-                self.model = AutoModelForCausalLM.from_pretrained(
-                    config.model.name,
-                    quantization_config=quantization_config,
-                    device_map="auto",
-                    torch_dtype=torch.float16,
-                    trust_remote_code=True
-                )
-            else:
-                self.model = AutoModelForCausalLM.from_pretrained(
-                    config.model.name,
-                    torch_dtype=torch.float16,
-                    trust_remote_code=True
-                ).to(self.device)
-            
-            # Load tokenizer
-            self.tokenizer = AutoTokenizer.from_pretrained(
-                config.model.name,
-                trust_remote_code=True
+            # Initialize and warmup Qwen3LlmStrategy
+            self.llm_strategy = Qwen3LlmStrategy(
+                model_name=config.model.name,
+                device=config.model.device,
+                max_context_length=config.model.max_context_length,
+                use_yarn=config.model.use_yarn if hasattr(config.model, 'use_yarn') else None,
+                huggingface_token=config.model.huggingface_token if hasattr(config.model, 'huggingface_token') else None,
+                model_cache_dir=config.model.model_cache_dir if hasattr(config.model, 'model_cache_dir') else None,
+                local_files_only=config.model.local_files_only if hasattr(config.model, 'local_files_only') else None,
             )
             
-            if self.tokenizer.pad_token is None:
-                self.tokenizer.pad_token = self.tokenizer.eos_token
+            # Warmup the strategy (loads model and tokenizer)
+            self.llm_strategy.warmup()
+            
+            logger.info("LLM model loaded successfully via Qwen3LlmStrategy")
             
             # Load embedding model (smaller model for efficiency)
+            # Note: Embedding model is still loaded directly as it's separate from LLM strategy
             embedding_model_name = "sentence-transformers/all-MiniLM-L6-v2"
+            logger.info(f"Loading embedding model: {embedding_model_name}")
             self.embedding_model = AutoModelForCausalLM.from_pretrained(embedding_model_name)
             self.embedding_tokenizer = AutoTokenizer.from_pretrained(embedding_model_name)
             
-            logger.info("Models loaded successfully")
+            logger.info("All models loaded successfully")
     
     async def _connect_services(self):
         """Connect to external services."""
         try:
-            # Connect to database
-            self.db_engine = create_async_engine(config.database.url)
-            logger.info("Connected to database")
+            # Connect to database with connection pooling
+            import os
+            pool_size = int(os.getenv("POSTGRES_POOL_SIZE", "20"))
+            max_overflow = int(os.getenv("POSTGRES_MAX_OVERFLOW", "10"))
+            pool_timeout = int(os.getenv("POSTGRES_POOL_TIMEOUT", "30"))
+            
+            self.db_engine = create_async_engine(
+                config.database.url,
+                pool_size=pool_size,
+                max_overflow=max_overflow,
+                pool_timeout=pool_timeout,
+                pool_pre_ping=True,  # Verify connections before using
+                pool_recycle=3600,  # Recycle connections after 1 hour
+                echo=False
+            )
+            logger.info(
+                f"Connected to database with connection pool "
+                f"(size={pool_size}, max_overflow={max_overflow})"
+            )
             
             # Connect to MinIO
             self.minio_client = Minio(
@@ -479,7 +632,7 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
     
     async def _check_model_health(self) -> bool:
         """Check if model is loaded and ready."""
-        return self.model is not None and self.tokenizer is not None
+        return self.llm_strategy is not None and self.llm_strategy._model is not None and self.llm_strategy._tokenizer is not None
     
     async def _check_database_health(self) -> bool:
         """Check database connection health."""
@@ -512,8 +665,35 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
 inference_service = InferenceAPIService()
 
 async def serve():
-    """Start the gRPC server."""
-    server = aio.server()
+    """Start the gRPC server and HTTP metrics server."""
+    # Start HTTP server for Prometheus metrics
+    metrics_port = int(os.getenv("INFERENCE_METRICS_PORT", "8001"))
+    try:
+        start_http_server(metrics_port, registry=REGISTRY)
+        logger.info(f"Started Prometheus metrics server on port {metrics_port}")
+    except Exception as e:
+        logger.warning(f"Failed to start metrics server on port {metrics_port}: {e}")
+    
+    # Add authentication interceptor
+    # Allow service-to-service auth from gateway, stt, tts services
+    auth_interceptor = create_auth_interceptor(
+        require_auth=True,
+        allowed_services=["gateway", "stt", "tts", "telegram", "webapp"]
+    )
+    
+    interceptors = [auth_interceptor]
+    
+    # Add rate limiting interceptor if available
+    if RATE_LIMIT_AVAILABLE:
+        rate_limit_config = RateLimitConfig(
+            default_per_minute=int(os.getenv("RATE_LIMIT_INFERENCE_PER_MINUTE", "60")),
+            default_per_hour=int(os.getenv("RATE_LIMIT_INFERENCE_PER_HOUR", "1000")),
+        )
+        rate_limit_interceptor = RateLimitInterceptor(config=rate_limit_config)
+        interceptors.append(rate_limit_interceptor)
+        logger.info("Rate limiting enabled for Inference API")
+    
+    server = aio.server(interceptors=interceptors)
     
     # Add the service to the server
     llm_pb2_grpc.add_LLMInferenceServicer_to_server(inference_service, server)
@@ -522,7 +702,7 @@ async def serve():
     listen_addr = '[::]:50051'
     server.add_insecure_port(listen_addr)
     
-    logger.info(f"Starting Inference API server on {listen_addr}")
+    logger.info(f"Starting Inference API server on {listen_addr} with authentication")
     
     # Load models and connect to services
     await inference_service._load_models()

@@ -1,0 +1,98 @@
+# Load Testing Configuration
+# This file configures load test scenarios and target endpoints
+
+# Service endpoints
+services:
+  gateway:
+    host: "http://localhost:8000"
+    rest_endpoints:
+      - path: "/health"
+        method: "GET"
+        weight: 10
+      - path: "/api/v1/llm/generate"
+        method: "POST"
+        weight: 30
+        requires_auth: true
+      - path: "/api/v1/tts/speak"
+        method: "POST"
+        weight: 20
+        requires_auth: true
+      - path: "/api/v1/audio/transcribe"
+        method: "POST"
+        weight: 20
+        requires_auth: true
+      - path: "/chat"
+        method: "POST"
+        weight: 40
+        requires_auth: true
+    websocket:
+      path: "/ws/{user_id}"
+      weight: 30
+  grpc:
+    inference_api:
+      host: "localhost:50051"
+      weight: 30
+    stt:
+      host: "localhost:50052"
+      weight: 20
+    tts:
+      host: "localhost:50053"
+      weight: 20
+
+# Load test scenarios
+scenarios:
+  # Baseline load - current capacity
+  baseline:
+    users: 10
+    spawn_rate: 2
+    duration: "5m"
+    description: "Baseline load test to establish current capacity"
+  
+  # Target load - 10x capacity
+  target:
+    users: 100
+    spawn_rate: 10
+    duration: "10m"
+    description: "Target load test for 10x capacity validation"
+  
+  # Gradual ramp-up
+  ramp_up:
+    users: 200
+    spawn_rate: 5
+    duration: "20m"
+    description: "Gradual ramp-up to test system under increasing load"
+  
+  # Spike test
+  spike:
+    users: 500
+    spawn_rate: 50
+    duration: "5m"
+    description: "Sudden spike test to verify system recovery"
+  
+  # Sustained load
+  sustained:
+    users: 150
+    spawn_rate: 10
+    duration: "30m"
+    description: "Sustained load test to identify memory leaks and stability issues"
+
+# Metrics to collect
+metrics:
+  latency:
+    percentiles: [50, 75, 90, 95, 99]
+  throughput:
+    window: "1m"
+  error_rate:
+    threshold: 0.01  # 1% error rate threshold
+  resource_utilization:
+    - cpu
+    - memory
+    - gpu
+    - database_connections
+
+# Report settings
+reports:
+  output_dir: "reports"
+  format: ["html", "json", "csv"]
+  include_charts: true
+  comparison_baseline: "baseline"

@@ -34,6 +34,20 @@ June follows GPT5's recommended microservices architecture with the following co
 - **Loki** - Log aggregation
 - **Jaeger** - Distributed tracing
 
+## 📚 Documentation
+
+For comprehensive documentation, see the [Documentation Index](docs/README.md).
+
+**Quick Links:**
+- **[User Guide](docs/guides/USER_GUIDE.md)** - Getting started, webapp guide, Telegram bot guide, Gateway API guide
+- **[Development Setup](docs/guides/DEVELOPMENT.md)** - Development environment setup, project structure, workflow, contributing guidelines
+- **[Deployment Guide](docs/guides/DEPLOYMENT.md)** - Production deployment, cloud deployments, configuration, monitoring
+- **[API Documentation](docs/API/)** - Complete API docs for all services
+- **[Architecture Documentation](docs/architecture/ARCHITECTURE.md)** - System architecture, service architecture, design decisions
+- **[Troubleshooting Guide](docs/guides/TROUBLESHOOTING.md)** - Common issues, debugging procedures, health checks
+- **[Agent Development Guide](docs/guides/AGENTS.md)** - Guidelines for AI agents working on the project
+- **[Agentic Capabilities](docs/architecture/AGENTIC_CAPABILITIES.md)** - Autonomous agent system documentation
+
 ## 🛠️ CLI Tools Usage
 
 ### Model Management
@@ -117,10 +131,15 @@ Key environment variables in `.env`:
 
 ```bash
 # Model Configuration
-MODEL_NAME=Qwen/Qwen2.5-32B-Instruct
-MODEL_DEVICE=cuda:0
-MAX_CONTEXT_LENGTH=131072
-USE_YARN=true
+MODEL_NAME=Qwen/Qwen3-30B-A3B-Thinking-2507  # HuggingFace model identifier
+MODEL_DEVICE=cuda:0                            # Device to run model on (cuda:0, cpu, etc.)
+MAX_CONTEXT_LENGTH=131072                      # Maximum context length in tokens
+USE_YARN=true                                   # Enable YaRN for long context support
+MODEL_TEMPERATURE=0.7                          # Default temperature for generation (0.0-2.0)
+MODEL_MAX_TOKENS=2048                          # Default maximum tokens to generate
+MODEL_TOP_P=0.9                                # Default top-p (nucleus) sampling parameter
+MODEL_TOP_K=                                    # Optional: top-k sampling (leave empty to disable)
+MODEL_REPETITION_PENALTY=                      # Optional: repetition penalty (leave empty to disable)
 
 # STT Configuration
 STT_MODEL=openai/whisper-large-v3
@@ -295,122 +314,835 @@ docker-compose up -d telegram
 - Port forwarding or load balancer configured
 - Firewall allows connections from Telegram servers
 
-### Environment Variables Reference
+## 🚀 Production Deployment
+
+This section provides comprehensive guidance for deploying June to production environments. Follow these guidelines to ensure a secure, scalable, and maintainable deployment.
+
+### Production Deployment Checklist
+
+Before deploying to production, ensure all items in this checklist are completed:
+
+#### 1. SSL/TLS Configuration
+
+**For External-Facing Services:**
+- **SSL Certificate**: Valid SSL certificate for your domain (required for HTTPS endpoints)
+  - Use Let's Encrypt for free certificates: `certbot certonly --standalone -d your-domain.com`
+  - Or use certificates from a trusted CA
+- **Certificate Location**: Store certificates securely (e.g., `/etc/ssl/certs/june/`)
+- **Certificate Renewal**: Set up automatic renewal
+  ```bash
+  # Add to crontab for auto-renewal
+  0 0 * * * certbot renew --quiet --deploy-hook "docker-compose restart gateway telegram"
+  ```
+- **TLS Configuration**: Configure reverse proxy (nginx/traefik) for TLS termination
+- **Internal Services**: Use TLS for service-to-service communication in production
+
+**For Telegram Webhook (if using):**
+- Valid SSL certificate required (Telegram enforces HTTPS)
+- Certificate must be trusted by Telegram servers
+- Port 8443 must be accessible from internet
+
+#### 2. Firewall Rules
+
+**Inbound Rules:**
+- **Gateway Service** (Port 8000): Allow from load balancer/reverse proxy only
+- **Webapp** (Port 3001): Allow from load balancer/reverse proxy only
+- **Telegram Webhook** (Port 8443): Allow from Telegram IP ranges
+  - Telegram IP ranges: https://core.telegram.org/bots/webhooks#the-short-version
+- **Monitoring** (Ports 9090, 3000, 3100, 16686): Restrict to internal network or VPN
+- **Health Checks**: Allow health check endpoints from monitoring systems
+
+**Outbound Rules:**
+- Allow connections to external APIs (Telegram API, Hugging Face)
+- Allow DNS resolution
+- Allow package manager access (for updates)
+
+**Network Security:**
+- Use Docker networks to isolate services (`june_network`)
+- Implement network policies to restrict inter-service communication
+- Use VPN or private networks for service-to-service communication
+- Block direct access to internal services from internet
+
+#### 3. Environment Variables
+
+Configure all production environment variables in `.env` or your secrets management system:
+
+```bash
+# Model Configuration
+MODEL_NAME=Qwen/Qwen3-30B-A3B-Thinking-2507
+MODEL_DEVICE=cuda:0
+MAX_CONTEXT_LENGTH=131072
+USE_YARN=true
+MODEL_TEMPERATURE=0.7
+MODEL_MAX_TOKENS=2048
+MODEL_TOP_P=0.9
+# Optional generation parameters (leave empty to use defaults):
+# MODEL_TOP_K=
+# MODEL_REPETITION_PENALTY=
+
+# STT Configuration
+STT_MODEL=openai/whisper-large-v3
+STT_DEVICE=cuda:0
+
+# TTS Configuration
+TTS_MODEL=facebook/fastspeech2-en-ljspeech
+TTS_DEVICE=cuda:0
+
+# Telegram Bot Configuration (if using)
+TELEGRAM_BOT_TOKEN=your_production_bot_token
+TELEGRAM_USE_WEBHOOK=true
+TELEGRAM_WEBHOOK_URL=https://your-domain.com/webhook
+TELEGRAM_WEBHOOK_PORT=8443
+TELEGRAM_REQUEST_TIMEOUT=30.0
+TELEGRAM_RATE_LIMIT_PER_MINUTE=10
+TELEGRAM_RATE_LIMIT_PER_HOUR=100
+TELEGRAM_RATE_LIMIT_PER_DAY=500
+
+# Database
+POSTGRES_PASSWORD=strong_random_password_here
+POSTGRES_USER=june
+POSTGRES_DB=june
+
+# MinIO
+MINIO_ROOT_USER=admin
+MINIO_ROOT_PASSWORD=strong_random_password_here
+
+# Authentication
+JWT_SECRET=strong_random_secret_here
+
+# Hugging Face Token
+HUGGINGFACE_TOKEN=your_huggingface_token
+
+# gRPC Connection Pooling
+GRPC_MAX_CONNECTIONS_PER_SERVICE=10
+GRPC_KEEPALIVE_TIME_MS=30000
+GRPC_KEEPALIVE_TIMEOUT_MS=5000
+
+# Logging
+LOG_LEVEL=INFO  # Use INFO for production, DEBUG for troubleshooting
+
+# Data Directories
+JUNE_DATA_DIR=/var/lib/june/data
+MODEL_CACHE_DIR=/var/lib/june/models
+```
+
+**Secrets Management Best Practices:**
+- Never commit secrets to version control
+- Use environment variables or secrets manager (AWS Secrets Manager, HashiCorp Vault, Kubernetes Secrets)
+- Rotate secrets regularly
+- Use different secrets for each environment (dev, staging, production)
+
+#### 4. Resource Limits
+
+Configure resource limits in `docker-compose.yml` for each service:
+
+```yaml
+deploy:
+  resources:
+    limits:
+      cpus: '2.0'      # Maximum CPU usage
+      memory: 4G       # Maximum memory usage
+    reservations:
+      cpus: '0.5'      # Reserved CPU
+      memory: 1G       # Reserved memory
+```
+
+**Recommended Resource Limits:**
+- **Gateway**: 2 CPU, 2GB RAM
+- **Inference API**: 4 CPU, 8GB RAM (GPU required)
+- **STT Service**: 2 CPU, 4GB RAM (GPU required)
+- **TTS Service**: 2 CPU, 4GB RAM (GPU required)
+- **Telegram Service**: 2 CPU, 2GB RAM
+- **PostgreSQL**: 2 CPU, 4GB RAM
+- **MinIO**: 1 CPU, 2GB RAM
+- **NATS**: 1 CPU, 1GB RAM
+
+Adjust based on your expected load and available resources. Monitor actual usage and adjust accordingly.
+
+#### 5. Monitoring and Alerting Setup
+
+June includes comprehensive monitoring infrastructure. Set up monitoring before going to production:
+
+**Prometheus Metrics Collection:**
+- Prometheus is configured to scrape metrics from all services
+- Access Prometheus UI at `http://localhost:9090`
+- Metrics are exposed at `/metrics` endpoint for each service:
+  - Gateway: `http://gateway:8000/metrics`
+  - Inference API: `http://inference-api:8001/metrics`
+  - STT: `http://stt:8002/metrics`
+  - TTS: `http://tts:8003/metrics`
+  - Orchestrator: `http://orchestrator:8005/metrics`
+  - TODO Service: `http://todo-mcp-service:8004/metrics`
+
+**Grafana Dashboards:**
+- Access Grafana at `http://localhost:3000` (default: admin/admin)
+- Dashboards are automatically provisioned from `config/grafana/provisioning/dashboards/`
+- Key dashboards:
+  - Service health overview
+  - Request metrics (counts, latencies, throughput)
+  - Resource usage (CPU, memory, GPU)
+  - Service-specific metrics (STT/TTS/LLM)
+
+**Log Aggregation (Loki):**
+- Loki aggregates logs from all services
+- Access Loki at `http://localhost:3100`
+- Configure log retention policies based on storage capacity
+- Set up log rotation to prevent disk space issues
+
+**Distributed Tracing (Jaeger):**
+- Jaeger collects distributed traces across services
+- Access Jaeger UI at `http://localhost:16686`
+- Use traces to debug performance issues and understand request flow
+
+**Alerting Configuration:**
+Configure alerts for:
+- **Service Downtime**: Alert when health checks fail
+- **High Error Rates**: Alert when error rate exceeds threshold (e.g., >5%)
+- **Resource Exhaustion**: Alert when CPU/memory usage >80%
+- **GPU Utilization**: Alert when GPU usage is consistently low or high
+- **Database Issues**: Alert on connection pool exhaustion, slow queries
+- **Rate Limit Violations**: Alert on excessive rate limit hits
+- **Disk Space**: Alert when disk usage >80%
+
+**Example Prometheus Alert Rules:**
+```yaml
+groups:
+  - name: june_alerts
+    rules:
+      - alert: ServiceDown
+        expr: up{job="gateway"} == 0
+        for: 5m
+        annotations:
+          summary: "Gateway service is down"
+      
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 5m
+        annotations:
+          summary: "High error rate detected"
+```
+
+#### 6. Logging and Troubleshooting Guide
+
+**Log Levels:**
+- **DEBUG**: Detailed information for debugging (development only)
+- **INFO**: General informational messages (production default)
+- **WARNING**: Warning messages for potential issues
+- **ERROR**: Error messages for failures
+
+**Log Locations:**
+- Container logs: `docker-compose logs -f <service-name>`
+- Loki aggregated logs: `http://localhost:3100`
+- Service-specific logs: Check `JUNE_DATA_DIR` for log files
+
+**Structured Logging:**
+All services use structured logging with:
+- Timestamps
+- Log levels
+- Service names
+- Request IDs (for tracing)
+- Error context
+
+**Troubleshooting Steps:**
+
+1. **Check Service Health:**
+   ```bash
+   # Check all services
+   docker-compose ps
+   
+   # Check specific service health
+   curl http://localhost:8000/health  # Gateway
+   curl http://localhost:8080/health  # Telegram
+   curl http://localhost:8005/health  # Orchestrator
+   ```
+
+2. **Review Logs:**
+   ```bash
+   # View logs for specific service
+   docker-compose logs -f gateway
+   docker-compose logs -f inference-api
+   docker-compose logs -f stt
+   ```
+
+3. **Check Metrics:**
+   - Access Prometheus: `http://localhost:9090`
+   - Query metrics: `rate(http_requests_total[5m])`
+   - Check error rates: `rate(http_requests_total{status=~"5.."}[5m])`
+
+4. **Check Resource Usage:**
+   ```bash
+   # Container resource usage
+   docker stats
+   
+   # System resource usage
+   docker-compose exec node-exporter curl http://localhost:9100/metrics
+   ```
+
+5. **Check Network Connectivity:**
+   ```bash
+   # Test internal service connections
+   docker-compose exec gateway ping -c 3 inference-api
+   docker-compose exec gateway ping -c 3 postgres
+   ```
+
+#### 7. Performance Tuning Recommendations
+
+**Database Optimization:**
+- **Connection Pooling**: Configure appropriate pool sizes
+  ```python
+  # PostgreSQL connection pool
+  POSTGRES_POOL_SIZE=20
+  POSTGRES_MAX_OVERFLOW=10
+  ```
+- **Query Optimization**: Add indexes for frequently queried columns
+- **Vacuum and Analyze**: Schedule regular VACUUM and ANALYZE operations
+- **Connection Limits**: Set appropriate `max_connections` in PostgreSQL
+
+**gRPC Optimization:**
+- **Connection Pooling**: Reuse connections across requests
+  ```bash
+  GRPC_MAX_CONNECTIONS_PER_SERVICE=20  # Increase for high load
+  ```
+- **Keepalive Settings**: Tune keepalive intervals
+  ```bash
+  GRPC_KEEPALIVE_TIME_MS=30000
+  GRPC_KEEPALIVE_TIMEOUT_MS=5000
+  ```
+- **Request Timeouts**: Set appropriate timeouts for your use case
+- **Streaming**: Use streaming for large responses to reduce memory usage
+
+**GPU Optimization:**
+- **CUDA MPS**: Enable Multi-Process Service for concurrent GPU usage
+  ```bash
+  CUDA_MPS_ENABLE_PER_CTX_SM_PARTITIONING=1
+  ```
+- **Model Quantization**: Use quantized models to reduce memory usage
+- **Batch Processing**: Batch requests when possible to improve throughput
+- **Context Management**: Optimize context length based on use case
+
+**Caching:**
+- **Response Caching**: Cache frequently requested responses
+- **Model Caching**: Models are cached in `MODEL_CACHE_DIR`
+- **Database Query Caching**: Use connection pooling and query caching
+
+**Rate Limiting:**
+- Tune rate limits based on actual usage patterns
+- Monitor rate limit hits and adjust accordingly
+- Use different limits for different user tiers
+
+#### 8. Security Best Practices
+
+**Secrets Management:**
+- **Never Commit Secrets**: Use `.gitignore` to exclude `.env` files
+- **Use Secrets Manager**: AWS Secrets Manager, HashiCorp Vault, Kubernetes Secrets
+- **Rotate Secrets Regularly**: Set up rotation schedule for all secrets
+- **Separate Environments**: Use different secrets for dev/staging/production
+- **Access Control**: Limit access to secrets (principle of least privilege)
+
+**Network Security:**
+- **TLS/HTTPS**: Use TLS for all external communications
+- **Internal Networks**: Use Docker networks to isolate services
+- **Firewall Rules**: Restrict access to internal services
+- **VPN Access**: Use VPN for administrative access
+- **Network Policies**: Implement network policies (Kubernetes NetworkPolicies)
+
+**Authentication and Authorization:**
+- **JWT Secrets**: Use strong, random JWT secrets
+- **Token Expiration**: Set appropriate token expiration times
+- **Rate Limiting**: Implement rate limiting to prevent abuse
+- **Input Validation**: Validate all user inputs
+- **SQL Injection Prevention**: Use parameterized queries
+
+**Container Security:**
+- **Base Images**: Use official, regularly updated base images
+- **Image Scanning**: Scan images for vulnerabilities
+- **Non-Root Users**: Run containers as non-root users when possible
+- **Resource Limits**: Set resource limits to prevent resource exhaustion attacks
+- **Read-Only Filesystems**: Use read-only filesystems where possible
+
+**Data Security:**
+- **Encryption at Rest**: Encrypt sensitive data in databases and object storage
+- **Encryption in Transit**: Use TLS for all network communications
+- **Backup Encryption**: Encrypt backups
+- **Data Retention**: Implement data retention policies
+- **PII Handling**: Follow regulations for handling personally identifiable information
+
+#### 9. Backup and Recovery Procedures
+
+**Data Backup Strategy:**
+
+1. **PostgreSQL Backups:**
+   ```bash
+   # Automated daily backup
+   docker-compose exec postgres pg_dump -U june june > backup_$(date +%Y%m%d).sql
+   
+   # Restore from backup
+   docker-compose exec -T postgres psql -U june june < backup_20240101.sql
+   ```
+
+2. **MinIO Backups:**
+   ```bash
+   # Backup MinIO data
+   docker-compose exec minio mc mirror /data /backup/minio
+   ```
+
+3. **Configuration Backups:**
+   - Backup `docker-compose.yml`
+   - Backup `.env` files (securely)
+   - Backup `config/` directory
+   - Backup Grafana dashboards and Prometheus rules
+
+4. **Model Cache Backups:**
+   - Models are large; consider backing up model cache separately
+   - Use incremental backups for model cache
+
+**Backup Schedule:**
+- **Database**: Daily full backups, hourly incremental backups
+- **Object Storage**: Daily backups
+- **Configuration**: Weekly backups
+- **Model Cache**: Monthly backups (models change infrequently)
+
+**Recovery Procedures:**
+
+1. **Service Failure Recovery:**
+   ```bash
+   # Restart failed service
+   docker-compose restart <service-name>
+   
+   # Check service health
+   curl http://localhost:<port>/health
+   ```
+
+2. **Database Recovery:**
+   ```bash
+   # Stop services using database
+   docker-compose stop gateway inference-api
+   
+   # Restore database
+   docker-compose exec -T postgres psql -U june june < backup.sql
+   
+   # Restart services
+   docker-compose start gateway inference-api
+   ```
+
+3. **Full System Recovery:**
+   - Restore database from backup
+   - Restore MinIO data
+   - Restore configuration files
+   - Restart all services
+   - Verify system health
+
+**Disaster Recovery Plan:**
+- Document recovery procedures
+- Test backup restoration regularly
+- Maintain off-site backups
+- Document recovery time objectives (RTO) and recovery point objectives (RPO)
+
+#### 10. Scaling Guidelines
+
+**Horizontal Scaling:**
+
+All stateless services can be scaled horizontally:
+
+```bash
+# Scale Gateway service
+docker-compose up -d --scale gateway=3
+
+# Scale Telegram voice workers
+docker-compose up -d --scale telegram-voice-worker=5
+
+# Use load balancer for Gateway
+# Configure nginx/traefik to load balance across multiple Gateway instances
+```
+
+**Stateless Services (can scale horizontally):**
+- Gateway
+- Telegram service
+- Telegram voice workers
+- Orchestrator
+- TODO service
+
+**Stateful Services (require special handling):**
+- PostgreSQL: Use read replicas for read scaling, connection pooling
+- MinIO: Use MinIO distributed mode for horizontal scaling
+- NATS: Use NATS clustering for horizontal scaling
+
+**Vertical Scaling:**
+
+Increase resource limits for services that need more resources:
+
+```yaml
+deploy:
+  resources:
+    limits:
+      cpus: '4.0'      # Increase from 2.0
+      memory: 8G       # Increase from 4G
+```
+
+**GPU Services Scaling:**
+- Inference API, STT, TTS require GPU access
+- Use CUDA MPS to share GPU across services
+- For multiple GPUs, distribute services across GPUs
+- Consider GPU memory requirements when scaling
+
+**Load Balancing:**
+- Use nginx, traefik, or cloud load balancer for Gateway
+- Configure health checks for load balancer
+- Use sticky sessions if needed (not required for stateless services)
+
+**Auto-Scaling:**
+- Monitor metrics (CPU, memory, request rate)
+- Set up auto-scaling based on metrics
+- Use Kubernetes HPA or similar for automatic scaling
+
+#### 11. Health Check Endpoints Documentation
+
+All services expose health check endpoints for monitoring:
+
+**HTTP Health Checks:**
+
+| Service | Endpoint | Port | Description |
+|---------|----------|------|-------------|
+| Gateway | `GET /health` | 8000 | Checks NATS and gRPC services |
+| Telegram | `GET /health` | 8080 | Checks STT, TTS, LLM services |
+| Orchestrator | `GET /health` | 8005 | Checks agent status |
+| TODO Service | `GET /health` | 8004 | Basic health check |
+| Webapp | Health check via Docker | 3001 | Container health check |
+
+**gRPC Health Checks:**
+
+| Service | Method | Port | Description |
+|---------|--------|------|-------------|
+| Inference API | `HealthCheck` | 50051 | Checks model, database, MinIO, NATS |
+| STT | `HealthCheck` | 50052 | Checks model and NATS |
+| TTS | `HealthCheck` | 50053 | Checks model and NATS |
+
+**Infrastructure Health Checks:**
+
+| Service | Endpoint | Port | Description |
+|---------|----------|------|-------------|
+| PostgreSQL | `pg_isready` | 5432 | Database readiness |
+| MinIO | `GET /minio/health/live` | 9000 | Object storage health |
+| NATS | `GET /healthz` | 8222 | Messaging health |
+| Prometheus | `GET /-/healthy` | 9090 | Metrics collection health |
+| Grafana | `GET /api/health` | 3000 | Dashboard health |
+| Loki | `GET /ready` | 3100 | Log aggregation health |
+
+**Health Check Usage:**
+
+```bash
+# Check Gateway health
+curl http://localhost:8000/health
+
+# Check Telegram health
+curl http://localhost:8080/health
+
+# Check gRPC service health (requires grpc_health_probe)
+docker-compose exec inference-api grpc_health_probe -addr=:50051
+
+# Check all services
+docker-compose ps
+```
+
+**Health Check Response Format:**
+
+```json
+{
+  "status": "healthy",
+  "checks": {
+    "nats": true,
+    "grpc_services": true
+  }
+}
+```
+
+#### 12. Production Environment Variable Reference
+
+Complete reference of all production environment variables:
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `TELEGRAM_BOT_TOKEN` | ✅ Yes | - | Bot token from BotFather |
-| `STT_URL` | No | `grpc://stt:50052` | STT service gRPC endpoint |
-| `TTS_URL` | No | `grpc://tts:50053` | TTS service gRPC endpoint |
-| `LLM_URL` | No | `grpc://inference-api:50051` | Inference API gRPC endpoint |
+| **Model Configuration** |
+| `MODEL_NAME` | No | `Qwen/Qwen3-30B-A3B-Thinking-2507` | HuggingFace model identifier |
+| `MODEL_DEVICE` | No | `cuda:0` | GPU device for LLM (cuda:0, cpu, etc.) |
+| `MAX_CONTEXT_LENGTH` | No | `131072` | Maximum context length in tokens |
+| `USE_YARN` | No | `true` | Enable YaRN for long context support |
+| `MODEL_TEMPERATURE` | No | `0.7` | Default temperature for generation (0.0-2.0) |
+| `MODEL_MAX_TOKENS` | No | `2048` | Default maximum tokens to generate |
+| `MODEL_TOP_P` | No | `0.9` | Default top-p (nucleus) sampling parameter |
+| `MODEL_TOP_K` | No | - | Optional: top-k sampling (leave empty to disable) |
+| `MODEL_REPETITION_PENALTY` | No | - | Optional: repetition penalty (leave empty to disable) |
+| **STT Configuration** |
+| `STT_MODEL` | No | `openai/whisper-large-v3` | STT model name |
+| `STT_DEVICE` | No | `cuda:0` | GPU device for STT |
+| **TTS Configuration** |
+| `TTS_MODEL` | No | `facebook/fastspeech2-en-ljspeech` | TTS model name |
+| `TTS_DEVICE` | No | `cuda:0` | GPU device for TTS |
+| **Telegram Bot** |
+| `TELEGRAM_BOT_TOKEN` | Yes* | - | Bot token from BotFather |
 | `TELEGRAM_USE_WEBHOOK` | No | `false` | Enable webhook mode |
-| `TELEGRAM_WEBHOOK_URL` | No* | - | Webhook URL (required if `TELEGRAM_USE_WEBHOOK=true`) |
+| `TELEGRAM_WEBHOOK_URL` | No** | - | Webhook URL |
 | `TELEGRAM_WEBHOOK_PORT` | No | `8443` | Webhook server port |
-| `TELEGRAM_MAX_FILE_SIZE` | No | `20971520` | Max voice file size in bytes (20MB) |
-| `LOG_LEVEL` | No | `INFO` | Logging level (DEBUG, INFO, WARNING, ERROR) |
+| `TELEGRAM_REQUEST_TIMEOUT` | No | `30.0` | Request timeout (seconds) |
+| `TELEGRAM_RATE_LIMIT_PER_MINUTE` | No | `10` | Max requests per minute |
+| `TELEGRAM_RATE_LIMIT_PER_HOUR` | No | `100` | Max requests per hour |
+| `TELEGRAM_RATE_LIMIT_PER_DAY` | No | `500` | Max requests per day |
+| `TELEGRAM_MAX_FILE_SIZE` | No | `20971520` | Max file size (20MB) |
+| **Database** |
+| `POSTGRES_PASSWORD` | Yes | `changeme` | PostgreSQL password |
+| `POSTGRES_USER` | No | `june` | PostgreSQL user |
+| `POSTGRES_DB` | No | `june` | PostgreSQL database |
+| **MinIO** |
+| `MINIO_ROOT_USER` | No | `admin` | MinIO admin user |
+| `MINIO_ROOT_PASSWORD` | Yes | `changeme` | MinIO admin password |
+| **Authentication** |
+| `JWT_SECRET` | No | `change-this-secret` | JWT signing secret |
+| **External Services** |
+| `HUGGINGFACE_TOKEN` | Yes* | - | Hugging Face API token |
+| **gRPC Configuration** |
+| `GRPC_MAX_CONNECTIONS_PER_SERVICE` | No | `10` | Max gRPC connections |
+| `GRPC_KEEPALIVE_TIME_MS` | No | `30000` | Keepalive interval (ms) |
+| `GRPC_KEEPALIVE_TIMEOUT_MS` | No | `5000` | Keepalive timeout (ms) |
+| **Logging** |
+| `LOG_LEVEL` | No | `INFO` | Log level (DEBUG/INFO/WARNING/ERROR) |
+| **Data Directories** |
+| `JUNE_DATA_DIR` | No | `/home/rlee/june_data` | Data directory |
+| `MODEL_CACHE_DIR` | No | `/home/rlee/models` | Model cache directory |
+| `JUNE_TEST_DATA_DIR` | No | `/home/rlee/june_test_data` | Test data directory |
+| **Service URLs** |
+| `STT_URL` | No | `grpc://stt:50052` | STT service endpoint |
+| `TTS_URL` | No | `grpc://tts:50053` | TTS service endpoint |
+| `LLM_URL` | No | `grpc://inference-api:50051` | Inference API endpoint |
+| `NATS_URL` | No | `nats://nats:4222` | NATS messaging endpoint |
+| `POSTGRES_URL` | No | Auto | PostgreSQL connection string |
+| `MINIO_ENDPOINT` | No | `minio:9000` | MinIO endpoint |
+| **Monitoring** |
+| `GRAFANA_PASSWORD` | No | `admin` | Grafana admin password |
 
-\* Required when `TELEGRAM_USE_WEBHOOK=true`
+\* Required if using Telegram bot  
+\** Required if `TELEGRAM_USE_WEBHOOK=true`
 
-### Troubleshooting
+### Troubleshooting Common Issues
 
-#### Bot Not Responding
+#### Service Won't Start
 
-1. **Check bot token:**
-   ```bash
-   # Verify token is set
-   docker-compose exec telegram env | grep TELEGRAM_BOT_TOKEN
-   
-   # Test token validity (run locally)
-   curl "https://api.telegram.org/bot<YOUR_TOKEN>/getMe"
-   ```
+**Symptoms:** Service fails to start or crashes immediately
 
-2. **Check service logs:**
-   ```bash
-   docker-compose logs -f telegram
-   ```
+**Diagnosis:**
+```bash
+# Check service logs
+docker-compose logs <service-name>
 
-3. **Verify dependencies are running:**
-   ```bash
-   docker-compose ps stt tts inference-api
-   ```
+# Check environment variables
+docker-compose exec <service-name> env
 
-#### Voice Messages Not Processing
+# Check service status
+docker-compose ps
+```
 
-1. **Check audio file size:**
-   - Ensure file is under 20MB (or your configured limit)
-   - Telegram has a ~1 minute duration limit
+**Common Causes:**
+- Missing required environment variables
+- Invalid configuration values
+- Port conflicts
+- Insufficient resources (CPU/memory)
+- Missing dependencies (other services not running)
+- Database connection failures
 
-2. **Check STT service:**
-   ```bash
-   # Test STT service connectivity
-   docker-compose exec telegram ping -c 3 stt
-   
-   # Check STT logs
-   docker-compose logs stt
-   ```
+**Solutions:**
+- Verify all required environment variables are set
+- Check port availability: `netstat -tuln | grep <port>`
+- Increase resource limits if needed
+- Ensure dependencies are running: `docker-compose ps`
+- Check database connectivity: `docker-compose exec postgres pg_isready`
 
-3. **Check audio format:**
-   - Bot expects OGG/OPUS format from Telegram
-   - Conversion to WAV/PCM is handled automatically
+#### High Error Rates
 
-#### Webhook Issues
+**Symptoms:** High percentage of failed requests (5xx errors)
 
-1. **SSL Certificate:**
-   - Ensure valid HTTPS certificate (Let's Encrypt recommended)
-   - Certificate must be trusted by Telegram servers
+**Diagnosis:**
+```bash
+# Check error rates in Prometheus
+# Query: rate(http_requests_total{status=~"5.."}[5m])
 
-2. **Webhook URL:**
-   ```bash
-   # Verify webhook is set (replace YOUR_TOKEN)
-   curl "https://api.telegram.org/bot<YOUR_TOKEN>/getWebhookInfo"
-   
-   # Set webhook manually if needed
-   curl -X POST "https://api.telegram.org/bot<YOUR_TOKEN>/setWebhook" \
-     -H "Content-Type: application/json" \
-     -d '{"url": "https://your-domain.com/webhook"}'
-   ```
+# Check service logs for errors
+docker-compose logs -f <service-name> | grep ERROR
 
-3. **Firewall:**
-   - Allow inbound connections on port 8443
-   - Telegram IP ranges: https://core.telegram.org/bots/webhooks
+# Check service health
+curl http://localhost:<port>/health
+```
 
-#### Service Connection Errors
+**Common Causes:**
+- Service dependencies unavailable (STT/TTS/LLM)
+- Database connection issues
+- Resource exhaustion (CPU/memory/GPU)
+- Network connectivity problems
+- Invalid requests or configuration
 
-1. **Check network connectivity:**
-   ```bash
-   # Test internal service connections
-   docker-compose exec telegram ping -c 3 stt
-   docker-compose exec telegram ping -c 3 tts
-   docker-compose exec telegram ping -c 3 inference-api
-   ```
+**Solutions:**
+- Verify all service dependencies are healthy
+- Check database connectivity and connection pool
+- Monitor resource usage: `docker stats`
+- Check network connectivity between services
+- Review error logs for specific error messages
+- Verify configuration values
 
-2. **Verify gRPC endpoints:**
-   - Ensure services are running: `docker-compose ps`
-   - Check service ports are accessible within Docker network
+#### Performance Issues
 
-3. **Check service health:**
-   ```bash
-   # Test STT health
-   docker-compose exec stt grpc_health_probe -addr=:50052
-   
-   # Test TTS health  
-   docker-compose exec tts grpc_health_probe -addr=:50053
-   ```
+**Symptoms:** Slow response times, high latency
 
-#### Common Error Messages
+**Diagnosis:**
+```bash
+# Check request latencies in Prometheus
+# Query: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
 
-- **"TELEGRAM_BOT_TOKEN environment variable is required"**
-  - Solution: Set `TELEGRAM_BOT_TOKEN` in `.env` file
+# Check resource usage
+docker stats
 
-- **"Voice message too large"**
-  - Solution: Send shorter voice messages or increase `TELEGRAM_MAX_FILE_SIZE`
+# Check GPU utilization
+nvidia-smi
 
-- **"Transcription failed"**
-  - Solution: Check STT service is running and accessible
-  - Verify audio format is valid
+# Check database query performance
+docker-compose exec postgres psql -U june -c "SELECT * FROM pg_stat_statements ORDER BY total_time DESC LIMIT 10;"
+```
 
-- **"Error processing audio"**
-  - Solution: Check audio format, file integrity, and service connectivity
+**Common Causes:**
+- Insufficient resources (CPU/memory/GPU)
+- Database query performance issues
+- Network latency
+- Inefficient model inference
+- Connection pool exhaustion
+
+**Solutions:**
+- Increase resource limits for services
+- Optimize database queries and add indexes
+- Check network latency between services
+- Optimize model inference (quantization, batching)
+- Increase connection pool sizes
+- Scale services horizontally
+
+#### Database Connection Issues
+
+**Symptoms:** Database connection errors, connection pool exhaustion
+
+**Diagnosis:**
+```bash
+# Check database connectivity
+docker-compose exec postgres pg_isready
+
+# Check connection count
+docker-compose exec postgres psql -U june -c "SELECT count(*) FROM pg_stat_activity;"
+
+# Check database logs
+docker-compose logs postgres
+```
+
+**Common Causes:**
+- Database not running
+- Incorrect connection string
+- Connection pool too small
+- Too many connections
+- Database performance issues
+
+**Solutions:**
+- Ensure PostgreSQL is running: `docker-compose ps postgres`
+- Verify connection string format
+- Increase connection pool size
+- Check `max_connections` setting in PostgreSQL
+- Optimize slow queries
+
+#### GPU Issues
+
+**Symptoms:** GPU not available, CUDA errors, low GPU utilization
+
+**Diagnosis:**
+```bash
+# Check GPU availability
+nvidia-smi
+
+# Check CUDA in container
+docker-compose exec inference-api nvidia-smi
+
+# Check CUDA MPS status
+docker-compose exec inference-api ps aux | grep mps
+```
+
+**Common Causes:**
+- NVIDIA Container Toolkit not installed
+- GPU not accessible in container
+- CUDA MPS not configured
+- Insufficient GPU memory
+- Multiple services competing for GPU
+
+**Solutions:**
+- Install NVIDIA Container Toolkit
+- Verify GPU access: `docker run --rm --gpus all nvidia/cuda:11.0-base nvidia-smi`
+- Enable CUDA MPS: `CUDA_MPS_ENABLE_PER_CTX_SM_PARTITIONING=1`
+- Monitor GPU memory usage
+- Distribute services across multiple GPUs if available
+
+#### Webhook Not Working (Telegram)
+
+**Symptoms:** Telegram webhook not receiving updates
+
+**Diagnosis:**
+```bash
+# Check webhook status
+curl "https://api.telegram.org/bot<TOKEN>/getWebhookInfo"
+
+# Test webhook endpoint
+curl -X POST https://your-domain.com/webhook -d '{"test": true}'
+
+# Check SSL certificate
+openssl s_client -connect your-domain.com:8443
+```
+
+**Common Causes:**
+- Invalid SSL certificate
+- Firewall blocking port 8443
+- Incorrect webhook URL
+- Telegram IP ranges blocked
+
+**Solutions:**
+- Verify SSL certificate is valid and trusted
+- Check firewall rules allow Telegram IP ranges
+- Verify webhook URL is correct and accessible
+- Test webhook endpoint manually
+- Check Telegram webhook documentation for IP ranges
+
+#### Monitoring Not Working
+
+**Symptoms:** Prometheus/Grafana not collecting metrics
+
+**Diagnosis:**
+```bash
+# Check Prometheus targets
+curl http://localhost:9090/api/v1/targets
+
+# Check service metrics endpoints
+curl http://localhost:8000/metrics
+
+# Check Prometheus configuration
+docker-compose exec prometheus cat /etc/prometheus/prometheus.yml
+```
+
+**Common Causes:**
+- Services not exposing metrics endpoints
+- Prometheus configuration incorrect
+- Network connectivity issues
+- Service not running
+
+**Solutions:**
+- Verify services expose `/metrics` endpoints
+- Check Prometheus configuration in `config/prometheus.yml`
+- Verify network connectivity between Prometheus and services
+- Ensure all services are running
+
+### Additional Resources
+
+- **Architecture Documentation**: See architecture overview in this README
+- **API Documentation**: See API usage examples in this README
+- **Development Setup**: See development section for local setup
+- **Contributing Guidelines**: See contributing section for development workflow
 
 ### Development
 
@@ -776,6 +1508,223 @@ docker-compose logs -f
 docker-compose down
 ```
 
+## 📦 Standalone Service Deployment (Non-Container)
+
+Some services (Telegram and Discord bots) can be deployed as standalone processes without Docker containers. This is useful for services that need direct access to the host system or when running `cursor-agent` processes.
+
+### Prerequisites
+
+- Python 3.10+
+- Poetry installed (`pip install poetry`)
+- Repository `.env` file configured with required environment variables (see Environment Configuration below)
+
+### Building a Service
+
+The build process creates a tarball containing a pristine virtual environment and all necessary code:
+
+```bash
+# Build a service (e.g., telegram or discord)
+./scripts/build.sh <service-name>
+
+# Example: Build telegram service
+./scripts/build.sh telegram
+
+# Example: Build discord service
+./scripts/build.sh discord
+```
+
+The build script will:
+1. Create a pristine Python virtual environment
+2. Install all dependencies (minimal set for telegram/discord, full poetry install for others)
+3. Copy the essence module and service code
+4. Create a run script (`run.sh`) that executes `python -m essence <service-name>-service`
+5. Package everything into a tarball in `build/` directory
+6. Automatically clean up old builds, keeping only the last 3
+
+**Output:**
+- Tarball: `build/june-<service-name>-<timestamp>.tar.gz`
+- Checksum: `build/june-<service-name>-<timestamp>.tar.gz.sha256`
+
+**Important:** The `.env` file is **not** included in the build. Environment variables are sourced at runtime from the repository's `.env` file via the `ENV_SH` mechanism (see Environment Configuration below).
+
+### Command Pattern Architecture
+
+All services use a reflection-based command discovery system:
+
+- Commands are discovered automatically by scanning `essence.commands` for `Command` subclasses
+- No manual registration required - commands are found via Python reflection
+- Services are invoked via: `python -m essence <service-name>-service [args...]`
+- Each command implements: `init()`, `run()`, `cleanup()` lifecycle methods
+
+### Environment Configuration
+
+Services source environment variables from the repository's `.env` file at runtime:
+
+1. **Repository `.env` file**: Located at the project root (`/home/rlee/dev/june/.env`)
+2. **ENV_SH mechanism**: The deploy script sets `ENV_SH` to point to the repo's `.env` file
+3. **Runtime sourcing**: The `run.sh` script sources `ENV_SH` before starting the service
+4. **Fallback**: If `ENV_SH` is not set, services fall back to a local `.env` file (if present)
+
+**Benefits:**
+- `.env` file stays in one place (repo root)
+- No secrets in build artifacts
+- Easy to update environment variables without rebuilding
+- Supports both development and production deployments
+
+**Required Environment Variables:**
+- `SERVICE_NAME`: Service name (set automatically by deploy script)
+- `TELEGRAM_BOT_TOKEN`: Telegram bot token (for telegram service)
+- `DISCORD_BOT_TOKEN`: Discord bot token (for discord service)
+- Service-specific ports and configuration
+
+### Deploying a Service
+
+The deploy script handles stopping the previous version, deploying the new version, and starting the service:
+
+```bash
+# Deploy a service
+./scripts/deploy.sh <service-name> <tarball-name>
+
+# Example: Deploy telegram service
+./scripts/deploy.sh telegram june-telegram-20240101-120000.tar.gz
+
+# Example: Deploy discord service
+./scripts/deploy.sh discord june-discord-20240101-120000.tar.gz
+```
+
+The deploy script will:
+1. Verify the tarball checksum
+2. Stop the previous version if running (graceful shutdown with SIGTERM)
+3. Remove the old deployment from `/usr/local/june/<service-name>` (or `~/.local/run/june/<service-name>` for non-root)
+4. Extract the new tarball
+5. **Verify deployment structure** (checks for required files, essence module importability, command discovery)
+6. Set `ENV_SH` to point to the repository's `.env` file
+7. Start the service in the background with proper logging
+
+**Service Locations:**
+- Runtime directory: `/usr/local/june/<service-name>/` (or `~/.local/run/june/<service-name>` for non-root)
+- Console logs: `/var/log/june/<service-name>.console` (or `~/.local/log/june/<service-name>.console` for non-root)
+- Application logs: `/var/log/june/<service-name>.log` (or `~/.local/log/june/<service-name>.log` for non-root)
+- PID file: `<runtime-dir>/service.pid`
+
+**Deployment Verification:**
+The deploy script automatically verifies:
+- Required files exist (run.sh, venv, essence module)
+- Essence module can be imported
+- Commands can be discovered via reflection
+- Service structure is valid
+
+If verification fails, deployment is aborted with an error message.
+
+### Testing Services
+
+Both Telegram and Discord services expose HTTP endpoints for testing:
+
+#### Telegram Service (Port 8080)
+
+```bash
+# Health check
+curl http://localhost:8080/health | jq
+
+# Test agent message endpoint
+curl -X POST http://localhost:8080/api/agent/message \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hello, this is a test"}' | jq
+
+# Metrics endpoint
+curl http://localhost:8080/metrics
+```
+
+#### Discord Service (Port 8081)
+
+```bash
+# Health check
+curl http://localhost:8081/health | jq
+
+# Metrics endpoint
+curl http://localhost:8081/metrics
+```
+
+### Service Management
+
+#### Viewing Logs
+
+```bash
+# Console output (stdout/stderr)
+tail -f /var/log/june/<service-name>.console
+
+# Application logs
+tail -f /var/log/june/<service-name>.log
+```
+
+#### Stopping a Service
+
+```bash
+# Stop using PID file
+kill $(cat /var/run/june/<service-name>/service.pid)
+
+# Or stop by process name
+pkill -f "essence <service-name>-service"
+```
+
+#### Restarting a Service
+
+```bash
+# Stop the service
+kill $(cat /var/run/june/<service-name>/service.pid)
+
+# Wait a moment
+sleep 2
+
+# Start again (service will auto-start from deploy, or manually):
+cd /var/run/june/<service-name>
+./run.sh >> /var/log/june/<service-name>.console 2>&1 &
+echo $! > service.pid
+```
+
+### Environment Configuration
+
+Before deploying, ensure required environment variables are set in `/var/run/june/<service-name>/.env`:
+
+**Telegram Service:**
+```bash
+SERVICE_NAME=telegram
+TELEGRAM_BOT_TOKEN=your_bot_token_here
+TELEGRAM_SERVICE_PORT=8080
+# ... other required variables
+```
+
+**Discord Service:**
+```bash
+SERVICE_NAME=discord
+DISCORD_BOT_TOKEN=your_bot_token_here
+DISCORD_SERVICE_PORT=8081
+# ... other required variables
+```
+
+### Command Pattern
+
+All services use the `essence` command pattern:
+
+```bash
+# Services are run via:
+poetry run -m essence <service-name>-service [args...]
+
+# Or directly with Python:
+python -m essence <service-name>-service [args...]
+```
+
+Available commands:
+- `telegram-service` - Telegram bot service
+- `discord-service` - Discord bot service
+- `tts` - Text-to-Speech service (future)
+- `stt` - Speech-to-Text service (future)
+
+Each command implements the `essence.command.Command` interface with:
+- `init()` - Initialize the service
+- `run()` - Run the service (blocking)
+- `cleanup()` - Clean up resources on shutdown
+
 ## 🔧 Development
 
 ### Project Structure
@@ -843,10 +1792,23 @@ The system is optimized for single GPU deployment:
 
 ## 🔒 Security
 
-- **JWT Authentication**: Secure token-based authentication
-- **Rate Limiting**: Prevents abuse and ensures fair usage
-- **Input Validation**: Comprehensive input sanitization
-- **Network Security**: Internal service communication over gRPC
+June Agent implements comprehensive security measures to protect the system and user data:
+
+- **JWT Authentication**: Secure token-based authentication with access and refresh tokens
+- **Rate Limiting**: Prevents abuse and ensures fair usage with per-user, per-IP, and per-endpoint limits
+- **Input Validation**: Comprehensive input sanitization using june-security package
+- **Security Headers**: Protection against XSS, clickjacking, and other web vulnerabilities
+- **Data Encryption**: Encryption at rest and in transit (TLS/HTTPS)
+- **Security Monitoring**: Threat detection, audit logging, and security metrics
+- **Network Security**: Internal service communication over gRPC with TLS support
+
+**For comprehensive security documentation, see:**
+- **[Security Documentation](docs/SECURITY.md)** - Complete security guide covering architecture, practices, and procedures
+- **[Security Runbook](docs/SECURITY_RUNBOOK.md)** - Operational security procedures and incident response
+- **[Security Audit Report](docs/SECURITY_AUDIT_REPORT.md)** - Security audit findings and recommendations
+- **[Security Headers](docs/SECURITY_HEADERS.md)** - Security headers configuration
+- **[Rate Limiting](docs/RATE_LIMITING.md)** - Rate limiting implementation details
+- **[june-security Package](packages/june-security/README.md)** - Security package documentation
 
 ## 📈 Scaling
 

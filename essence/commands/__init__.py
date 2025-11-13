@@ -1,0 +1,18 @@
+"""
+Service command implementations.
+
+Each service is implemented as a command that can be run via:
+    poetry run -m essence <service-name>
+    
+Commands are discovered via reflection - they must be:
+1. Subclasses of essence.command.Command
+2. Located in this package (essence.commands)
+3. Have a get_name() class method that returns the command name
+"""
+
+# Import command modules so they're available for reflection
+from . import telegram_service  # noqa: F401
+from . import discord_service  # noqa: F401
+
+__all__ = ["telegram_service", "discord_service"]
+

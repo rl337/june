@@ -1,0 +1,132 @@
+{
+  "dashboard": {
+    "title": "TTS Service",
+    "tags": ["june", "tts", "service"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 0,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "TTS Request Rate",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "sum(rate(tts_requests_total[5m])) by (status)",
+            "refId": "A",
+            "legendFormat": "{{status}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "decimals": 2,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Synthesis Time",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(tts_synthesis_time_seconds_bucket[5m]))",
+            "refId": "A",
+            "legendFormat": "p95"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(tts_synthesis_time_seconds_bucket[5m]))",
+            "refId": "B",
+            "legendFormat": "p50"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "decimals": 3,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Audio Duration",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 6},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(tts_audio_duration_seconds_bucket[5m]))",
+            "refId": "A",
+            "legendFormat": "p95"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(tts_audio_duration_seconds_bucket[5m]))",
+            "refId": "B",
+            "legendFormat": "p50"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "decimals": 2,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "TTS Errors",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 6},
+        "targets": [
+          {
+            "expr": "sum(rate(tts_errors_total[5m])) by (error_type)",
+            "refId": "A",
+            "legendFormat": "{{error_type}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ops",
+            "decimals": 2,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Active Connections",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 12},
+        "targets": [
+          {
+            "expr": "tts_active_connections",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 0,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "templating": {
+      "list": []
+    },
+    "annotations": {
+      "list": []
+    }
+  }
+}

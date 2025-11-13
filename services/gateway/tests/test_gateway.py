@@ -80,6 +80,30 @@ class TestHealthEndpoints:
         assert response.status_code == 200
         assert "gateway_requests_total" in response.text
     
+    def test_security_headers(self, client):
+        """Test that security headers are present in HTTP responses."""
+        response = client.get("/health")
+        assert response.status_code == 200
+        
+        # Check that all required security headers are present
+        assert "X-Content-Type-Options" in response.headers
+        assert response.headers["X-Content-Type-Options"] == "nosniff"
+        
+        assert "X-Frame-Options" in response.headers
+        assert response.headers["X-Frame-Options"] == "DENY"
+        
+        assert "X-XSS-Protection" in response.headers
+        assert response.headers["X-XSS-Protection"] == "1; mode=block"
+        
+        assert "Referrer-Policy" in response.headers
+        assert response.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+        
+        assert "Permissions-Policy" in response.headers
+        assert "geolocation=()" in response.headers["Permissions-Policy"]
+        
+        assert "Content-Security-Policy" in response.headers
+        assert "default-src 'self'" in response.headers["Content-Security-Policy"]
+    
     def test_status_endpoint(self, client):
         """Test status endpoint."""
         response = client.get("/status")

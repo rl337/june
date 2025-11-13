@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional
 
 from ..strategies import LlmStrategy, InferenceRequest, InferenceResponse
 from ..config import config
+from ..utils.inference_cache import get_llm_cache
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,9 @@ class Qwen3LlmStrategy(LlmStrategy):
         use_yarn: Optional[bool] = None,
         huggingface_token: Optional[str] = None,
         model_cache_dir: Optional[str] = None,
+        local_files_only: Optional[bool] = None,
+        use_quantization: Optional[bool] = None,
+        use_kv_cache: Optional[bool] = None,
     ) -> None:
         """Initialize Qwen3 LLM strategy.
 
@@ -31,6 +35,9 @@ class Qwen3LlmStrategy(LlmStrategy):
             use_yarn: Whether to use YaRN for long context (defaults to config.model.use_yarn)
             huggingface_token: HuggingFace token for private models (defaults to config.model.huggingface_token)
             model_cache_dir: Directory to cache models (defaults to config.model.model_cache_dir)
+            local_files_only: If True, only load from local cache (defaults to False)
+            use_quantization: Whether to use 4-bit quantization (defaults to True for CUDA)
+            use_kv_cache: Whether to use KV cache for faster inference (defaults to True)
         """
         self.model_name = model_name or config.model.name
         self.device = device or config.model.device
@@ -38,6 +45,20 @@ class Qwen3LlmStrategy(LlmStrategy):
         self.use_yarn = use_yarn if use_yarn is not None else config.model.use_yarn
         self.huggingface_token = huggingface_token or config.model.huggingface_token
         self.model_cache_dir = model_cache_dir or config.model.model_cache_dir
+        self.local_files_only = local_files_only if local_files_only is not None else False
+        
+        # GPU optimization settings
+        # Default to quantization for CUDA devices (reduces memory usage significantly)
+        if use_quantization is None:
+            self.use_quantization = self.device.startswith("cuda")
+        else:
+            self.use_quantization = use_quantization
+        
+        # Default to KV cache for faster inference
+        if use_kv_cache is None:
+            self.use_kv_cache = True
+        else:
+            self.use_kv_cache = use_kv_cache
 
         # Set HuggingFace cache directories if provided
         if config.model.huggingface_cache_dir:
@@ -47,6 +68,15 @@ class Qwen3LlmStrategy(LlmStrategy):
 
         self._model = None
         self._tokenizer = None
+        self._past_key_values = None  # For KV cache
+        
+        # Initialize inference cache (can be disabled via environment variable)
+        cache_enabled = os.getenv("LLM_CACHE_ENABLED", "true").lower() == "true"
+        cache_max_size = int(os.getenv("LLM_CACHE_MAX_SIZE", "1000"))
+        cache_ttl = float(os.getenv("LLM_CACHE_TTL_SECONDS", "3600"))  # 1 hour default
+        self._cache = get_llm_cache(max_size=cache_max_size, ttl_seconds=cache_ttl if cache_enabled else None)
+        if not cache_enabled:
+            self._cache.enable_cache = False
 
     def warmup(self) -> None:
         """Load and initialize the Qwen3 model."""
@@ -65,7 +95,9 @@ class Qwen3LlmStrategy(LlmStrategy):
 
             # Load tokenizer
             logger.info("Loading tokenizer...")
-            tokenizer_kwargs = {}
+            tokenizer_kwargs = {
+                "local_files_only": self.local_files_only,
+            }
             if self.huggingface_token:
                 tokenizer_kwargs["token"] = self.huggingface_token
 
@@ -76,31 +108,56 @@ class Qwen3LlmStrategy(LlmStrategy):
                 **tokenizer_kwargs,
             )
 
-            # Load model
+            # Load model with optional 4-bit quantization
             logger.info("Loading model (this may take a while)...")
             model_kwargs = {
                 "cache_dir": self.model_cache_dir,
                 "trust_remote_code": True,
-                "torch_dtype": torch.float16 if self.device.startswith("cuda") else torch.float32,
+                "local_files_only": self.local_files_only,
             }
             if self.huggingface_token:
                 model_kwargs["token"] = self.huggingface_token
 
-            # Use device_map="auto" for CUDA to handle multi-GPU
-            if self.device.startswith("cuda"):
-                model_kwargs["device_map"] = "auto"
-                model_kwargs["low_cpu_mem_usage"] = True
+            # Apply 4-bit quantization if enabled and CUDA is available
+            if self.use_quantization and self.device.startswith("cuda"):
+                try:
+                    from transformers import BitsAndBytesConfig
+                    logger.info("Using 4-bit quantization for memory efficiency")
+                    quantization_config = BitsAndBytesConfig(
+                        load_in_4bit=True,
+                        bnb_4bit_compute_dtype=torch.float16,
+                        bnb_4bit_use_double_quant=True,
+                        bnb_4bit_quant_type="nf4"  # NormalFloat4 for optimal performance
+                    )
+                    model_kwargs["quantization_config"] = quantization_config
+                    model_kwargs["torch_dtype"] = torch.float16
+                    # When using quantization, device_map should be "auto"
+                    model_kwargs["device_map"] = "auto"
+                    model_kwargs["low_cpu_mem_usage"] = True
+                except ImportError:
+                    logger.warning("bitsandbytes not available, falling back to standard loading")
+                    model_kwargs["torch_dtype"] = torch.float16 if self.device.startswith("cuda") else torch.float32
+                    if self.device.startswith("cuda"):
+                        model_kwargs["device_map"] = "auto"
+                        model_kwargs["low_cpu_mem_usage"] = True
+                    else:
+                        model_kwargs["device_map"] = None
             else:
-                # For CPU, we'll move the model after loading
-                model_kwargs["device_map"] = None
+                # Standard loading without quantization
+                model_kwargs["torch_dtype"] = torch.float16 if self.device.startswith("cuda") else torch.float32
+                if self.device.startswith("cuda"):
+                    model_kwargs["device_map"] = "auto"
+                    model_kwargs["low_cpu_mem_usage"] = True
+                else:
+                    model_kwargs["device_map"] = None
 
             self._model = AutoModelForCausalLM.from_pretrained(
                 self.model_name,
                 **model_kwargs,
             )
 
-            # Move to device if not using device_map="auto"
-            if not self.device.startswith("cuda") or "device_map" not in model_kwargs:
+            # Move to device if not using device_map="auto" and not quantized
+            if (not self.device.startswith("cuda") or "device_map" not in model_kwargs) and not self.use_quantization:
                 self._model = self._model.to(self.device)
 
             # Configure YaRN if enabled
@@ -160,6 +217,28 @@ class Qwen3LlmStrategy(LlmStrategy):
             top_k = params.get("top_k", None)
             repetition_penalty = params.get("repetition_penalty", None)
 
+            # Check cache first (only for deterministic generation: temperature=0)
+            cache_key = None
+            if temperature == 0.0 and self._cache.enable_cache:
+                cache_key = {
+                    "prompt": prompt,
+                    "max_tokens": max_tokens,
+                    "top_p": top_p,
+                    "top_k": top_k,
+                    "repetition_penalty": repetition_penalty,
+                }
+                cached_result = self._cache.get(cache_key, model_name=self.model_name)
+                if cached_result is not None:
+                    logger.debug("Cache hit for LLM inference")
+                    return InferenceResponse(
+                        payload={"text": cached_result["text"], "tokens": cached_result["tokens"]},
+                        metadata={
+                            "input_tokens": cached_result.get("input_tokens", 0),
+                            "output_tokens": cached_result["tokens"],
+                            "cached": True,
+                        },
+                    )
+
             # Tokenize input
             inputs = self._tokenizer(prompt, return_tensors="pt").to(self.device)
 
@@ -179,12 +258,26 @@ class Qwen3LlmStrategy(LlmStrategy):
             if repetition_penalty is not None and repetition_penalty > 0:
                 generation_kwargs["repetition_penalty"] = repetition_penalty
 
+            # Enable KV cache for faster inference (reuses computed key-value pairs)
+            if self.use_kv_cache:
+                generation_kwargs["use_cache"] = True
+                # If we have past_key_values from previous generation, use them
+                if self._past_key_values is not None:
+                    # Note: past_key_values usage requires careful handling of input_ids
+                    # For now, we'll use use_cache=True which enables KV cache within a single generation
+                    # Full past_key_values reuse would require tracking conversation state
+                    pass
+
             # Generate
             with torch.no_grad():
                 outputs = self._model.generate(
                     inputs.input_ids,
                     **generation_kwargs
                 )
+                
+                # Store past_key_values for potential reuse in future calls
+                # Note: This requires the model to return past_key_values in outputs
+                # For now, we enable use_cache which improves performance within a single generation
 
             # Decode output
             generated_text = self._tokenizer.decode(
@@ -199,9 +292,21 @@ class Qwen3LlmStrategy(LlmStrategy):
             input_tokens = len(inputs.input_ids[0])
             output_tokens = len(outputs[0]) - input_tokens
 
+            # Cache result if deterministic (temperature=0)
+            if cache_key is not None and temperature == 0.0:
+                self._cache.put(
+                    cache_key,
+                    {
+                        "text": generated_text,
+                        "tokens": output_tokens,
+                        "input_tokens": input_tokens,
+                    },
+                    model_name=self.model_name,
+                )
+
             return InferenceResponse(
                 payload={"text": generated_text, "tokens": output_tokens},
-                metadata={"input_tokens": input_tokens, "output_tokens": output_tokens},
+                metadata={"input_tokens": input_tokens, "output_tokens": output_tokens, "cached": False},
             )
 
         except Exception as e:

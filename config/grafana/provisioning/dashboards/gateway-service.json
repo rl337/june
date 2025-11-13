@@ -1,0 +1,146 @@
+{
+  "dashboard": {
+    "title": "Gateway Service",
+    "tags": ["june", "gateway", "service"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 0,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "API Request Rate",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "sum(rate(gateway_requests_total[5m])) by (method, endpoint)",
+            "refId": "A",
+            "legendFormat": "{{method}} {{endpoint}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "decimals": 2,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Request Rate by Status",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "sum(rate(gateway_requests_total[5m])) by (status)",
+            "refId": "A",
+            "legendFormat": "{{status}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "decimals": 2,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Request Latency",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 6},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(gateway_request_duration_seconds_bucket[5m]))",
+            "refId": "A",
+            "legendFormat": "p95"
+          },
+          {
+            "expr": "histogram_quantile(0.50, rate(gateway_request_duration_seconds_bucket[5m]))",
+            "refId": "B",
+            "legendFormat": "p50"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "decimals": 3,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "WebSocket Connections",
+        "type": "stat",
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 6},
+        "targets": [
+          {
+            "expr": "gateway_active_connections",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 0,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Rate Limit Hits",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 0, "y": 12},
+        "targets": [
+          {
+            "expr": "sum(rate(gateway_rate_limit_hits_total[5m]))",
+            "refId": "A"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ops",
+            "decimals": 2,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Authentication Stats",
+        "type": "timeseries",
+        "gridPos": {"h": 6, "w": 12, "x": 12, "y": 12},
+        "targets": [
+          {
+            "expr": "sum(rate(gateway_requests_total{endpoint=~\"/auth/.*\"}[5m])) by (status)",
+            "refId": "A",
+            "legendFormat": "{{status}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "reqps",
+            "decimals": 2,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "templating": {
+      "list": []
+    },
+    "annotations": {
+      "list": []
+    }
+  }
+}

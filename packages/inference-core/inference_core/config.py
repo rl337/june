@@ -46,6 +46,12 @@ class ModelConfig:
     model_cache_dir: str = "/home/rlee/models"
     huggingface_cache_dir: str = "/home/rlee/models/huggingface"
     transformers_cache_dir: str = "/home/rlee/models/transformers"
+    # Generation parameters (defaults, can be overridden per request)
+    temperature: float = 0.7
+    max_tokens: int = 2048
+    top_p: float = 0.9
+    top_k: Optional[int] = None
+    repetition_penalty: Optional[float] = None
 
 
 @dataclass
@@ -125,7 +131,12 @@ class Config:
             huggingface_token=os.getenv("HUGGINGFACE_TOKEN"),
             model_cache_dir=os.getenv("MODEL_CACHE_DIR", "/home/rlee/models"),
             huggingface_cache_dir=os.getenv("HUGGINGFACE_CACHE_DIR", "/home/rlee/models/huggingface"),
-            transformers_cache_dir=os.getenv("TRANSFORMERS_CACHE_DIR", "/home/rlee/models/transformers")
+            transformers_cache_dir=os.getenv("TRANSFORMERS_CACHE_DIR", "/home/rlee/models/transformers"),
+            temperature=float(os.getenv("MODEL_TEMPERATURE", "0.7")),
+            max_tokens=int(os.getenv("MODEL_MAX_TOKENS", "2048")),
+            top_p=float(os.getenv("MODEL_TOP_P", "0.9")),
+            top_k=int(os.getenv("MODEL_TOP_K")) if os.getenv("MODEL_TOP_K") else None,
+            repetition_penalty=float(os.getenv("MODEL_REPETITION_PENALTY")) if os.getenv("MODEL_REPETITION_PENALTY") else None,
         )
 
         self.stt = STTConfig(

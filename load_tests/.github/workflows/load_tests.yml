@@ -1,0 +1,87 @@
+name: Load Tests
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: 'Test scenario to run'
+        required: false
+        default: 'baseline'
+        type: choice
+        options:
+          - baseline
+          - target
+          - ramp_up
+          - spike
+          - sustained
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          pip install -r load_tests/requirements.txt
+      
+      - name: Start services
+        run: |
+          # Start June services using docker-compose
+          docker-compose up -d
+          # Wait for services to be ready
+          sleep 30
+      
+      - name: Run load tests
+        run: |
+          python load_tests/run_load_tests.py \
+            --scenario ${{ github.event.inputs.scenario || 'baseline' }} \
+            --test-type all \
+            --output-dir load_tests/reports
+        continue-on-error: true
+      
+      - name: Generate reports
+        if: always()
+        run: |
+          # Find the latest JSON report
+          LATEST_JSON=$(find load_tests/reports -name "*.json" -type f | sort -r | head -1)
+          if [ -n "$LATEST_JSON" ]; then
+            python load_tests/generate_report.py "$LATEST_JSON" --output-dir load_tests/reports/analysis
+          fi
+      
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: load-test-reports
+          path: load_tests/reports/
+          retention-days: 30
+      
+      - name: Check thresholds
+        if: always()
+        run: |
+          # Check if error rate and latency meet requirements
+          LATEST_JSON=$(find load_tests/reports -name "*.json" -type f | sort -r | head -1)
+          if [ -n "$LATEST_JSON" ]; then
+            python -c "
+            import json
+            import sys
+            with open('$LATEST_JSON') as f:
+                data = json.load(f)
+            fail_ratio = data.get('fail_ratio', 0)
+            if fail_ratio > 0.01:
+                print(f'ERROR: Fail ratio {fail_ratio:.2%} exceeds 1% threshold')
+                sys.exit(1)
+            print('✅ Error rate within acceptable limits')
+            "
+          fi

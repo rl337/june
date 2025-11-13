@@ -1,13 +1,58 @@
+import os
+import asyncio
+import logging
+from prometheus_client import Counter, Histogram, Gauge, CollectorRegistry, CONTENT_TYPE_LATEST
+from prometheus_client.exposition import start_http_server
+
 from inference_core import TtsGrpcApp
 from inference_core.tts.espeak_strategy import EspeakTtsStrategy
 
+# Import rate limiting
+try:
+    from june_rate_limit import RateLimitInterceptor, RateLimitConfig
+    RATE_LIMIT_AVAILABLE = True
+except ImportError:
+    RATE_LIMIT_AVAILABLE = False
+    RateLimitInterceptor = None
+    RateLimitConfig = None
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Prometheus metrics
+REGISTRY = CollectorRegistry()
+TTS_REQUESTS_TOTAL = Counter('tts_requests_total', 'Total TTS requests', ['status'], registry=REGISTRY)
+TTS_SYNTHESIS_TIME = Histogram('tts_synthesis_time_seconds', 'TTS synthesis time', registry=REGISTRY)
+TTS_AUDIO_DURATION = Histogram('tts_audio_duration_seconds', 'Generated audio duration', registry=REGISTRY)
+TTS_ERRORS_TOTAL = Counter('tts_errors_total', 'Total errors', ['error_type'], registry=REGISTRY)
+ACTIVE_CONNECTIONS = Gauge('tts_active_connections', 'Active gRPC connections', registry=REGISTRY)
+
 
 def main() -> None:
-    import os
+    # Start HTTP server for Prometheus metrics
+    metrics_port = int(os.getenv("TTS_METRICS_PORT", "8003"))
+    try:
+        start_http_server(metrics_port, registry=REGISTRY)
+        logger.info(f"Started Prometheus metrics server on port {metrics_port}")
+    except Exception as e:
+        logger.warning(f"Failed to start metrics server on port {metrics_port}: {e}")
+    
+    # Setup interceptors
+    interceptors = []
+    if RATE_LIMIT_AVAILABLE:
+        rate_limit_config = RateLimitConfig(
+            default_per_minute=int(os.getenv("RATE_LIMIT_TTS_PER_MINUTE", "60")),
+            default_per_hour=int(os.getenv("RATE_LIMIT_TTS_PER_HOUR", "1000")),
+        )
+        rate_limit_interceptor = RateLimitInterceptor(config=rate_limit_config)
+        interceptors.append(rate_limit_interceptor)
+        logger.info("Rate limiting enabled for TTS service")
+    
     strategy = EspeakTtsStrategy(
         sample_rate=int(os.getenv("TTS_SAMPLE_RATE", "16000"))
     )
-    app = TtsGrpcApp(strategy)
+    app = TtsGrpcApp(strategy, interceptors=interceptors if interceptors else None)
     app.initialize()
     app.run()
 

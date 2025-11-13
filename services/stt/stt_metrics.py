@@ -218,6 +218,7 @@ class STTMetricsStorage:
             format_distribution = {row[0]: row[1] for row in cursor.fetchall()}
             
             # Get duration distribution
+            duration_where = where_clause + " AND error_message IS NULL" if where_clause else " WHERE error_message IS NULL"
             cursor.execute(f"""
                 SELECT 
                     CASE 
@@ -230,7 +231,7 @@ class STTMetricsStorage:
                     COUNT(*) as count,
                     AVG(confidence) as avg_confidence
                 FROM transcription_metrics
-                {where_clause} AND error_message IS NULL
+                {duration_where}
                 GROUP BY duration_range
                 ORDER BY count DESC
             """, params)

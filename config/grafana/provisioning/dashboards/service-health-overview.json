@@ -1,0 +1,162 @@
+{
+  "dashboard": {
+    "title": "Service Health Overview",
+    "tags": ["june", "health", "overview"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 0,
+    "refresh": "10s",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Service Status",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "up{job=~\"gateway|inference-api|stt|tts|telegram|orchestrator|todo-mcp-service\"}",
+            "refId": "A",
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                {"value": null, "color": "red"},
+                {"value": 1, "color": "green"}
+              ]
+            },
+            "mappings": [
+              {
+                "type": "value",
+                "options": {
+                  "0": {"text": "Down", "color": "red"},
+                  "1": {"text": "Up", "color": "green"}
+                }
+              }
+            ],
+            "unit": "short"
+          }
+        },
+        "options": {
+          "graphMode": "none",
+          "colorMode": "value",
+          "orientation": "auto"
+        }
+      },
+      {
+        "id": 2,
+        "title": "Service Uptime (hours)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+        "targets": [
+          {
+            "expr": "(time() - process_start_time_seconds{job=~\"gateway|inference-api|stt|tts|telegram|orchestrator|todo-mcp-service\"}) / 3600",
+            "refId": "A",
+            "legendFormat": "{{job}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "h",
+            "decimals": 1,
+            "color": {"mode": "palette-classic"}
+          }
+        },
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        }
+      },
+      {
+        "id": 3,
+        "title": "Error Rate by Service",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+        "targets": [
+          {
+            "expr": "sum(rate(gateway_requests_total{status=~\"5..\"}[5m])) by (job)",
+            "refId": "A",
+            "legendFormat": "Gateway 5xx"
+          },
+          {
+            "expr": "sum(rate(inference_errors_total[5m])) by (job)",
+            "refId": "B",
+            "legendFormat": "Inference API"
+          },
+          {
+            "expr": "sum(rate(stt_errors_total[5m])) by (job)",
+            "refId": "C",
+            "legendFormat": "STT"
+          },
+          {
+            "expr": "sum(rate(tts_errors_total[5m])) by (job)",
+            "refId": "D",
+            "legendFormat": "TTS"
+          },
+          {
+            "expr": "sum(rate(telegram_errors_total[5m])) by (job)",
+            "refId": "E",
+            "legendFormat": "Telegram"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ops",
+            "decimals": 2,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Active Connections",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+        "targets": [
+          {
+            "expr": "gateway_active_connections",
+            "refId": "A",
+            "legendFormat": "Gateway WebSocket"
+          },
+          {
+            "expr": "inference_active_connections",
+            "refId": "B",
+            "legendFormat": "Inference API gRPC"
+          },
+          {
+            "expr": "stt_active_connections",
+            "refId": "C",
+            "legendFormat": "STT gRPC"
+          },
+          {
+            "expr": "tts_active_connections",
+            "refId": "D",
+            "legendFormat": "TTS gRPC"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "decimals": 0,
+            "color": {"mode": "palette-classic"}
+          }
+        }
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "templating": {
+      "list": []
+    },
+    "annotations": {
+      "list": []
+    }
+  }
+}

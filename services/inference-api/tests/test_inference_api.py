@@ -23,6 +23,7 @@ from llm_pb2 import (
 import llm_pb2_grpc
 
 from main import InferenceAPIService, inference_service
+from inference_core.strategies import InferenceRequest, InferenceResponse
 
 @pytest.fixture
 def mock_model():
@@ -92,11 +93,43 @@ def mock_nats_client():
     return mock_nats
 
 @pytest.fixture
-def service_instance(mock_model, mock_tokenizer, mock_embedding_model, mock_embedding_tokenizer, mock_db_engine, mock_minio_client, mock_nats_client):
+def mock_llm_strategy():
+    """Mock Qwen3LlmStrategy."""
+    from inference_core.strategies import InferenceRequest, InferenceResponse
+    
+    mock_strategy = MagicMock()
+    mock_strategy._model = MagicMock()
+    mock_strategy._tokenizer = MagicMock()
+    
+    # Mock infer() to return a proper InferenceResponse
+    def mock_infer(request):
+        if isinstance(request, InferenceRequest):
+            payload = request.payload
+        else:
+            payload = request
+        prompt = payload.get("prompt", "")
+        params = payload.get("params", {})
+        
+        # Simulate generation
+        response_text = "Generated response text"
+        if prompt:
+            # Remove prompt from response if it starts with prompt
+            if response_text.startswith(prompt):
+                response_text = response_text[len(prompt):].strip()
+        
+        return InferenceResponse(
+            payload={"text": response_text, "tokens": 10},
+            metadata={"input_tokens": 5, "output_tokens": 10}
+        )
+    
+    mock_strategy.infer = MagicMock(side_effect=mock_infer)
+    return mock_strategy
+
+@pytest.fixture
+def service_instance(mock_llm_strategy, mock_embedding_model, mock_embedding_tokenizer, mock_db_engine, mock_minio_client, mock_nats_client):
     """Create service instance with mocked dependencies."""
     service = InferenceAPIService()
-    service.model = mock_model
-    service.tokenizer = mock_tokenizer
+    service.llm_strategy = mock_llm_strategy
     service.embedding_model = mock_embedding_model
     service.embedding_tokenizer = mock_embedding_tokenizer
     service.db_engine = mock_db_engine
@@ -120,12 +153,6 @@ class TestGeneration:
             context=Context(user_id="test_user", session_id="test_session")
         )
         
-        # Mock model generation
-        mock_output = MagicMock()
-        mock_output.sequences = torch.tensor([[1, 2, 3, 4, 5, 6, 7, 8]])
-        service_instance.model.generate.return_value = mock_output
-        service_instance.tokenizer.decode.return_value = "Hello world Generated response text"
-        
         chunks = []
         async for chunk in service_instance.GenerateStream(request, None):
             chunks.append(chunk)
@@ -133,6 +160,109 @@ class TestGeneration:
         assert len(chunks) > 0
         assert chunks[-1].is_final is True
         assert chunks[-1].finish_reason == FinishReason.STOP
+        # Verify strategy.infer was called
+        assert service_instance.llm_strategy.infer.called
+    
+    @pytest.mark.asyncio
+    async def test_generate_stream_short_prompt(self, service_instance):
+        """Test GenerateStream with short prompt."""
+        request = GenerationRequest(
+            prompt="Hi",
+            params=GenerationParameters(max_tokens=20),
+            context=Context(user_id="test_user", session_id="test_session")
+        )
+        
+        chunks = []
+        async for chunk in service_instance.GenerateStream(request, None):
+            chunks.append(chunk)
+        
+        # Verify we get chunks
+        assert len(chunks) > 0
+        # Verify schema: GenerationChunk has required fields
+        for chunk in chunks:
+            assert hasattr(chunk, 'token')
+            assert hasattr(chunk, 'is_final')
+            assert hasattr(chunk, 'index')
+            assert hasattr(chunk, 'finish_reason')
+            assert isinstance(chunk.token, str)
+            assert isinstance(chunk.is_final, bool)
+            assert isinstance(chunk.index, int)
+        # Verify final chunk has is_final=True
+        assert chunks[-1].is_final is True
+        assert chunks[-1].finish_reason == FinishReason.STOP
+    
+    @pytest.mark.asyncio
+    async def test_generate_stream_long_prompt(self, service_instance):
+        """Test GenerateStream with long prompt."""
+        long_prompt = "Write a detailed explanation about " * 10  # Long prompt
+        request = GenerationRequest(
+            prompt=long_prompt,
+            params=GenerationParameters(max_tokens=100),
+            context=Context(user_id="test_user", session_id="test_session")
+        )
+        
+        chunks = []
+        async for chunk in service_instance.GenerateStream(request, None):
+            chunks.append(chunk)
+        
+        # Verify we get multiple chunks for longer response
+        assert len(chunks) > 0
+        # Verify all chunks except last have is_final=False
+        for i, chunk in enumerate(chunks[:-1]):
+            assert chunk.is_final is False or i == len(chunks) - 1
+        # Verify final chunk
+        assert chunks[-1].is_final is True
+        assert chunks[-1].finish_reason == FinishReason.STOP
+    
+    @pytest.mark.asyncio
+    async def test_generate_stream_is_final_flag(self, service_instance):
+        """Test that is_final flag is set correctly in GenerateStream."""
+        request = GenerationRequest(
+            prompt="Generate a response with multiple tokens",
+            params=GenerationParameters(max_tokens=50),
+            context=Context(user_id="test_user", session_id="test_session")
+        )
+        
+        chunks = []
+        async for chunk in service_instance.GenerateStream(request, None):
+            chunks.append(chunk)
+        
+        # Verify we have multiple chunks
+        assert len(chunks) > 1
+        # Verify only the last chunk has is_final=True
+        for i, chunk in enumerate(chunks):
+            if i == len(chunks) - 1:
+                assert chunk.is_final is True, f"Last chunk (index {i}) should have is_final=True"
+            else:
+                assert chunk.is_final is False, f"Non-final chunk (index {i}) should have is_final=False"
+    
+    @pytest.mark.asyncio
+    async def test_generate_stream_schema_compliance(self, service_instance):
+        """Test that GenerateStream returns GenerationChunk matching expected schema."""
+        request = GenerationRequest(
+            prompt="Test prompt",
+            params=GenerationParameters(max_tokens=30),
+            context=Context(user_id="test_user", session_id="test_session")
+        )
+        
+        chunks = []
+        async for chunk in service_instance.GenerateStream(request, None):
+            chunks.append(chunk)
+        
+        assert len(chunks) > 0
+        for chunk in chunks:
+            # Verify GenerationChunk schema fields
+            assert hasattr(chunk, 'token')
+            assert hasattr(chunk, 'is_final')
+            assert hasattr(chunk, 'index')
+            assert hasattr(chunk, 'finish_reason')
+            # Verify field types
+            assert isinstance(chunk.token, str)
+            assert isinstance(chunk.is_final, bool)
+            assert isinstance(chunk.index, int)
+            assert chunk.finish_reason in [FinishReason.STOP, FinishReason.LENGTH, FinishReason.TOOL_CALLS, FinishReason.ERROR]
+            # Verify index is non-negative
+            assert chunk.index >= 0
     
     @pytest.mark.asyncio
     async def test_generate_stream_error(self, service_instance):
@@ -143,8 +273,8 @@ class TestGeneration:
             context=Context(user_id="test_user", session_id="test_session")
         )
         
-        # Mock model error
-        service_instance.model.generate.side_effect = Exception("Model error")
+        # Mock strategy error
+        service_instance.llm_strategy.infer.side_effect = Exception("Model error")
         
         chunks = []
         async for chunk in service_instance.GenerateStream(request, None):
@@ -166,12 +296,6 @@ class TestGeneration:
             context=Context(user_id="test_user", session_id="test_session")
         )
         
-        # Mock model generation
-        mock_output = MagicMock()
-        mock_output.sequences = torch.tensor([[1, 2, 3, 4, 5, 6, 7, 8]])
-        service_instance.model.generate.return_value = mock_output
-        service_instance.tokenizer.decode.return_value = "Hello world Generated response text"
-        
         response = await service_instance.Generate(request, None)
         
         assert response.text == "Generated response text"
@@ -179,6 +303,8 @@ class TestGeneration:
         assert response.finish_reason == FinishReason.STOP
         assert response.usage.prompt_tokens > 0
         assert response.usage.completion_tokens > 0
+        # Verify strategy.infer was called
+        assert service_instance.llm_strategy.infer.called
     
     @pytest.mark.asyncio
     async def test_generate_one_shot_error(self, service_instance):
@@ -189,8 +315,8 @@ class TestGeneration:
             context=Context(user_id="test_user", session_id="test_session")
         )
         
-        # Mock model error
-        service_instance.model.generate.side_effect = Exception("Model error")
+        # Mock strategy error
+        service_instance.llm_strategy.infer.side_effect = Exception("Model error")
         
         context = MagicMock()
         response = await service_instance.Generate(request, context)
@@ -216,12 +342,6 @@ class TestChat:
             context=Context(user_id="test_user", session_id="test_session")
         )
         
-        # Mock model generation
-        mock_output = MagicMock()
-        mock_output.sequences = torch.tensor([[1, 2, 3, 4, 5, 6, 7, 8]])
-        service_instance.model.generate.return_value = mock_output
-        service_instance.tokenizer.decode.return_value = "Human: Hello\n\nAssistant: Hi there!\n\nHuman: How are you?\n\nAssistant: Generated response text"
-        
         chunks = []
         async for chunk in service_instance.ChatStream(request, None):
             chunks.append(chunk)
@@ -229,6 +349,128 @@ class TestChat:
         assert len(chunks) > 0
         assert chunks[-1].role == "assistant"
         assert chunks[-1].is_final is True
+        # Verify strategy.infer was called
+        assert service_instance.llm_strategy.infer.called
+    
+    @pytest.mark.asyncio
+    async def test_chat_stream_short_conversation(self, service_instance):
+        """Test ChatStream with short conversation."""
+        messages = [
+            ChatMessage(role="user", content="Hi")
+        ]
+        
+        request = ChatRequest(
+            messages=messages,
+            params=GenerationParameters(max_tokens=20),
+            context=Context(user_id="test_user", session_id="test_session")
+        )
+        
+        chunks = []
+        async for chunk in service_instance.ChatStream(request, None):
+            chunks.append(chunk)
+        
+        # Verify we get chunks
+        assert len(chunks) > 0
+        # Verify schema: ChatChunk has required fields
+        for chunk in chunks:
+            assert hasattr(chunk, 'content_delta')
+            assert hasattr(chunk, 'role')
+            assert hasattr(chunk, 'is_final')
+            assert hasattr(chunk, 'finish_reason')
+            assert isinstance(chunk.content_delta, str)
+            assert isinstance(chunk.role, str)
+            assert isinstance(chunk.is_final, bool)
+            assert chunk.role == "assistant"
+        # Verify final chunk
+        assert chunks[-1].is_final is True
+        assert chunks[-1].finish_reason == FinishReason.STOP
+    
+    @pytest.mark.asyncio
+    async def test_chat_stream_long_conversation(self, service_instance):
+        """Test ChatStream with long conversation."""
+        messages = [
+            ChatMessage(role="system", content="You are a helpful assistant."),
+            ChatMessage(role="user", content="Tell me a long story about " + "adventure " * 20),
+            ChatMessage(role="assistant", content="Once upon a time..."),
+            ChatMessage(role="user", content="Continue the story with more details.")
+        ]
+        
+        request = ChatRequest(
+            messages=messages,
+            params=GenerationParameters(max_tokens=100),
+            context=Context(user_id="test_user", session_id="test_session")
+        )
+        
+        chunks = []
+        async for chunk in service_instance.ChatStream(request, None):
+            chunks.append(chunk)
+        
+        # Verify we get multiple chunks
+        assert len(chunks) > 0
+        # Verify all chunks have role="assistant"
+        for chunk in chunks:
+            assert chunk.role == "assistant"
+        # Verify final chunk
+        assert chunks[-1].is_final is True
+        assert chunks[-1].finish_reason == FinishReason.STOP
+    
+    @pytest.mark.asyncio
+    async def test_chat_stream_is_final_flag(self, service_instance):
+        """Test that is_final flag is set correctly in ChatStream."""
+        messages = [
+            ChatMessage(role="user", content="Generate a detailed response")
+        ]
+        
+        request = ChatRequest(
+            messages=messages,
+            params=GenerationParameters(max_tokens=50),
+            context=Context(user_id="test_user", session_id="test_session")
+        )
+        
+        chunks = []
+        async for chunk in service_instance.ChatStream(request, None):
+            chunks.append(chunk)
+        
+        # Verify we have multiple chunks
+        assert len(chunks) > 1
+        # Verify only the last chunk has is_final=True
+        for i, chunk in enumerate(chunks):
+            if i == len(chunks) - 1:
+                assert chunk.is_final is True, f"Last chunk (index {i}) should have is_final=True"
+            else:
+                assert chunk.is_final is False, f"Non-final chunk (index {i}) should have is_final=False"
+    
+    @pytest.mark.asyncio
+    async def test_chat_stream_schema_compliance(self, service_instance):
+        """Test that ChatStream returns ChatChunk matching expected schema."""
+        messages = [
+            ChatMessage(role="user", content="Test message")
+        ]
+        
+        request = ChatRequest(
+            messages=messages,
+            params=GenerationParameters(max_tokens=30),
+            context=Context(user_id="test_user", session_id="test_session")
+        )
+        
+        chunks = []
+        async for chunk in service_instance.ChatStream(request, None):
+            chunks.append(chunk)
+        
+        assert len(chunks) > 0
+        for chunk in chunks:
+            # Verify ChatChunk schema fields
+            assert hasattr(chunk, 'content_delta')
+            assert hasattr(chunk, 'role')
+            assert hasattr(chunk, 'is_final')
+            assert hasattr(chunk, 'finish_reason')
+            # Verify field types
+            assert isinstance(chunk.content_delta, str)
+            assert isinstance(chunk.role, str)
+            assert isinstance(chunk.is_final, bool)
+            assert chunk.finish_reason in [FinishReason.STOP, FinishReason.LENGTH, FinishReason.TOOL_CALLS, FinishReason.ERROR]
+            # Verify role is "assistant"
+            assert chunk.role == "assistant"
     
     @pytest.mark.asyncio
     async def test_chat_one_shot_success(self, service_instance):
@@ -245,18 +487,14 @@ class TestChat:
             context=Context(user_id="test_user", session_id="test_session")
         )
         
-        # Mock model generation
-        mock_output = MagicMock()
-        mock_output.sequences = torch.tensor([[1, 2, 3, 4, 5, 6, 7, 8]])
-        service_instance.model.generate.return_value = mock_output
-        service_instance.tokenizer.decode.return_value = "Human: Hello\n\nAssistant: Hi there!\n\nHuman: How are you?\n\nAssistant: Generated response text"
-        
         response = await service_instance.Chat(request, None)
         
         assert response.message.role == "assistant"
         assert response.message.content == "Generated response text"
         assert response.tokens_generated > 0
         assert response.usage.total_tokens > 0
+        # Verify strategy.infer was called
+        assert service_instance.llm_strategy.infer.called
 
 class TestEmbeddings:
     """Test embedding generation."""
@@ -442,24 +680,30 @@ class TestModelLoading:
     @pytest.mark.asyncio
     async def test_load_models_success(self, service_instance):
         """Test successful model loading."""
-        with patch('main.AutoModelForCausalLM') as mock_model_class, \
+        with patch('main.Qwen3LlmStrategy') as mock_strategy_class, \
+             patch('main.AutoModelForCausalLM') as mock_model_class, \
              patch('main.AutoTokenizer') as mock_tokenizer_class:
             
-            mock_model_class.from_pretrained.return_value = mock_model
-            mock_tokenizer_class.from_pretrained.return_value = mock_tokenizer
+            mock_strategy = MagicMock()
+            mock_strategy.warmup = MagicMock()
+            mock_strategy_class.return_value = mock_strategy
+            mock_model_class.from_pretrained.return_value = mock_embedding_model
+            mock_tokenizer_class.from_pretrained.return_value = mock_embedding_tokenizer
             
             await service_instance._load_models()
             
-            assert service_instance.model is not None
-            assert service_instance.tokenizer is not None
+            assert service_instance.llm_strategy is not None
+            assert service_instance.llm_strategy.warmup.called
             assert service_instance.embedding_model is not None
             assert service_instance.embedding_tokenizer is not None
     
     @pytest.mark.asyncio
     async def test_load_models_error(self, service_instance):
         """Test model loading with error."""
-        with patch('main.AutoModelForCausalLM') as mock_model_class:
-            mock_model_class.from_pretrained.side_effect = Exception("Model loading error")
+        with patch('main.Qwen3LlmStrategy') as mock_strategy_class:
+            mock_strategy = MagicMock()
+            mock_strategy.warmup.side_effect = Exception("Model loading error")
+            mock_strategy_class.return_value = mock_strategy
             
             with pytest.raises(Exception):
                 await service_instance._load_models()
@@ -499,8 +743,8 @@ class TestHealthChecks:
     @pytest.mark.asyncio
     async def test_check_model_health_healthy(self, service_instance):
         """Test model health check when healthy."""
-        service_instance.model = mock_model
-        service_instance.tokenizer = mock_tokenizer
+        service_instance.llm_strategy._model = MagicMock()
+        service_instance.llm_strategy._tokenizer = MagicMock()
         
         is_healthy = await service_instance._check_model_health()
         assert is_healthy is True
@@ -508,8 +752,7 @@ class TestHealthChecks:
     @pytest.mark.asyncio
     async def test_check_model_health_unhealthy(self, service_instance):
         """Test model health check when unhealthy."""
-        service_instance.model = None
-        service_instance.tokenizer = None
+        service_instance.llm_strategy = None
         
         is_healthy = await service_instance._check_model_health()
         assert is_healthy is False
@@ -556,6 +799,158 @@ class TestHealthChecks:
         is_healthy = await service_instance._check_nats_health()
         assert is_healthy is False
 
+class TestStreamingErrorHandling:
+    """Test error handling during streaming."""
+    
+    @pytest.mark.asyncio
+    async def test_generate_stream_error_during_streaming(self, service_instance):
+        """Test error handling during GenerateStream when error occurs mid-stream."""
+        request = GenerationRequest(
+            prompt="Test prompt",
+            params=GenerationParameters(max_tokens=50),
+            context=Context(user_id="test_user", session_id="test_session")
+        )
+        
+        # Mock strategy to raise error after first call
+        call_count = 0
+        def mock_infer_with_error(request):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise Exception("Streaming error occurred")
+            return InferenceResponse(
+                payload={"text": "Generated response text", "tokens": 10},
+                metadata={"input_tokens": 5, "output_tokens": 10}
+            )
+        
+        service_instance.llm_strategy.infer.side_effect = mock_infer_with_error
+        
+        chunks = []
+        async for chunk in service_instance.GenerateStream(request, None):
+            chunks.append(chunk)
+        
+        # Verify error chunk is returned
+        assert len(chunks) > 0
+        assert chunks[-1].is_final is True
+        assert chunks[-1].finish_reason == FinishReason.ERROR
+    
+    @pytest.mark.asyncio
+    async def test_chat_stream_error_during_streaming(self, service_instance):
+        """Test error handling during ChatStream when error occurs mid-stream."""
+        messages = [
+            ChatMessage(role="user", content="Test message")
+        ]
+        
+        request = ChatRequest(
+            messages=messages,
+            params=GenerationParameters(max_tokens=50),
+            context=Context(user_id="test_user", session_id="test_session")
+        )
+        
+        # Mock strategy to raise error
+        service_instance.llm_strategy.infer.side_effect = Exception("Chat streaming error")
+        
+        chunks = []
+        async for chunk in service_instance.ChatStream(request, None):
+            chunks.append(chunk)
+        
+        # Verify error chunk is returned
+        assert len(chunks) > 0
+        assert chunks[-1].is_final is True
+        assert chunks[-1].finish_reason == FinishReason.ERROR
+        assert chunks[-1].role == "assistant"
+
+class TestStreamingPerformance:
+    """Test streaming performance characteristics."""
+    
+    @pytest.mark.asyncio
+    async def test_generate_stream_latency(self, service_instance):
+        """Test that GenerateStream has acceptable latency."""
+        import time
+        
+        request = GenerationRequest(
+            prompt="Short prompt",
+            params=GenerationParameters(max_tokens=20),
+            context=Context(user_id="test_user", session_id="test_session")
+        )
+        
+        start_time = time.time()
+        chunks = []
+        async for chunk in service_instance.GenerateStream(request, None):
+            chunks.append(chunk)
+        end_time = time.time()
+        
+        latency = end_time - start_time
+        # Verify latency is reasonable (with mocked strategy, should be very fast)
+        # In real scenario, this would test actual model latency
+        assert latency < 5.0, f"Streaming latency {latency}s is too high"
+        assert len(chunks) > 0
+    
+    @pytest.mark.asyncio
+    async def test_chat_stream_latency(self, service_instance):
+        """Test that ChatStream has acceptable latency."""
+        import time
+        
+        messages = [
+            ChatMessage(role="user", content="Short message")
+        ]
+        
+        request = ChatRequest(
+            messages=messages,
+            params=GenerationParameters(max_tokens=20),
+            context=Context(user_id="test_user", session_id="test_session")
+        )
+        
+        start_time = time.time()
+        chunks = []
+        async for chunk in service_instance.ChatStream(request, None):
+            chunks.append(chunk)
+        end_time = time.time()
+        
+        latency = end_time - start_time
+        # Verify latency is reasonable
+        assert latency < 5.0, f"Streaming latency {latency}s is too high"
+        assert len(chunks) > 0
+    
+    @pytest.mark.asyncio
+    async def test_generate_stream_throughput(self, service_instance):
+        """Test that GenerateStream provides reasonable throughput."""
+        request = GenerationRequest(
+            prompt="Generate a longer response",
+            params=GenerationParameters(max_tokens=100),
+            context=Context(user_id="test_user", session_id="test_session")
+        )
+        
+        chunks = []
+        async for chunk in service_instance.GenerateStream(request, None):
+            chunks.append(chunk)
+        
+        # Verify we get multiple chunks (indicating streaming)
+        assert len(chunks) > 1
+        # Verify chunks are received incrementally (not all at once)
+        # This is verified by the fact that we iterate through chunks
+    
+    @pytest.mark.asyncio
+    async def test_chat_stream_throughput(self, service_instance):
+        """Test that ChatStream provides reasonable throughput."""
+        messages = [
+            ChatMessage(role="user", content="Generate a longer response")
+        ]
+        
+        request = ChatRequest(
+            messages=messages,
+            params=GenerationParameters(max_tokens=100),
+            context=Context(user_id="test_user", session_id="test_session")
+        )
+        
+        chunks = []
+        async for chunk in service_instance.ChatStream(request, None):
+            chunks.append(chunk)
+        
+        # Verify we get multiple chunks (indicating streaming)
+        assert len(chunks) > 1
+        # Verify chunks are received incrementally
+
 # Integration tests
 class TestInferenceAPIIntegration:
     """Integration tests for Inference API service."""
@@ -578,12 +973,6 @@ class TestInferenceAPIIntegration:
             )
         )
         
-        # Mock successful generation
-        mock_output = MagicMock()
-        mock_output.sequences = torch.tensor([[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]])
-        service_instance.model.generate.return_value = mock_output
-        service_instance.tokenizer.decode.return_value = "Write a short story about a robot. Once upon a time, there was a robot named Robo."
-        
         # Test streaming
         chunks = []
         async for chunk in service_instance.GenerateStream(request, None):
@@ -594,7 +983,7 @@ class TestInferenceAPIIntegration:
         
         # Test one-shot
         response = await service_instance.Generate(request, None)
-        assert response.text == "Once upon a time, there was a robot named Robo."
+        assert response.text == "Generated response text"
         assert response.tokens_generated > 0
     
     @pytest.mark.asyncio
@@ -617,12 +1006,6 @@ class TestInferenceAPIIntegration:
             )
         )
         
-        # Mock successful generation
-        mock_output = MagicMock()
-        mock_output.sequences = torch.tensor([[1, 2, 3, 4, 5, 6, 7, 8]])
-        service_instance.model.generate.return_value = mock_output
-        service_instance.tokenizer.decode.return_value = "System: You are a helpful assistant.\n\nHuman: What is 2+2?\n\nAssistant: 2+2 equals 4.\n\nHuman: What about 3+3?\n\nAssistant: 3+3 equals 6."
-        
         # Test streaming chat
         chunks = []
         async for chunk in service_instance.ChatStream(request, None):
@@ -634,7 +1017,7 @@ class TestInferenceAPIIntegration:
         # Test one-shot chat
         response = await service_instance.Chat(request, None)
         assert response.message.role == "assistant"
-        assert response.message.content == "3+3 equals 6."
+        assert response.message.content == "Generated response text"
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

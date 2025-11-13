@@ -6,6 +6,14 @@ pydub>=0.25.1
 httpx>=0.24.0
 psycopg2-binary>=2.9.0
 
-# Audio processing (for format conversion)
+# Audio processing (for format conversion and quality analysis)
 # ffmpeg is installed in base image
+numpy>=1.24.0
+librosa>=0.10.1
+
+# PDF generation for conversation export
+reportlab>=4.0.0
+
+# NATS for message queue
+nats-py>=2.3.0
 
