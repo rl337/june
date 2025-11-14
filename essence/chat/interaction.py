@@ -40,6 +40,9 @@ def setup_agent_message_endpoint(
         agent_script_simple_name: Name of the simple agent script (no session)
         max_message_length: Maximum message length for the platform
     """
+    # Log that we're setting up the endpoint
+    logger.info(f"Setting up /api/agent/message endpoint for {platform}")
+    
     @app.post("/api/agent/message")
     async def agent_message_endpoint(request: Request):
         """HTTP endpoint to test agent responses without the chat platform.
@@ -131,6 +134,13 @@ def setup_agent_message_endpoint(
                 status_code=500,
                 content={"success": False, "error": str(e)}
             )
+    
+    # Verify the route was registered
+    route_paths = [route.path for route in app.routes]
+    if "/api/agent/message" in route_paths:
+        logger.info(f"Successfully registered /api/agent/message endpoint. Available routes: {route_paths}")
+    else:
+        logger.error(f"Failed to register /api/agent/message endpoint. Available routes: {route_paths}")
 
 
 def setup_health_endpoint(

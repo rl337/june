@@ -6,7 +6,15 @@ import os
 import time
 import threading
 import queue
+import sys
+from pathlib import Path
 from typing import Optional, Dict, Any, Iterator, Tuple
+
+# Add essence module to path for streaming_popen_generator
+essence_path = Path(__file__).parent.parent.parent.parent / "essence"
+sys.path.insert(0, str(essence_path))
+
+from essence.chat.utils.streaming_popen import streaming_popen_generator
 
 logger = logging.getLogger(__name__)
 
@@ -388,36 +396,14 @@ def stream_chat_response_agent(
     if user_id is not None and chat_id is not None:
         script_args = [str(user_id), str(chat_id), user_message]
     
-    # Use PTY for cursor-agent (required for proper operation)
-    # This matches the non-streaming version
-    import pty
-    import select
-    
-    try:
-        # pty.fork() creates a PTY pair and forks, returning (pid, master_fd)
-        pid, master_fd = pty.fork()
-        
-        if pid == 0:
-            # Child process - execute the command
-            os.execve("/bin/bash", ["bash", "-x", agent_script] + script_args, env)
-        else:
-            # Parent process - we'll read from master_fd in the loop below
-            process_pid = pid
-            process_fd = master_fd
-    except Exception as e:
-        logger.error(f"Failed to start agent process: {e}", exc_info=True)
-        yield ("❌ I encountered an error starting the agent. Please try again.", True)
-        return
+    # Use streaming_popen_generator utility for proper PTY-based streaming
+    command = ["/bin/bash", "-x", agent_script] + script_args
     
     start_time = time.time()
     last_json_line_time = start_time
     last_message_yield_time = start_time
     seen_messages = set()  # Track messages we've already yielded to avoid duplicates
     pending_messages = []  # Queue of messages waiting to be yielded (for pacing)
-    
-    # Buffer for reading from PTY
-    buffer = b''
-    last_activity_time = start_time
     
     try:
         # Minimum time between yielding messages (pacing) - 0.5 seconds
@@ -427,81 +413,39 @@ def stream_chat_response_agent(
         
         first_message_sent = False
         
-        while True:
+        # Use the streaming_popen_generator utility
+        for line, is_final_line in streaming_popen_generator(command, env=env, chunk_size=1024, read_timeout=0.05):
             current_time = time.time()
             elapsed = current_time - start_time
             
             # Check total timeout
             if elapsed > max_total_time:
                 logger.warning(f"Agent stream exceeded max total time ({max_total_time}s)")
-                try:
-                    os.kill(process_pid, 15)  # SIGTERM
-                except:
-                    pass
                 yield ("⏱️ The request took too long to process. Please try a simpler request.", True)
                 break
             
-            # Check line timeout (no activity recently)
-            time_since_activity = current_time - last_activity_time
-            if time_since_activity > line_timeout:
-                logger.warning(f"No activity for {time_since_activity}s, timing out")
+            # Process JSON lines - only process complete, valid JSON
+            if line and line.startswith('{'):
+                last_json_line_time = current_time
+                # Try to parse JSON first to ensure it's complete
                 try:
-                    os.kill(process_pid, 15)  # SIGTERM
-                except:
-                    pass
-                yield ("⏱️ The agent stopped responding. Please try again.", True)
-                break
-            
-            # Check if process is still running
-            try:
-                wait_result = os.waitpid(process_pid, os.WNOHANG)
-                if wait_result[0] == process_pid:
-                    # Process finished, read any remaining output
-                    process_done = True
-                    returncode = os.WEXITSTATUS(wait_result[1])
-                else:
-                    process_done = False
-                    returncode = None
-            except OSError:
-                # Process not finished yet
-                process_done = False
-                returncode = None
-            
-            # Read from PTY (non-blocking)
-            ready, _, _ = select.select([process_fd], [], [], 0.1)
-            if ready:
-                try:
-                    data = os.read(process_fd, 4096)
-                    if data:
-                        last_activity_time = current_time
-                        buffer += data
-                        # Process complete lines
-                        while b'\n' in buffer:
-                            line_bytes, buffer = buffer.split(b'\n', 1)
-                            try:
-                                line = line_bytes.decode('utf-8', errors='replace').strip()
-                                if line and line.startswith('{'):
-                                    last_json_line_time = current_time
-                                    message = _extract_human_readable_from_json_line(line)
-                                    if message and message not in seen_messages:
-                                        seen_messages.add(message)
-                                        # Add to pending queue for pacing
-                                        pending_messages.append((message, current_time))
-                                        # If this is the first message and we've waited long enough, send it immediately
-                                        if not first_message_sent and elapsed >= max_wait_for_first_message:
-                                            first_message_sent = True
-                                            yield (message, False)
-                                            last_message_yield_time = current_time
-                                            # Remove from pending since we just sent it
-                                            pending_messages = [m for m in pending_messages if m[0] != message]
-                            except Exception as e:
-                                logger.debug(f"Error processing line: {e}")
-                                continue
-                except (OSError, EOFError) as e:
-                    # I/O error might be normal when process closes PTY
-                    if process_done:
-                        break
-                    logger.debug(f"PTY read error (might be normal): {e}")
+                    json.loads(line)  # Validate JSON is complete
+                except json.JSONDecodeError:
+                    # Incomplete JSON line, skip it
+                    continue
+                
+                message = _extract_human_readable_from_json_line(line)
+                if message and message not in seen_messages:
+                    seen_messages.add(message)
+                    # Add to pending queue for pacing
+                    pending_messages.append((message, current_time))
+                    # If this is the first message and we've waited long enough, send it immediately
+                    if not first_message_sent and elapsed >= max_wait_for_first_message:
+                        first_message_sent = True
+                        yield (message, False)
+                        last_message_yield_time = current_time
+                        # Remove from pending since we just sent it
+                        pending_messages = [m for m in pending_messages if m[0] != message]
             
             # Yield pending messages if enough time has passed (pacing)
             if pending_messages:
@@ -513,55 +457,30 @@ def stream_chat_response_agent(
                     yield (message, False)
                     last_message_yield_time = current_time
             
-            # If process is done, break
-            if process_done:
+            # If this is the final line from the generator, process remaining messages
+            if is_final_line:
                 # Process any remaining pending messages quickly
                 for message, _ in pending_messages:
                     if message not in seen_messages or not first_message_sent:
                         yield (message, False)
                         first_message_sent = True
+                
+                # Check for timeout on final line
+                time_since_last_json = current_time - last_json_line_time
+                if time_since_last_json > line_timeout and last_json_line_time > start_time:
+                    logger.warning(f"No JSON line received for {time_since_last_json}s before final line")
+                
+                # Final message indicating completion
+                if first_message_sent:
+                    # We've already sent messages, just mark as final
+                    yield ("", True)  # Empty message with is_final=True to signal completion
+                else:
+                    # No messages were extracted, send error
+                    yield ("⚠️ I received your message but couldn't generate a response. Please try again.", True)
                 break
-        
-        # Wait for process to finish if not already done
-        if returncode is None:
-            try:
-                _, status = os.waitpid(process_pid, 0)
-                returncode = os.WEXITSTATUS(status)
-            except OSError:
-                returncode = 1
-        
-        # Close PTY
-        try:
-            os.close(process_fd)
-        except:
-            pass
-        
-        if returncode != 0:
-            logger.error(f"Agent script failed with exit code {returncode}")
-            if not first_message_sent:
-                yield ("❌ I encountered an error processing your request. Please try again.", True)
-            return
-        
-        # Final message indicating completion
-        if first_message_sent:
-            # We've already sent messages, just mark as final
-            yield ("", True)  # Empty message with is_final=True to signal completion
-        else:
-            # No messages were extracted, send error
-            yield ("⚠️ I received your message but couldn't generate a response. Please try again.", True)
     
     except Exception as e:
         logger.error(f"Error streaming agent response: {e}", exc_info=True)
-        try:
-            if 'process_pid' in locals():
-                os.kill(process_pid, 15)  # SIGTERM
-        except:
-            pass
-        try:
-            if 'process_fd' in locals():
-                os.close(process_fd)
-        except:
-            pass
         yield ("❌ I encountered an error processing your message. Please try again.", True)
 
 
