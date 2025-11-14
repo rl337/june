@@ -1551,25 +1551,44 @@ The build script will:
 
 All services use a reflection-based command discovery system:
 
-- Commands are discovered automatically by scanning `essence.commands` for `Command` subclasses
-- No manual registration required - commands are found via Python reflection
-- Services are invoked via: `python -m essence <service-name>-service [args...]`
-- Each command implements: `init()`, `run()`, `cleanup()` lifecycle methods
+- **Automatic Discovery**: Commands are discovered automatically by scanning `essence.commands` for `Command` subclasses using Python's `inspect` and `pkgutil` modules
+- **No Manual Registration**: No manual registration required - commands are found via Python reflection at runtime
+- **Discovery Process**: 
+  - The `essence.__main__.get_commands()` function iterates through all modules in `essence.commands`
+  - For each module, it uses `inspect.getmembers()` to find classes that are subclasses of `Command`
+  - Command names are extracted via `command_class.get_name()` method
+  - Commands are cached after first discovery for performance
+- **Service Invocation**: Services are invoked via: `python -m essence <service-name>-service [args...]`
+- **Command Interface**: Each command implements the `essence.command.Command` interface with:
+  - `get_name()` - Returns the command name (e.g., "telegram-service")
+  - `get_description()` - Returns command description for help text
+  - `add_args(parser)` - Adds command-specific arguments to argparse parser
+  - `__init__(args)` - Initializes the command with parsed arguments
+  - `execute()` - Executes the command (calls `init()`, `run()`, and `cleanup()` lifecycle methods)
 
 ### Environment Configuration
 
-Services source environment variables from the repository's `.env` file at runtime:
+Services source environment variables from the repository's `.env` file at runtime using the **ENV_SH mechanism**:
 
 1. **Repository `.env` file**: Located at the project root (`/home/rlee/dev/june/.env`)
-2. **ENV_SH mechanism**: The deploy script sets `ENV_SH` to point to the repo's `.env` file
-3. **Runtime sourcing**: The `run.sh` script sources `ENV_SH` before starting the service
-4. **Fallback**: If `ENV_SH` is not set, services fall back to a local `.env` file (if present)
+2. **ENV_SH Environment Variable**: The deploy script sets `ENV_SH` environment variable to point to the repo's `.env` file path
+3. **Runtime Sourcing in run.sh**: The generated `run.sh` script checks for `ENV_SH` and sources it before starting the service:
+   ```bash
+   if [ -n "${ENV_SH:-}" ] && [ -f "${ENV_SH}" ]; then
+       echo "Sourcing environment from: ${ENV_SH}"
+       set -a  # Automatically export all variables
+       source "${ENV_SH}"
+       set +a
+   ```
+4. **Fallback**: If `ENV_SH` is not set, services fall back to a local `.env` file in the service directory (if present)
+5. **Verification**: The console log will show "Sourcing environment from: <path>" when ENV_SH is successfully sourced
 
 **Benefits:**
-- `.env` file stays in one place (repo root)
-- No secrets in build artifacts
-- Easy to update environment variables without rebuilding
-- Supports both development and production deployments
+- `.env` file stays in one place (repo root) - no need to copy it to each deployment
+- No secrets in build artifacts - environment variables are not included in tarballs
+- Easy to update environment variables without rebuilding - just update the repo's `.env` file
+- Supports both development and production deployments - same mechanism works everywhere
+- Centralized configuration management - all services use the same `.env` file
 
 **Required Environment Variables:**
 - `SERVICE_NAME`: Service name (set automatically by deploy script)
@@ -1608,13 +1627,44 @@ The deploy script will:
 - PID file: `<runtime-dir>/service.pid`
 
 **Deployment Verification:**
-The deploy script automatically verifies:
-- Required files exist (run.sh, venv, essence module)
-- Essence module can be imported
-- Commands can be discovered via reflection
-- Service structure is valid
+The deploy script automatically performs comprehensive verification before starting the service:
 
-If verification fails, deployment is aborted with an error message.
+1. **File Structure Verification**: Checks for required files:
+   - `run.sh` - Service startup script
+   - `venv/bin/python3` - Python interpreter in virtual environment
+   - `essence/__main__.py` - Essence module entry point
+   - `essence/command/__init__.py` - Command base class
+   - `essence/commands` - Commands directory
+
+2. **Module Import Verification**: Verifies the essence module can be imported:
+   ```bash
+   python3 -c "import sys; sys.path.insert(0, '.'); import essence; print('✓ Essence module importable')"
+   ```
+
+3. **Command Discovery Verification**: Verifies commands can be discovered via reflection:
+   ```bash
+   python3 -c "from essence.__main__ import get_commands; cmds = get_commands(); print(f'✓ Discovered {len(cmds)} command(s)')"
+   ```
+   - This ensures the reflection-based command discovery system is working
+   - Lists all discovered commands (e.g., `telegram-service`, `discord-service`, `tts`)
+   - If discovery fails, a warning is shown but deployment continues
+
+4. **Checksum Verification**: If a `.sha256` checksum file exists, the tarball integrity is verified before extraction
+
+**Verification Failure Handling:**
+- If file structure verification fails: Deployment is aborted with a list of missing files
+- If module import fails: Deployment is aborted with an error message
+- If command discovery fails: A warning is shown but deployment continues (service may still work)
+
+**Verification Output:**
+The deploy script provides clear feedback during verification:
+```
+Verifying deployment structure...
+Verifying essence module...
+✓ Essence module importable
+Verifying command discovery...
+✓ Discovered 3 command(s): ['discord-service', 'telegram-service', 'tts']
+```
 
 ### Testing Services
 
