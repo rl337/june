@@ -276,13 +276,25 @@ class TelegramBotService:
         
         # Setup agent message test endpoint using shared base
         from essence.chat.interaction import setup_agent_message_endpoint
-        from agent_handler import process_agent_message as telegram_process_agent_message
         from typing import Optional, Dict, Any
+        
+        # Add chat-service-base to path for shared agent handler
+        chat_base_path = Path(__file__).parent.parent / "chat-service-base"
+        sys.path.insert(0, str(chat_base_path))
+        from agent.handler import process_agent_message
         
         def process_message_wrapper(user_message: str, user_id: Optional[int] = None, 
                                      chat_id: Optional[int] = None, **kwargs) -> Dict[str, Any]:
             """Wrapper for process_agent_message to match expected signature."""
-            return telegram_process_agent_message(user_message, user_id=user_id, chat_id=chat_id)
+            return process_agent_message(
+                user_message, 
+                user_id=user_id, 
+                chat_id=chat_id,
+                platform="telegram",
+                agent_script_name="telegram_response_agent.sh",
+                agent_script_simple_name="telegram_response_agent_simple.sh",
+                max_message_length=4096
+            )
         
         setup_agent_message_endpoint(
             self.health_app,

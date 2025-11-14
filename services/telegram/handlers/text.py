@@ -12,8 +12,11 @@ from pathlib import Path
 # Add parent directory to path to import modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from agent_response import call_telegram_response_agent, format_agent_response_for_telegram
-from agent_handler import stream_agent_message
+# Add chat-service-base to path for shared agent handler
+chat_base_path = Path(__file__).parent.parent.parent / "chat-service-base"
+sys.path.insert(0, str(chat_base_path))
+
+from agent.handler import stream_agent_message
 from conversation_storage import ConversationStorage
 
 logger = logging.getLogger(__name__)
@@ -151,7 +154,11 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 user_id=user_id,
                 chat_id=chat_id,
                 line_timeout=30.0,  # 30 seconds between JSON lines
-                max_total_time=300.0  # 5 minutes total
+                max_total_time=300.0,  # 5 minutes total
+                platform="telegram",
+                agent_script_name="telegram_response_agent.sh",
+                agent_script_simple_name="telegram_response_agent_simple.sh",
+                max_message_length=4096
             ):
                 # Skip empty messages (final signal)
                 if not message_text and is_final:

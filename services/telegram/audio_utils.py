@@ -12,6 +12,7 @@ Provides functions for:
 """
 import io
 import logging
+import shutil
 from typing import Optional, Tuple
 
 from pydub import AudioSegment
@@ -30,6 +31,48 @@ except ImportError:
     librosa = None
 
 logger = logging.getLogger(__name__)
+
+# Check for FFmpeg/ffprobe availability
+_FFPROBE_AVAILABLE = None
+
+
+def _check_ffprobe_available() -> bool:
+    """
+    Check if ffprobe (part of FFmpeg) is available in the system PATH.
+    
+    Returns:
+        True if ffprobe is available, False otherwise
+    """
+    global _FFPROBE_AVAILABLE
+    if _FFPROBE_AVAILABLE is None:
+        _FFPROBE_AVAILABLE = shutil.which("ffprobe") is not None
+        if not _FFPROBE_AVAILABLE:
+            logger.warning(
+                "ffprobe is not available in PATH. OGG audio conversion will fail. "
+                "FFmpeg (which includes ffprobe) should be installed in the june-base Docker image. "
+                "If this error persists, verify that FFmpeg is installed and available in PATH."
+            )
+    return _FFPROBE_AVAILABLE
+
+
+def _raise_ffprobe_error(operation: str) -> None:
+    """
+    Raise a clear error message when ffprobe is not available.
+    
+    Args:
+        operation: Description of the operation that failed (e.g., "OGG to WAV conversion")
+        
+    Raises:
+        RuntimeError: Always raises with a clear error message
+    """
+    error_msg = (
+        f"Failed to perform {operation}: ffprobe (part of FFmpeg) is not available. "
+        "FFmpeg should be installed in the june-base Docker image. "
+        "Please verify that FFmpeg is installed and available in PATH. "
+        "Error: [Errno 2] No such file or directory: 'ffprobe'"
+    )
+    logger.error(error_msg)
+    raise RuntimeError(error_msg)
 
 # Constants for audio validation
 MAX_AUDIO_DURATION_SECONDS = 60.0  # Maximum audio duration in seconds (Telegram ~1 minute)
@@ -81,7 +124,12 @@ def convert_ogg_to_wav(ogg_data: bytes) -> bytes:
         
     Raises:
         ValueError: If the input data cannot be decoded as OGG audio
+        RuntimeError: If ffprobe is not available
     """
+    # Check for ffprobe availability before attempting conversion
+    if not _check_ffprobe_available():
+        _raise_ffprobe_error("OGG to WAV conversion")
+    
     try:
         # Load OGG audio from bytes
         audio = AudioSegment.from_ogg(io.BytesIO(ogg_data))
@@ -99,7 +147,16 @@ def convert_ogg_to_wav(ogg_data: bytes) -> bytes:
     except CouldntDecodeError as e:
         logger.error(f"Failed to decode OGG audio: {e}")
         raise ValueError(f"Invalid OGG audio data: {e}")
+    except FileNotFoundError as e:
+        # Check if this is the ffprobe error
+        if "ffprobe" in str(e) or "No such file or directory" in str(e):
+            _raise_ffprobe_error("OGG to WAV conversion")
+        raise
     except Exception as e:
+        # Check if this is the ffprobe error
+        error_str = str(e)
+        if "ffprobe" in error_str or ("No such file or directory" in error_str and "ffprobe" in error_str.lower()):
+            _raise_ffprobe_error("OGG to WAV conversion")
         logger.error(f"Error converting OGG to WAV: {e}")
         raise ValueError(f"Failed to convert OGG to WAV: {e}")
 
@@ -130,9 +187,17 @@ def convert_to_16khz_mono(audio_data: bytes) -> bytes:
             except CouldntDecodeError:
                 # Last attempt: try as OGG
                 try:
+                    # Check for ffprobe before attempting OGG conversion
+                    if not _check_ffprobe_available():
+                        _raise_ffprobe_error("OGG audio decoding")
                     audio = AudioSegment.from_ogg(io.BytesIO(audio_data))
                 except CouldntDecodeError as e:
                     raise ValueError(f"Could not decode audio data (tried WAV, auto-detect, and OGG): {e}")
+                except FileNotFoundError as e:
+                    # Check if this is the ffprobe error
+                    if "ffprobe" in str(e) or "No such file or directory" in str(e):
+                        _raise_ffprobe_error("OGG audio decoding")
+                    raise
         
         # Convert to 16kHz sample rate
         audio = audio.set_frame_rate(16000)
@@ -159,7 +224,16 @@ def convert_to_16khz_mono(audio_data: bytes) -> bytes:
     except CouldntDecodeError as e:
         logger.error(f"Failed to decode audio: {e}")
         raise ValueError(f"Invalid audio data: {e}")
+    except FileNotFoundError as e:
+        # Check if this is the ffprobe error
+        if "ffprobe" in str(e) or "No such file or directory" in str(e):
+            _raise_ffprobe_error("audio format conversion")
+        raise
     except Exception as e:
+        # Check if this is the ffprobe error
+        error_str = str(e)
+        if "ffprobe" in error_str or ("No such file or directory" in error_str and "ffprobe" in error_str.lower()):
+            _raise_ffprobe_error("audio format conversion")
         logger.error(f"Error converting to 16kHz mono: {e}")
         raise ValueError(f"Failed to convert to 16kHz mono: {e}")
 
