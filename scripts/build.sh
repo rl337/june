@@ -94,7 +94,13 @@ if [ "${SERVICE_NAME}" = "telegram" ] || [ "${SERVICE_NAME}" = "discord" ]; then
         "python-dotenv>=1.0.0" \
         "httpx>=0.25.0" \
         "aiofiles>=23.2.1" \
-        "prometheus-client>=0.19.0" || {
+        "prometheus-client>=0.19.0" \
+        "grpcio>=1.60.0" \
+        "grpcio-tools>=1.60.0" \
+        "psycopg2-binary>=2.9.0" \
+        "librosa>=0.10.1" \
+        "numpy>=1.24.0" \
+        "pydub>=0.25.1" || {
         echo "Error: Failed to install minimal dependencies"
         exit 1
     }
@@ -189,7 +195,20 @@ fi
 
 # Set PYTHONPATH to include the directory containing essence (not essence itself)
 # essence needs to be importable as a module, so we add its parent directory
-export PYTHONPATH="${SCRIPT_DIR}:${SCRIPT_DIR}/services:${SCRIPT_DIR}/packages:${PYTHONPATH:-}"
+# Also add individual package directories (e.g., packages/inference-core for inference_core)
+NEW_PYTHONPATH="${SCRIPT_DIR}:${SCRIPT_DIR}/services:${SCRIPT_DIR}/packages"
+# Add each package subdirectory to PYTHONPATH
+for pkg_dir in "${SCRIPT_DIR}/packages"/*; do
+    if [ -d "${pkg_dir}" ]; then
+        NEW_PYTHONPATH="${NEW_PYTHONPATH}:${pkg_dir}"
+    fi
+done
+# Preserve existing PYTHONPATH if set
+if [ -n "${PYTHONPATH:-}" ]; then
+    export PYTHONPATH="${NEW_PYTHONPATH}:${PYTHONPATH}"
+else
+    export PYTHONPATH="${NEW_PYTHONPATH}"
+fi
 
 # Stay in SCRIPT_DIR so essence can be imported as a module
 cd "${SCRIPT_DIR}"
