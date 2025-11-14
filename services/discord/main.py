@@ -19,20 +19,88 @@ from discord.ext import commands
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST
 
 # Add shared base to path
-chat_base_path = Path(__file__).parent.parent / "chat-service-base"
-sys.path.insert(0, str(chat_base_path))
+# Use absolute path resolution to handle different working directories
+_script_dir = Path(__file__).parent.absolute()
+# main.py is in services/discord/, so parent is services/, parent.parent is deployment root
+_deploy_root = _script_dir.parent.parent.absolute()
+
+# Try multiple path resolution strategies
+chat_base_path = None
+candidates = [
+    _deploy_root / "services" / "chat-service-base",
+    _script_dir.parent / "chat-service-base",
+    Path("services/chat-service-base").absolute(),
+]
+
+# Add explicit logging to see what we're checking
+import logging as _logging
+_temp_logger = _logging.getLogger(__name__)
+for candidate in candidates:
+    exists = candidate.exists()
+    handler_exists = (candidate / "agent" / "handler.py").exists() if exists else False
+    if exists and handler_exists:
+        chat_base_path = candidate
+        break
+
+if chat_base_path:
+    chat_base_abs = str(chat_base_path.absolute())
+    sys.path.insert(0, chat_base_abs)  # Always insert, even if already there (move to front)
+else:
+    # Last resort: add current working directory's services/chat-service-base
+    import os
+    cwd_chat_base = Path(os.getcwd()) / "services" / "chat-service-base"
+    if cwd_chat_base.exists() and (cwd_chat_base / "agent" / "handler.py").exists():
+        sys.path.insert(0, str(cwd_chat_base.absolute()))
 
 # Add essence module to path
-essence_path = Path(__file__).parent.parent.parent / "essence"
-sys.path.insert(0, str(essence_path))
+essence_path = None
+for candidate in [
+    _deploy_root / "essence",
+    _script_dir.parent.parent / "essence",
+    Path("essence").absolute(),
+]:
+    if candidate.exists():
+        essence_path = candidate
+        break
+
+if essence_path:
+    essence_abs = str(essence_path.absolute())
+    if essence_abs not in sys.path:
+        sys.path.insert(0, essence_abs)
 
 from inference_core import config, setup_logging
-from agent.handler import process_agent_message, stream_agent_message
 from typing import Optional, Dict, Any
 
-# Setup logging
+# Setup logging early
 setup_logging(config.monitoring.log_level, "discord")
 logger = logging.getLogger(__name__)
+
+# Import from chat-service-base agent handler
+# Add chat-service-base to sys.path first, then import normally
+# This allows relative imports within the agent package to work
+logger.info(f"chat_base_path={chat_base_path}, _deploy_root={_deploy_root}, _script_dir={_script_dir}")
+
+if chat_base_path:
+    chat_base_abs = str(chat_base_path.absolute())
+    logger.info(f"Adding {chat_base_abs} to sys.path")
+    sys.path.insert(0, chat_base_abs)
+    logger.info(f"sys.path[0] is now: {sys.path[0]}")
+    # Verify the handler file exists
+    handler_file = chat_base_path / "agent" / "handler.py"
+    logger.info(f"Handler file exists: {handler_file.exists()} at {handler_file}")
+    # Now we can import normally, which will handle relative imports correctly
+    from agent.handler import process_agent_message, stream_agent_message
+    logger.info(f"Successfully imported agent.handler from {chat_base_abs}")
+else:
+    # Try one more time with explicit path
+    explicit_path = _deploy_root / "services" / "chat-service-base"
+    logger.error(f"chat_base_path is None. Trying explicit path: {explicit_path} (exists={explicit_path.exists()})")
+    if explicit_path.exists():
+        sys.path.insert(0, str(explicit_path.absolute()))
+        from agent.handler import process_agent_message, stream_agent_message
+        logger.info(f"Successfully imported agent.handler from explicit path")
+    else:
+        raise ImportError(f"Could not find chat-service-base directory. _deploy_root={_deploy_root}, _script_dir={_script_dir}, explicit_path={explicit_path}")
 
 # Prometheus metrics
 REGISTRY = CollectorRegistry()
@@ -274,14 +342,19 @@ class DiscordBotService:
                 max_message_length=2000
             )
         
-        setup_agent_message_endpoint(
-            self.health_app,
-            platform="discord",
-            process_agent_message_func=process_message_wrapper,
-            agent_script_name="telegram_response_agent.sh",
-            agent_script_simple_name="telegram_response_agent_simple.sh",
-            max_message_length=2000
-        )
+        try:
+            setup_agent_message_endpoint(
+                self.health_app,
+                platform="discord",
+                process_agent_message_func=process_message_wrapper,
+                agent_script_name="telegram_response_agent.sh",
+                agent_script_simple_name="telegram_response_agent_simple.sh",
+                max_message_length=2000
+            )
+            logger.info("Agent message endpoint configured successfully")
+        except Exception as e:
+            logger.error(f"Failed to setup agent message endpoint: {e}", exc_info=True)
+            raise
     
     def _setup_signal_handlers(self):
         """Setup signal handlers for graceful shutdown."""
@@ -296,6 +369,10 @@ class DiscordBotService:
         """Run the Discord bot service."""
         logger.info("Starting Discord bot service...")
         
+        # Verify routes before starting server
+        route_paths = [route.path for route in self.health_app.routes]
+        logger.info(f"Health app routes before server start: {route_paths}")
+        
         # Start health check server in background
         health_server = uvicorn.Server(
             uvicorn.Config(
@@ -306,6 +383,11 @@ class DiscordBotService:
             )
         )
         health_task = asyncio.create_task(health_server.serve())
+        
+        # Give server a moment to start, then verify routes again
+        await asyncio.sleep(0.5)
+        route_paths_after = [route.path for route in self.health_app.routes]
+        logger.info(f"Health app routes after server start: {route_paths_after}")
         
         try:
             # Start bot
