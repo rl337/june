@@ -1,29 +1,29 @@
 {
   "mcpServers": {
-    "todo-service": {
+    "bucketofacts": {
       "command": "npx",
       "args": [
         "-y",
         "@modelcontextprotocol/server-fetch",
-        "http://todo-mcp-service:8004/mcp"
+        "http://bucket-o-facts:8006/mcp/sse"
       ],
       "env": {}
     },
-    "knowledge-graph": {
+    "docomatic": {
       "command": "npx",
       "args": [
         "-y",
         "@modelcontextprotocol/server-fetch",
-        "http://knowledge-graph:8006/mcp"
+        "http://doc-o-matic:8005/mcp/sse"
       ],
       "env": {}
     },
-    "document-manager": {
+    "todorama": {
       "command": "npx",
       "args": [
         "-y",
         "@modelcontextprotocol/server-fetch",
-        "http://document-manager:8007/mcp"
+        "http://todo-mcp-service:8004/mcp/sse"
       ],
       "env": {}
     }
