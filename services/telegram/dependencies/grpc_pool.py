@@ -20,7 +20,7 @@ class GrpcConnectionPool:
         keepalive_time_ms: int = 30000,
         keepalive_timeout_ms: int = 5000,
         keepalive_permit_without_calls: bool = True,
-        http2_max_pings_without_data: int = 0,
+        http2_max_pings_without_data: int = 2,  # Limit pings to prevent "too_many_pings" error
         http2_min_time_between_pings_ms: int = 10000,
         http2_min_ping_interval_without_data_ms: int = 300000
     ):
