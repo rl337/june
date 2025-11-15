@@ -1518,44 +1518,31 @@ docker-compose logs -f
 docker-compose down
 ```
 
-## 📦 Standalone Service Deployment (Non-Container)
+## 📦 Service Deployment (Docker)
 
-Some services (Telegram and Discord bots) can be deployed as standalone processes without Docker containers. This is useful for services that need direct access to the host system or when running `cursor-agent` processes.
+All services (including Telegram and Discord bots) are deployed using Docker containers. Services are built using Docker Compose with Poetry for dependency management.
 
-### Prerequisites
+### Building Services
 
-- Python 3.10+
-- Poetry installed (`pip install poetry`)
-- Repository `.env` file configured with required environment variables (see Environment Configuration below)
-
-### Building a Service
-
-The build process creates a tarball containing a pristine virtual environment and all necessary code:
+Services are built using Docker Compose:
 
 ```bash
-# Build a service (e.g., telegram or discord)
-./scripts/build.sh <service-name>
+# Build all services
+docker compose build
 
-# Example: Build telegram service
-./scripts/build.sh telegram
+# Build specific services
+docker compose build telegram discord
 
-# Example: Build discord service
-./scripts/build.sh discord
+# Rebuild without cache
+docker compose build --no-cache telegram discord
 ```
 
-The build script will:
-1. Create a pristine Python virtual environment
-2. Install all dependencies (minimal set for telegram/discord, full poetry install for others)
-3. Copy the essence module and service code
-4. Create a run script (`run.sh`) that executes `python -m essence <service-name>-service`
-5. Package everything into a tarball in `build/` directory
-6. Automatically clean up old builds, keeping only the last 3
-
-**Output:**
-- Tarball: `build/june-<service-name>-<timestamp>.tar.gz`
-- Checksum: `build/june-<service-name>-<timestamp>.tar.gz.sha256`
-
-**Important:** The `.env` file is **not** included in the build. Environment variables are sourced at runtime from the repository's `.env` file via the `ENV_SH` mechanism (see Environment Configuration below).
+**Build Process:**
+1. Base image (`june-base`) includes Poetry and common dependencies
+2. Service Dockerfiles copy `pyproject.toml`, `poetry.lock`, and `essence` module
+3. Poetry installs dependencies to system Python (no virtualenv)
+4. Service code is copied into container
+5. Services run via `poetry run python -m essence <service-name>-service`
 
 ### Command Pattern Architecture
 
@@ -1578,33 +1565,19 @@ All services use a reflection-based command discovery system:
 
 ### Environment Configuration
 
-Services source environment variables from the repository's `.env` file at runtime using the **ENV_SH mechanism**:
+Environment variables are configured in `docker-compose.yml` or via a `.env` file:
 
-1. **Repository `.env` file**: Located at the project root (`/home/rlee/dev/june/.env`)
-2. **ENV_SH Environment Variable**: The deploy script sets `ENV_SH` environment variable to point to the repo's `.env` file path
-3. **Runtime Sourcing in run.sh**: The generated `run.sh` script checks for `ENV_SH` and sources it before starting the service:
-   ```bash
-   if [ -n "${ENV_SH:-}" ] && [ -f "${ENV_SH}" ]; then
-       echo "Sourcing environment from: ${ENV_SH}"
-       set -a  # Automatically export all variables
-       source "${ENV_SH}"
-       set +a
-   ```
-4. **Fallback**: If `ENV_SH` is not set, services fall back to a local `.env` file in the service directory (if present)
-5. **Verification**: The console log will show "Sourcing environment from: <path>" when ENV_SH is successfully sourced
-
-**Benefits:**
-- `.env` file stays in one place (repo root) - no need to copy it to each deployment
-- No secrets in build artifacts - environment variables are not included in tarballs
-- Easy to update environment variables without rebuilding - just update the repo's `.env` file
-- Supports both development and production deployments - same mechanism works everywhere
-- Centralized configuration management - all services use the same `.env` file
+1. **`.env` file**: Located at the project root (`/home/rlee/dev/june/.env`)
+2. **Docker Compose**: Reads environment variables from `.env` file automatically
+3. **Service-specific variables**: Configured in `docker-compose.yml` under each service's `environment:` section
+4. **Secrets**: Use Docker secrets or environment variables (never commit secrets to git)
 
 **Required Environment Variables:**
-- `SERVICE_NAME`: Service name (set automatically by deploy script)
 - `TELEGRAM_BOT_TOKEN`: Telegram bot token (for telegram service)
 - `DISCORD_BOT_TOKEN`: Discord bot token (for discord service)
+- `CURSOR_API_KEY`: Cursor API key for agent functionality
 - Service-specific ports and configuration
+- Network configuration for MCP services
 
 ## 🌐 Cross-Container Networking
 
@@ -1704,68 +1677,40 @@ June services use MCP services via the configuration in `config/cursor-mcp-confi
 - Check container names match MCP client configuration
 - Ensure network names in `docker-compose.yml` match actual network names
 
-### Deploying a Service
+### Deploying Services
 
-The deploy script handles stopping the previous version, deploying the new version, and starting the service:
+Services are deployed using Docker Compose:
 
 ```bash
-# Deploy a service
-./scripts/deploy.sh <service-name> <tarball-name>
+# Build and start services
+docker compose build telegram discord
+docker compose up -d telegram discord
 
-# Example: Deploy telegram service
-./scripts/deploy.sh telegram june-telegram-20240101-120000.tar.gz
+# View logs
+docker compose logs -f telegram discord
 
-# Example: Deploy discord service
-./scripts/deploy.sh discord june-discord-20240101-120000.tar.gz
+# Check status
+docker compose ps telegram discord
+
+# Restart services
+docker compose restart telegram discord
+
+# Stop services
+docker compose stop telegram discord
 ```
 
-The deploy script will:
-1. Verify the tarball checksum
-2. Stop the previous version if running (graceful shutdown with SIGTERM)
-3. Remove the old deployment from `/usr/local/june/<service-name>` (or `~/.local/run/june/<service-name>` for non-root)
-4. Extract the new tarball
-5. **Verify deployment structure** (checks for required files, essence module importability, command discovery)
-6. Set `ENV_SH` to point to the repository's `.env` file
-7. Start the service in the background with proper logging
+**Service Management:**
+- All services run as Docker containers
+- Logs: `docker compose logs <service-name>`
+- Health checks: Built-in Docker healthchecks configured in Dockerfiles
+- Environment variables: Configured in `docker-compose.yml` or `.env` file
+- Network configuration: Services connect to external MCP service networks
 
-**Service Locations:**
-- Runtime directory: `/usr/local/june/<service-name>/` (or `~/.local/run/june/<service-name>` for non-root)
-- Console logs: `/var/log/june/<service-name>.console` (or `~/.local/log/june/<service-name>.console` for non-root)
-- Application logs: `/var/log/june/<service-name>.log` (or `~/.local/log/june/<service-name>.log` for non-root)
-- PID file: `<runtime-dir>/service.pid`
-
-**Deployment Verification:**
-The deploy script automatically performs comprehensive verification before starting the service:
-
-1. **File Structure Verification**: Checks for required files:
-   - `run.sh` - Service startup script
-   - `venv/bin/python3` - Python interpreter in virtual environment
-   - `essence/__main__.py` - Essence module entry point
-   - `essence/command/__init__.py` - Command base class
-   - `essence/commands` - Commands directory
-
-2. **Module Import Verification**: Verifies the essence module can be imported:
-   ```bash
-   python3 -c "import sys; sys.path.insert(0, '.'); import essence; print('✓ Essence module importable')"
-   ```
-
-3. **Command Discovery Verification**: Verifies commands can be discovered via reflection:
-   ```bash
-   python3 -c "from essence.__main__ import get_commands; cmds = get_commands(); print(f'✓ Discovered {len(cmds)} command(s)')"
-   ```
-   - This ensures the reflection-based command discovery system is working
-   - Lists all discovered commands (e.g., `telegram-service`, `discord-service`, `tts`)
-   - If discovery fails, a warning is shown but deployment continues
-
-4. **Checksum Verification**: If a `.sha256` checksum file exists, the tarball integrity is verified before extraction
-
-**Verification Failure Handling:**
-- If file structure verification fails: Deployment is aborted with a list of missing files
-- If module import fails: Deployment is aborted with an error message
-- If command discovery fails: A warning is shown but deployment continues (service may still work)
-
-**Verification Output:**
-The deploy script provides clear feedback during verification:
+**Deployment Process:**
+1. Build Docker images using `docker compose build`
+2. Start containers with `docker compose up -d`
+3. Monitor health with `docker compose ps`
+4. View logs with `docker compose logs`
 ```
 Verifying deployment structure...
 Verifying essence module...

@@ -821,38 +821,32 @@ Each service includes:
 
 ## 🚀 Deployment Commands
 
-### Standalone Service Build and Deploy (Non-Container Services)
+### Service Build and Deploy (Docker)
 
-Some services (Telegram and Discord bots) are deployed as standalone processes without Docker containers. This allows direct access to the host system and is required for services that run `cursor-agent` processes.
+All services (including Telegram and Discord bots) are deployed using Docker containers. Services are built using Docker Compose with Poetry for dependency management.
 
 #### Building a Service
 
 **Process:**
-1. Create a pristine virtual environment
-2. Install all dependencies from `essence/pyproject.toml`
-3. Copy essence module and service code
-4. Package into a tarball
+1. Services are built using Docker Compose
+2. Dockerfiles use Poetry to install dependencies from `pyproject.toml`
+3. Services run via `poetry run python -m essence <service-name>-service`
 
 **Command:**
 ```bash
-# Build a service
-./scripts/build.sh <service-name>
+# Build services using Docker Compose
+docker compose build telegram discord
 
-# Examples
-./scripts/build.sh telegram
-./scripts/build.sh discord
+# Start services
+docker compose up -d telegram discord
 ```
 
-**Output:**
-- Tarball: `build/june-<service-name>-<timestamp>.tar.gz`
-- Checksum: `build/june-<service-name>-<timestamp>.tar.gz.sha256`
-
 **What Gets Built:**
-- Pristine Python virtual environment with all dependencies
-- Complete `essence` module
+- Docker images with all dependencies installed via Poetry
+- Complete `essence` module copied into container
 - Service-specific code from `services/<service-name>/`
 - Shared dependencies (chat-service-base, packages, proto)
-- Run script (`run.sh`) that executes `python -m essence <service-name>-service`
+- Services run via essence command system
 
 #### Testing Services
 
@@ -889,59 +883,63 @@ curl http://localhost:8081/metrics
 #### Deploying a Service
 
 **Process:**
-1. Verify tarball checksum
-2. Stop previous version if running
-3. Remove old deployment from `/var/run/june/<service-name>`
-4. Extract new tarball
-5. Start service with logging
+1. Build Docker images using Docker Compose
+2. Stop previous containers if running
+3. Start new containers with updated images
+4. Monitor container health and logs
 
 **Command:**
 ```bash
-# Deploy a service (requires sudo for /var/run and /var/log)
-sudo ./scripts/deploy.sh <service-name> <tarball-name>
+# Build and deploy services
+docker compose build telegram discord
+docker compose up -d telegram discord
 
-# Examples
-sudo ./scripts/deploy.sh telegram june-telegram-20240101-120000.tar.gz
-sudo ./scripts/deploy.sh discord june-discord-20240101-120000.tar.gz
+# View logs
+docker compose logs -f telegram discord
+
+# Check status
+docker compose ps telegram discord
 ```
 
-**Service Locations:**
-- Runtime: `/var/run/june/<service-name>/`
-- Console logs: `/var/log/june/<service-name>.console`
-- Application logs: `/var/log/june/<service-name>.log`
+**Service Management:**
+- Containers run via Docker Compose
+- Logs: `docker compose logs <service-name>`
+- Health checks: Built-in Docker healthchecks
+- Restart: `docker compose restart <service-name>`
 
 **Environment Configuration:**
-Before deploying, ensure `/var/run/june/<service-name>/.env` contains required variables:
-- `SERVICE_NAME=<service-name>`
+Environment variables are configured in `docker-compose.yml` or via `.env` file:
 - Service-specific tokens and configuration
 - Port numbers and other settings
+- Network configuration for MCP services
 
 #### Service Management
 
 **View Logs:**
 ```bash
-# Console output
-tail -f /var/log/june/<service-name>.console
+# Docker Compose logs
+docker compose logs -f <service-name>
 
-# Application logs
-tail -f /var/log/june/<service-name>.log
+# Last 100 lines
+docker compose logs --tail=100 <service-name>
+
+# Follow logs
+docker compose logs -f --tail=50 <service-name>
 ```
 
 **Stop Service:**
 ```bash
-kill $(cat /var/run/june/<service-name>/service.pid)
+docker compose stop <service-name>
 ```
 
 **Restart Service:**
 ```bash
-# Stop
-kill $(cat /var/run/june/<service-name>/service.pid)
-sleep 2
+docker compose restart <service-name>
+```
 
-# Start manually (or redeploy)
-cd /var/run/june/<service-name>
-./run.sh >> /var/log/june/<service-name>.console 2>&1 &
-echo $! > service.pid
+**View Service Status:**
+```bash
+docker compose ps <service-name>
 ```
 
 #### Command Pattern Architecture
@@ -986,13 +984,15 @@ python -m essence <service-name>-service [args...]
    - Test HTTP endpoints if available
    - Verify health checks pass
 
-2. **Use checksums:**
-   - Deploy script verifies tarball checksum automatically
-   - Never skip checksum verification
-
-3. **Monitor logs after deployment:**
-   - Check console logs for startup errors
+2. **Monitor container health:**
+   - Check Docker health status: `docker compose ps`
    - Verify service is responding to health checks
+   - Monitor logs for startup errors
+
+3. **Use Docker Compose for management:**
+   - All services managed via `docker compose`
+   - Consistent deployment process
+   - Built-in health checks and restart policies
    - Monitor application logs for runtime issues
 
 4. **Graceful shutdown:**
