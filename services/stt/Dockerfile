@@ -11,10 +11,10 @@ COPY pyproject.toml poetry.lock ./
 COPY essence ./essence
 
 # Install dependencies using poetry (skip installing project itself with --no-root)
-# Set config globally and ensure it persists
-RUN poetry config virtualenvs.create false --global && \
-    poetry config virtualenvs.in-project false --global && \
-    poetry install --no-interaction --no-ansi --only main --no-root
+# Use environment variables to disable virtualenv creation
+ENV POETRY_VIRTUALENVS_CREATE=false
+ENV POETRY_VIRTUALENVS_IN_PROJECT=false
+RUN poetry install --no-interaction --no-ansi --only main --no-root
 
 ## shared module removed; use inference_core instead
 

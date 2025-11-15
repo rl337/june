@@ -15,10 +15,10 @@ COPY essence ./essence
 COPY services/telegram .
 
 # Install dependencies using poetry (skip installing project itself with --no-root)
-# Set config globally and ensure it persists
-RUN poetry config virtualenvs.create false --global && \
-    poetry config virtualenvs.in-project false --global && \
-    poetry install --no-interaction --no-ansi --only main --no-root
+# Use environment variables to disable virtualenv creation
+ENV POETRY_VIRTUALENVS_CREATE=false
+ENV POETRY_VIRTUALENVS_IN_PROJECT=false
+RUN poetry install --no-interaction --no-ansi --only main --no-root
 
 # Ensure permissions
 RUN chown -R june:june /app
