@@ -42,12 +42,18 @@ from dependencies.rate_limit import get_rate_limiter
 from dependencies.grpc_pool import shutdown_grpc_pool
 
 # Import admin_db for blocked user check
-try:
-    from admin_db import is_user_blocked
-except ImportError:
-    # Fallback if admin_db not available
-    def is_user_blocked(user_id: str) -> bool:
-        return False
+# Disabled: No PostgreSQL service available
+# try:
+#     from admin_db import is_user_blocked
+# except ImportError:
+#     # Fallback if admin_db not available
+#     def is_user_blocked(user_id: str) -> bool:
+#         return False
+
+# Always use fallback - no PostgreSQL available
+def is_user_blocked(user_id: str) -> bool:
+    """Check if user is blocked. Always returns False since PostgreSQL is not available."""
+    return False
 
 # Setup logging
 setup_logging(config.monitoring.log_level, "telegram")
