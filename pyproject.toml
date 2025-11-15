@@ -68,7 +68,7 @@ dependencies = [
     "httpx>=0.25.0",
     "aiofiles>=23.2.1",
     "pillow>=10.1.0",
-    "numpy==1.22.0",  # Pinned for TTS compatibility
+    "numpy>=1.22.0,<1.23.0",  # Compatible with TTS and librosa
     "scipy>=1.11.0",
 ]
 
