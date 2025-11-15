@@ -139,7 +139,7 @@ is_safe, threat = monitor.analyze_operation(
 To integrate security into the June agent execution pipeline:
 
 ```python
-# In june-agent-loop.py or similar
+# In agent loop scripts or similar
 from june_security import SecurityManager
 from pathlib import Path
 

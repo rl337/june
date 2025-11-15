@@ -18,6 +18,51 @@ from essence.chat.utils.streaming_popen import streaming_popen_generator
 
 logger = logging.getLogger(__name__)
 
+# Valid agent modes (matching prompt directory names)
+VALID_AGENT_MODES = {
+    "normal", "architect", "precommit", "refactor-planner", 
+    "project-cleanup", "telegram-response"
+}
+
+
+def parse_agent_mode_from_message(user_message: str) -> Tuple[str, str]:
+    """
+    Parse agent mode from message prefix like !name.
+    
+    Args:
+        user_message: The user's message
+        
+    Returns:
+        Tuple of (cleaned_message, agent_mode) where:
+        - cleaned_message: Message with !name prefix removed (if present)
+        - agent_mode: Agent mode name (default: "telegram-response")
+    """
+    # Strip leading whitespace
+    stripped = user_message.lstrip()
+    
+    # Check if message starts with !
+    if not stripped.startswith("!"):
+        return user_message, "telegram-response"
+    
+    # Find the end of the agent name (whitespace or end of string)
+    # Look for !name pattern where name is alphanumeric and hyphens
+    import re
+    match = re.match(r"^!([a-zA-Z0-9-]+)(\s+|$)", stripped)
+    if match:
+        agent_name = match.group(1)
+        # Check if it's a valid agent mode
+        if agent_name in VALID_AGENT_MODES:
+            # Remove the !name prefix and any following whitespace
+            cleaned = user_message[len(stripped[:match.end()]):].lstrip()
+            # If the cleaned message is empty, return the original (fallback)
+            if not cleaned:
+                return user_message, "telegram-response"
+            logger.info(f"Parsed agent mode '{agent_name}' from message prefix")
+            return cleaned, agent_name
+    
+    # If !name pattern doesn't match a valid agent, return original message
+    return user_message, "telegram-response"
+
 
 def call_chat_response_agent(
     user_message: str, 
@@ -32,7 +77,7 @@ def call_chat_response_agent(
     Call the chat response agent with a user message.
     
     Args:
-        user_message: The message from the user
+        user_message: The message from the user (may contain !name prefix to select agent)
         agenticness_dir: Path to agenticness directory (defaults to ../agenticness)
         user_id: User ID for session identification (optional, but required for context preservation)
         chat_id: Chat ID for session identification (optional, but required for context preservation)
@@ -43,6 +88,9 @@ def call_chat_response_agent(
     Returns:
         Dictionary with agent response or error information
     """
+    # Parse agent mode from message prefix (e.g., !architect, !normal)
+    cleaned_message, agent_mode = parse_agent_mode_from_message(user_message)
+    
     if agenticness_dir is None:
         # Default to ../agenticness from service directory
         script_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -77,6 +125,9 @@ def call_chat_response_agent(
         env["AGENT_TIMEOUT"] = env.get("AGENT_TIMEOUT", "300")
         env["TODO_SERVICE_URL"] = env.get("TODO_SERVICE_URL", "http://localhost:8004")
         
+        # Set AGENT_MODE from parsed message prefix
+        env["AGENT_MODE"] = agent_mode
+        
         # Set AGENTICNESS_STATE_DIR so the script uses the correct session directory
         # This must be set before the script sources session_manager.sh
         agenticness_state_dir = os.getenv("AGENTICNESS_STATE_DIR", "/home/rlee/june_data/agenticness-state")
@@ -91,19 +142,19 @@ def call_chat_response_agent(
         if user_id is not None and chat_id is not None:
             env[f"{platform.upper()}_USER_ID"] = str(user_id)
             env[f"{platform.upper()}_CHAT_ID"] = str(chat_id)
-            logger.info(f"Using session-aware agent for user {user_id}, chat {chat_id}")
+            logger.info(f"Using session-aware agent for user {user_id}, chat {chat_id}, mode: {agent_mode}")
         
         # Call the agent script with bash -x for debugging
         # CRITICAL: cursor-agent requires a PTY (isTTY check fails otherwise)
         # Use pty.fork() which creates a PTY pair and forks in one call
-        logger.info(f"Calling {platform} response agent with message: {user_message[:50]}...")
+        logger.info(f"Calling {platform} response agent (mode: {agent_mode}) with message: {cleaned_message[:50]}...")
         import pty
         import select
         
-        # Build command arguments
-        script_args = [user_message]
+        # Build command arguments with cleaned message (with !name prefix removed)
+        script_args = [cleaned_message]
         if user_id is not None and chat_id is not None:
-            script_args = [str(user_id), str(chat_id), user_message]
+            script_args = [str(user_id), str(chat_id), cleaned_message]
         
         # pty.fork() creates a PTY pair and forks, returning (pid, master_fd)
         # The child process automatically gets the slave PTY as its controlling terminal
@@ -337,7 +388,7 @@ def stream_chat_response_agent(
     out intermediate states like "thinking".
     
     Args:
-        user_message: The message from the user
+        user_message: The message from the user (may contain !name prefix to select agent)
         agenticness_dir: Path to agenticness directory (defaults to ../agenticness)
         user_id: User ID for session identification
         chat_id: Chat ID for session identification
@@ -352,6 +403,9 @@ def stream_chat_response_agent(
         - message_text: Human-readable text to send to the chat platform
         - is_final: True if this is the final message, False for intermediate messages
     """
+    # Parse agent mode from message prefix (e.g., !architect, !normal)
+    cleaned_message, agent_mode = parse_agent_mode_from_message(user_message)
+    
     if agenticness_dir is None:
         script_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         agenticness_dir = os.path.join(script_dir, "agenticness")
@@ -380,6 +434,9 @@ def stream_chat_response_agent(
     env["AGENT_TIMEOUT"] = env.get("AGENT_TIMEOUT", "300")
     env["TODO_SERVICE_URL"] = env.get("TODO_SERVICE_URL", "http://localhost:8004")
     
+    # Set AGENT_MODE from parsed message prefix
+    env["AGENT_MODE"] = agent_mode
+    
     agenticness_state_dir = os.getenv("AGENTICNESS_STATE_DIR", "/home/rlee/june_data/agenticness-state")
     env["AGENTICNESS_STATE_DIR"] = agenticness_state_dir
     
@@ -389,12 +446,12 @@ def stream_chat_response_agent(
     if user_id is not None and chat_id is not None:
         env[f"{platform.upper()}_USER_ID"] = str(user_id)
         env[f"{platform.upper()}_CHAT_ID"] = str(chat_id)
-        logger.info(f"Streaming agent response for user {user_id}, chat {chat_id}")
+        logger.info(f"Streaming agent response for user {user_id}, chat {chat_id}, mode: {agent_mode}")
     
-    # Build command arguments
-    script_args = [user_message]
+    # Build command arguments with cleaned message (with !name prefix removed)
+    script_args = [cleaned_message]
     if user_id is not None and chat_id is not None:
-        script_args = [str(user_id), str(chat_id), user_message]
+        script_args = [str(user_id), str(chat_id), cleaned_message]
     
     # Use streaming_popen_generator utility for proper PTY-based streaming
     command = ["/bin/bash", "-x", agent_script] + script_args
@@ -435,17 +492,41 @@ def stream_chat_response_agent(
                     continue
                 
                 message = _extract_human_readable_from_json_line(line)
-                if message and message not in seen_messages:
-                    seen_messages.add(message)
-                    # Add to pending queue for pacing
-                    pending_messages.append((message, current_time))
-                    # If this is the first message and we've waited long enough, send it immediately
-                    if not first_message_sent and elapsed >= max_wait_for_first_message:
-                        first_message_sent = True
-                        yield (message, False)
-                        last_message_yield_time = current_time
-                        # Remove from pending since we just sent it
-                        pending_messages = [m for m in pending_messages if m[0] != message]
+                if message:
+                    # Check if this is a new message or an update to an existing one
+                    # For assistant messages, we want to accumulate the full response
+                    # Compare message content to see if it's an extension of previous message
+                    is_new_or_extended = True
+                    message_to_use = message
+                    
+                    if seen_messages:
+                        # Check if this message contains or extends a previous message
+                        for seen_msg in list(seen_messages):
+                            if seen_msg in message:
+                                # This message contains a previous one - it's an extension
+                                # Remove the shorter version and use the longer one
+                                seen_messages.discard(seen_msg)
+                                # Remove from pending if it's there
+                                pending_messages = [m for m in pending_messages if m[0] != seen_msg]
+                                message_to_use = message
+                                is_new_or_extended = True
+                                break
+                            elif message in seen_msg:
+                                # This is a shorter version of something we've seen, skip it
+                                is_new_or_extended = False
+                                break
+                    
+                    if is_new_or_extended:
+                        seen_messages.add(message_to_use)
+                        # Add to pending queue for pacing
+                        pending_messages.append((message_to_use, current_time))
+                        # If this is the first message and we've waited long enough, send it immediately
+                        if not first_message_sent and elapsed >= max_wait_for_first_message:
+                            first_message_sent = True
+                            yield (message_to_use, False)
+                            last_message_yield_time = current_time
+                            # Remove from pending since we just sent it
+                            pending_messages = [m for m in pending_messages if m[0] != message_to_use]
             
             # Yield pending messages if enough time has passed (pacing)
             if pending_messages:
@@ -539,6 +620,8 @@ def _extract_human_readable_from_json_line(line: str) -> Optional[str]:
                             if text and len(text) > 5:  # Lower threshold for earlier messages
                                 # Filter out descriptions but allow partial responses
                                 if not text.strip().startswith(("Writing", "Wrote", "Created", "Updated", "Response written")):
+                                    # Return the full text, not just the first chunk
+                                    # The streaming function will handle chunking if needed
                                     return text.strip()
         
         # 3. Check for result objects (but be careful - these might be descriptions)
