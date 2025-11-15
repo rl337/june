@@ -106,20 +106,56 @@ def setup_agent_message_endpoint(
             result = process_agent_message_func(**kwargs)
             
             if result.get("success"):
+                # Validate the response using structured messaging
+                from essence.chat.message_builder import MessageBuilder
+                from essence.chat.platform_validators import get_validator
+                
+                message_text = result.get("message", "")
+                
+                # Build turn to validate structure
+                builder = MessageBuilder(service_name=platform, user_id=str(user_id), chat_id=str(chat_id))
+                turn = builder.build_turn(user_message, message_text)
+                
+                # Render and validate for platform
+                rendered = builder.render_message()
+                validator = get_validator(platform)
+                is_valid, validation_errors = validator.validate(rendered)
+                
+                response_content = {
+                    "success": True,
+                    "message": message_text,
+                    "rendered": rendered,
+                    "validation": {
+                        "is_valid": is_valid,
+                        "errors": validation_errors if not is_valid else []
+                    },
+                    "turn_id": turn.turn_id,
+                    "message_count": len(turn.messages)
+                }
+                
+                # Log the turn
+                turn.log_to_file()
+                
                 return JSONResponse(
                     status_code=200,
-                    content={
-                        "success": True,
-                        "message": result.get("message", "")
-                    }
+                    content=response_content
                 )
             else:
+                # Use structured error message
+                from essence.chat.error_handler import render_error_for_platform
+                error_text = render_error_for_platform(
+                    Exception(result.get("error", "Unknown error")),
+                    platform,
+                    result.get("message", "Error processing message")
+                )
+                
                 return JSONResponse(
                     status_code=500,
                     content={
                         "success": False,
                         "error": result.get("error", "Unknown error"),
-                        "message": result.get("message", "Error processing message")
+                        "message": result.get("message", "Error processing message"),
+                        "rendered_error": error_text
                     }
                 )
                 
