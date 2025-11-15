@@ -41,7 +41,7 @@ dependencies = [
     "pyaudio>=0.2.11",
     
     # Audio processing
-    "librosa>=0.10.1,<0.11.0",  # Compatible with numpy 1.22.0
+    "librosa>=0.11.0",  # Supports numpy >=1.22.3
     "soundfile>=0.12.1",
     "webrtcvad>=2.0.10",
     
@@ -68,7 +68,7 @@ dependencies = [
     "httpx>=0.25.0",
     "aiofiles>=23.2.1",
     "pillow>=10.1.0",
-    "numpy>=1.22.0,<1.23.0",  # Compatible with TTS and librosa
+    "numpy>=1.22.3,<1.23.0",  # Compatible with librosa 0.11+, try with TTS
     "scipy>=1.11.0",
 ]
 
