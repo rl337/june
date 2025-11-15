@@ -216,8 +216,8 @@ services:
   # Orchestration Service (Agent orchestration and coordination)
   orchestrator:
     build:
-      context: ./services/orchestrator
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/orchestrator/Dockerfile
     container_name: june-orchestrator
     restart: unless-stopped
     ports:
