@@ -37,7 +37,6 @@ dependencies = [
     "optimum>=1.14.0",
     "openai-whisper>=20231117",
     "speechrecognition>=3.10.0",
-    "pyaudio>=0.2.11",
     
     # Audio processing
     "librosa>=0.10.1",  # Standard version
