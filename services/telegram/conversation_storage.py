@@ -333,6 +333,7 @@ class ConversationStorage:
                     conn.commit()
                     logger.info(f"Created conversation with user preferences for {user_id}/{chat_id}: name={name}, favorite_color={favorite_color}")
                     return True
+                    
             except Exception as e:
                 conn.rollback()
                 raise e
@@ -775,7 +776,7 @@ class ConversationStorage:
                 # PostgreSQL not available - return default
                 logger.debug(f"PostgreSQL not available: {e}")
                 return False
-            except Exception as e:
+                except Exception as e:
                 conn.rollback()
                 raise e
             finally:
@@ -1091,7 +1092,7 @@ class ConversationStorage:
                 # PostgreSQL not available - return default
                 logger.debug(f"PostgreSQL not available: {e}")
                 return False
-        except Exception as e:
+                except Exception as e:
                 conn.rollback()
                 raise e
             finally:
@@ -1136,7 +1137,7 @@ class ConversationStorage:
                 # PostgreSQL not available - return default
                 logger.debug(f"PostgreSQL not available: {e}")
                 return False
-        except Exception as e:
+                except Exception as e:
                 conn.rollback()
                 raise e
             finally:
@@ -1414,7 +1415,7 @@ class ConversationStorage:
                 # PostgreSQL not available - return default
                 logger.debug(f"PostgreSQL not available: {e}")
                 return False
-        except Exception as e:
+            except Exception as e:
                 conn.rollback()
                 raise e
             finally:
@@ -1594,7 +1595,7 @@ class ConversationStorage:
                 # PostgreSQL not available - return default
                 logger.debug(f"PostgreSQL not available: {e}")
                 return False
-        except Exception as e:
+            except Exception as e:
                 conn.rollback()
                 raise e
             finally:
@@ -1725,7 +1726,7 @@ class ConversationStorage:
                 # PostgreSQL not available - return default
                 logger.debug(f"PostgreSQL not available: {e}")
                 return False
-        except Exception as e:
+            except Exception as e:
                 conn.rollback()
                 raise e
             finally:
@@ -1779,7 +1780,7 @@ class ConversationStorage:
                 # PostgreSQL not available - return default
                 logger.debug(f"PostgreSQL not available: {e}")
                 return False
-        except Exception as e:
+            except Exception as e:
                 conn.rollback()
                 raise e
             finally:
