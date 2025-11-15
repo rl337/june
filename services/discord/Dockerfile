@@ -18,7 +18,9 @@ COPY services/chat-service-base /app/chat-service-base
 COPY services/discord .
 
 # Install dependencies using poetry (skip installing project itself with --no-root)
-RUN poetry config virtualenvs.create false && \
+# Set config globally and ensure it persists
+RUN poetry config virtualenvs.create false --global && \
+    poetry config virtualenvs.in-project false --global && \
     poetry install --no-interaction --no-ansi --only main --no-root
 
 # Ensure permissions

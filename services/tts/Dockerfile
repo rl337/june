@@ -20,8 +20,10 @@ COPY pyproject.toml poetry.lock ./
 COPY essence ./essence
 
 # Install dependencies using poetry (skip installing project itself with --no-root)
+# Set config globally and ensure it persists
 # Then install TTS separately with compatible numpy
-RUN poetry config virtualenvs.create false && \
+RUN poetry config virtualenvs.create false --global && \
+    poetry config virtualenvs.in-project false --global && \
     poetry install --no-interaction --no-ansi --only main --no-root && \
     pip install "numpy==1.22.0" "TTS>=0.20.0,<0.23.0"
 
