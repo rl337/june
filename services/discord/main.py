@@ -68,6 +68,9 @@ if essence_path:
     if essence_abs not in sys.path:
         sys.path.insert(0, essence_abs)
 
+# Import human interface
+from essence.chat.message_builder import MessageBuilder
+
 from inference_core import config, setup_logging
 from typing import Optional, Dict, Any
 
@@ -205,9 +208,17 @@ class DiscordBotService:
             
             # Show typing indicator
             async with message.channel.typing():
+                # Initialize message builder for structured messaging
+                message_builder = MessageBuilder(
+                    service_name="discord",
+                    user_id=str(user_id),
+                    chat_id=str(channel_id)
+                )
+                
                 # Stream responses from the agent
                 message_count = 0
                 last_message = None
+                raw_llm_response = ""  # Track raw LLM response for building turn
                 
                 try:
                     for message_text, is_final in stream_agent_message(
@@ -221,31 +232,110 @@ class DiscordBotService:
                     ):
                         # Skip empty messages (final signal)
                         if not message_text and is_final:
+                            # Final signal - build full turn, handle splitting, and log
+                            if raw_llm_response:
+                                try:
+                                    # Build full turn for logging
+                                    turn = message_builder.build_turn(message.content, raw_llm_response)
+                                    rendered_parts = message_builder.split_message_if_needed(2000)
+                                    
+                                    if rendered_parts:
+                                        if last_message:
+                                            # Edit first part in place, send rest as new
+                                            await last_message.edit(content=rendered_parts[0])
+                                            for part in rendered_parts[1:]:
+                                                await message.channel.send(part)
+                                                message_count += 1
+                                        else:
+                                            # No message sent yet, send all parts
+                                            last_message = await message.channel.send(rendered_parts[0])
+                                            message_count += 1
+                                            for part in rendered_parts[1:]:
+                                                await message.channel.send(part)
+                                                message_count += 1
+                                    
+                                    # Log the turn for debugging
+                                    turn.log_to_file()
+                                except Exception as edit_error:
+                                    logger.error(f"Failed to edit final message: {edit_error}", exc_info=True)
+                                    from essence.chat.error_handler import render_error_for_platform
+                                    error_text = render_error_for_platform(
+                                        edit_error,
+                                        "discord",
+                                        "❌ I encountered an error finalizing my response."
+                                    )
+                                    try:
+                                        if last_message:
+                                            await last_message.edit(content=error_text)
+                                        else:
+                                            await message.channel.send(error_text)
+                                    except:
+                                        pass
                             break
                         
                         if not message_text:
                             continue
                         
-                        # Send the message
-                        try:
-                            sent_message = await message.channel.send(message_text)
-                            message_count += 1
-                            last_message = sent_message
-                            logger.debug(f"Sent message {message_count} to user {user_id}")
-                        except Exception as send_error:
-                            logger.error(f"Failed to send message to Discord: {send_error}", exc_info=True)
-                            if message_count == 0:
-                                try:
-                                    await message.channel.send(
-                                        "❌ I encountered an error sending my response. Please try again."
-                                    )
-                                except:
-                                    pass
-                            break
+                        # Track the raw LLM response (use longest version for incremental updates)
+                        if len(message_text) > len(raw_llm_response):
+                            raw_llm_response = message_text
+                            
+                            # For streaming, parse and render incrementally
+                            # Don't build full turn until final (that's expensive)
+                            try:
+                                from essence.chat.markdown_parser import parse_markdown
+                                from essence.chat.platform_translators import get_translator
+                                
+                                # Parse markdown incrementally
+                                widgets = parse_markdown(raw_llm_response)
+                                translator = get_translator("discord")
+                                rendered_text = translator.render_message(widgets)
+                                
+                                # Validate before sending
+                                from essence.chat.platform_validators import get_validator
+                                validator = get_validator("discord")
+                                is_valid, errors = validator.validate(rendered_text)
+                                
+                                if not is_valid:
+                                    # If invalid, escape the text to be safe
+                                    logger.warning(f"Invalid Discord markdown detected, escaping: {errors}")
+                                    from essence.chat.human_interface import EscapedText
+                                    safe_widget = EscapedText(text=raw_llm_response)
+                                    rendered_text = translator.render_widget(safe_widget)
+                                
+                                # Split if needed (but only for final, for streaming just use first part)
+                                if len(rendered_text) > 2000:
+                                    # For streaming, just show first part
+                                    rendered_text = rendered_text[:2000]
+                                
+                                if last_message is None:
+                                    # First message - send it immediately for streaming
+                                    last_message = await message.channel.send(rendered_text)
+                                    message_count += 1
+                                    logger.debug(f"Sent initial streaming message to user {user_id} (length: {len(rendered_text)})")
+                                else:
+                                    # Update existing message in place for streaming
+                                    await last_message.edit(content=rendered_text)
+                                    logger.debug(f"Updated streaming message in place (length: {len(rendered_text)})")
+                            except Exception as send_error:
+                                logger.error(f"Failed to send/edit message to Discord: {send_error}", exc_info=True)
+                                # Use structured error message
+                                from essence.chat.error_handler import render_error_for_platform
+                                error_text = render_error_for_platform(
+                                    send_error,
+                                    "discord",
+                                    "❌ I encountered an error sending my response. Please try again."
+                                )
+                                if message_count == 0:
+                                    try:
+                                        await message.channel.send(error_text)
+                                    except:
+                                        pass
+                                break
                         
-                        # If this is the final message, we're done
+                        # If this is the final message, we're done (but continue to get final signal)
                         if is_final:
-                            break
+                            continue
                     
                     if message_count > 0:
                         logger.info(f"Successfully sent {message_count} message(s) to user {user_id}")
@@ -256,9 +346,13 @@ class DiscordBotService:
                     logger.error(f"Error streaming agent response: {stream_error}", exc_info=True)
                     if message_count == 0:
                         try:
-                            await message.channel.send(
+                            from essence.chat.error_handler import render_error_for_platform
+                            error_text = render_error_for_platform(
+                                stream_error,
+                                "discord",
                                 "❌ I encountered an error processing your message. Please try again."
                             )
+                            await message.channel.send(error_text)
                         except Exception as send_error:
                             logger.error(f"Failed to send error message: {send_error}", exc_info=True)
         
@@ -266,9 +360,13 @@ class DiscordBotService:
             logger.error(f"Error handling Discord message: {e}", exc_info=True)
             DISCORD_ERRORS_TOTAL.labels(error_type=type(e).__name__).inc()
             try:
-                await message.channel.send(
+                from essence.chat.error_handler import render_error_for_platform
+                error_text = render_error_for_platform(
+                    e,
+                    "discord",
                     "❌ I encountered an error processing your message. Please try again."
                 )
+                await message.channel.send(error_text)
             except:
                 pass
     

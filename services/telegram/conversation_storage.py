@@ -23,18 +23,14 @@ DEFAULT_LANGUAGE = "en"
 
 
 def get_db_connection():
-    """Get PostgreSQL database connection."""
-    db_host = os.getenv("DB_HOST", "localhost")
-    db_port = os.getenv("DB_PORT", "5432")
-    db_name = os.getenv("DB_NAME", "conversations")
-    db_user = os.getenv("DB_USER", "postgres")
-    db_password = os.getenv("DB_PASSWORD", "")
+    """
+    Get PostgreSQL database connection.
     
-    conn_string = f"host={db_host} port={db_port} dbname={db_name} user={db_user}"
-    if db_password:
-        conn_string += f" password={db_password}"
-    
-    return psycopg2.connect(conn_string)
+    Note: PostgreSQL is not available. This function will raise an exception
+    if called. All methods in ConversationStorage handle this gracefully.
+    """
+    # PostgreSQL is not available - raise an exception that will be caught by callers
+    raise RuntimeError("PostgreSQL is not available. ConversationStorage methods will return defaults.")
 
 
 class ConversationStorage:
@@ -88,6 +84,14 @@ class ConversationStorage:
                 
             finally:
                 conn.close()
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available for language preference check: {e}")
+            return DEFAULT_LANGUAGE
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error getting language preference for {user_id}/{chat_id}: {e}", exc_info=True)
             # Return default on error
@@ -174,6 +178,10 @@ class ConversationStorage:
                 raise e
             finally:
                 conn.close()
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return False (preference not saved)
+            logger.debug(f"PostgreSQL not available for setting language preference: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error setting language preference for {user_id}/{chat_id}: {e}", exc_info=True)
             return False
@@ -233,6 +241,10 @@ class ConversationStorage:
                 
             finally:
                 conn.close()
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error getting user preferences for {user_id}/{chat_id}: {e}", exc_info=True)
             # Return empty dict on error
@@ -321,12 +333,15 @@ class ConversationStorage:
                     conn.commit()
                     logger.info(f"Created conversation with user preferences for {user_id}/{chat_id}: name={name}, favorite_color={favorite_color}")
                     return True
-                    
             except Exception as e:
                 conn.rollback()
                 raise e
             finally:
                 conn.close()
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error setting user preferences for {user_id}/{chat_id}: {e}", exc_info=True)
             return False
@@ -458,6 +473,10 @@ class ConversationStorage:
                 
             finally:
                 conn.close()
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error getting conversation analytics for {user_id}/{chat_id}: {e}", exc_info=True)
             return {
@@ -584,6 +603,10 @@ class ConversationStorage:
                 
             finally:
                 conn.close()
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error getting dashboard analytics: {e}", exc_info=True)
             return {
@@ -639,6 +662,10 @@ class ConversationStorage:
                 # Generate JSON report
                 return json.dumps(dashboard_data, indent=2)
                 
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error generating analytics report: {e}", exc_info=True)
             error_report = {"error": str(e)}
@@ -744,11 +771,19 @@ class ConversationStorage:
                 conn.rollback()
                 logger.error(f"Template already exists or constraint violation: {e}")
                 return None
+            except (RuntimeError, psycopg2.OperationalError) as e:
+                # PostgreSQL not available - return default
+                logger.debug(f"PostgreSQL not available: {e}")
+                return False
             except Exception as e:
                 conn.rollback()
                 raise e
             finally:
                 conn.close()
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error creating prompt template: {e}", exc_info=True)
             return None
@@ -784,6 +819,10 @@ class ConversationStorage:
                 
             finally:
                 conn.close()
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error getting prompt template: {e}", exc_info=True)
             return None
@@ -835,6 +874,10 @@ class ConversationStorage:
                 
             finally:
                 conn.close()
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error getting user prompt template: {e}", exc_info=True)
             return None
@@ -906,6 +949,10 @@ class ConversationStorage:
                 
             finally:
                 conn.close()
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error getting conversation prompt template: {e}", exc_info=True)
             # Fallback to user template on error
@@ -962,6 +1009,10 @@ class ConversationStorage:
                 
             finally:
                 conn.close()
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error listing prompt templates: {e}", exc_info=True)
             return []
@@ -1036,11 +1087,19 @@ class ConversationStorage:
                     logger.warning(f"Template not found: {template_id}")
                     return False
                 
-            except Exception as e:
+            except (RuntimeError, psycopg2.OperationalError) as e:
+                # PostgreSQL not available - return default
+                logger.debug(f"PostgreSQL not available: {e}")
+                return False
+        except Exception as e:
                 conn.rollback()
                 raise e
             finally:
                 conn.close()
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error updating prompt template: {e}", exc_info=True)
             return False
@@ -1073,11 +1132,19 @@ class ConversationStorage:
                     logger.warning(f"Template not found: {template_id}")
                     return False
                 
-            except Exception as e:
+            except (RuntimeError, psycopg2.OperationalError) as e:
+                # PostgreSQL not available - return default
+                logger.debug(f"PostgreSQL not available: {e}")
+                return False
+        except Exception as e:
                 conn.rollback()
                 raise e
             finally:
                 conn.close()
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error deleting prompt template: {e}", exc_info=True)
             return False
@@ -1286,6 +1353,10 @@ class ConversationStorage:
                 
             finally:
                 conn.close()
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error exporting conversation for {user_id}/{chat_id}: {e}", exc_info=True)
             raise
@@ -1339,11 +1410,19 @@ class ConversationStorage:
                 conn.rollback()
                 logger.error(f"A/B test name already exists or constraint violation: {e}")
                 return None
-            except Exception as e:
+            except (RuntimeError, psycopg2.OperationalError) as e:
+                # PostgreSQL not available - return default
+                logger.debug(f"PostgreSQL not available: {e}")
+                return False
+        except Exception as e:
                 conn.rollback()
                 raise e
             finally:
                 conn.close()
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error creating A/B test: {e}", exc_info=True)
             return None
@@ -1381,6 +1460,10 @@ class ConversationStorage:
                 return None
             finally:
                 conn.close()
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error getting A/B test: {e}", exc_info=True)
             return None
@@ -1428,6 +1511,10 @@ class ConversationStorage:
                 return tests
             finally:
                 conn.close()
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error listing A/B tests: {e}", exc_info=True)
             return []
@@ -1503,11 +1590,19 @@ class ConversationStorage:
                 else:
                     logger.warning(f"A/B test not found: {test_id}")
                     return False
-            except Exception as e:
+            except (RuntimeError, psycopg2.OperationalError) as e:
+                # PostgreSQL not available - return default
+                logger.debug(f"PostgreSQL not available: {e}")
+                return False
+        except Exception as e:
                 conn.rollback()
                 raise e
             finally:
                 conn.close()
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error updating A/B test: {e}", exc_info=True)
             return False
@@ -1626,11 +1721,19 @@ class ConversationStorage:
                 if existing:
                     return existing['variant_name']
                 return None
-            except Exception as e:
+            except (RuntimeError, psycopg2.OperationalError) as e:
+                # PostgreSQL not available - return default
+                logger.debug(f"PostgreSQL not available: {e}")
+                return False
+        except Exception as e:
                 conn.rollback()
                 raise e
             finally:
                 conn.close()
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error assigning A/B variant: {e}", exc_info=True)
             return None
@@ -1672,11 +1775,19 @@ class ConversationStorage:
                 conn.commit()
                 logger.debug(f"Recorded metric {metric_type}={metric_value} for variant {variant_name} in test {test_id}")
                 return True
-            except Exception as e:
+            except (RuntimeError, psycopg2.OperationalError) as e:
+                # PostgreSQL not available - return default
+                logger.debug(f"PostgreSQL not available: {e}")
+                return False
+        except Exception as e:
                 conn.rollback()
                 raise e
             finally:
                 conn.close()
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error recording A/B metric: {e}", exc_info=True)
             return False
@@ -1744,6 +1855,10 @@ class ConversationStorage:
                 return metrics
             finally:
                 conn.close()
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error getting A/B metrics: {e}", exc_info=True)
             return []
@@ -1835,6 +1950,10 @@ class ConversationStorage:
                 }
             finally:
                 conn.close()
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error getting A/B statistics: {e}", exc_info=True)
             return {"error": str(e)}
@@ -1927,6 +2046,10 @@ class ConversationStorage:
             
             return result
             
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error getting A/B test variant config: {e}", exc_info=True)
             return None
@@ -1988,6 +2111,10 @@ class ConversationStorage:
                 )
             
             return True
+        except (RuntimeError, psycopg2.OperationalError) as e:
+            # PostgreSQL not available - return default
+            logger.debug(f"PostgreSQL not available: {e}")
+            return False
         except Exception as e:
             logger.error(f"Error recording LLM response metrics: {e}", exc_info=True)
             return False
