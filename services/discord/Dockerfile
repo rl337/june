@@ -27,6 +27,7 @@ EXPOSE 8081
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8081/health || exit 1
 
-# Run the Discord bot via poetry (for proper dependency management)
-CMD ["poetry", "run", "python", "main.py"]
+# Run the Discord bot
+# Note: Poetry is available in base image for future use, but we use pip/requirements.txt for now
+CMD ["python", "main.py"]
 
