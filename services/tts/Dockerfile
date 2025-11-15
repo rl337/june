@@ -19,9 +19,10 @@ COPY pyproject.toml poetry.lock ./
 # Copy essence package (if needed)
 COPY essence ./essence
 
-# Install dependencies using poetry
+# Install dependencies using poetry, then install TTS separately with compatible numpy
 RUN poetry config virtualenvs.create false && \
-    poetry install --no-interaction --no-ansi --only main
+    poetry install --no-interaction --no-ansi --only main && \
+    pip install "numpy==1.22.0" "TTS>=0.20.0,<0.23.0"
 
 ## shared module removed; use inference_core instead
 
