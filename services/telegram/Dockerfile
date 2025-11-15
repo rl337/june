@@ -14,10 +14,9 @@ COPY essence ./essence
 # Copy service code
 COPY services/telegram .
 
-# Install dependencies using poetry
-# First install dependencies only, then install the project itself
+# Install dependencies using poetry (skip installing project itself with --no-root)
 RUN poetry config virtualenvs.create false && \
-    poetry install --no-interaction --no-ansi --only main
+    poetry install --no-interaction --no-ansi --only main --no-root
 
 # Ensure permissions
 RUN chown -R june:june /app
