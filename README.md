@@ -34,6 +34,16 @@ June follows GPT5's recommended microservices architecture with the following co
 - **Loki** - Log aggregation
 - **Jaeger** - Distributed tracing
 
+### External MCP Services
+
+June integrates with external MCP (Model Context Protocol) services for enhanced capabilities:
+
+- **Bucket-O-Facts** - Knowledge graph service for structured fact storage and semantic search
+- **Doc-O-Matic** - Document management service for code documentation
+- **To-Do-Rama** - Task management service for agent task tracking
+
+These services run in separate Docker Compose projects and communicate with June services via **external Docker networks**. See the [Cross-Container Networking](#-cross-container-networking) section below for details.
+
 ## 📚 Documentation
 
 For comprehensive documentation, see the [Documentation Index](docs/README.md).
@@ -1595,6 +1605,104 @@ Services source environment variables from the repository's `.env` file at runti
 - `TELEGRAM_BOT_TOKEN`: Telegram bot token (for telegram service)
 - `DISCORD_BOT_TOKEN`: Discord bot token (for discord service)
 - Service-specific ports and configuration
+
+## 🌐 Cross-Container Networking
+
+June services communicate with external MCP services (Bucket-O-Facts, Doc-O-Matic, To-Do-Rama) using Docker's external network feature. This enables services in different `docker-compose.yml` projects to communicate seamlessly.
+
+### Architecture
+
+**External MCP Services:**
+- Each MCP service runs in its own Docker Compose project
+- Creates its own network (e.g., `bucket-o-facts_bucket-network`)
+- Network names follow: `{project-name}_{network-name}`
+
+**June Services:**
+- Connect to MCP service networks as **external networks**
+- Defined in `docker-compose.yml` under `networks` section
+- Can communicate using container names (e.g., `http://bucket-o-facts:8006`)
+
+### Configuration
+
+In `june/docker-compose.yml`:
+
+```yaml
+networks:
+  june_network:
+    driver: bridge
+  # External networks for MCP services
+  bucket-network:
+    external: true
+    name: bucket-o-facts_bucket-network
+  doc-o-matic-network:
+    external: true
+    name: docomatic-mcp-service_doc-o-matic-network
+  todo-network:
+    external: true
+    name: todo-network
+```
+
+Services reference these networks:
+
+```yaml
+services:
+  telegram:
+    networks:
+      - june_network
+      - bucket-network
+      - doc-o-matic-network
+      - todo-network
+```
+
+### MCP Client Configuration
+
+June services use MCP services via the configuration in `config/cursor-mcp-config.json`:
+
+```json
+{
+  "mcpServers": {
+    "bucketofacts": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-fetch", "http://bucket-o-facts:8006/mcp/sse"]
+    },
+    "docomatic": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-fetch", "http://doc-o-matic:8005/mcp/sse"]
+    },
+    "todorama": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-fetch", "http://todo-mcp-service:8004/mcp/sse"]
+    }
+  }
+}
+```
+
+### Network Lifecycle
+
+1. **Start MCP Service**: Creates its network automatically
+2. **Start June Service**: Connects to external network (must exist)
+3. **Communication**: Services communicate using container names
+4. **Network Persistence**: Network persists if referenced by other services
+5. **Cleanup**: Network removed only when no containers reference it
+
+### Benefits
+
+- ✅ **Independent Deployment**: Update MCP services without affecting June
+- ✅ **Service Isolation**: Each service manages its own network
+- ✅ **Flexible Scaling**: Scale services independently
+- ✅ **No Central Orchestration**: No single docker-compose file needed
+
+### Troubleshooting
+
+**Error: `network not found`**
+- Ensure MCP service is running: `cd /path/to/mcp-service && docker compose up -d`
+- Verify network exists: `docker network ls | grep <network-name>`
+- Check network name matches exactly (case-sensitive)
+
+**Services Cannot Communicate**
+- Verify both services are on the same network
+- Check container names match MCP client configuration
+- Ensure network names in `docker-compose.yml` match actual network names
 
 ### Deploying a Service
 

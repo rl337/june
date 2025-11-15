@@ -169,31 +169,6 @@ services:
     depends_on:
       - prometheus
 
-  # TODO MCP Service (Standalone task management service)
-  todo-mcp-service:
-    build:
-      context: .
-      dockerfile: ./services/todo-service/Dockerfile
-    container_name: june-todo-mcp-service
-    restart: unless-stopped
-    ports:
-      - "5080:8004"
-    environment:
-      - TODO_DB_PATH=/app/data/todos.db
-      - TODO_BACKUPS_DIR=/app/backups
-      - TODO_SERVICE_PORT=8004
-      - TODO_BACKUP_INTERVAL_HOURS=24
-    volumes:
-      - ${JUNE_DATA_DIR:-/home/rlee/june_data}/todo-mcp-service/data:/app/data
-      - ${JUNE_DATA_DIR:-/home/rlee/june_data}/todo-mcp-service/backups:/app/backups
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8004/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    networks:
-      - june_network
-
   # Knowledge Graph MCP Service
   knowledge-graph:
     build:
@@ -249,11 +224,9 @@ services:
       - "8005:8005"
     environment:
       - ORCHESTRATOR_PORT=8005
-      - TODO_SERVICE_URL=http://todo-mcp-service:8004
       - GATEWAY_URL=http://gateway:8000
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     depends_on:
-      - todo-mcp-service
       - gateway
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8005/health"]
@@ -562,7 +535,6 @@ services:
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_AUTHORIZED_USERS=${TELEGRAM_AUTHORIZED_USERS:-39833618}
-      - TODO_SERVICE_URL=http://todo-mcp-service:8004
       - CURSOR_AGENT_EXE=/usr/local/bin/cursor-tools/cursor-agent
       - CURSOR_API_KEY=${CURSOR_API_KEY:-}
       - CURSOR_AGENT=1
@@ -594,7 +566,6 @@ services:
       - tts
       - inference-api
       - nats
-      - todo-mcp-service
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
       interval: 30s
@@ -619,6 +590,9 @@ services:
           memory: 512M
     networks:
       - june_network
+      - bucket-network
+      - doc-o-matic-network
+      - todo-network
 
   # Discord Bot Service
   discord:
@@ -631,7 +605,6 @@ services:
     environment:
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-}
       - DISCORD_AUTHORIZED_USERS=${DISCORD_AUTHORIZED_USERS:-}
-      - TODO_SERVICE_URL=http://todo-mcp-service:8004
       - CURSOR_AGENT_EXE=/usr/local/bin/cursor-tools/cursor-agent
       - CURSOR_API_KEY=${CURSOR_API_KEY:-}
       - CURSOR_AGENT=1
@@ -662,6 +635,9 @@ services:
       - ${HOME}/.cursor:/home/june/.cursor:rw
     networks:
       - june_network
+      - bucket-network
+      - doc-o-matic-network
+      - todo-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
       interval: 30s
@@ -697,6 +673,16 @@ services:
 networks:
   june_network:
     driver: bridge
+  # External networks for MCP services
+  bucket-network:
+    external: true
+    name: bucket-o-facts_bucket-network
+  doc-o-matic-network:
+    external: true
+    name: docomatic-mcp-service_doc-o-matic-network
+  todo-network:
+    external: true
+    name: todo-network
 
 # Docker Secrets (uncomment to use)
 # secrets:

@@ -1309,6 +1309,106 @@ June Agent implements comprehensive security measures. All agents working on the
 - Audio format compatibility
 - Model loading race conditions
 
+## 🌐 Cross-Container Network Architecture
+
+June services communicate with external MCP services (Bucket-O-Facts, Doc-O-Matic, To-Do-Rama) using Docker's external network feature. This allows services in different `docker-compose.yml` files to communicate seamlessly.
+
+### Network Architecture
+
+**MCP Services** (Bucket-O-Facts, Doc-O-Matic, To-Do-Rama):
+- Each MCP service runs in its own Docker Compose project
+- Each creates its own network (e.g., `bucket-o-facts_bucket-network`)
+- Network names follow the pattern: `{project-name}_{network-name}`
+
+**June Services** (Telegram, Discord):
+- Connect to MCP service networks as **external networks**
+- Defined in `docker-compose.yml` under the `networks` section
+- Services can communicate with MCP services using container names
+
+### Network Configuration
+
+In `june/docker-compose.yml`:
+
+```yaml
+networks:
+  june_network:
+    driver: bridge
+  # External networks for MCP services
+  bucket-network:
+    external: true
+    name: bucket-o-facts_bucket-network
+  doc-o-matic-network:
+    external: true
+    name: docomatic-mcp-service_doc-o-matic-network
+  todo-network:
+    external: true
+    name: todo-network
+```
+
+Services connect to these networks:
+
+```yaml
+services:
+  telegram:
+    networks:
+      - june_network
+      - bucket-network
+      - doc-o-matic-network
+      - todo-network
+  
+  discord:
+    networks:
+      - june_network
+      - bucket-network
+      - doc-o-matic-network
+      - todo-network
+```
+
+### How It Works
+
+1. **MCP Service Starts**: When an MCP service (e.g., Bucket-O-Facts) starts, it creates its network
+2. **June Service Connects**: June services reference the network as external
+3. **Communication**: Services can communicate using container names:
+   - `http://bucket-o-facts:8006/mcp/sse`
+   - `http://doc-o-matic:8005/mcp/sse`
+   - `http://todo-mcp-service:8004/mcp/sse`
+
+### Network Lifecycle
+
+- **Network Creation**: MCP service creates network when first started
+- **Network Persistence**: Network persists even if MCP service stops (if other services reference it)
+- **Network Cleanup**: Network is removed only when no containers reference it
+- **Reference Counting**: Docker tracks how many services use each network
+
+### Benefits
+
+- **Decoupled Deployment**: MCP services can be updated independently
+- **Service Isolation**: Each service manages its own network
+- **Flexible Scaling**: Services can be scaled independently
+- **No Central Orchestration**: No need for a single docker-compose file
+
+### Troubleshooting
+
+**Network Not Found Error:**
+```
+Error: network bucketofacts-mcp-service_bucket-network not found
+```
+
+**Solution**: Ensure the MCP service is running and has created its network:
+```bash
+# Check if network exists
+docker network ls | grep bucket
+
+# Start MCP service to create network
+cd /path/to/bucketofacts-mcp-service
+docker compose up -d
+```
+
+**Container Cannot Reach MCP Service:**
+- Verify network names match exactly (case-sensitive)
+- Check that both services are on the same network
+- Verify container names match what's configured in MCP client config
+
 ---
 
 **Last Updated:** December 2024  
