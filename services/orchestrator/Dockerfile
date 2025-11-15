@@ -1,16 +1,28 @@
-FROM python:3.12-slim
+FROM june-base:latest
 
 WORKDIR /app
+ENV PYTHONPATH="/app:/app/shared"
 
-# Install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy poetry configuration files
+USER root
+COPY pyproject.toml poetry.lock ./
+
+# Copy essence package (if needed)
+COPY essence ./essence
 
 # Copy service code
-COPY main.py .
+COPY services/orchestrator/main.py .
+
+# Install dependencies using poetry
+RUN poetry config virtualenvs.create false && \
+    poetry install --no-interaction --no-ansi --only main
+
+# Ensure permissions
+RUN chown -R june:june /app
+USER june
 
 # Expose port
 EXPOSE 8005
 
 # Run the service
-CMD ["python", "main.py"]
+CMD ["poetry", "run", "python", "main.py"]

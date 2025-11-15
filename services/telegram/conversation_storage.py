@@ -776,7 +776,7 @@ class ConversationStorage:
                 # PostgreSQL not available - return default
                 logger.debug(f"PostgreSQL not available: {e}")
                 return False
-                except Exception as e:
+            except Exception as e:
                 conn.rollback()
                 raise e
             finally:
@@ -1092,7 +1092,7 @@ class ConversationStorage:
                 # PostgreSQL not available - return default
                 logger.debug(f"PostgreSQL not available: {e}")
                 return False
-                except Exception as e:
+            except Exception as e:
                 conn.rollback()
                 raise e
             finally:
@@ -1137,7 +1137,7 @@ class ConversationStorage:
                 # PostgreSQL not available - return default
                 logger.debug(f"PostgreSQL not available: {e}")
                 return False
-                except Exception as e:
+            except Exception as e:
                 conn.rollback()
                 raise e
             finally:

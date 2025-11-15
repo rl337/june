@@ -36,12 +36,12 @@ dependencies = [
     "bitsandbytes>=0.41.0",
     "optimum>=1.14.0",
     "openai-whisper>=20231117",
-    "TTS>=0.20.0",
+    "TTS>=0.20.0,<0.23.0",  # Constrained to avoid numpy conflict
     "speechrecognition>=3.10.0",
     "pyaudio>=0.2.11",
     
     # Audio processing
-    "librosa>=0.10.1",
+    "librosa>=0.10.1,<0.11.0",  # Compatible with numpy 1.22.0
     "soundfile>=0.12.1",
     "webrtcvad>=2.0.10",
     
@@ -68,7 +68,7 @@ dependencies = [
     "httpx>=0.25.0",
     "aiofiles>=23.2.1",
     "pillow>=10.1.0",
-    "numpy>=1.24.0",
+    "numpy==1.22.0",  # Pinned for TTS compatibility
     "scipy>=1.11.0",
 ]
 

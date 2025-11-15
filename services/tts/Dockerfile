@@ -13,8 +13,15 @@ RUN apt-get update && apt-get install -y \
     libespeak-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install service-specific Python deps
-RUN pip install soundfile numpy
+# Copy poetry configuration files
+COPY pyproject.toml poetry.lock ./
+
+# Copy essence package (if needed)
+COPY essence ./essence
+
+# Install dependencies using poetry
+RUN poetry config virtualenvs.create false && \
+    poetry install --no-interaction --no-ansi --only main
 
 ## shared module removed; use inference_core instead
 
@@ -33,6 +40,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD python -c "import grpc; grpc.insecure_channel('localhost:50053').check_connectivity_state(True)" || exit 1
 
 # Run the application
-CMD ["python", "main.py"]
+CMD ["poetry", "run", "python", "main.py"]
 
 

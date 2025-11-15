@@ -4,9 +4,15 @@ FROM june-base:latest
 WORKDIR /app
 ENV PYTHONPATH="/app:/app/shared"
 
-# Install service-specific Python deps
-USER root
-RUN pip install numpy openai-whisper soundfile
+# Copy poetry configuration files
+COPY pyproject.toml poetry.lock ./
+
+# Copy essence package (if needed)
+COPY essence ./essence
+
+# Install dependencies using poetry
+RUN poetry config virtualenvs.create false && \
+    poetry install --no-interaction --no-ansi --only main
 
 ## shared module removed; use inference_core instead
 
@@ -28,6 +34,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 # Run the Whisper-based STT application
 ENV STT_MODEL_NAME=base.en
 ENV STT_DEVICE=cpu
-CMD ["python", "main_whisper.py"]
+CMD ["poetry", "run", "python", "main_whisper.py"]
 
 

@@ -4,12 +4,19 @@ FROM june-base:latest
 WORKDIR /app
 ENV PYTHONPATH="/app:/app/shared"
 
-# Install service-specific Python deps
+# Copy poetry configuration files
 USER root
-RUN pip install fastapi uvicorn
+COPY pyproject.toml poetry.lock ./
+
+# Copy essence package (if needed)
+COPY essence ./essence
 
 # Copy service code
 COPY services/document-manager .
+
+# Install dependencies using poetry
+RUN poetry config virtualenvs.create false && \
+    poetry install --no-interaction --no-ansi --only main
 
 # Ensure permissions
 USER root
@@ -30,4 +37,4 @@ ENV DOC_SERVICE_PORT=8007
 # Create data directory
 RUN mkdir -p /app/data && chown june:june /app/data
 
-CMD ["python", "main.py"]
+CMD ["poetry", "run", "python", "main.py"]
