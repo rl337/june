@@ -11,7 +11,7 @@ COPY pyproject.toml poetry.lock ./
 COPY essence ./essence
 
 # Copy service code
-COPY services/orchestrator/main.py .
+COPY services/orchestrator .
 
 # Install dependencies using poetry
 RUN poetry config virtualenvs.create false && \
