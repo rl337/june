@@ -1,19 +1,21 @@
-FROM python:3.11-slim
+FROM june-base:latest
 
 # Set working directory
 WORKDIR /app
 ENV PYTHONPATH="/app:/app/shared"
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    libffi-dev \
-    libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Copy poetry configuration files
+USER root
+COPY pyproject.toml poetry.lock ./
 
-# Install Python dependencies directly
-RUN pip install --no-cache-dir fastapi uvicorn httpx pydantic grpcio nats-py prometheus-client python-jose python-multipart
+# Copy essence package (needed for poetry install)
+COPY essence ./essence
+
+# Install dependencies using poetry (skip installing project itself with --no-root)
+# Use environment variables to disable virtualenv creation
+ENV POETRY_VIRTUALENVS_CREATE=false
+ENV POETRY_VIRTUALENVS_IN_PROJECT=false
+RUN poetry install --no-interaction --no-ansi --only main --no-root
 
 ## shared module removed; use inference_core instead
 
@@ -23,10 +25,10 @@ COPY packages/inference-core/dist/*.whl /tmp/
 RUN pip install /tmp/june_grpc_api-*.whl /tmp/inference_core-*.whl
 
 # Copy service code
-COPY services/gateway/ .
+COPY services/gateway .
 
-# Create non-root user
-RUN useradd -m -u 1000 june && chown -R june:june /app
+# Ensure permissions
+RUN chown -R june:june /app
 USER june
 
 # Expose ports
@@ -37,7 +39,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Run the application
-CMD ["python", "main.py"]
+CMD ["poetry", "run", "python", "main.py"]
 
 
 
