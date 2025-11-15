@@ -1711,8 +1711,6 @@ docker compose stop telegram discord
 2. Start containers with `docker compose up -d`
 3. Monitor health with `docker compose ps`
 4. View logs with `docker compose logs`
-✓ Discovered 3 command(s): ['discord-service', 'telegram-service', 'tts']
-```
 
 ### Testing Services
 
