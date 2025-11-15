@@ -45,6 +45,8 @@ dependencies = [
     
     # Telegram integration
     "python-telegram-bot>=20.7",
+    "pydub>=0.25.1",  # Audio format conversion for Telegram
+    "reportlab>=4.0.0",  # PDF generation for conversation export
     
     # Authentication and security
     "python-jose[cryptography]>=3.3.0",
