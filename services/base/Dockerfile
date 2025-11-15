@@ -20,6 +20,10 @@ RUN apt-get update && apt-get install -y \
 RUN ln -s /usr/bin/python3.10 /usr/bin/python && \
     python -m pip install --upgrade pip
 
+# Install poetry for Python dependency management
+RUN pip install poetry && \
+    poetry --version
+
 # Install runtime libs common to services
 RUN pip install grpcio nats-py prometheus-client pydantic uvicorn fastapi scipy
 
