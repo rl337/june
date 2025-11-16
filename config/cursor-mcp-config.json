@@ -5,7 +5,7 @@
       "args": [
         "-y",
         "@modelcontextprotocol/server-fetch",
-        "http://bucket-o-facts:8006/mcp/sse"
+        "http://localhost:8000/mcp/bucket-o-facts/sse"
       ],
       "env": {}
     },
@@ -14,7 +14,7 @@
       "args": [
         "-y",
         "@modelcontextprotocol/server-fetch",
-        "http://doc-o-matic:8005/mcp/sse"
+        "http://localhost:8000/mcp/doc-o-matic/sse"
       ],
       "env": {}
     },
@@ -23,7 +23,7 @@
       "args": [
         "-y",
         "@modelcontextprotocol/server-fetch",
-        "http://todo-mcp-service:8004/mcp/sse"
+        "http://localhost:8000/mcp/todo-mcp-service/sse"
       ],
       "env": {}
     }
