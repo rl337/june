@@ -35,6 +35,8 @@ class PlatformTranslator:
             rendered = self.render_widget(widget)
             if rendered:
                 parts.append(rendered)
+        # Join with double newline to preserve spacing between widgets
+        # This ensures headings, paragraphs, etc. are properly separated
         return '\n\n'.join(parts) if parts else ''
     
     def _render_list_item(self, item: ListItem, ordered: bool, level: int = 0) -> str:
@@ -75,7 +77,9 @@ class TelegramTranslator(PlatformTranslator):
     """
     
     # Characters that need escaping in Telegram
-    TELEGRAM_ESCAPE_CHARS = r'_*[]()~`>#+-=|{}.!'
+    # Note: Period (.) doesn't need escaping in normal text, only in special contexts
+    # We'll escape it only when necessary (e.g., in code or when validation fails)
+    TELEGRAM_ESCAPE_CHARS = r'_*[]()~`>#+-=|{}!'
     
     def escape_text(self, text: str) -> str:
         """Escape special characters for Telegram."""
@@ -90,12 +94,13 @@ class TelegramTranslator(PlatformTranslator):
             return self.escape_text(widget.text)
         
         elif isinstance(widget, Paragraph):
-            # Paragraph may contain inline formatting - preserve it but validate
-            return self._sanitize_telegram_markdown(widget.text)
+            # Paragraph may contain inline formatting - preserve it as-is
+            # Validation will happen on the full rendered message, not individual widgets
+            return widget.text
         
         elif isinstance(widget, Heading):
             # Telegram doesn't have headings, use bold
-            return f"*{self._sanitize_telegram_markdown(widget.text)}*"
+            return f"*{widget.text}*"
         
         elif isinstance(widget, ListWidget):
             return self._render_list(widget)
@@ -111,7 +116,7 @@ class TelegramTranslator(PlatformTranslator):
         
         elif isinstance(widget, Blockquote):
             # Telegram doesn't support blockquotes - use italic
-            return f"_{self._sanitize_telegram_markdown(widget.text)}_"
+            return f"_{widget.text}_"
         
         elif isinstance(widget, HorizontalRule):
             # Telegram doesn't support HR - use dashes
@@ -119,7 +124,7 @@ class TelegramTranslator(PlatformTranslator):
         
         elif isinstance(widget, Link):
             # Telegram supports links
-            return f"[{self._sanitize_telegram_markdown(widget.text)}]({widget.url})"
+            return f"[{widget.text}]({widget.url})"
         
         else:
             logger.warning(f"Unknown widget type: {type(widget)}")
@@ -173,29 +178,54 @@ class TelegramTranslator(PlatformTranslator):
                 marker = f"{i + 1}."
             else:
                 marker = "•"
-            text = self._sanitize_telegram_markdown(item.text)
-            lines.append(f"{marker} {text}")
+            # Preserve inline formatting in list items - validation happens on full message
+            lines.append(f"{marker} {item.text}")
             # Telegram doesn't support nested lists well - flatten them
             for subitem in item.subitems:
-                subtext = self._sanitize_telegram_markdown(subitem.text)
-                lines.append(f"  • {subtext}")
+                lines.append(f"  • {subitem.text}")
         return '\n'.join(lines)
     
     def _render_table_as_text(self, widget: TableWidget) -> str:
-        """Convert table to plain text representation."""
+        """Convert table to fixed-width ASCII table representation."""
         if not widget.rows:
             return ""
         
-        lines = []
+        # Extract all cell texts
+        all_rows = []
         for row in widget.rows:
-            if row.is_header:
-                # Header row
-                cells = [self._sanitize_telegram_markdown(cell.text) for cell in row.cells]
-                lines.append(" | ".join(cells))
-                lines.append(" | ".join(["---"] * len(cells)))
-            else:
-                cells = [self._sanitize_telegram_markdown(cell.text) for cell in row.cells]
-                lines.append(" | ".join(cells))
+            all_rows.append([cell.text for cell in row.cells])
+        
+        if not all_rows:
+            return ""
+        
+        # Calculate column widths (max width for each column)
+        num_cols = len(all_rows[0])
+        col_widths = [0] * num_cols
+        for row in all_rows:
+            for i, cell_text in enumerate(row):
+                if i < num_cols:
+                    col_widths[i] = max(col_widths[i], len(cell_text))
+        
+        # Build the table
+        lines = []
+        for row_idx, row in enumerate(all_rows):
+            # Pad cells to column width
+            padded_cells = []
+            for i, cell_text in enumerate(row):
+                if i < num_cols:
+                    # Pad to column width (left-align for now)
+                    padded = cell_text.ljust(col_widths[i])
+                    padded_cells.append(padded)
+            
+            # Join with separators
+            line = " | ".join(padded_cells)
+            lines.append(line)
+            
+            # Add separator after header row
+            if row_idx == 0 and widget.rows[0].is_header:
+                separator_parts = ["-" * width for width in col_widths]
+                separator = "-+-".join(separator_parts)
+                lines.append(separator)
         
         return '\n'.join(lines)
 

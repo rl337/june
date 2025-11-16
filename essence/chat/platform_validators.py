@@ -64,40 +64,47 @@ class TelegramValidator(PlatformValidator):
         # Characters that need escaping
         self.special_chars = r'_*[]()~`>#+-=|{}.!'
     
-    def validate(self, markdown: str) -> Tuple[bool, List[str]]:
+    def validate(self, markdown: str, lenient: bool = False) -> Tuple[bool, List[str]]:
         """
         Validate Telegram markdown syntax.
+        
+        Args:
+            markdown: Markdown text to validate
+            lenient: If True, skip unbalanced marker checks (for streaming/incomplete content)
         
         Returns:
             (is_valid, list_of_errors)
         """
         errors = []
         
-        # Check for unbalanced bold markers
-        bold_count = markdown.count('*')
-        if bold_count % 2 != 0:
-            errors.append("Unbalanced bold markers (*) - must be even number")
-        
-        # Check for unbalanced italic markers (underscores)
-        italic_count = markdown.count('_')
-        if italic_count % 2 != 0:
-            errors.append("Unbalanced italic markers (_) - must be even number")
-        
-        # Check for unbalanced code markers
-        code_count = markdown.count('`')
-        if code_count % 2 != 0:
-            errors.append("Unbalanced code markers (`) - must be even number")
-        
-        # Check for unbalanced brackets (links)
-        open_brackets = markdown.count('[')
-        close_brackets = markdown.count(']')
-        if open_brackets != close_brackets:
-            errors.append("Unbalanced link brackets ([ ]) - must match")
-        
-        open_parens = markdown.count('(')
-        close_parens = markdown.count(')')
-        if open_parens != close_parens:
-            errors.append("Unbalanced parentheses ( ) - must match")
+        # During streaming, markdown might be incomplete, so we skip unbalanced checks
+        # Only do strict validation on final messages
+        if not lenient:
+            # Check for unbalanced bold markers
+            bold_count = markdown.count('*')
+            if bold_count % 2 != 0:
+                errors.append("Unbalanced bold markers (*) - must be even number")
+            
+            # Check for unbalanced italic markers (underscores)
+            italic_count = markdown.count('_')
+            if italic_count % 2 != 0:
+                errors.append("Unbalanced italic markers (_) - must be even number")
+            
+            # Check for unbalanced code markers
+            code_count = markdown.count('`')
+            if code_count % 2 != 0:
+                errors.append("Unbalanced code markers (`) - must be even number")
+            
+            # Check for unbalanced brackets (links)
+            open_brackets = markdown.count('[')
+            close_brackets = markdown.count(']')
+            if open_brackets != close_brackets:
+                errors.append("Unbalanced link brackets ([ ]) - must match")
+            
+            open_parens = markdown.count('(')
+            close_parens = markdown.count(')')
+            if open_parens != close_parens:
+                errors.append("Unbalanced parentheses ( ) - must match")
         
         # Check for nested formatting (not supported)
         # Look for bold inside italic or vice versa
@@ -105,11 +112,24 @@ class TelegramValidator(PlatformValidator):
             errors.append("Nested formatting detected - Telegram does not support nested bold/italic")
         
         # Check for unsupported table syntax
+        # Note: We convert tables to plain text with pipes as separators (not markdown table syntax)
+        # So we only flag actual markdown table syntax, not plain text with pipes
+        # Markdown tables have: | col1 | col2 | followed by |---|---| separator
         if '|' in markdown and markdown.count('|') > 2:
-            # Might be a table - Telegram doesn't support tables
-            lines_with_pipes = [line for line in markdown.split('\n') if '|' in line]
+            lines_with_pipes = [line.strip() for line in markdown.split('\n') if '|' in line]
             if len(lines_with_pipes) > 1:
-                errors.append("Table syntax detected - Telegram does not support tables")
+                # Check if it's actual markdown table syntax (has separator line with dashes)
+                has_separator = False
+                for line in lines_with_pipes:
+                    # Markdown table separator: |---|---| or |:---|:---:|---:|
+                    if re.match(r'^\|[\s\-:]+\|', line):
+                        has_separator = True
+                        break
+                
+                # Only flag as error if it has the markdown table separator
+                # Plain text tables (from our TableWidget conversion) don't have this
+                if has_separator:
+                    errors.append("Markdown table syntax detected - Telegram does not support markdown tables")
         
         # Check for heading syntax (not supported, should use bold)
         if re.search(r'^#{1,6}\s+', markdown, re.MULTILINE):
