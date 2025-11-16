@@ -666,7 +666,12 @@ All services use structured logging with:
 **Container Security:**
 - **Base Images**: Use official, regularly updated base images
 - **Image Scanning**: Scan images for vulnerabilities
-- **Non-Root Users**: Run containers as non-root users when possible
+- **Non-Root Users**: **REQUIRED** - All services MUST run as non-root users (UID 1000)
+  - Dockerfiles must include `USER june` (or equivalent non-root user)
+  - Docker Compose services must specify `user: "1000:1000"`
+  - Host directories mounted as volumes must be owned by UID 1000
+  - Never use `privileged: true` or run containers as root
+  - Verify with: `docker inspect <container> --format '{{.Config.User}}'`
 - **Resource Limits**: Set resource limits to prevent resource exhaustion attacks
 - **Read-Only Filesystems**: Use read-only filesystems where possible
 
@@ -1681,7 +1686,7 @@ June services use MCP services via the configuration in `config/cursor-mcp-confi
 
 Services are deployed using Docker Compose:
 
-```bash
+   ```bash
 # Build and start services
 docker compose build telegram discord
 docker compose up -d telegram discord
