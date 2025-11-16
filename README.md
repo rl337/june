@@ -1163,12 +1163,14 @@ docker-compose exec prometheus cat /etc/prometheus/prometheus.yml
 
 #### Running Locally (Outside Docker)
 
-```bash
-# Navigate to telegram service
-cd services/telegram
+**Note: All Python code is managed via Poetry. Use `poetry run` for all Python commands.**
 
-# Install dependencies
-pip install -r requirements.txt
+```bash
+# Navigate to project root
+cd /home/rlee/dev/june
+
+# Install dependencies (if not already installed)
+poetry install
 
 # Set environment variables
 export TELEGRAM_BOT_TOKEN=your_token_here
@@ -1176,19 +1178,18 @@ export STT_URL=grpc://localhost:50052
 export TTS_URL=grpc://localhost:50053
 export LLM_URL=grpc://localhost:50051
 
-# Run the bot
-python main.py
+# Run the service via Poetry
+poetry run python -m essence telegram-service
 ```
 
 #### Testing
 
 ```bash
 # Run unit tests
-cd services/telegram
-python -m pytest tests/ -v
+poetry run pytest tests/ -v
 
 # Run with coverage
-python -m pytest tests/ --cov=. --cov-report=html
+poetry run pytest tests/ --cov=. --cov-report=html
 ```
 
 ### Architecture
@@ -1281,13 +1282,13 @@ The test mode is controlled by environment variables:
 ./scripts/set_test_mode.sh mock              # Full mock
 ./scripts/set_test_mode.sh stt_tts_roundtrip # STT/TTS round-trip
 
-# Check current configuration
-python scripts/test_pipeline_modes.py --show-config
+# Check current configuration (via Poetry)
+poetry run python scripts/test_pipeline_modes.py --show-config
 
-# Run tests for specific mode
-python scripts/test_pipeline_modes.py --mode mock
-python scripts/test_pipeline_modes.py --mode stt_tts_roundtrip
-python scripts/test_pipeline_modes.py --mode both  # Test both
+# Run tests for specific mode (via Poetry)
+poetry run python scripts/test_pipeline_modes.py --mode mock
+poetry run python scripts/test_pipeline_modes.py --mode stt_tts_roundtrip
+poetry run python scripts/test_pipeline_modes.py --mode both  # Test both
 ```
 
 ## 🔧 Service Details
@@ -1371,28 +1372,25 @@ python scripts/test_pipeline_modes.py --mode both  # Test both
 
 ### Running Tests
 
+**Note: All tests are run via Poetry to ensure proper dependency resolution.**
+
 Each service has comprehensive test suites:
 
 ```bash
 # Gateway service tests
-cd services/gateway
-python -m pytest tests/ -v
+poetry run pytest services/gateway/tests/ -v
 
 # Inference API tests
-cd services/inference-api
-python -m pytest tests/ -v
+poetry run pytest services/inference-api/tests/ -v
 
 # STT service tests
-cd services/stt
-python -m pytest tests/ -v
+poetry run pytest services/stt/tests/ -v
 
 # TTS service tests
-cd services/tts
-python -m pytest tests/ -v
+poetry run pytest services/tts/tests/ -v
 
 # Integration tests
-cd tests/integration
-python -m pytest test_system_integration.py -v
+poetry run pytest tests/integration/test_system_integration.py -v
 ```
 
 ### Test Coverage
@@ -1560,7 +1558,7 @@ All services use a reflection-based command discovery system:
   - For each module, it uses `inspect.getmembers()` to find classes that are subclasses of `Command`
   - Command names are extracted via `command_class.get_name()` method
   - Commands are cached after first discovery for performance
-- **Service Invocation**: Services are invoked via: `python -m essence <service-name>-service [args...]`
+- **Service Invocation**: Services are invoked via: `poetry run python -m essence <service-name>-service [args...]`
 - **Command Interface**: Each command implements the `essence.command.Command` interface with:
   - `get_name()` - Returns the command name (e.g., "telegram-service")
   - `get_description()` - Returns command description for help text
@@ -1805,15 +1803,14 @@ DISCORD_SERVICE_PORT=8081
 
 ### Command Pattern
 
-All services use the `essence` command pattern:
+All services use the `essence` command pattern and are executed via Poetry:
 
 ```bash
-# Services are run via:
-poetry run -m essence <service-name>-service [args...]
-
-# Or directly with Python:
-python -m essence <service-name>-service [args...]
+# Services are run via Poetry:
+poetry run python -m essence <service-name>-service [args...]
 ```
+
+**Important:** Always use `poetry run` to ensure correct dependency resolution and environment isolation.
 
 Available commands:
 - `telegram-service` - Telegram bot service
@@ -1865,7 +1862,7 @@ The project uses:
 - **mypy** for type checking
 - **pytest** for testing
 
-Run quality checks:
+Run quality checks (all via Poetry):
 ```bash
 poetry run black .
 poetry run isort .
@@ -1873,6 +1870,8 @@ poetry run flake8
 poetry run mypy
 poetry run pytest
 ```
+
+**Note:** All Python execution in the June project uses Poetry for dependency management. Always use `poetry run` for Python commands and `poetry run pytest` for tests.
 
 ## 🚀 Performance Optimization
 

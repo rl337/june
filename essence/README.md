@@ -14,29 +14,32 @@ Essence is June's core reusable codebase that powers all services. This module c
 
 ## Installation
 
+**Note: All Python code in June is managed via Poetry. Use Poetry for installation and execution.**
+
 ```bash
-cd essence
-pip install -e .
+# From project root, install dependencies
+cd /home/rlee/dev/june
+poetry install
 ```
 
 For development with test dependencies:
 ```bash
-pip install -e ".[dev]"
+poetry install --with dev
 ```
 
 ## Testing
 
-All tests are in `june/tests/` and use pytest:
+All tests are in `june/tests/` and use pytest via Poetry:
 
 ```bash
 # Run all tests
-pytest
+poetry run pytest
 
 # Run specific test categories
-pytest -m unit
-pytest -m integration
-pytest -m chat
-pytest -m audio
+poetry run pytest -m unit
+poetry run pytest -m integration
+poetry run pytest -m chat
+poetry run pytest -m audio
 ```
 
 ## Dependencies

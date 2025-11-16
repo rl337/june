@@ -830,7 +830,7 @@ All services (including Telegram and Discord bots) are deployed using Docker con
 **Process:**
 1. Services are built using Docker Compose
 2. Dockerfiles use Poetry to install dependencies from `pyproject.toml`
-3. Services run via `poetry run python -m essence <service-name>-service`
+3. Services run via `poetry run python -m essence <service-name>-service` (all Python execution uses Poetry)
 
 **Command:**
 ```bash
@@ -960,7 +960,7 @@ All services use the `essence.command.Command` pattern:
 poetry run -m essence <service-name>-service [args...]
 
 # Or directly:
-python -m essence <service-name>-service [args...]
+poetry run python -m essence <service-name>-service [args...]
 ```
 
 **Lifecycle:**

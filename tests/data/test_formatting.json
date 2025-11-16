@@ -1,0 +1,162 @@
+
+YOUR ROLE:
+- Respond to user messages in a helpful, conversational manner
+- You are NOT a task worker - you do NOT automatically pick up or complete tasks
+- You only interact with tasks when the user explicitly asks you to
+- Provide clear, actionable responses formatted for Telegram
+- Be conversational and helpful, like a personal assistant
+
+AVAILABLE SERVICES (use only when user requests):
+
+1. Todorama (Task Management):
+   - Use 'todo-' prefixed MCP tools ONLY when the user asks about tasks/projects
+   - todo-list_available_tasks() - List available tasks (when user asks "what tasks", "show tasks", etc.)
+   - todo-list_projects() - List all projects (when user asks "what projects", "show projects", etc.)
+   - todo-get_project() - Get project details (when user asks about a specific project)
+   - todo-create_task() - Create new tasks (when user asks to create a task)
+   - todo-get_task_context() - Get task details (when user asks about a specific task)
+   - todo-reserve_task() - Reserve a task (when user asks to work on a task)
+   - todo-complete_task() - Complete a task (when user asks to complete a task)
+   - todo-unlock_task() - Unlock a task (when user asks to unlock a task)
+   - todo-add_task_update() - Add updates to tasks (when user asks to update a task)
+
+2. Docomatic (Documentation Management):
+   - Use 'docomatic-' prefixed MCP tools when the user asks about documentation
+   - docomatic-list_documents() - List documents (when user asks "what documents", "show docs", etc.)
+   - docomatic-get_document() - Get document details (when user asks about a specific document)
+   - docomatic-create_document() - Create new documents (when user asks to create documentation)
+   - docomatic-search_sections() - Search documentation (when user asks to search docs)
+   - docomatic-export_to_github() - Export documentation (when user asks to export docs)
+
+3. Bucketofacts (Knowledge Graph):
+   - Use 'bucketofacts-' prefixed MCP tools when the user asks about knowledge or facts
+   - bucketofacts-query_facts() - Query facts (when user asks "what facts", "show knowledge", etc.)
+   - bucketofacts-create_fact() - Create facts (when user asks to store knowledge)
+   - bucketofacts-find_related_facts() - Find related facts (when user asks about relationships)
+   - bucketofacts-semantic_search() - Semantic search (when user asks to search knowledge)
+
+IMPORTANT:
+- Do NOT automatically pick up tasks or start working on them
+- Only use service tools when the user explicitly requests it
+- If the user just says "hello" or asks a general question, respond conversationally without using tools
+- You are a conversational assistant, not an autonomous task worker
+
+RESPONSE FORMAT:
+- Your response will be converted to human-readable format for Telegram
+- Be concise but informative
+- Use markdown formatting when appropriate
+- If you perform actions (create tasks, list tasks, etc.), summarize what you did clearly
+- If you need to ask clarifying questions, ask them naturally
+
+EXAMPLES:
+- User: "Hello"
+  → Respond conversationally: "Hello! How can I help you today?"
+
+- User: "What tasks do I have?"
+  → Use todo-list_available_tasks() and format the response clearly
+
+- User: "Create a task to fix the login bug"
+  → Use todo-create_task() with appropriate details, then confirm: "I've created task #123: Fix login bug"
+
+- User: "What projects are available?"
+  → Use todo-list_projects() and format the list clearly
+
+- User: "Tell me about task 123"
+  → Use todo-get_task_context() and provide a clear summary
+
+- User: "How are you?"
+  → Respond conversationally without using any tools: "I'm doing well, thanks for asking! How can I help you?"
+
+Remember: Your output will be parsed as JSON and converted to human-readable format. Be clear, helpful, and conversational. Only use tools when the user explicitly requests task/project operations.
+
+CRITICAL RULES:
+- NEVER use sudo or su - all commands must run as regular users
+- All operations must be performed with regular user permissions - do not attempt to escalate privileges
+
+
+Use MCP service tools with their respective prefixes:
+- 'todo-' for todorama (task management)
+- 'docomatic-' for docomatic (documentation)
+- 'bucketofacts-' for bucketofacts (knowledge graph)
+
+Only use these tools when the user explicitly requests operations related to that service.
+
+USER MESSAGE:
+Show me bold and italic text formatting" --output-format stream-json
+{"type":"system","subtype":"init","apiKeySource":"login","cwd":"/home/rlee/dev/agenticness","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","model":"Auto","permissionMode":"default"}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"You are a TelegramResponse agent (agent_id: telegram-response-agent) that responds to user messages from Telegram.\n\nYOUR ROLE:\n- Respond to user messages in a helpful, conversational manner\n- You are NOT a task worker - you do NOT automatically pick up or complete tasks\n- You only interact with tasks when the user explicitly asks you to\n- Provide clear, actionable responses formatted for Telegram\n- Be conversational and helpful, like a personal assistant\n\nAVAILABLE SERVICES (use only when user requests):\n\n1. Todorama (Task Management):\n   - Use 'todo-' prefixed MCP tools ONLY when the user asks about tasks/projects\n   - todo-list_available_tasks() - List available tasks (when user asks what tasks, show tasks, etc.)\n   - todo-list_projects() - List all projects (when user asks what projects, show projects, etc.)\n   - todo-get_project() - Get project details (when user asks about a specific project)\n   - todo-create_task() - Create new tasks (when user asks to create a task)\n   - todo-get_task_context() - Get task details (when user asks about a specific task)\n   - todo-reserve_task() - Reserve a task (when user asks to work on a task)\n   - todo-complete_task() - Complete a task (when user asks to complete a task)\n   - todo-unlock_task() - Unlock a task (when user asks to unlock a task)\n   - todo-add_task_update() - Add updates to tasks (when user asks to update a task)\n\n2. Docomatic (Documentation Management):\n   - Use 'docomatic-' prefixed MCP tools when the user asks about documentation\n   - docomatic-list_documents() - List documents (when user asks what documents, show docs, etc.)\n   - docomatic-get_document() - Get document details (when user asks about a specific document)\n   - docomatic-create_document() - Create new documents (when user asks to create documentation)\n   - docomatic-search_sections() - Search documentation (when user asks to search docs)\n   - docomatic-export_to_github() - Export documentation (when user asks to export docs)\n\n3. Bucketofacts (Knowledge Graph):\n   - Use 'bucketofacts-' prefixed MCP tools when the user asks about knowledge or facts\n   - bucketofacts-query_facts() - Query facts (when user asks what facts, show knowledge, etc.)\n   - bucketofacts-create_fact() - Create facts (when user asks to store knowledge)\n   - bucketofacts-find_related_facts() - Find related facts (when user asks about relationships)\n   - bucketofacts-semantic_search() - Semantic search (when user asks to search knowledge)\n\nIMPORTANT:\n- Do NOT automatically pick up tasks or start working on them\n- Only use service tools when the user explicitly requests it\n- If the user just says hello or asks a general question, respond conversationally without using tools\n- You are a conversational assistant, not an autonomous task worker\n\nRESPONSE FORMAT:\n- Your response will be converted to human-readable format for Telegram\n- Be concise but informative\n- Use markdown formatting when appropriate\n- If you perform actions (create tasks, list tasks, etc.), summarize what you did clearly\n- If you need to ask clarifying questions, ask them naturally\n\nEXAMPLES:\n- User: Hello\n  → Respond conversationally: Hello! How can I help you today?\n\n- User: What tasks do I have?\n  → Use todo-list_available_tasks() and format the response clearly\n\n- User: Create a task to fix the login bug\n  → Use todo-create_task() with appropriate details, then confirm: Ive created task #123: Fix login bug\"\n\n- User: \"What projects are available?\"\n  → Use todo-list_projects() and format the list clearly\n\n- User: \"Tell me about task 123\"\n  → Use todo-get_task_context() and provide a clear summary\n\n- User: \"How are you?\"\n  → Respond conversationally without using any tools: \"Im doing well, thanks for asking! How can I help you?\n\nRemember: Your output will be parsed as JSON and converted to human-readable format. Be clear, helpful, and conversational. Only use tools when the user explicitly requests task/project operations.\n\nCRITICAL RULES:\n- NEVER use sudo or su - all commands must run as regular users\n- All operations must be performed with regular user permissions - do not attempt to escalate privileges\n\n\nUse MCP service tools with their respective prefixes:\n- 'todo-' for todorama (task management)\n- 'docomatic-' for docomatic (documentation)\n- 'bucketofacts-' for bucketofacts (knowledge graph)\n\nOnly use these tools when the user explicitly requests operations related to that service.\n\nUSER MESSAGE:\nShow me bold and italic text formatting"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc"}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268803375}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268803399}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268803428}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268803454}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268803454}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268803482}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268803508}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268803536}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268803590}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268803620}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268803675}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268803700}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268803727}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268803727}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268803754}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268803841}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268803841}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268803885}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268803971}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804065}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804085}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804090}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804100}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804113}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804137}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804163}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804214}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804260}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804285}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804309}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804333}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804358}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804382}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804382}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804431}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804478}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804478}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804501}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804552}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804576}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804600}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804648}
+{"type":"thinking","subtype":"delta","text":"","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804648}
+{"type":"thinking","subtype":"completed","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804774}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"\nHere are exa"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804775}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"mples of bol"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804848}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"d and italic"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804894}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":" formatting "}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804918}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"in markdown:\n\n**"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804943}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Bold text:**\n"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268804993}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"- `**bold**`"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268805015}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":" → **bold**\n"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268805063}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"- `__bold__`"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268805087}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":" → **bold**\n\n*"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268805115}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Italic text:"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268805162}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"*\n- `*italic*` → "}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268805185}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"*italic*\n- `_i"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268805235}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"talic_` → *i"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268805259}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"talic*\n\n***Bold "}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268805282}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"and italic:***"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268805307}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"\n- `***bold "}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268805307}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"italic***` → *"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268805354}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"**bold itali"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268805378}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"c***\n- `___bo"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268805426}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"ld italic___`"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268805453}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":" → ***bold it"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268805474}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"alic***\n\n**Exam"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268805523}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"ples:**\n- Thi"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268805549}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"s is **bold**\n-"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268805550}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":" This is *italic"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268805574}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"*\n- This is *"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268805621}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"**bold and ita"}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268805648}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"lic***\n\nTelegram supports these markdown styles. Use them in your messages."}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","timestamp_ms":1763268805649}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"\nHere are examples of bold and italic formatting in markdown:\n\n**Bold text:**\n- `**bold**` → **bold**\n- `__bold__` → **bold**\n\n*Italic text:*\n- `*italic*` → *italic*\n- `_italic_` → *italic*\n\n***Bold and italic:***\n- `***bold italic***` → ***bold italic***\n- `___bold italic___` → ***bold italic***\n\n**Examples:**\n- This is **bold**\n- This is *italic*\n- This is ***bold and italic***\n\nTelegram supports these markdown styles. Use them in your messages."}]},"session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc"}
+{"type":"result","subtype":"success","duration_ms":10073,"duration_api_ms":10073,"is_error":false,"result":"\nHere are examples of bold and italic formatting in markdown:\n\n**Bold text:**\n- `**bold**` → **bold**\n- `__bold__` → **bold**\n\n*Italic text:*\n- `*italic*` → *italic*\n- `_italic_` → *italic*\n\n***Bold and italic:***\n- `***bold italic***` → ***bold italic***\n- `___bold italic___` → ***bold italic***\n\n**Examples:**\n- This is **bold**\n- This is *italic*\n- This is ***bold and italic***\n\nTelegram supports these markdown styles. Use them in your messages.","session_id":"f1e355cc-cdba-4a74-bfe5-ed9d9e43a9fc","request_id":"a9ab600f-4091-46fd-afe9-40de2a8d7bad"}

@@ -27,7 +27,8 @@ from essence.chat.platform_translators import get_translator
 
 def load_test_data(filename):
     """Load JSON test data from file."""
-    test_data_dir = Path(__file__).parent / "test_data"
+    # Test data is now in tests/data at the root
+    test_data_dir = Path(__file__).parent.parent.parent.parent.parent / "data"
     file_path = test_data_dir / filename
     
     if not file_path.exists():

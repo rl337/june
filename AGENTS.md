@@ -2,6 +2,15 @@
 
 This document outlines the architectural principles and best practices for developing agents and services within the June project.
 
+## Python Dependency Management
+
+**All Python code in the June project is built and managed via Poetry.**
+
+- All Python execution examples use `poetry run` to ensure correct dependency resolution
+- Commands are invoked via: `poetry run python -m essence <command>`
+- Tests are run via: `poetry run pytest`
+- This ensures consistent environments and proper dependency isolation
+
 ## Core Architecture Principles
 
 ### Python Code Organization
@@ -151,6 +160,11 @@ def test_my_agent_command():
     exit_code = command.execute()
     
     assert exit_code == 0
+```
+
+Run tests using Poetry:
+```bash
+poetry run pytest tests/
 ```
 
 Service-level tests should verify command invocation:
