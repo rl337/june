@@ -399,9 +399,10 @@ def stream_chat_response_agent(
         platform: Platform name (telegram, discord, etc.) for environment variables
     
     Yields:
-        Tuples of (message_text, is_final) where:
+        Tuples of (message_text, is_final, message_type) where:
         - message_text: Human-readable text to send to the chat platform
         - is_final: True if this is the final message, False for intermediate messages
+        - message_type: "assistant" for incremental assistant chunks, "result" for final result message, None for other types
     """
     # Parse agent mode from message prefix (e.g., !architect, !normal)
     cleaned_message, agent_mode = parse_agent_mode_from_message(user_message)
@@ -566,11 +567,14 @@ def stream_chat_response_agent(
                         # Clear pending and add the new accumulated message
                         pending_messages = [(accumulated_message, current_time)]
                         
+                        # Determine message type for the handler
+                        message_type = "result" if is_result else "assistant"
+                        
                         # If this is the first message and we've waited long enough, send it immediately
                         if not first_message_sent and elapsed >= max_wait_for_first_message:
                             first_message_sent = True
-                            logger.info(f"Yielding first message after {elapsed:.2f}s: length={len(accumulated_message)}")
-                            yield (accumulated_message, False)
+                            logger.info(f"Yielding first message after {elapsed:.2f}s: length={len(accumulated_message)}, type={message_type}")
+                            yield (accumulated_message, False, message_type)
                             last_message_yield_time = current_time
                             # Remove from pending since we just sent it
                             pending_messages = []
@@ -581,8 +585,8 @@ def stream_chat_response_agent(
                             if is_result:
                                 logger.info(f"Yielding result message (authoritative): length={len(accumulated_message)} chars")
                             else:
-                                logger.info(f"Yielding updated accumulated message: length={len(accumulated_message)}")
-                            yield (accumulated_message, False)
+                                logger.info(f"Yielding updated accumulated message: length={len(accumulated_message)}, type={message_type}")
+                            yield (accumulated_message, False, message_type)
                             last_message_yield_time = current_time
                             pending_messages = []
             
@@ -594,7 +598,7 @@ def stream_chat_response_agent(
                     message, _ = pending_messages.pop(0)
                     first_message_sent = True
                     logger.info(f"Yielding pending message after {time_since_last_yield:.2f}s: length={len(message)}")
-                    yield (message, False)
+                    yield (message, False, "assistant")  # Pending messages are from assistant chunks
                     last_message_yield_time = current_time
             
             # If this is the final line from the generator, process remaining messages
@@ -604,7 +608,7 @@ def stream_chat_response_agent(
                 for message, _ in pending_messages:
                     if message not in seen_messages or not first_message_sent:
                         logger.info(f"Yielding remaining pending message: length={len(message)}")
-                        yield (message, False)
+                        yield (message, False, "assistant")  # Pending messages are from assistant chunks
                         first_message_sent = True
                 
                 # Check for timeout on final line
@@ -620,12 +624,12 @@ def stream_chat_response_agent(
                 else:
                     # No messages were extracted, send error
                     logger.warning("No messages were extracted from stream")
-                    yield ("⚠️ I received your message but couldn't generate a response. Please try again.", True)
+                    yield ("⚠️ I received your message but couldn't generate a response. Please try again.", True, None)
                 break
     
     except Exception as e:
         logger.error(f"Error streaming agent response: {e}", exc_info=True)
-        yield ("❌ I encountered an error processing your message. Please try again.", True)
+        yield ("❌ I encountered an error processing your message. Please try again.", True, None)
 
 
 def _extract_human_readable_from_json_line(line: str) -> Optional[str]:

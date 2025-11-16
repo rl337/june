@@ -193,7 +193,7 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         _first_message_pattern = None
         
         try:
-            for message_text, is_final in stream_agent_message(
+            for message_text, is_final, message_type in stream_agent_message(
                 user_message,
                 user_id=user_id,
                 chat_id=chat_id,
@@ -262,9 +262,8 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 
                 # Track the raw LLM response
                 # Strategy:
-                # 1. If new message is longer, it's likely an extension - use it
-                # 2. If new message is significantly shorter but starts with the same pattern as the FIRST message we saw,
-                #    it's likely the authoritative result message (full accumulated) - use it
+                # 1. If message_type is "result", it's authoritative - always use it
+                # 2. If new message is longer, it's likely an extension - use it
                 # 3. Otherwise, keep the longest version
                 message_updated = False
                 
@@ -273,20 +272,17 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                     # Store the pattern from the first message we see
                     _first_message_pattern = raw_llm_response[:30] if len(raw_llm_response) >= 30 else raw_llm_response
                 
-                first_message_pattern = _first_message_pattern
-                
-                if len(message_text) > len(raw_llm_response):
+                if message_type == "result":
+                    # Result message is always authoritative - overwrite regardless of length
+                    old_length = len(raw_llm_response) if raw_llm_response else 0
+                    raw_llm_response = message_text
+                    message_updated = True
+                    logger.info(f"Replaced with authoritative result message: {len(raw_llm_response)} chars (was {old_length} chars)")
+                elif len(message_text) > len(raw_llm_response):
                     # New message is longer - it's an extension
                     raw_llm_response = message_text
                     message_updated = True
                     logger.debug(f"Extended raw_llm_response: {len(raw_llm_response)} chars, preview={raw_llm_response[:50]}...")
-                elif message_text and raw_llm_response and first_message_pattern and message_text.startswith(first_message_pattern) and len(message_text) < len(raw_llm_response) * 0.9:
-                    # Message is shorter but starts with same pattern as FIRST message - likely the authoritative result message
-                    # This handles cases where we incorrectly accumulated duplicates, and the result message is the correct shorter version
-                    old_length = len(raw_llm_response)
-                    raw_llm_response = message_text
-                    message_updated = True
-                    logger.info(f"Replaced with authoritative result message (shorter but correct): {len(raw_llm_response)} chars (was {old_length} chars)")
                 elif message_text and raw_llm_response and message_text not in raw_llm_response:
                     # Different content - check if it's actually longer or if we should keep the accumulated one
                     # Usually cursor-agent sends full accumulated text, so longer = more complete

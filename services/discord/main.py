@@ -221,7 +221,7 @@ class DiscordBotService:
                 raw_llm_response = ""  # Track raw LLM response for building turn
                 
                 try:
-                    for message_text, is_final in stream_agent_message(
+                    for message_text, is_final, message_type in stream_agent_message(
                         message.content,
                         user_id=user_id,
                         chat_id=channel_id,
@@ -276,11 +276,23 @@ class DiscordBotService:
                         if not message_text:
                             continue
                         
-                        # Track the raw LLM response (use longest version for incremental updates)
-                        if len(message_text) > len(raw_llm_response):
+                        # Track the raw LLM response
+                        # Strategy:
+                        # 1. If message_type is "result", it's authoritative - always use it
+                        # 2. If new message is longer, it's likely an extension - use it
+                        # 3. Otherwise, keep the longest version
+                        message_updated = False
+                        if message_type == "result":
+                            # Result message is always authoritative - overwrite regardless of length
                             raw_llm_response = message_text
-                            
-                            # For streaming, parse and render incrementally
+                            message_updated = True
+                        elif len(message_text) > len(raw_llm_response):
+                            # New message is longer - it's an extension
+                            raw_llm_response = message_text
+                            message_updated = True
+                        
+                        # For streaming, parse and render incrementally (only if message was updated)
+                        if message_updated:
                             # Don't build full turn until final (that's expensive)
                             try:
                                 from essence.chat.markdown_parser import parse_markdown
@@ -311,7 +323,7 @@ class DiscordBotService:
                                 if last_message is None:
                                     # First message - send it immediately for streaming
                                     last_message = await message.channel.send(rendered_text)
-                                        message_count += 1
+                                    message_count += 1
                                     logger.debug(f"Sent initial streaming message to user {user_id} (length: {len(rendered_text)})")
                                 else:
                                     # Update existing message in place for streaming

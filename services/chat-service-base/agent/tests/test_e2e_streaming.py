@@ -70,15 +70,16 @@ def extract_result_message(json_lines):
     return None
 
 
-def simulate_handler_logic(message_text, raw_llm_response, first_message_pattern=None, update_first_pattern=True):
+def simulate_handler_logic(message_text, raw_llm_response, message_type=None, first_message_pattern=None, update_first_pattern=True):
     """
     Simulate the handler logic for updating raw_llm_response.
     
-    This mimics the logic in handlers/text.py lines 259-285.
+    This mimics the logic in handlers/text.py lines 263-292.
     
     Args:
         message_text: New message text
         raw_llm_response: Current raw_llm_response
+        message_type: "assistant" for incremental chunks, "result" for authoritative final message, None for other
         first_message_pattern: Pattern from the very first message (persists across calls)
         update_first_pattern: If True, update first_message_pattern from raw_llm_response if not set
     """
@@ -91,12 +92,12 @@ def simulate_handler_logic(message_text, raw_llm_response, first_message_pattern
     
     message_updated = False
     
-    if len(message_text) > len(raw_llm_response):
-        # New message is longer - it's an extension
+    if message_type == "result":
+        # Result message is always authoritative - overwrite regardless of length
         raw_llm_response = message_text
         message_updated = True
-    elif message_text and raw_llm_response and first_message_pattern and message_text.startswith(first_message_pattern) and len(message_text) < len(raw_llm_response) * 0.9:
-        # Message is shorter but starts with same pattern as FIRST message - likely the authoritative result message
+    elif len(message_text) > len(raw_llm_response):
+        # New message is longer - it's an extension
         raw_llm_response = message_text
         message_updated = True
     elif message_text and raw_llm_response and message_text not in raw_llm_response:
@@ -144,13 +145,13 @@ def simulate_streaming_flow(json_lines):
         # Yield message during streaming
         yielded_messages.append(accumulated)
         
-        # Handler updates raw_llm_response
-        raw_llm_response, _, first_message_pattern = simulate_handler_logic(accumulated, raw_llm_response, first_message_pattern)
+        # Handler updates raw_llm_response (assistant chunks)
+        raw_llm_response, _, first_message_pattern = simulate_handler_logic(accumulated, raw_llm_response, "assistant", first_message_pattern)
     
     # Result message comes in - should overwrite
     if result_message:
         yielded_messages.append(result_message)
-        raw_llm_response, _, first_message_pattern = simulate_handler_logic(result_message, raw_llm_response, first_message_pattern, update_first_pattern=False)
+        raw_llm_response, _, first_message_pattern = simulate_handler_logic(result_message, raw_llm_response, "result", first_message_pattern, update_first_pattern=False)
     
     return raw_llm_response, result_message
 
@@ -263,7 +264,7 @@ def test_e2e_streaming_result_overwrites_duplicates():
     first_message_pattern = None
     
     # Process accumulated (corrupted version)
-    raw_llm_response, _, first_message_pattern = simulate_handler_logic(accumulated, raw_llm_response, first_message_pattern)
+    raw_llm_response, _, first_message_pattern = simulate_handler_logic(accumulated, raw_llm_response, "assistant", first_message_pattern)
     
     # Verify it's corrupted
     assert raw_llm_response.count('# Header 1') > 1, "raw_llm_response should contain duplication"
@@ -272,7 +273,7 @@ def test_e2e_streaming_result_overwrites_duplicates():
     # Use the first_message_pattern from the FIRST message (before corruption)
     # In real flow, this would be from the very first chunk
     first_chunk_pattern = chunks[0][:30] if len(chunks[0]) >= 30 else chunks[0]
-    final_raw_llm_response, _, _ = simulate_handler_logic(result, raw_llm_response, first_chunk_pattern, update_first_pattern=False)
+    final_raw_llm_response, _, _ = simulate_handler_logic(result, raw_llm_response, "result", first_chunk_pattern, update_first_pattern=False)
     
     # Should be overwritten with result
     assert final_raw_llm_response == result, (
