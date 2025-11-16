@@ -311,7 +311,7 @@ class DiscordBotService:
                                 if last_message is None:
                                     # First message - send it immediately for streaming
                                     last_message = await message.channel.send(rendered_text)
-                                    message_count += 1
+                                        message_count += 1
                                     logger.debug(f"Sent initial streaming message to user {user_id} (length: {len(rendered_text)})")
                                 else:
                                     # Update existing message in place for streaming

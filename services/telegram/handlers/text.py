@@ -258,8 +258,8 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                         if last_message is None:
                             # First message - send it immediately for streaming
                             last_message = await update.message.reply_text(rendered_text, parse_mode="Markdown")
-                            message_count += 1
-                            last_message_id = last_message.message_id
+                                message_count += 1
+                                last_message_id = last_message.message_id
                             logger.debug(f"Sent initial streaming message to user {user_id} (length: {len(rendered_text)})")
                         else:
                             # Update existing message in place for streaming

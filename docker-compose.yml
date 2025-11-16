@@ -8,70 +8,6 @@ services:
     - tools
     volumes:
     - /var/log/june/base:/logs
-  postgres:
-    image: pgvector/pgvector:pg16
-    container_name: june-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: june
-      POSTGRES_USER: june
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
-    ports:
-    - 5432:5432
-    volumes:
-    - ${JUNE_DATA_DIR:-/home/rlee/june_data}/postgres:/var/lib/postgresql/data
-    - ./config/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql
-    - /var/log/june/postgres:/logs
-    healthcheck:
-      test:
-      - CMD-SHELL
-      - pg_isready -U june
-      interval: 10s
-      timeout: 5s
-      retries: 5
-  minio:
-    image: minio/minio:latest
-    container_name: june-minio
-    restart: unless-stopped
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-changeme}
-    ports:
-    - 9000:9000
-    - 9001:9001
-    volumes:
-    - ${JUNE_DATA_DIR:-/home/rlee/june_data}/minio:/data
-    - /var/log/june/minio:/logs
-    command: server /data --console-address ":9001"
-    healthcheck:
-      test:
-      - CMD
-      - curl
-      - -f
-      - http://localhost:9000/minio/health/live
-      interval: 30s
-      timeout: 20s
-      retries: 3
-  redis:
-    image: redis:7-alpine
-    container_name: june-redis
-    restart: unless-stopped
-    ports:
-    - 6379:6379
-    volumes:
-    - ${JUNE_DATA_DIR:-/home/rlee/june_data}/redis:/data
-    - /var/log/june/redis:/logs
-    command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy allkeys-lru
-    healthcheck:
-      test:
-      - CMD
-      - redis-cli
-      - ping
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-    - june_network
   orchestrator:
     build:
       context: .
@@ -79,7 +15,7 @@ services:
     container_name: june-orchestrator
     restart: unless-stopped
     ports:
-    - 8005:8005
+    - 8007:8005
     environment:
     - ORCHESTRATOR_PORT=8005
     - GATEWAY_URL=http://gateway:8000
@@ -175,19 +111,15 @@ services:
     - STT_URL=grpc://stt:50052
     - TTS_URL=grpc://tts:50053
     - NATS_URL=nats://common-nats:4222
-    - POSTGRES_URL=postgresql://june:${POSTGRES_PASSWORD:-changeme}@postgres:5432/june
-    - MINIO_ENDPOINT=minio:9000
+    - POSTGRES_URL=postgresql://june:${POSTGRES_PASSWORD:-changeme}@common-postgres:5432/june
+    - MINIO_ENDPOINT=common-minio:9000
     - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-admin}
     - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-changeme}
-    - REDIS_URL=redis://redis:6379/0
+    - REDIS_URL=redis://common-redis:6379/0
     - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
     - JWT_SECRET=${JWT_SECRET:-change-this-secret}
     - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
     - ENABLE_DB_ENCRYPTION=${ENABLE_DB_ENCRYPTION:-true}
-    depends_on:
-    - postgres
-    - minio
-    - redis
     volumes:
     - ${JUNE_DATA_DIR:-/home/rlee/june_data}/model_artifacts/gateway:/app/model_artifacts
     - ./services/gateway:/app
