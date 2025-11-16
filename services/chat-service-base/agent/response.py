@@ -461,6 +461,7 @@ def stream_chat_response_agent(
     last_message_yield_time = start_time
     seen_messages = set()  # Track messages we've already yielded to avoid duplicates
     pending_messages = []  # Queue of messages waiting to be yielded (for pacing)
+    accumulated_message = ""  # Track the longest/fullest message we've seen
     
     try:
         # Minimum time between yielding messages (pacing) - 0.5 seconds
@@ -486,63 +487,109 @@ def stream_chat_response_agent(
                 last_json_line_time = current_time
                 # Try to parse JSON first to ensure it's complete
                 try:
-                    json.loads(line)  # Validate JSON is complete
+                    json_obj = json.loads(line)  # Validate JSON is complete
                 except json.JSONDecodeError:
                     # Incomplete JSON line, skip it
                     continue
                 
+                # Check if this is a result message (full accumulated text)
+                obj_type = json_obj.get("type", "")
+                is_result = obj_type == "result" and json_obj.get("subtype") == "success"
+                
                 message = _extract_human_readable_from_json_line(line)
                 if message:
-                    # Check if this is a new message or an update to an existing one
-                    # For assistant messages, we want to accumulate the full response
-                    # Compare message content to see if it's an extension of previous message
-                    is_new_or_extended = True
-                    message_to_use = message
+                    message_updated = False
                     
-                    if seen_messages:
-                        # Check if this message contains or extends a previous message
-                        for seen_msg in list(seen_messages):
-                            if seen_msg in message:
-                                # This message contains a previous one - it's an extension
-                                # Remove the shorter version and use the longer one
-                                seen_messages.discard(seen_msg)
-                                # Remove from pending if it's there
-                                pending_messages = [m for m in pending_messages if m[0] != seen_msg]
-                                message_to_use = message
-                                is_new_or_extended = True
-                                break
-                            elif message in seen_msg:
-                                # This is a shorter version of something we've seen, skip it
-                                is_new_or_extended = False
-                                break
+                    if is_result:
+                        # Result message contains the full accumulated text - replace accumulated with it
+                        # Also validate that our chunk appending worked correctly
+                        if accumulated_message:
+                            # Validate: check if appended chunks match result (allowing for newlines)
+                            appended_normalized = accumulated_message.replace('\n\n', '\n')
+                            result_normalized = message.replace('\n\n', '\n')
+                            
+                            if appended_normalized == result_normalized:
+                                logger.info(f"✅ Chunk appending validated: appended chunks match result ({len(accumulated_message)} chars)")
+                            else:
+                                # Log the difference for debugging
+                                logger.warning(
+                                f"⚠️ Chunk appending mismatch: "
+                                f"appended={len(accumulated_message)} chars, result={len(message)} chars. "
+                                f"Using result as authoritative."
+                            )
+                        
+                        accumulated_message = message
+                        message_updated = True
+                        logger.info(f"Replaced with result message (full accumulated): {len(message)} chars")
+                    else:
+                        # Assistant message: check if it's a delta chunk or full accumulated
+                        logger.info(f"Extracted assistant chunk: length={len(message)}, preview={message[:100]}...")
+                        if accumulated_message:
+                            # If this chunk contains the accumulated message, it's the full accumulated - replace
+                            if accumulated_message in message:
+                                logger.info(f"Assistant chunk contains accumulated - replacing: {len(accumulated_message)} -> {len(message)} chars")
+                                accumulated_message = message
+                                message_updated = True
+                            else:
+                                # Delta chunk - append directly (no separators, chunks should fit together)
+                                old_accumulated = accumulated_message
+                                accumulated_message = accumulated_message + message
+                                message_updated = True
+                                logger.info(
+                                    f"Appending assistant delta chunk. "
+                                    f"Old: {old_accumulated[:50]}... ({len(old_accumulated)} chars), "
+                                    f"New chunk: {message[:50]}... ({len(message)} chars), "
+                                    f"Combined: {len(accumulated_message)} chars"
+                                )
+                        else:
+                            # First message - always accept it
+                            accumulated_message = message
+                            message_updated = True
+                            logger.info(f"First assistant chunk: {len(accumulated_message)} chars")
                     
-                    if is_new_or_extended:
-                        seen_messages.add(message_to_use)
-                        # Add to pending queue for pacing
-                        pending_messages.append((message_to_use, current_time))
+                    # Always yield the accumulated message when it updates, so Telegram can update in place
+                    if message_updated:
+                        # Update seen_messages with the accumulated message
+                        seen_messages.discard(accumulated_message)  # Remove old if exists
+                        seen_messages.add(accumulated_message)
+                        
+                        # Clear pending and add the new accumulated message
+                        pending_messages = [(accumulated_message, current_time)]
+                        
                         # If this is the first message and we've waited long enough, send it immediately
                         if not first_message_sent and elapsed >= max_wait_for_first_message:
                             first_message_sent = True
-                            yield (message_to_use, False)
+                            logger.info(f"Yielding first message after {elapsed:.2f}s: length={len(accumulated_message)}")
+                            yield (accumulated_message, False)
                             last_message_yield_time = current_time
                             # Remove from pending since we just sent it
-                            pending_messages = [m for m in pending_messages if m[0] != message_to_use]
+                            pending_messages = []
+                        elif first_message_sent:
+                            # We've already sent a message, yield the updated one immediately
+                            # This allows Telegram to update the message in place
+                            logger.info(f"Yielding updated accumulated message: length={len(accumulated_message)}")
+                            yield (accumulated_message, False)
+                            last_message_yield_time = current_time
+                            pending_messages = []
             
             # Yield pending messages if enough time has passed (pacing)
             if pending_messages:
                 time_since_last_yield = current_time - last_message_yield_time
                 if time_since_last_yield >= min_message_interval:
-                    # Send the oldest pending message
+                    # Send the accumulated message (should be the longest/fullest version)
                     message, _ = pending_messages.pop(0)
                     first_message_sent = True
+                    logger.info(f"Yielding pending message after {time_since_last_yield:.2f}s: length={len(message)}")
                     yield (message, False)
                     last_message_yield_time = current_time
             
             # If this is the final line from the generator, process remaining messages
             if is_final_line:
+                logger.info(f"Received final line from generator. pending_messages={len(pending_messages)}, seen_messages={len(seen_messages)}")
                 # Process any remaining pending messages quickly
                 for message, _ in pending_messages:
                     if message not in seen_messages or not first_message_sent:
+                        logger.info(f"Yielding remaining pending message: length={len(message)}")
                         yield (message, False)
                         first_message_sent = True
                 
@@ -554,9 +601,11 @@ def stream_chat_response_agent(
                 # Final message indicating completion
                 if first_message_sent:
                     # We've already sent messages, just mark as final
+                    logger.info(f"Yielding final signal. Total messages sent: {len(seen_messages)}")
                     yield ("", True)  # Empty message with is_final=True to signal completion
                 else:
                     # No messages were extracted, send error
+                    logger.warning("No messages were extracted from stream")
                     yield ("⚠️ I received your message but couldn't generate a response. Please try again.", True)
                 break
     
