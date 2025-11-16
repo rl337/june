@@ -5,6 +5,11 @@ These tests validate that:
 1. Assistant message chunks are correctly appended together
 2. The appended chunks match the result message (full accumulated text)
 3. The markdown translation produces the expected Telegram-formatted output
+
+NOTE: This test only validates accumulation logic. For end-to-end streaming
+behavior (including handler logic and result message overwriting), see
+test_e2e_streaming.py. The accumulation test might pass trivially if we
+just use the result message, but the e2e test ensures the full flow works.
 """
 
 import json
@@ -149,6 +154,8 @@ def test_chunk_appending_matches_result(test_file):
     # Special check for duplication test: ensure no repeated content
     if "duplication" in test_file:
         # Check that the result doesn't contain the same header sequence multiple times
+        # This test case captures a real-world scenario where cursor-agent sends
+        # a full accumulated message (chunk 20) that should replace accumulated, not append
         header_sequence = "# Header 1\n\n## Header 2"
         occurrences = result_normalized.count(header_sequence)
         assert occurrences <= 1, (
