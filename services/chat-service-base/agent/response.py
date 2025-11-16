@@ -123,7 +123,7 @@ def call_chat_response_agent(
         env["CURSOR_AGENT_EXE"] = env.get("CURSOR_AGENT_EXE", "cursor-agent")
         env["AGENT_ID"] = env.get("AGENT_ID", f"{platform}-response-agent")
         env["AGENT_TIMEOUT"] = env.get("AGENT_TIMEOUT", "300")
-        env["TODO_SERVICE_URL"] = env.get("TODO_SERVICE_URL", "http://localhost:8004")
+        env["TODO_SERVICE_URL"] = env.get("TODO_SERVICE_URL", "http://localhost:8000/mcp/todo-mcp-service")
         
         # Set AGENT_MODE from parsed message prefix
         env["AGENT_MODE"] = agent_mode

@@ -58,7 +58,7 @@ class MCPClient:
         ```python
         from june_mcp_client import MCPClient
         
-        client = MCPClient(base_url="http://localhost:8004")
+        client = MCPClient(base_url="http://localhost:8000/mcp/todo-mcp-service")
         
         # List available tasks
         tasks = client.list_available_tasks(agent_type="implementation", limit=10)
@@ -83,7 +83,7 @@ class MCPClient:
         Initialize MCP client.
         
         Args:
-            base_url: Base URL of TODO MCP Service (defaults to TODO_SERVICE_URL env var or http://localhost:8004)
+            base_url: Base URL of TODO MCP Service (defaults to TODO_SERVICE_URL env var or http://localhost:8000/mcp/todo-mcp-service)
             api_key: API key for authentication (optional, defaults to TODO_API_KEY env var)
             timeout: Request timeout in seconds (default: 30.0)
             max_retries: Maximum number of retry attempts for transient failures (default: 3)
@@ -91,7 +91,7 @@ class MCPClient:
         """
         if base_url is None:
             import os
-            base_url = os.getenv("TODO_SERVICE_URL", "http://localhost:8004")
+            base_url = os.getenv("TODO_SERVICE_URL", "http://localhost:8000/mcp/todo-mcp-service")
         self.base_url = base_url.rstrip("/")
         
         if api_key is None:

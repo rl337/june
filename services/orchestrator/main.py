@@ -154,7 +154,7 @@ class OrchestrationService:
         self.resource_locks: Dict[str, str] = {}  # resource -> agent_id
         
         # Configuration
-        self.todo_service_url = os.getenv("TODO_SERVICE_URL", "http://localhost:8004")
+        self.todo_service_url = os.getenv("TODO_SERVICE_URL", "http://localhost:8000/mcp/todo-mcp-service")
         self.gateway_url = os.getenv("GATEWAY_URL", "http://localhost:8000")
         
         # MCP client for TODO service

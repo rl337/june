@@ -67,7 +67,7 @@ def call_chat_response_agent(
         env["CURSOR_AGENT_EXE"] = env.get("CURSOR_AGENT_EXE", "cursor-agent")
         env["AGENT_ID"] = env.get("AGENT_ID", f"{platform}-response-agent")
         env["AGENT_TIMEOUT"] = env.get("AGENT_TIMEOUT", "300")
-        env["TODO_SERVICE_URL"] = env.get("TODO_SERVICE_URL", "http://localhost:8004")
+        env["TODO_SERVICE_URL"] = env.get("TODO_SERVICE_URL", "http://localhost:8000/mcp/todo-mcp-service")
         
         # Set AGENTICNESS_STATE_DIR so the script uses the correct session directory
         # This must be set before the script sources session_manager.sh

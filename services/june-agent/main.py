@@ -72,7 +72,7 @@ AGENT_ID = os.getenv("JUNE_AGENT_ID", "june-agent")
 PROJECT_ID = os.getenv("JUNE_PROJECT_ID")
 AGENT_TYPE = os.getenv("JUNE_AGENT_TYPE", "implementation")
 SLEEP_INTERVAL = int(os.getenv("JUNE_SLEEP_INTERVAL", "60"))
-TODO_SERVICE_URL = os.getenv("TODO_SERVICE_URL", "http://localhost:8004")
+TODO_SERVICE_URL = os.getenv("TODO_SERVICE_URL", "http://localhost:8000/mcp/todo-mcp-service")
 QWEN3_MODEL_NAME = os.getenv("QWEN3_MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 QWEN3_DEVICE = os.getenv("QWEN3_DEVICE", "cuda" if os.getenv("CUDA_VISIBLE_DEVICES") else "cpu")
 
