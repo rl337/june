@@ -187,6 +187,22 @@ result = response.json()
 print(result["message"])
 ```
 
+## Security: Non-Root User Requirement
+
+**CRITICAL**: All services MUST run as non-root users. This is a mandatory security requirement.
+
+**Implementation:**
+- Docker containers must use `USER` directive to specify a non-root user (UID 1000 recommended)
+- Docker Compose services must specify `user: "1000:1000"` in service definitions
+- Host directories mounted as volumes must be owned by the non-root user (UID 1000)
+- Never use `privileged: true` or run containers as root
+
+**Verification:**
+```bash
+# Check container user (should return 1000:1000, never empty)
+docker inspect <container> --format '{{.Config.User}}'
+```
+
 ## Development
 
 ### Adding a New Agent Type
@@ -234,4 +250,6 @@ registry.register_agent_type("my_custom", MyCustomAgent)
 - [ ] Agent load balancing
 - [ ] Priority queues for agent execution
 - [ ] Agent resource limits and quotas
+
+
 
