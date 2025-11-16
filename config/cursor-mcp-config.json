@@ -1,31 +1,13 @@
 {
   "mcpServers": {
     "bucketofacts": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-fetch",
-        "http://localhost:8000/mcp/bucket-o-facts/sse"
-      ],
-      "env": {}
+      "url": "http://192.168.1.21:8000/mcp/bucket-o-facts/sse"
     },
     "docomatic": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-fetch",
-        "http://localhost:8000/mcp/doc-o-matic/sse"
-      ],
-      "env": {}
+      "url": "http://192.168.1.21:8000/mcp/doc-o-matic/sse"
     },
     "todorama": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@modelcontextprotocol/server-fetch",
-        "http://localhost:8000/mcp/todo-mcp-service/sse"
-      ],
-      "env": {}
+      "url": "http://192.168.1.21:8000/mcp/todo-mcp-service/sse"
     }
   }
 }

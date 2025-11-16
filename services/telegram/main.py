@@ -285,9 +285,27 @@ class TelegramBotService:
         from typing import Optional, Dict, Any
         
         # Add chat-service-base to path for shared agent handler
-        chat_base_path = Path(__file__).parent.parent / "chat-service-base"
-        sys.path.insert(0, str(chat_base_path))
-        from agent.handler import process_agent_message
+        # In Docker container, chat-service-base is copied to /app/chat-service-base
+        _script_dir = Path(__file__).parent
+        possible_paths = [
+            Path("/app") / "chat-service-base",  # Docker container path (copied by Dockerfile)
+            _script_dir.parent / "chat-service-base",  # Relative from services/telegram/ (local dev)
+            Path("/app") / "services" / "chat-service-base",  # Alternative Docker path
+        ]
+        
+        chat_base_path = None
+        for path in possible_paths:
+            resolved = path.resolve()
+            if resolved.exists() and (resolved / "agent" / "handler.py").exists():
+                chat_base_path = resolved
+                break
+        
+        if chat_base_path:
+            chat_base_abs = str(chat_base_path.absolute())
+            sys.path.insert(0, chat_base_abs)
+            from agent.handler import process_agent_message
+        else:
+            raise ImportError(f"Could not find chat-service-base directory. Tried: {possible_paths}")
         
         def process_message_wrapper(user_message: str, user_id: Optional[int] = None, 
                                      chat_id: Optional[int] = None, **kwargs) -> Dict[str, Any]:
