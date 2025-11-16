@@ -28,19 +28,40 @@ This document outlines the architectural principles and best practices for devel
 
 ```python
 from essence.command import Command
+import argparse
 
 class MyAgentCommand(Command):
-    """Description of what this agent does."""
+    """Command for running a custom agent service."""
     
-    def execute(self, args):
-        """Execute the agent logic."""
-        # Your agent implementation here
+    @classmethod
+    def get_name(cls) -> str:
+        return "my-agent"
+    
+    @classmethod
+    def get_description(cls) -> str:
+        return "Run the custom agent service"
+    
+    @classmethod
+    def add_args(cls, parser: argparse.ArgumentParser) -> None:
+        parser.add_argument("--input", type=str, help="Input for the agent")
+    
+    def init(self) -> None:
+        """Initialize the agent (load config, setup resources, etc.)."""
+        # Load configuration
+        # Initialize resources
         pass
     
-    def validate(self, args):
-        """Validate input arguments."""
-        # Validation logic
-        return True
+    def run(self) -> None:
+        """Run the agent main loop (blocking)."""
+        # Main agent logic here
+        # This should block until shutdown
+        pass
+    
+    def cleanup(self) -> None:
+        """Clean up resources on shutdown."""
+        # Close connections
+        # Stop background tasks
+        pass
 ```
 
 ### Service Structure
@@ -55,20 +76,25 @@ Services should be thin wrappers around `essence.command.Command` implementation
 
 ```python
 from fastapi import FastAPI
-from essence.command import get_command
+from essence.commands.my_agent import MyAgentCommand
+import argparse
 
 app = FastAPI()
 
 @app.post("/agent")
 async def handle_agent_request(request: AgentRequest):
-    # Get the command instance
-    command = get_command("my_agent_command")
+    # Create command with parsed arguments
+    args = argparse.Namespace(input=request.input)
+    command = MyAgentCommand(args)
     
-    # Execute with validated arguments
-    result = command.execute(request.args)
-    
-    # Return formatted response
-    return {"result": result}
+    # Initialize and run (or use execute() for full lifecycle)
+    command.init()
+    try:
+        # Run in background or call specific methods
+        result = await run_agent_async(command)
+        return {"result": result}
+    finally:
+        command.cleanup()
 ```
 
 ## Benefits of This Architecture
@@ -88,29 +114,43 @@ When refactoring existing code:
 3. **Update service entry points**: Modify services to invoke commands rather than containing business logic
 4. **Maintain backward compatibility**: During migration, services can call both old and new patterns
 
-## Command Registration
+## Command Discovery
 
-Commands should be registered in a central registry (typically in `essence.command.registry`):
+Commands are automatically discovered via Python reflection:
 
-```python
-from essence.command import Command, register_command
+- Commands must be subclasses of `essence.command.Command`
+- Commands must be located in the `essence.commands` package
+- The `essence.__main__.get_commands()` function automatically discovers all commands
+- No manual registration is required
 
-class MyAgentCommand(Command):
-    # ... implementation ...
-
-# Register the command
-register_command("my_agent", MyAgentCommand)
-```
+Commands are discovered by:
+1. Scanning all modules in `essence.commands`
+2. Finding classes that are subclasses of `Command`
+3. Extracting command names via `get_name()` classmethod
 
 ## Testing
 
 Commands should be tested independently:
 
 ```python
+import argparse
+from essence.commands.my_agent import MyAgentCommand
+
 def test_my_agent_command():
-    command = MyAgentCommand()
-    result = command.execute({"input": "test"})
-    assert result == expected_output
+    # Create mock args
+    args = argparse.Namespace(input="test")
+    
+    # Create command instance
+    command = MyAgentCommand(args)
+    
+    # Test initialization
+    command.init()
+    
+    # Test execution (or test run() separately)
+    # Note: execute() calls init(), run(), cleanup() in sequence
+    exit_code = command.execute()
+    
+    assert exit_code == 0
 ```
 
 Service-level tests should verify command invocation:
