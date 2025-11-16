@@ -13,14 +13,38 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Add chat-service-base to path for shared agent handler
-chat_base_path = Path(__file__).parent.parent.parent / "chat-service-base"
-sys.path.insert(0, str(chat_base_path))
+# In Docker container, chat-service-base is copied to /app/chat-service-base
+_script_dir = Path(__file__).parent
+possible_paths = [
+    Path("/app") / "chat-service-base",  # Docker container path (copied by Dockerfile)
+    _script_dir.parent.parent / "chat-service-base",  # Relative from handlers/ (local dev)
+    Path("/app") / "services" / "chat-service-base",  # Alternative Docker path
+]
+
+chat_base_path = None
+for path in possible_paths:
+    resolved = path.resolve()
+    if resolved.exists() and (resolved / "agent" / "handler.py").exists():
+        chat_base_path = resolved
+        break
+
+if chat_base_path:
+    chat_base_abs = str(chat_base_path.absolute())
+    sys.path.insert(0, chat_base_abs)
+    from agent.handler import stream_agent_message
+else:
+    raise ImportError(f"Could not find chat-service-base directory. Tried: {possible_paths}")
 
 # Add essence to path for human interface
-essence_path = Path(__file__).parent.parent.parent.parent / "essence"
-sys.path.insert(0, str(essence_path))
-
-from agent.handler import stream_agent_message
+# In Docker container, essence is copied to /app/essence
+essence_paths = [
+    Path("/app") / "essence",  # Docker container path
+    Path(__file__).parent.parent.parent.parent / "essence",  # Local dev relative path
+]
+for essence_path in essence_paths:
+    if essence_path.exists():
+        sys.path.insert(0, str(essence_path.absolute()))
+        break
 from conversation_storage import ConversationStorage
 from essence.chat.message_builder import MessageBuilder
 
@@ -165,7 +189,6 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         raw_llm_response = ""
         
         try:
-            import time
             for message_text, is_final in stream_agent_message(
                 user_message,
                 user_id=user_id,
@@ -180,29 +203,39 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 # Skip empty messages (final signal)
                 if not message_text and is_final:
                     # Final signal - build full turn, handle splitting, and log
+                    logger.info(f"Received final signal. raw_llm_response length: {len(raw_llm_response) if raw_llm_response else 0}")
                     if raw_llm_response:
                         try:
                             # Build full turn for logging
                             turn = message_builder.build_turn(user_message, raw_llm_response)
                             rendered_parts = message_builder.split_message_if_needed(4096)
                             
+                            logger.info(f"Final message split into {len(rendered_parts)} parts. First part length: {len(rendered_parts[0]) if rendered_parts else 0}")
+                            
                             if rendered_parts:
                                 if last_message:
                                     # Edit first part in place, send rest as new
+                                    logger.info(f"Editing final message (first part: {len(rendered_parts[0])} chars)")
                                     await last_message.edit_text(rendered_parts[0], parse_mode="Markdown")
-                                    for part in rendered_parts[1:]:
+                                    for i, part in enumerate(rendered_parts[1:], 1):
+                                        logger.info(f"Sending additional part {i+1}/{len(rendered_parts)} (length: {len(part)})")
                                         await update.message.reply_text(part, parse_mode="Markdown")
                                         message_count += 1
                                 else:
                                     # No message sent yet, send all parts
+                                    logger.info(f"Sending final message (first part: {len(rendered_parts[0])} chars)")
                                     last_message = await update.message.reply_text(rendered_parts[0], parse_mode="Markdown")
                                     message_count += 1
-                                    for part in rendered_parts[1:]:
+                                    for i, part in enumerate(rendered_parts[1:], 1):
+                                        logger.info(f"Sending additional part {i+1}/{len(rendered_parts)} (length: {len(part)})")
                                         await update.message.reply_text(part, parse_mode="Markdown")
                                         message_count += 1
                             
                             # Log the turn for debugging
-                            turn.log_to_file()
+                            try:
+                                turn.log_to_file()
+                            except Exception as log_error:
+                                logger.warning(f"Failed to log turn to file: {log_error}")
                         except Exception as edit_error:
                             logger.error(f"Failed to edit final message: {edit_error}", exc_info=True)
                             from essence.chat.error_handler import render_error_for_platform
@@ -223,10 +256,26 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 if not message_text:
                     continue
                 
-                # Track the raw LLM response (use longest version for incremental updates)
+                # Track the raw LLM response - ALWAYS use the longest version we've seen
+                # Cursor-agent sends incremental updates where each new message contains the previous one plus more
+                # So we should always keep the longest version
+                message_updated = False
                 if len(message_text) > len(raw_llm_response):
+                    # New message is longer - it's an extension
                     raw_llm_response = message_text
-                    
+                    message_updated = True
+                    logger.debug(f"Extended raw_llm_response: {len(raw_llm_response)} chars, preview={raw_llm_response[:50]}...")
+                elif message_text and raw_llm_response and message_text not in raw_llm_response:
+                    # Different content - check if it's actually longer or if we should keep the accumulated one
+                    # Usually cursor-agent sends full accumulated text, so longer = more complete
+                    if len(message_text) > len(raw_llm_response):
+                        raw_llm_response = message_text
+                        message_updated = True
+                        logger.debug(f"Replaced with longer message: {len(raw_llm_response)} chars")
+                
+                # Always render and update with the longest accumulated message
+                # Update on every new chunk to show incremental progress
+                if raw_llm_response and (message_updated or last_message is None):
                     # For streaming, parse and render incrementally
                     # Don't build full turn until final (that's expensive)
                     try:
@@ -239,32 +288,48 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                         rendered_text = translator.render_message(widgets)
                         
                         # Validate before sending
+                        # Use lenient validation during streaming (is_final=False) to allow incomplete markdown
+                        # Only do strict validation on final messages
                         from essence.chat.platform_validators import get_validator
                         validator = get_validator("telegram")
-                        is_valid, errors = validator.validate(rendered_text)
+                        is_valid, errors = validator.validate(rendered_text, lenient=not is_final)
                         
                         if not is_valid:
-                            # If invalid, escape the text to be safe
-                            logger.warning(f"Invalid Telegram markdown detected, escaping: {errors}")
-                            from essence.chat.human_interface import EscapedText
-                            safe_widget = EscapedText(text=raw_llm_response)
-                            rendered_text = translator.render_widget(safe_widget)
+                            # If invalid, try to re-parse and render more carefully
+                            # Don't escape the entire raw_llm_response - that loses all structure
+                            # Instead, re-parse and render, which will handle escaping at the widget level
+                            logger.warning(f"Invalid Telegram markdown detected during streaming, re-parsing: {errors}")
+                            # Re-parse to ensure widgets are correct
+                            widgets = parse_markdown(raw_llm_response)
+                            rendered_text = translator.render_message(widgets)
+                            # Re-validate after re-parsing
+                            is_valid, errors = validator.validate(rendered_text, lenient=not is_final)
+                            if not is_valid:
+                                # If still invalid, only then escape (but this should be rare)
+                                logger.warning(f"Still invalid after re-parsing, escaping: {errors}")
+                                from essence.chat.human_interface import EscapedText
+                                safe_widget = EscapedText(text=raw_llm_response)
+                                rendered_text = translator.render_widget(safe_widget)
                         
-                        # Split if needed (but only for final, for streaming just use first part)
+                        # For streaming, show full message (don't truncate - let final handler split if needed)
+                        # Only truncate if it's extremely long to avoid Telegram API errors
+                        original_length = len(rendered_text)
                         if len(rendered_text) > 4096:
-                            # For streaming, just show first part
+                            # For very long messages during streaming, show first 4096 chars
+                            # The final handler will properly split the full message
                             rendered_text = rendered_text[:4096]
+                            logger.debug(f"Truncated streaming message to 4096 chars (full length: {original_length})")
                         
                         if last_message is None:
                             # First message - send it immediately for streaming
                             last_message = await update.message.reply_text(rendered_text, parse_mode="Markdown")
-                                message_count += 1
-                                last_message_id = last_message.message_id
-                            logger.debug(f"Sent initial streaming message to user {user_id} (length: {len(rendered_text)})")
+                            message_count += 1
+                            last_message_id = last_message.message_id
+                            logger.info(f"Sent initial streaming message to user {user_id} (length: {len(rendered_text)}, is_final: {is_final})")
                         else:
-                            # Update existing message in place for streaming
+                            # Update existing message in place for streaming - this should add more text
                             await last_message.edit_text(rendered_text, parse_mode="Markdown")
-                            logger.debug(f"Updated streaming message in place (length: {len(rendered_text)})")
+                            logger.info(f"Updated streaming message in place (length: {len(rendered_text)}, is_final: {is_final})")
                     except Exception as send_error:
                         logger.error(f"Failed to send/edit message to Telegram: {send_error}", exc_info=True)
                         # Use structured error message
@@ -281,9 +346,12 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                                 pass
                         break
                     
-                    # If this is the final message, we're done (but continue to get final signal)
+                    # If this is the final message, we've already updated the message above
+                    # Continue to get the final empty signal to trigger final processing
                     if is_final:
-                        continue
+                        # Don't skip - we want to process this final chunk
+                        # The final empty signal will come next to trigger final processing
+                        pass
             
             # Stop typing indicator
             stream_active = False

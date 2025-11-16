@@ -71,15 +71,27 @@ def append_chunks_directly(chunks):
     
     This mimics the simplified logic: just concatenate chunks as-is.
     However, if a chunk contains the accumulated message, it's the full accumulated
-    and should replace (not append).
+    and should replace (not append). Also skip chunks that are prefixes of what we already have.
+    
+    Additionally, if a chunk is significantly longer and appears to be a full restart
+    (starts with the same pattern as the first chunk), it's likely the full accumulated message.
     """
     if not chunks:
         return ""
     
     accumulated = chunks[0]
+    first_chunk_start = chunks[0][:20] if len(chunks[0]) >= 20 else chunks[0]  # First 20 chars as pattern
+    
     for chunk in chunks[1:]:
         # If chunk contains accumulated, it's the full accumulated message - replace
         if accumulated in chunk:
+            accumulated = chunk
+        elif chunk in accumulated:
+            # This chunk is a prefix/substring of what we already have - skip it (duplicate/restart)
+            continue
+        elif len(chunk) > len(accumulated) * 0.8 and chunk.startswith(first_chunk_start):
+            # Chunk is significantly long and starts with the same pattern - likely full accumulated
+            # This handles cases where cursor-agent sends the full message after sending partial chunks
             accumulated = chunk
         else:
             # Otherwise, append
@@ -100,6 +112,7 @@ TEST_FILES = [
     "test_blockquote.json",       # Blockquotes (>)
     "test_strikethrough.json",    # Strikethrough (~~)
     "test_mixed.json",            # Mixed markdown (all types together)
+    "test_duplication_headers.json",  # Headers with duplication issue (real-world case)
 ]
 
 
@@ -118,7 +131,7 @@ def test_chunk_appending_matches_result(test_file):
     if not result_message:
         pytest.skip(f"No result message found in {test_file}")
     
-    # Append chunks using our logic (direct concatenation)
+    # Append chunks using our logic (direct concatenation with duplicate detection)
     appended = append_chunks_directly(assistant_chunks)
     
     # Normalize for comparison (handle potential newline differences)
@@ -132,6 +145,16 @@ def test_chunk_appending_matches_result(test_file):
         f"Appended: {repr(appended[:200])}\n"
         f"Result: {repr(result_message[:200])}"
     )
+    
+    # Special check for duplication test: ensure no repeated content
+    if "duplication" in test_file:
+        # Check that the result doesn't contain the same header sequence multiple times
+        header_sequence = "# Header 1\n\n## Header 2"
+        occurrences = result_normalized.count(header_sequence)
+        assert occurrences <= 1, (
+            f"Found {occurrences} occurrences of header sequence - indicates duplication issue.\n"
+            f"Result: {repr(result_normalized[:300])}"
+        )
 
 
 # Expected Telegram markdown translations (captured from actual translations)

@@ -530,6 +530,16 @@ def stream_chat_response_agent(
                                 logger.info(f"Assistant chunk contains accumulated - replacing: {len(accumulated_message)} -> {len(message)} chars")
                                 accumulated_message = message
                                 message_updated = True
+                            elif message in accumulated_message:
+                                # This chunk is a prefix/substring of what we already have - skip it (duplicate/restart)
+                                logger.debug(f"Skipping duplicate/restart chunk: {len(message)} chars (already have {len(accumulated_message)} chars)")
+                                message_updated = False
+                            elif len(message) > len(accumulated_message) * 0.8 and message.startswith(accumulated_message[:20] if len(accumulated_message) >= 20 else accumulated_message):
+                                # Chunk is significantly long and starts with the same pattern - likely full accumulated
+                                # This handles cases where cursor-agent sends the full message after sending partial chunks
+                                logger.info(f"Detected full accumulated message (long restart pattern): {len(accumulated_message)} -> {len(message)} chars")
+                                accumulated_message = message
+                                message_updated = True
                             else:
                                 # Delta chunk - append directly (no separators, chunks should fit together)
                                 old_accumulated = accumulated_message
