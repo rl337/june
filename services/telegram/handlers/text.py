@@ -256,15 +256,27 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 if not message_text:
                     continue
                 
-                # Track the raw LLM response - ALWAYS use the longest version we've seen
-                # Cursor-agent sends incremental updates where each new message contains the previous one plus more
-                # So we should always keep the longest version
+                # Track the raw LLM response
+                # Strategy:
+                # 1. If new message is longer, it's likely an extension - use it
+                # 2. If new message is significantly shorter but starts with the same pattern as the first message,
+                #    it's likely the authoritative result message (full accumulated) - use it
+                # 3. Otherwise, keep the longest version
                 message_updated = False
+                first_message_pattern = raw_llm_response[:30] if raw_llm_response and len(raw_llm_response) >= 30 else raw_llm_response
+                
                 if len(message_text) > len(raw_llm_response):
                     # New message is longer - it's an extension
                     raw_llm_response = message_text
                     message_updated = True
                     logger.debug(f"Extended raw_llm_response: {len(raw_llm_response)} chars, preview={raw_llm_response[:50]}...")
+                elif message_text and raw_llm_response and message_text.startswith(first_message_pattern) and len(message_text) < len(raw_llm_response) * 0.9:
+                    # Message is shorter but starts with same pattern - likely the authoritative result message
+                    # This handles cases where we incorrectly accumulated duplicates, and the result message is the correct shorter version
+                    old_length = len(raw_llm_response)
+                    raw_llm_response = message_text
+                    message_updated = True
+                    logger.info(f"Replaced with authoritative result message (shorter but correct): {len(raw_llm_response)} chars (was {old_length} chars)")
                 elif message_text and raw_llm_response and message_text not in raw_llm_response:
                     # Different content - check if it's actually longer or if we should keep the accumulated one
                     # Usually cursor-agent sends full accumulated text, so longer = more complete

@@ -577,7 +577,11 @@ def stream_chat_response_agent(
                         elif first_message_sent:
                             # We've already sent a message, yield the updated one immediately
                             # This allows Telegram to update the message in place
-                            logger.info(f"Yielding updated accumulated message: length={len(accumulated_message)}")
+                            # If this is a result message, it's authoritative and should overwrite regardless of length
+                            if is_result:
+                                logger.info(f"Yielding result message (authoritative): length={len(accumulated_message)} chars")
+                            else:
+                                logger.info(f"Yielding updated accumulated message: length={len(accumulated_message)}")
                             yield (accumulated_message, False)
                             last_message_yield_time = current_time
                             pending_messages = []
