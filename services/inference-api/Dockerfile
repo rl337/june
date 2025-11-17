@@ -23,11 +23,13 @@ COPY packages/june-grpc-api/dist/*.whl /tmp/
 RUN pip install --force-reinstall --no-deps /tmp/inference_core-*.whl /tmp/june_grpc_api-*.whl
 
 # Install PyTorch with CUDA support (replace CPU-only version installed by poetry)
-# Use CUDA 12.1 which is compatible with CUDA 13.0 driver
-# Note: Container needs NVIDIA Container Toolkit for GPU access, PyTorch CUDA build provides CUDA runtime
+# Install AFTER copying service code to ensure it's not overwritten
+# Try CUDA 12.4 index first (has newer PyTorch versions), fallback to 12.1
+# Note: Container needs NVIDIA Container Toolkit for GPU access
 RUN pip uninstall -y torch torchvision torchaudio 2>/dev/null || true && \
-    pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 && \
-    python -c "import torch; assert torch.cuda.is_available() or True, 'CUDA check will happen at runtime with GPU access'" || echo "Note: CUDA availability requires GPU access at runtime"
+    (pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124 || \
+     pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121) && \
+    python -c "import torch; print(f'PyTorch {torch.__version__} installed'); print(f'CUDA compiled: {torch.version.cuda if torch.version.cuda else \"None (CPU build)\"}')"
 
 ## shared module removed; use inference_core instead
 
@@ -36,6 +38,13 @@ COPY packages/june-grpc-api/grpc_auth.py /app/grpc_auth.py
 
 # Copy service code
 COPY services/inference-api .
+
+# Reinstall PyTorch with CUDA support AFTER copying service code
+# (ensures PyTorch CUDA is not overwritten by any service code dependencies)
+RUN pip uninstall -y torch torchvision torchaudio 2>/dev/null || true && \
+    (pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124 || \
+     pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121) && \
+    python -c "import torch; print(f'Final PyTorch {torch.__version__}'); print(f'CUDA compiled: {torch.version.cuda if torch.version.cuda else \"None\"}')"
 
 # Ensure permissions
 RUN chown -R june:june /app
