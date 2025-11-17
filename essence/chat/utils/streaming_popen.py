@@ -9,7 +9,17 @@ import pty
 import select
 import termios
 import tty
+import logging
 from typing import Iterator, Tuple, Optional, Dict
+
+# Import tracing utilities
+try:
+    from essence.chat.utils.tracing import get_or_create_tracer
+    _tracer = get_or_create_tracer(__name__)
+except ImportError:
+    _tracer = None
+
+logger = logging.getLogger(__name__)
 
 
 def streaming_popen_generator(
@@ -45,6 +55,18 @@ def streaming_popen_generator(
     if env is None:
         env = os.environ.copy()
     
+    # Start tracing span for streaming operation
+    span = None
+    start_time = None
+    if _tracer:
+        span = _tracer.start_span("streaming_popen_generator", attributes={
+            "command": " ".join(command),
+            "chunk_size": chunk_size,
+            "read_timeout": read_timeout
+        })
+        import time
+        start_time = time.time()
+    
     # Create PTY and fork
     pid, master_fd = pty.fork()
     
@@ -67,19 +89,35 @@ def streaming_popen_generator(
         process_done = False
         returncode = None
         old_settings = None
+        first_read = True
+        first_data_time = None
+        total_bytes_read = 0
+        total_lines_yielded = 0
         
         try:
+            if span:
+                span.set_attribute("pid", pid)
             # Set PTY to raw mode for immediate character-by-character reading
             old_settings = termios.tcgetattr(master_fd)
             tty.setraw(master_fd)
             
             while True:
+                # Update elapsed time for span
+                if span:
+                    import time
+                    elapsed = time.time() - start_time
+                
                 # Check if process is done
                 try:
                     wait_result = os.waitpid(pid, os.WNOHANG)
                     if wait_result[0] == pid:
                         process_done = True
                         returncode = os.WEXITSTATUS(wait_result[1])
+                        if span:
+                            span.add_event("process_completed", attributes={
+                                "returncode": returncode,
+                                "elapsed_seconds": elapsed
+                            })
                 except OSError:
                     pass
                 
@@ -89,12 +127,31 @@ def streaming_popen_generator(
                     try:
                         data = os.read(master_fd, chunk_size)
                         if data:
+                            if first_read:
+                                first_read = False
+                                import time
+                                first_data_time = time.time()
+                                if span:
+                                    span.add_event("first_data_received", attributes={
+                                        "first_bytes": data[:100].decode('utf-8', errors='replace'),
+                                        "first_bytes_length": len(data)
+                                    })
+                                logger.info(f"First data received: {len(data)} bytes, preview: {data[:100]}")
+                            
+                            total_bytes_read += len(data)
                             buffer += data
                             # Process complete lines immediately
                             while b'\n' in buffer:
                                 line_bytes, buffer = buffer.split(b'\n', 1)
                                 line = line_bytes.decode('utf-8', errors='replace').strip()
                                 if line:
+                                    total_lines_yielded += 1
+                                    if span and total_lines_yielded <= 5:  # Log first 5 lines
+                                        span.add_event("line_yielded", attributes={
+                                            "line_number": total_lines_yielded,
+                                            "line_preview": line[:100],
+                                            "line_length": len(line)
+                                        })
                                     yield (line, False)
                     except (OSError, EOFError):
                         if process_done:
@@ -106,7 +163,25 @@ def streaming_popen_generator(
                     if buffer:
                         line = buffer.decode('utf-8', errors='replace').strip()
                         if line:
+                            total_lines_yielded += 1
+                            if span:
+                                span.add_event("final_buffer_yielded", attributes={
+                                    "buffer_length": len(line),
+                                    "buffer_preview": line[:100]
+                                })
                             yield (line, True)
+                    
+                    # Set span attributes with final stats
+                    if span and start_time:
+                        import time
+                        total_elapsed = time.time() - start_time
+                        span.set_attribute("total_bytes_read", total_bytes_read)
+                        span.set_attribute("total_lines_yielded", total_lines_yielded)
+                        span.set_attribute("returncode", returncode)
+                        span.set_attribute("total_elapsed_seconds", total_elapsed)
+                        if first_data_time:
+                            time_to_first_data = first_data_time - start_time
+                            span.set_attribute("time_to_first_data_ms", time_to_first_data * 1000)
                     break
             
             # Restore PTY settings
@@ -117,4 +192,6 @@ def streaming_popen_generator(
                 os.close(master_fd)
             except:
                 pass
+            if span:
+                span.end()
 

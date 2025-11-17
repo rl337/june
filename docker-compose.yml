@@ -8,53 +8,6 @@ services:
     - tools
     volumes:
     - /var/log/june/base:/logs
-  orchestrator:
-    build:
-      context: .
-      dockerfile: ./services/orchestrator/Dockerfile
-    container_name: june-orchestrator
-    restart: unless-stopped
-    ports:
-    - 8007:8005
-    environment:
-    - ORCHESTRATOR_PORT=8005
-    - GATEWAY_URL=http://gateway:8000
-    - LOG_LEVEL=${LOG_LEVEL:-INFO}
-    depends_on:
-    - gateway
-    healthcheck:
-      test:
-      - CMD
-      - wget
-      - -q
-      - --spider
-      - http://localhost:8005/health
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    networks:
-    - june_network
-    volumes:
-    - /var/log/june/orchestrator:/logs
-  webapp:
-    build:
-      context: ./services/webapp
-      dockerfile: Dockerfile
-    container_name: june-webapp
-    restart: unless-stopped
-    ports:
-    - 3001:3000
-    environment:
-    - REACT_APP_GATEWAY_URL=http://localhost:8000
-    - REACT_APP_WS_URL=ws://localhost:8000
-    depends_on:
-    - gateway
-    volumes:
-    - ./services/webapp:/app
-    - /app/node_modules
-    - /var/log/june/webapp:/logs
-    networks:
-    - june_network
   cli-tools:
     build:
       context: .
@@ -71,7 +24,6 @@ services:
     - ${JUNE_TEST_DATA_DIR:-/home/rlee/june_test_data}:/test_data
     - ./services/cli-tools/scripts:/app/scripts
     - ./scripts:/app/root_scripts
-    - ./services/gateway/tests:/app/gateway_tests
     - /var/log/june/cli-tools:/logs
     extra_hosts:
     - host.docker.internal:host-gateway
@@ -84,60 +36,6 @@ services:
     - -c
     - 'echo ''CLI Tools container ready. Use: docker exec -it june-cli-tools bash''
       && tail -f /dev/null'
-  mock-sink:
-    build:
-      context: ./services/mock-sink
-      dockerfile: Dockerfile
-    container_name: june-mock-sink
-    restart: unless-stopped
-    ports:
-    - 7000:7000
-    volumes:
-    - ${JUNE_DATA_DIR:-/home/rlee/june_data}/model_artifacts/mock-sink:/app/model_artifacts
-    - /var/log/june/mock-sink:/logs
-    networks:
-    - june_network
-    profiles:
-    - tools
-  gateway:
-    build:
-      context: .
-      dockerfile: ./services/gateway/Dockerfile
-    restart: unless-stopped
-    expose:
-    - '8000'
-    environment:
-    - INFERENCE_API_URL=grpc://inference-api:50051
-    - STT_URL=grpc://stt:50052
-    - TTS_URL=grpc://tts:50053
-    - NATS_URL=nats://common-nats:4222
-    - POSTGRES_URL=postgresql://june:${POSTGRES_PASSWORD:-changeme}@common-postgres:5432/june
-    - MINIO_ENDPOINT=common-minio:9000
-    - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-admin}
-    - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-changeme}
-    - REDIS_URL=redis://common-redis:6379/0
-    - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-    - JWT_SECRET=${JWT_SECRET:-change-this-secret}
-    - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
-    - ENABLE_DB_ENCRYPTION=${ENABLE_DB_ENCRYPTION:-true}
-    volumes:
-    - ${JUNE_DATA_DIR:-/home/rlee/june_data}/model_artifacts/gateway:/app/model_artifacts
-    - ./services/gateway:/app
-    - /var/log/june/gateway:/logs
-    healthcheck:
-      test:
-      - CMD
-      - wget
-      - -q
-      - --spider
-      - http://localhost:8000/health
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-    networks:
-    - june_network
-    - shared-network
   inference-api:
     build:
       context: .
@@ -156,14 +54,13 @@ services:
     - MODEL_TOP_P=${MODEL_TOP_P:-0.9}
     - MODEL_TOP_K=${MODEL_TOP_K:-}
     - MODEL_REPETITION_PENALTY=${MODEL_REPETITION_PENALTY:-}
-    - POSTGRES_URL=postgresql://june:${POSTGRES_PASSWORD:-changeme}@postgres:5432/june
-    - MINIO_ENDPOINT=minio:9000
-    - MINIO_ACCESS_KEY=${MINIO_ROOT_USER:-admin}
-    - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD:-changeme}
-    - NATS_URL=nats://common-nats:4222
     - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
     - CUDA_VISIBLE_DEVICES=0
     - CUDA_MPS_ENABLE_PER_CTX_SM_PARTITIONING=1
+    - ENABLE_TRACING=${ENABLE_TRACING:-true}
+    - JAEGER_ENDPOINT=http://common-jaeger:14268/api/traces
+    - JAEGER_AGENT_HOST=common-jaeger
+    - JAEGER_AGENT_PORT=6831
     deploy:
       resources:
         reservations:
@@ -173,9 +70,6 @@ services:
             - '0'
             capabilities:
             - gpu
-    depends_on:
-    - postgres
-    - minio
     volumes:
     - ${MODEL_CACHE_DIR:-/home/rlee/models}:/models
     - ${JUNE_DATA_DIR:-/home/rlee/june_data}/model_artifacts/inference-api:/app/model_artifacts
@@ -194,10 +88,13 @@ services:
     - MODEL_NAME=${STT_MODEL:-openai/whisper-large-v3}
     - MODEL_DEVICE=${STT_DEVICE:-cuda:0}
     - MODEL_CACHE_DIR=/models
-    - NATS_URL=nats://common-nats:4222
     - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
     - CUDA_VISIBLE_DEVICES=0
     - CUDA_MPS_ENABLE_PER_CTX_SM_PARTITIONING=1
+    - ENABLE_TRACING=${ENABLE_TRACING:-true}
+    - JAEGER_ENDPOINT=http://common-jaeger:14268/api/traces
+    - JAEGER_AGENT_HOST=common-jaeger
+    - JAEGER_AGENT_PORT=6831
     deploy:
       resources:
         reservations:
@@ -234,10 +131,13 @@ services:
     environment:
     - MODEL_NAME=${TTS_MODEL:-facebook/fastspeech2-en-ljspeech}
     - MODEL_DEVICE=${TTS_DEVICE:-cuda:0}
-    - NATS_URL=nats://common-nats:4222
     - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
     - CUDA_VISIBLE_DEVICES=0
     - CUDA_MPS_ENABLE_PER_CTX_SM_PARTITIONING=1
+    - ENABLE_TRACING=${ENABLE_TRACING:-true}
+    - JAEGER_ENDPOINT=http://common-jaeger:14268/api/traces
+    - JAEGER_AGENT_HOST=common-jaeger
+    - JAEGER_AGENT_PORT=6831
     deploy:
       resources:
         reservations:
@@ -300,8 +200,10 @@ services:
     - STT_URL=grpc://stt:50052
     - TTS_URL=grpc://tts:50053
     - LLM_URL=grpc://inference-api:50051
-    - NATS_URL=nats://common-nats:4222
-    - USE_VOICE_QUEUE=${USE_VOICE_QUEUE:-false}
+    - ENABLE_TRACING=${ENABLE_TRACING:-true}
+    - JAEGER_ENDPOINT=http://common-jaeger:14268/api/traces
+    - JAEGER_AGENT_HOST=common-jaeger
+    - JAEGER_AGENT_PORT=6831
     depends_on:
     - stt
     - tts
@@ -363,6 +265,10 @@ services:
     - STT_URL=grpc://stt:50052
     - TTS_URL=grpc://tts:50053
     - LLM_URL=grpc://inference-api:50051
+    - ENABLE_TRACING=${ENABLE_TRACING:-true}
+    - JAEGER_ENDPOINT=http://common-jaeger:14268/api/traces
+    - JAEGER_AGENT_HOST=common-jaeger
+    - JAEGER_AGENT_PORT=6831
     depends_on:
     - stt
     - tts
@@ -389,32 +295,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
-  telegram-voice-worker:
-    build:
-      context: .
-      dockerfile: ./services/telegram/Dockerfile
-    restart: unless-stopped
-    command:
-    - python
-    - voice_worker.py
-    environment:
-    - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-    - LOG_LEVEL=${LOG_LEVEL:-INFO}
-    - STT_URL=grpc://stt:50052
-    - TTS_URL=grpc://tts:50053
-    - LLM_URL=grpc://inference-api:50051
-    - NATS_URL=nats://common-nats:4222
-    - WORKER_ID=worker-${HOSTNAME}
-    - stt
-    - tts
-    - inference-api
-    networks:
-    - june_network
-    - shared-network
-    profiles:
-    - workers
-    volumes:
-    - /var/log/june/telegram-voice-worker:/logs
 networks:
   june_network:
     driver: bridge

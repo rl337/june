@@ -11,9 +11,6 @@ COPY pyproject.toml poetry.lock ./
 # Copy essence package (needed for poetry install and command execution)
 COPY essence ./essence
 
-# Copy chat-service-base (needed for shared agent handler)
-COPY services/chat-service-base ./chat-service-base
-
 # Copy service code
 COPY services/telegram .
 

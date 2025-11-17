@@ -7,6 +7,19 @@ from prometheus_client.exposition import start_http_server
 from inference_core import TtsGrpcApp
 from inference_core.tts.espeak_strategy import EspeakTtsStrategy
 
+# Initialize tracing early
+try:
+    import sys
+    from pathlib import Path
+    # Add essence package to path for tracing import
+    essence_path = Path(__file__).parent.parent.parent / "essence"
+    if str(essence_path) not in sys.path:
+        sys.path.insert(0, str(essence_path))
+    from essence.chat.utils.tracing import setup_tracing
+    setup_tracing(service_name="june-tts")
+except ImportError:
+    pass
+
 # Import rate limiting
 try:
     from june_rate_limit import RateLimitInterceptor, RateLimitConfig
@@ -44,10 +57,12 @@ def main() -> None:
         rate_limit_config = RateLimitConfig(
             default_per_minute=int(os.getenv("RATE_LIMIT_TTS_PER_MINUTE", "60")),
             default_per_hour=int(os.getenv("RATE_LIMIT_TTS_PER_HOUR", "1000")),
+            use_redis=False,  # Use in-memory rate limiting for MVP (Redis not required)
+            fallback_to_memory=True,
         )
         rate_limit_interceptor = RateLimitInterceptor(config=rate_limit_config)
         interceptors.append(rate_limit_interceptor)
-        logger.info("Rate limiting enabled for TTS service")
+        logger.info("Rate limiting enabled for TTS service (in-memory, Redis not required)")
     
     strategy = EspeakTtsStrategy(
         sample_rate=int(os.getenv("TTS_SAMPLE_RATE", "16000"))

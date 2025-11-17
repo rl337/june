@@ -18,12 +18,13 @@ class PlatformValidator(ABC):
     """Base class for platform-specific markdown validators."""
     
     @abstractmethod
-    def validate(self, markdown: str) -> Tuple[bool, List[str]]:
+    def validate(self, markdown: str, lenient: bool = False) -> Tuple[bool, List[str]]:
         """
         Validate markdown syntax for this platform.
         
         Args:
             markdown: Markdown text to validate
+            lenient: If True, skip checks for incomplete markdown (e.g., during streaming)
             
         Returns:
             Tuple of (is_valid, list_of_errors)
@@ -70,15 +71,13 @@ class TelegramValidator(PlatformValidator):
         
         Args:
             markdown: Markdown text to validate
-            lenient: If True, skip unbalanced marker checks (for streaming/incomplete content)
+            lenient: If True, skip checks for incomplete markdown (e.g., during streaming)
         
         Returns:
             (is_valid, list_of_errors)
         """
         errors = []
         
-        # During streaming, markdown might be incomplete, so we skip unbalanced checks
-        # Only do strict validation on final messages
         if not lenient:
             # Check for unbalanced bold markers
             bold_count = markdown.count('*')
@@ -112,24 +111,11 @@ class TelegramValidator(PlatformValidator):
             errors.append("Nested formatting detected - Telegram does not support nested bold/italic")
         
         # Check for unsupported table syntax
-        # Note: We convert tables to plain text with pipes as separators (not markdown table syntax)
-        # So we only flag actual markdown table syntax, not plain text with pipes
-        # Markdown tables have: | col1 | col2 | followed by |---|---| separator
         if '|' in markdown and markdown.count('|') > 2:
-            lines_with_pipes = [line.strip() for line in markdown.split('\n') if '|' in line]
+            # Might be a table - Telegram doesn't support tables
+            lines_with_pipes = [line for line in markdown.split('\n') if '|' in line]
             if len(lines_with_pipes) > 1:
-                # Check if it's actual markdown table syntax (has separator line with dashes)
-                has_separator = False
-                for line in lines_with_pipes:
-                    # Markdown table separator: |---|---| or |:---|:---:|---:|
-                    if re.match(r'^\|[\s\-:]+\|', line):
-                        has_separator = True
-                        break
-                
-                # Only flag as error if it has the markdown table separator
-                # Plain text tables (from our TableWidget conversion) don't have this
-                if has_separator:
-                    errors.append("Markdown table syntax detected - Telegram does not support markdown tables")
+                errors.append("Table syntax detected - Telegram does not support tables")
         
         # Check for heading syntax (not supported, should use bold)
         if re.search(r'^#{1,6}\s+', markdown, re.MULTILINE):
@@ -186,43 +172,48 @@ class DiscordValidator(PlatformValidator):
         self.link_pattern = re.compile(r'\[([^\]]+)\]\(([^)]+)\)')
         self.blockquote_pattern = re.compile(r'^>\s+', re.MULTILINE)
     
-    def validate(self, markdown: str) -> Tuple[bool, List[str]]:
+    def validate(self, markdown: str, lenient: bool = False) -> Tuple[bool, List[str]]:
         """
         Validate Discord markdown syntax.
+        
+        Args:
+            markdown: Markdown text to validate
+            lenient: If True, skip checks for incomplete markdown (e.g., during streaming)
         
         Returns:
             (is_valid, list_of_errors)
         """
         errors = []
         
-        # Check for unbalanced bold markers (must be **)
-        # Count ** pairs
-        bold_pairs = len(re.findall(r'\*\*', markdown))
-        if bold_pairs % 2 != 0:
-            errors.append("Unbalanced bold markers (**) - must be even number")
-        
-        # Check for unbalanced italic markers (single *)
-        # Need to exclude ** from single * count
-        text_without_bold = re.sub(r'\*\*', '', markdown)
-        italic_count = text_without_bold.count('*')
-        if italic_count % 2 != 0:
-            errors.append("Unbalanced italic markers (*) - must be even number")
-        
-        # Check for unbalanced code markers
-        code_count = markdown.count('`')
-        if code_count % 2 != 0:
-            errors.append("Unbalanced code markers (`) - must be even number")
-        
-        # Check for unbalanced brackets (links)
-        open_brackets = markdown.count('[')
-        close_brackets = markdown.count(']')
-        if open_brackets != close_brackets:
-            errors.append("Unbalanced link brackets ([ ]) - must match")
-        
-        open_parens = markdown.count('(')
-        close_parens = markdown.count(')')
-        if open_parens != close_parens:
-            errors.append("Unbalanced parentheses ( ) - must match")
+        if not lenient:
+            # Check for unbalanced bold markers (must be **)
+            # Count ** pairs
+            bold_pairs = len(re.findall(r'\*\*', markdown))
+            if bold_pairs % 2 != 0:
+                errors.append("Unbalanced bold markers (**) - must be even number")
+            
+            # Check for unbalanced italic markers (single *)
+            # Need to exclude ** from single * count
+            text_without_bold = re.sub(r'\*\*', '', markdown)
+            italic_count = text_without_bold.count('*')
+            if italic_count % 2 != 0:
+                errors.append("Unbalanced italic markers (*) - must be even number")
+            
+            # Check for unbalanced code markers
+            code_count = markdown.count('`')
+            if code_count % 2 != 0:
+                errors.append("Unbalanced code markers (`) - must be even number")
+            
+            # Check for unbalanced brackets (links)
+            open_brackets = markdown.count('[')
+            close_brackets = markdown.count(']')
+            if open_brackets != close_brackets:
+                errors.append("Unbalanced link brackets ([ ]) - must match")
+            
+            open_parens = markdown.count('(')
+            close_parens = markdown.count(')')
+            if open_parens != close_parens:
+                errors.append("Unbalanced parentheses ( ) - must match")
         
         # Check for unsupported table syntax
         if '|' in markdown and markdown.count('|') > 2:

@@ -34,6 +34,19 @@ import asr_pb2_grpc
 
 from inference_core import config, setup_logging, Timer, HealthChecker, CircularBuffer
 
+# Initialize tracing early
+try:
+    import sys
+    from pathlib import Path
+    # Add essence package to path for tracing import
+    essence_path = Path(__file__).parent.parent.parent / "essence"
+    if str(essence_path) not in sys.path:
+        sys.path.insert(0, str(essence_path))
+    from essence.chat.utils.tracing import setup_tracing
+    setup_tracing(service_name="june-stt")
+except ImportError:
+    pass
+
 # Import rate limiting
 try:
     from june_rate_limit import RateLimitInterceptor, RateLimitConfig
@@ -519,10 +532,12 @@ async def serve():
         rate_limit_config = RateLimitConfig(
             default_per_minute=int(os.getenv("RATE_LIMIT_STT_PER_MINUTE", "60")),
             default_per_hour=int(os.getenv("RATE_LIMIT_STT_PER_HOUR", "1000")),
+            use_redis=False,  # Use in-memory rate limiting for MVP (Redis not required)
+            fallback_to_memory=True,
         )
         rate_limit_interceptor = RateLimitInterceptor(config=rate_limit_config)
         interceptors.append(rate_limit_interceptor)
-        logger.info("Rate limiting enabled for STT service")
+        logger.info("Rate limiting enabled for STT service (in-memory, Redis not required)")
     
     server = aio.server(interceptors=interceptors if interceptors else None)
     

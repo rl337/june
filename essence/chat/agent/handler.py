@@ -147,20 +147,21 @@ def stream_agent_message(
         max_message_length: Maximum message length for the platform
     
     Yields:
-        Tuples of (message_text, is_final) where:
+        Tuples of (message_text, is_final, message_type) where:
         - message_text: Human-readable text to send to the chat platform
         - is_final: True if this is the final message, False for intermediate messages
+        - message_type: Type of message ("assistant" for incremental chunks, "result" for final result, None for errors)
     """
     try:
         # Find agenticness directory
         agenticness_dir = find_agenticness_directory(agent_script_name)
         
         if agenticness_dir is None:
-            yield ("⚠️ I'm unable to process your message right now. The agent system is not properly configured.", True)
+            yield ("⚠️ I'm unable to process your message right now. The agent system is not properly configured.", True, None)
             return
         
         # Stream responses from the agent
-        for message, is_final in stream_chat_response_agent(
+        for message, is_final, message_type in stream_chat_response_agent(
             user_message,
             agenticness_dir,
             user_id,
@@ -174,11 +175,11 @@ def stream_agent_message(
             # Truncate if needed
             if message and len(message) > max_message_length:
                 message = message[:max_message_length-10] + "\n\n... (message truncated)"
-            yield (message, is_final)
+            yield (message, is_final, message_type)
         
     except Exception as e:
         logger.error(f"Error streaming agent message: {e}", exc_info=True)
-        yield ("❌ I encountered an error processing your message. Please try again.", True)
+        yield ("❌ I encountered an error processing your message. Please try again.", True, None)
 
 
 

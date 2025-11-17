@@ -60,12 +60,8 @@ class TelegramServiceCommand(Command):
         # Setup signal handlers
         self.setup_signal_handlers()
         
-        # Import the service class
-        # For now, import from services directory until full migration
-        service_path = Path(__file__).parent.parent.parent / "services" / "telegram"
-        sys.path.insert(0, str(service_path))
-        
-        from main import TelegramBotService
+        # Import the service class from essence
+        from essence.services.telegram.main import TelegramBotService
         
         self.service = TelegramBotService()
         logger.info("Telegram service initialized")

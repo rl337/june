@@ -45,6 +45,8 @@ dependencies = [
     
     # Telegram integration
     "python-telegram-bot>=20.7",
+    # Discord integration
+    "discord.py>=2.3.0",
     "pydub>=0.25.1",  # Audio format conversion for Telegram
     "reportlab>=4.0.0",  # PDF generation for conversation export
     
@@ -60,6 +62,7 @@ dependencies = [
     "opentelemetry-instrumentation-fastapi>=0.42b0",
     "opentelemetry-instrumentation-grpc>=0.42b0",
     "opentelemetry-exporter-jaeger>=1.21.0",
+    "deprecated>=1.2.14",
     
     # Utilities
     "pydantic>=2.5.0",

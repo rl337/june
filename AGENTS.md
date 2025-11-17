@@ -1,192 +1,351 @@
-# Agent Development Guidelines
+# Agent Development Guidelines for June Refactoring
 
-This document outlines the architectural principles and best practices for developing agents and services within the June project.
+This document provides essential context and guidelines for AI agents working on the June project refactoring.
 
-## Python Dependency Management
+## Current Refactoring Context
 
-**All Python code in the June project is built and managed via Poetry.**
+**Goal:** Pare down the june project to bare essentials for the **voice message → STT → LLM → TTS → voice response** round trip, supporting both **Telegram** and **Discord** platforms.
 
-- All Python execution examples use `poetry run` to ensure correct dependency resolution
-- Commands are invoked via: `poetry run python -m essence <command>`
-- Tests are run via: `poetry run pytest`
-- This ensures consistent environments and proper dependency isolation
+**Status:** See `REFACTOR_PLAN.md` for detailed progress and TODO items.
 
-## Core Architecture Principles
+**CRITICAL:** Run tests at the start and end of every turn and fix any breakages. 
+**CRITICAL:** Check in outstanding logically grouped changes with good descriptive commit messages. If there are commits unpushed, push upstream
 
-### Python Code Organization
+## Project Structure
 
-**All Python code must be in the `essence` package.**
+### Code Organization
 
-- The `essence` package is the single source of truth for all shared Python functionality
-- Services should import from `essence`, not duplicate code
-- New functionality should be added to `essence` rather than service-specific modules
-- This ensures consistency, reusability, and maintainability across all services
+**CRITICAL:** All Python code lives in the `essence/` package. Services are thin wrappers.
 
-### Entry Point Pattern
+- **`essence/`** = All actual service code and shared utilities
+  - `essence/services/telegram/` = Telegram bot service code
+  - `essence/services/discord/` = Discord bot service code
+  - `essence/chat/` = Shared chat/conversation utilities (used by both platforms)
+  - `essence/commands/` = Command pattern implementations
+  - `essence/chat/utils/tracing.py` = OpenTelemetry tracing utilities
 
-**The only entry point into code should be subclasses of `essence.command.Command`.**
+- **`services/<service_name>/`** = Dockerfiles and configuration ONLY
+  - Contains: Dockerfile, config files
+  - Does NOT contain: Python code (code is in `essence/`)
+  - Services import from `essence` package, not from `services/` directories
 
-- All executable functionality must be exposed through `essence.command.Command` subclasses
-- This provides a consistent interface for:
-  - Command-line invocation
-  - Programmatic execution
-  - Service integration
-  - Testing and validation
+### Essential Services (Keep)
 
-#### Example Command Implementation
+1. **telegram** - Receives voice messages from Telegram, orchestrates pipeline
+2. **discord** - Receives voice messages from Discord, orchestrates pipeline
+3. **stt** - Speech-to-text conversion (Whisper)
+4. **tts** - Text-to-speech conversion (FastSpeech2/espeak)
+5. **inference-api** - LLM processing (Qwen3)
+
+### Removed Services (Do Not Use)
+
+- ❌ **gateway** - Using common nginx from home_infra instead
+- ❌ **postgres** - Not needed for MVP (available in home_infra for other services)
+- ❌ **minio** - Not needed for MVP
+- ❌ **redis** - Not needed for MVP
+- ❌ **nats** - Not needed for MVP (available in home_infra for other services)
+- ❌ **orchestrator** - Removed
+- ❌ **webapp** - Removed
+- ❌ **june-agent** - Removed
+- ❌ **mock-sink** - Removed
+- ❌ **telegram-voice-worker** - Removed
+
+## Architecture Patterns
+
+### Command Pattern
+
+All services use the `essence.command.Command` pattern:
 
 ```python
 from essence.command import Command
-import argparse
 
-class MyAgentCommand(Command):
-    """Command for running a custom agent service."""
-    
+class TelegramServiceCommand(Command):
     @classmethod
     def get_name(cls) -> str:
-        return "my-agent"
-    
-    @classmethod
-    def get_description(cls) -> str:
-        return "Run the custom agent service"
-    
-    @classmethod
-    def add_args(cls, parser: argparse.ArgumentParser) -> None:
-        parser.add_argument("--input", type=str, help="Input for the agent")
+        return "telegram-service"
     
     def init(self) -> None:
-        """Initialize the agent (load config, setup resources, etc.)."""
-        # Load configuration
-        # Initialize resources
+        # Initialize service
         pass
     
     def run(self) -> None:
-        """Run the agent main loop (blocking)."""
-        # Main agent logic here
-        # This should block until shutdown
+        # Run service (blocking)
         pass
     
     def cleanup(self) -> None:
-        """Clean up resources on shutdown."""
-        # Close connections
-        # Stop background tasks
+        # Clean up resources
         pass
 ```
 
-### Service Structure
+Services are invoked via: `python -m essence <service-name>-service`
 
-Services should be thin wrappers around `essence.command.Command` implementations:
+### Service Entry Points
 
-1. **Service Entry Point**: FastAPI/HTTP endpoints or platform-specific handlers
-2. **Command Invocation**: Call the appropriate `essence.command.Command` subclass
-3. **Response Handling**: Format and return the command's output
+- Services run via `essence` command system
+- Dockerfiles copy `essence/` package and run: `poetry run python -m essence <service-name>-service`
+- Services get their code from `essence` package, NOT from `services/` directories
 
-#### Example Service Pattern
+### Shared Code
 
-```python
-from fastapi import FastAPI
-from essence.commands.my_agent import MyAgentCommand
-import argparse
+- **Telegram and Discord share code** via `essence/chat/` module:
+  - `essence/chat/agent/handler.py` - Shared agent message processing
+  - `essence/chat/message_builder.py` - Shared message building utilities
+  - `essence/chat/storage/conversation.py` - Shared conversation storage
+  - Platform-specific handlers in `essence/services/telegram/` and `essence/services/discord/`
 
-app = FastAPI()
+## Dependencies to Remove
 
-@app.post("/agent")
-async def handle_agent_request(request: AgentRequest):
-    # Create command with parsed arguments
-    args = argparse.Namespace(input=request.input)
-    command = MyAgentCommand(args)
-    
-    # Initialize and run (or use execute() for full lifecycle)
-    command.init()
-    try:
-        # Run in background or call specific methods
-        result = await run_agent_async(command)
-        return {"result": result}
-    finally:
-        command.cleanup()
-```
+When refactoring, remove dependencies on:
 
-## Benefits of This Architecture
+1. **PostgreSQL** - Remove `POSTGRES_URL`, database connections, queries
+2. **MinIO** - Remove `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, storage operations
+3. **Redis** - Remove `REDIS_URL`, caching, rate limiting (use in-memory alternatives)
+4. **NATS** - Remove `NATS_URL`, pub/sub messaging (services call each other directly via gRPC)
+5. **Gateway** - Remove `GATEWAY_URL`, `CONVERSATION_API_URL` (use in-memory conversation storage)
 
-1. **Consistency**: All agents follow the same interface pattern
-2. **Testability**: Commands can be tested independently of service infrastructure
-3. **Reusability**: Commands can be invoked from multiple contexts (CLI, HTTP, platform-specific)
-4. **Maintainability**: Centralized code in `essence` reduces duplication
-5. **Discoverability**: Commands are self-documenting and discoverable
+## Replacement Patterns
 
-## Migration Guidelines
+### Conversation Storage
+- **Before:** Gateway HTTP API or PostgreSQL
+- **After:** In-memory storage in telegram/discord services
+- **Implementation:** Use dictionaries or simple in-memory data structures
 
-When refactoring existing code:
+### Rate Limiting
+- **Before:** Redis-based rate limiting
+- **After:** In-memory rate limiting in telegram/discord services
+- **Implementation:** Use in-memory counters with time windows
 
-1. **Move shared logic to `essence`**: Extract common functionality from services into `essence` modules
-2. **Create Command subclasses**: Wrap executable functionality in `Command` subclasses
-3. **Update service entry points**: Modify services to invoke commands rather than containing business logic
-4. **Maintain backward compatibility**: During migration, services can call both old and new patterns
+### Caching
+- **Before:** Redis caching
+- **After:** In-memory caching or no caching for MVP
+- **Implementation:** Simple Python dictionaries with TTL
 
-## Command Discovery
+### Messaging
+- **Before:** NATS pub/sub
+- **After:** Direct gRPC calls between services
+- **Implementation:** Services call each other directly via gRPC (already implemented)
 
-Commands are automatically discovered via Python reflection:
+## Observability Requirements
 
-- Commands must be subclasses of `essence.command.Command`
-- Commands must be located in the `essence.commands` package
-- The `essence.__main__.get_commands()` function automatically discovers all commands
-- No manual registration is required
+### OpenTelemetry Tracing
 
-Commands are discovered by:
-1. Scanning all modules in `essence.commands`
-2. Finding classes that are subclasses of `Command`
-3. Extracting command names via `get_name()` classmethod
+**All services MUST use proper tracing:**
 
-## Testing
+1. **Initialize tracing on startup:**
+   ```python
+   from essence.chat.utils.tracing import setup_tracing
+   setup_tracing(service_name="june-telegram")  # or "june-discord", "june-stt", etc.
+   ```
 
-Commands should be tested independently:
+2. **Add spans to all operations:**
+   - gRPC calls (STT, TTS, LLM)
+   - HTTP requests (Telegram/Discord webhooks)
+   - Voice processing (download, conversion, transcription)
+   - Message handling (processing, generation, synthesis)
+   - Error handling (with proper error tags)
 
-```python
-import argparse
-from essence.commands.my_agent import MyAgentCommand
+3. **Trace propagation:**
+   - Ensure trace context propagates across gRPC calls
+   - Use OpenTelemetry gRPC instrumentation for automatic propagation
+   - Traces should show full request flow: Telegram → STT → LLM → TTS → Telegram
 
-def test_my_agent_command():
-    # Create mock args
-    args = argparse.Namespace(input="test")
-    
-    # Create command instance
-    command = MyAgentCommand(args)
-    
-    # Test initialization
-    command.init()
-    
-    # Test execution (or test run() separately)
-    # Note: execute() calls init(), run(), cleanup() in sequence
-    exit_code = command.execute()
-    
-    assert exit_code == 0
-```
+4. **Configuration:**
+   - Environment variables: `ENABLE_TRACING=true`, `JAEGER_ENDPOINT=http://common-jaeger:14268/api/traces`
+   - Traces go to Jaeger in shared-network: `common-jaeger:14268`
 
-Run tests using Poetry:
-```bash
-poetry run pytest tests/
-```
+### Prometheus Metrics
 
-Service-level tests should verify command invocation:
+**All services MUST expose Prometheus metrics:**
 
-```python
-def test_service_calls_command():
-    response = client.post("/agent", json={"args": {...}})
-    assert response.status_code == 200
-    # Verify command was called correctly
-```
+1. **Expose `/metrics` endpoint:**
+   - Use `prometheus_client` library
+   - Metrics available on service's HTTP port (telegram:8080, discord:8081)
 
-## Best Practices
+2. **Key metrics to implement:**
+   - `http_requests_total` - Total HTTP requests (labels: method, endpoint, status_code)
+   - `http_request_duration_seconds` - Request duration histogram
+   - `grpc_requests_total` - Total gRPC requests (labels: service, method, status_code)
+   - `grpc_request_duration_seconds` - gRPC request duration histogram
+   - `voice_messages_processed_total` - Total voice messages (labels: platform, status)
+   - `voice_processing_duration_seconds` - Voice processing duration histogram
+   - `errors_total` - Total errors (labels: service, error_type)
+   - `service_health` - Service health status (1 = healthy, 0 = unhealthy)
 
-1. **Keep services thin**: Services should only handle platform-specific concerns (HTTP, Discord, Telegram, etc.)
-2. **Business logic in essence**: All business logic belongs in `essence` modules
-3. **Command composition**: Complex agents can compose multiple commands
-4. **Error handling**: Commands should raise appropriate exceptions; services handle platform-specific error formatting
-5. **Logging**: Use structured logging from `essence` utilities
+3. **Verification:**
+   - Metrics should be scraped by Prometheus in home_infra
+   - Metrics should appear in Grafana dashboards
 
-## Related Documentation
+## Network Configuration
 
-- See `essence/command/__init__.py` for Command base class implementation
-- See `essence/README.md` for package structure and module organization
-- See individual service READMEs for platform-specific integration patterns
+### Docker Networks
 
+- **`june_network`** - Internal network for june services
+- **`shared-network`** - External network connecting to home_infra services
+  - Access to: Jaeger, Prometheus, Grafana, nginx
+  - Name: `shared_network` (external network)
+
+### Service Communication
+
+- **gRPC:** Services communicate via gRPC directly
+  - STT: `grpc://stt:50052`
+  - TTS: `grpc://tts:50053`
+  - LLM: `grpc://inference-api:50051`
+- **HTTP:** Health checks and metrics endpoints
+  - Telegram: `http://telegram:8080`
+  - Discord: `http://discord:8081`
+
+## Python Dependency Management
+
+**All Python code uses Poetry for dependency management.**
+
+- Commands: `poetry run python -m essence <command>`
+- Tests: `poetry run pytest`
+- Dependencies: `pyproject.toml` and `poetry.lock`
+
+## Working with the Refactoring Plan
+
+### Reading the Plan
+
+- **File:** `REFACTOR_PLAN.md`
+- **Status markers:**
+  - ✅ = Completed
+  - ⏳ = TODO (unfinished)
+  - ~~strikethrough~~ = Removed/obsolete
+
+### Updating the Plan
+
+When completing tasks:
+
+1. **Mark completed tasks:**
+   - Change ⏳ TODO to ✅ COMPLETED
+   - Add brief summary of what was done
+
+2. **Document discoveries:**
+   - Add new tasks with ⏳ TODO
+   - Document issues or blockers
+   - Document decisions made
+   - Add to appropriate section
+
+3. **Keep it organized:**
+   - Update progress status section
+   - Keep phases in order
+   - Maintain clear task descriptions
+
+## Common Tasks
+
+### Removing Service Dependencies
+
+1. **Find references:**
+   ```bash
+   grep -r "POSTGRES_URL\|MINIO_ENDPOINT\|REDIS_URL\|NATS_URL" essence/
+   ```
+
+2. **Remove environment variables:**
+   - Remove from docker-compose.yml (already done)
+   - Remove from code that reads them
+
+3. **Replace functionality:**
+   - Database → In-memory storage
+   - Redis → In-memory rate limiting/caching
+   - NATS → Direct gRPC calls
+   - Gateway API → In-memory conversation storage
+
+### Adding Tracing
+
+1. **Import tracing utilities:**
+   ```python
+   from essence.chat.utils.tracing import get_tracer
+   ```
+
+2. **Create spans:**
+   ```python
+   tracer = get_tracer(__name__)
+   with tracer.start_as_current_span("operation_name") as span:
+       span.set_attribute("key", "value")
+       # ... do work ...
+   ```
+
+3. **Add to gRPC calls:**
+   - Use OpenTelemetry gRPC instrumentation
+   - Ensure trace context propagates
+
+### Adding Metrics
+
+1. **Import prometheus_client:**
+   ```python
+   from prometheus_client import Counter, Histogram, generate_latest
+   ```
+
+2. **Define metrics:**
+   ```python
+   requests_total = Counter('http_requests_total', 'Total requests', ['method', 'endpoint'])
+   request_duration = Histogram('http_request_duration_seconds', 'Request duration')
+   ```
+
+3. **Expose endpoint:**
+   ```python
+   @app.get("/metrics")
+   def metrics():
+       return Response(generate_latest(), media_type="text/plain")
+   ```
+
+## Testing Guidelines
+
+### Unit Tests
+
+- Test individual functions and classes
+- Mock external dependencies (gRPC, HTTP)
+- Use `poetry run pytest tests/`
+
+### Integration Tests
+
+- Test service interactions
+- Use test fixtures for starting services
+- Verify tracing and metrics
+
+### End-to-End Tests
+
+- Test complete request flow
+- Verify traces in Jaeger
+- Verify metrics in Prometheus
+- Fully automated (no human interaction)
+
+## Important Files
+
+- **`REFACTOR_PLAN.md`** - Main refactoring plan (READ THIS FIRST)
+- **`docker-compose.yml`** - Service definitions (already cleaned up)
+- **`pyproject.toml`** - Python dependencies
+- **`essence/`** - All service code
+- **`services/`** - Dockerfiles and config only
+
+## Common Pitfalls
+
+1. **Don't add code to `services/` directories** - Code goes in `essence/`
+2. **Don't use removed services** - No postgres, minio, redis, nats, gateway
+3. **Don't skip tracing** - All operations must be traced
+4. **Don't skip metrics** - All services must expose metrics
+5. **Don't forget to update REFACTOR_PLAN.md** - Document what you did
+
+## Getting Help
+
+- Read `REFACTOR_PLAN.md` for current state and tasks
+- Check `essence/chat/utils/tracing.py` for tracing examples
+- Check existing service code in `essence/services/` for patterns
+- Review docker-compose.yml to understand service configuration
+
+## Workflow for Refactoring Agent
+
+1. **Read REFACTOR_PLAN.md** - Understand current state
+2. **Pick ONE unfinished task** - Don't try to do everything at once
+3. **Work on the task** - Make focused, incremental changes
+4. **Update REFACTOR_PLAN.md** - Document what you did and what you discovered
+5. **Verify changes** - Make sure things still work
+6. **Commit progress** - Keep the plan updated for next iteration
+
+## Key Principles
+
+1. **Incremental progress** - One task at a time
+2. **Update the plan** - Always document progress and discoveries
+3. **Keep it simple** - MVP means minimal viable product
+4. **Test as you go** - Verify changes work
+5. **Follow patterns** - Use existing code patterns and structure

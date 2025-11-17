@@ -6,9 +6,71 @@ import os
 import time
 import threading
 import queue
+import sys
+from pathlib import Path
 from typing import Optional, Dict, Any, Iterator, Tuple
 
+# Add essence module to path for streaming_popen_generator
+essence_path = Path(__file__).parent.parent.parent.parent / "essence"
+sys.path.insert(0, str(essence_path))
+
+from essence.chat.utils.streaming_popen import streaming_popen_generator
+
+# Import tracing utilities
+try:
+    from essence.chat.utils.tracing import get_or_create_tracer
+    from opentelemetry import trace
+    _tracer = get_or_create_tracer(__name__)
+except (ImportError, Exception):
+    _tracer = None
+    trace = None
+
 logger = logging.getLogger(__name__)
+
+# Valid agent modes (matching prompt directory names)
+VALID_AGENT_MODES = {
+    "normal", "architect", "precommit", "refactor-planner", 
+    "project-cleanup", "telegram-response"
+}
+
+
+def parse_agent_mode_from_message(user_message: str) -> Tuple[str, str]:
+    """
+    Parse agent mode from message prefix like !name.
+    
+    Args:
+        user_message: The user's message
+        
+    Returns:
+        Tuple of (cleaned_message, agent_mode) where:
+        - cleaned_message: Message with !name prefix removed (if present)
+        - agent_mode: Agent mode name (default: "telegram-response")
+    """
+    # Strip leading whitespace
+    stripped = user_message.lstrip()
+    
+    # Check if message starts with !
+    if not stripped.startswith("!"):
+        return user_message, "telegram-response"
+    
+    # Find the end of the agent name (whitespace or end of string)
+    # Look for !name pattern where name is alphanumeric and hyphens
+    import re
+    match = re.match(r"^!([a-zA-Z0-9-]+)(\s+|$)", stripped)
+    if match:
+        agent_name = match.group(1)
+        # Check if it's a valid agent mode
+        if agent_name in VALID_AGENT_MODES:
+            # Remove the !name prefix and any following whitespace
+            cleaned = user_message[len(stripped[:match.end()]):].lstrip()
+            # If the cleaned message is empty, return the original (fallback)
+            if not cleaned:
+                return user_message, "telegram-response"
+            logger.info(f"Parsed agent mode '{agent_name}' from message prefix")
+            return cleaned, agent_name
+    
+    # If !name pattern doesn't match a valid agent, return original message
+    return user_message, "telegram-response"
 
 
 def call_chat_response_agent(
@@ -24,7 +86,7 @@ def call_chat_response_agent(
     Call the chat response agent with a user message.
     
     Args:
-        user_message: The message from the user
+        user_message: The message from the user (may contain !name prefix to select agent)
         agenticness_dir: Path to agenticness directory (defaults to ../agenticness)
         user_id: User ID for session identification (optional, but required for context preservation)
         chat_id: Chat ID for session identification (optional, but required for context preservation)
@@ -35,6 +97,9 @@ def call_chat_response_agent(
     Returns:
         Dictionary with agent response or error information
     """
+    # Parse agent mode from message prefix (e.g., !architect, !normal)
+    cleaned_message, agent_mode = parse_agent_mode_from_message(user_message)
+    
     if agenticness_dir is None:
         # Default to ../agenticness from service directory
         script_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -69,6 +134,9 @@ def call_chat_response_agent(
         env["AGENT_TIMEOUT"] = env.get("AGENT_TIMEOUT", "300")
         env["TODO_SERVICE_URL"] = env.get("TODO_SERVICE_URL", "http://localhost:8000/mcp/todo-mcp-service")
         
+        # Set AGENT_MODE from parsed message prefix
+        env["AGENT_MODE"] = agent_mode
+        
         # Set AGENTICNESS_STATE_DIR so the script uses the correct session directory
         # This must be set before the script sources session_manager.sh
         agenticness_state_dir = os.getenv("AGENTICNESS_STATE_DIR", "/home/rlee/june_data/agenticness-state")
@@ -83,19 +151,19 @@ def call_chat_response_agent(
         if user_id is not None and chat_id is not None:
             env[f"{platform.upper()}_USER_ID"] = str(user_id)
             env[f"{platform.upper()}_CHAT_ID"] = str(chat_id)
-            logger.info(f"Using session-aware agent for user {user_id}, chat {chat_id}")
+            logger.info(f"Using session-aware agent for user {user_id}, chat {chat_id}, mode: {agent_mode}")
         
         # Call the agent script with bash -x for debugging
         # CRITICAL: cursor-agent requires a PTY (isTTY check fails otherwise)
         # Use pty.fork() which creates a PTY pair and forks in one call
-        logger.info(f"Calling {platform} response agent with message: {user_message[:50]}...")
+        logger.info(f"Calling {platform} response agent (mode: {agent_mode}) with message: {cleaned_message[:50]}...")
         import pty
         import select
         
-        # Build command arguments
-        script_args = [user_message]
+        # Build command arguments with cleaned message (with !name prefix removed)
+        script_args = [cleaned_message]
         if user_id is not None and chat_id is not None:
-            script_args = [str(user_id), str(chat_id), user_message]
+            script_args = [str(user_id), str(chat_id), cleaned_message]
         
         # pty.fork() creates a PTY pair and forks, returning (pid, master_fd)
         # The child process automatically gets the slave PTY as its controlling terminal
@@ -329,7 +397,7 @@ def stream_chat_response_agent(
     out intermediate states like "thinking".
     
     Args:
-        user_message: The message from the user
+        user_message: The message from the user (may contain !name prefix to select agent)
         agenticness_dir: Path to agenticness directory (defaults to ../agenticness)
         user_id: User ID for session identification
         chat_id: Chat ID for session identification
@@ -340,10 +408,14 @@ def stream_chat_response_agent(
         platform: Platform name (telegram, discord, etc.) for environment variables
     
     Yields:
-        Tuples of (message_text, is_final) where:
+        Tuples of (message_text, is_final, message_type) where:
         - message_text: Human-readable text to send to the chat platform
         - is_final: True if this is the final message, False for intermediate messages
+        - message_type: "assistant" for incremental assistant chunks, "result" for final result message, None for other types
     """
+    # Parse agent mode from message prefix (e.g., !architect, !normal)
+    cleaned_message, agent_mode = parse_agent_mode_from_message(user_message)
+    
     if agenticness_dir is None:
         script_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         agenticness_dir = os.path.join(script_dir, "agenticness")
@@ -357,12 +429,12 @@ def stream_chat_response_agent(
     
     if not os.path.exists(agent_script):
         logger.error(f"Agent script not found: {agent_script}")
-        yield (f"⚠️ The {platform} response agent is not available.", True)
+        yield (f"⚠️ The {platform} response agent is not available.", True, None)
         return
     
     if not os.access(agent_script, os.X_OK):
         logger.error(f"Agent script is not executable: {agent_script}")
-        yield (f"⚠️ The {platform} response agent script is not executable.", True)
+        yield (f"⚠️ The {platform} response agent script is not executable.", True, None)
         return
     
     # Set environment variables for the agent
@@ -371,6 +443,9 @@ def stream_chat_response_agent(
     env["AGENT_ID"] = env.get("AGENT_ID", f"{platform}-response-agent")
     env["AGENT_TIMEOUT"] = env.get("AGENT_TIMEOUT", "300")
     env["TODO_SERVICE_URL"] = env.get("TODO_SERVICE_URL", "http://localhost:8004")
+    
+    # Set AGENT_MODE from parsed message prefix
+    env["AGENT_MODE"] = agent_mode
     
     agenticness_state_dir = os.getenv("AGENTICNESS_STATE_DIR", "/home/rlee/june_data/agenticness-state")
     env["AGENTICNESS_STATE_DIR"] = agenticness_state_dir
@@ -381,43 +456,40 @@ def stream_chat_response_agent(
     if user_id is not None and chat_id is not None:
         env[f"{platform.upper()}_USER_ID"] = str(user_id)
         env[f"{platform.upper()}_CHAT_ID"] = str(chat_id)
-        logger.info(f"Streaming agent response for user {user_id}, chat {chat_id}")
+        logger.info(f"Streaming agent response for user {user_id}, chat {chat_id}, mode: {agent_mode}")
     
-    # Build command arguments
-    script_args = [user_message]
+    # Build command arguments with cleaned message (with !name prefix removed)
+    script_args = [cleaned_message]
     if user_id is not None and chat_id is not None:
-        script_args = [str(user_id), str(chat_id), user_message]
+        script_args = [str(user_id), str(chat_id), cleaned_message]
     
-    # Use PTY for cursor-agent (required for proper operation)
-    # This matches the non-streaming version
-    import pty
-    import select
-    
-    try:
-        # pty.fork() creates a PTY pair and forks, returning (pid, master_fd)
-        pid, master_fd = pty.fork()
-        
-        if pid == 0:
-            # Child process - execute the command
-            os.execve("/bin/bash", ["bash", "-x", agent_script] + script_args, env)
-        else:
-            # Parent process - we'll read from master_fd in the loop below
-            process_pid = pid
-            process_fd = master_fd
-    except Exception as e:
-        logger.error(f"Failed to start agent process: {e}", exc_info=True)
-        yield ("❌ I encountered an error starting the agent. Please try again.", True)
-        return
+    # Use streaming_popen_generator utility for proper PTY-based streaming
+    command = ["/bin/bash", "-x", agent_script] + script_args
     
     start_time = time.time()
     last_json_line_time = start_time
     last_message_yield_time = start_time
     seen_messages = set()  # Track messages we've already yielded to avoid duplicates
     pending_messages = []  # Queue of messages waiting to be yielded (for pacing)
+    accumulated_message = ""  # Track the longest/fullest message we've seen
+    result_message = None  # Track the authoritative result message if we receive one
     
-    # Buffer for reading from PTY
-    buffer = b''
-    last_activity_time = start_time
+    # Start tracing span for agent response streaming
+    span = None
+    if _tracer:
+        try:
+            span = _tracer.start_span("stream_chat_response_agent", attributes={
+                "user_id": str(user_id) if user_id else None,
+                "chat_id": str(chat_id) if chat_id else None,
+                "platform": platform,
+                "agent_mode": agent_mode,
+                "agent_script": agent_script
+            })
+            logger.debug(f"Created tracing span: {span}")
+        except Exception as e:
+            logger.warning(f"Failed to create tracing span: {e}", exc_info=True)
+    else:
+        logger.debug("Tracer is None, skipping span creation")
     
     try:
         # Minimum time between yielding messages (pacing) - 0.5 seconds
@@ -427,142 +499,424 @@ def stream_chat_response_agent(
         
         first_message_sent = False
         
-        while True:
+        # Use the streaming_popen_generator utility
+        first_json_line = True
+        json_line_count = 0
+        result_message_received = False
+        incomplete_json_buffer = ""  # Accumulate incomplete JSON lines across reads
+        
+        for line, is_final_line in streaming_popen_generator(command, env=env, chunk_size=1024, read_timeout=0.05):
             current_time = time.time()
             elapsed = current_time - start_time
             
             # Check total timeout
             if elapsed > max_total_time:
                 logger.warning(f"Agent stream exceeded max total time ({max_total_time}s)")
-                try:
-                    os.kill(process_pid, 15)  # SIGTERM
-                except:
-                    pass
-                yield ("⏱️ The request took too long to process. Please try a simpler request.", True)
+                yield ("⏱️ The request took too long to process. Please try a simpler request.", True, None)
                 break
             
-            # Check line timeout (no activity recently)
-            time_since_activity = current_time - last_activity_time
-            if time_since_activity > line_timeout:
-                logger.warning(f"No activity for {time_since_activity}s, timing out")
-                try:
-                    os.kill(process_pid, 15)  # SIGTERM
-                except:
-                    pass
-                yield ("⏱️ The agent stopped responding. Please try again.", True)
-                break
-            
-            # Check if process is still running
-            try:
-                wait_result = os.waitpid(process_pid, os.WNOHANG)
-                if wait_result[0] == process_pid:
-                    # Process finished, read any remaining output
-                    process_done = True
-                    returncode = os.WEXITSTATUS(wait_result[1])
-                else:
-                    process_done = False
-                    returncode = None
-            except OSError:
-                # Process not finished yet
-                process_done = False
-                returncode = None
-            
-            # Read from PTY (non-blocking)
-            ready, _, _ = select.select([process_fd], [], [], 0.1)
-            if ready:
-                try:
-                    data = os.read(process_fd, 4096)
-                    if data:
-                        last_activity_time = current_time
-                        buffer += data
-                        # Process complete lines
-                        while b'\n' in buffer:
-                            line_bytes, buffer = buffer.split(b'\n', 1)
+            # Skip non-JSON lines (shell output, etc.)
+            # BUT: if this is the final line, we need to handle it even if it's not JSON
+            if not line or not line.startswith('{'):
+                # If we have an incomplete buffer, try appending this line (might be continuation)
+                if incomplete_json_buffer:
+                    incomplete_json_buffer += line
+                    if span:
+                        span.add_event("appending_to_buffer", attributes={
+                            "line_preview": line[:100],
+                            "buffer_length": len(incomplete_json_buffer)
+                        })
+                    # Try to parse the accumulated buffer
+                    try:
+                        json_obj = json.loads(incomplete_json_buffer)
+                        # Successfully parsed - use the complete line
+                        line = incomplete_json_buffer
+                        incomplete_json_buffer = ""
+                        if span:
+                            span.add_event("buffer_parse_success", attributes={
+                                "total_length": len(line)
+                            })
+                        # Fall through to process this JSON
+                    except json.JSONDecodeError:
+                        # Still incomplete
+                        if is_final_line:
+                            # Final line - try one more time
                             try:
-                                line = line_bytes.decode('utf-8', errors='replace').strip()
-                                if line and line.startswith('{'):
-                                    last_json_line_time = current_time
-                                    message = _extract_human_readable_from_json_line(line)
-                                    if message and message not in seen_messages:
-                                        seen_messages.add(message)
-                                        # Add to pending queue for pacing
-                                        pending_messages.append((message, current_time))
-                                        # If this is the first message and we've waited long enough, send it immediately
-                                        if not first_message_sent and elapsed >= max_wait_for_first_message:
-                                            first_message_sent = True
-                                            yield (message, False)
-                                            last_message_yield_time = current_time
-                                            # Remove from pending since we just sent it
-                                            pending_messages = [m for m in pending_messages if m[0] != message]
-                            except Exception as e:
-                                logger.debug(f"Error processing line: {e}")
-                                continue
-                except (OSError, EOFError) as e:
-                    # I/O error might be normal when process closes PTY
-                    if process_done:
-                        break
-                    logger.debug(f"PTY read error (might be normal): {e}")
+                                json_obj = json.loads(incomplete_json_buffer)
+                                line = incomplete_json_buffer
+                                incomplete_json_buffer = ""
+                                if span:
+                                    span.add_event("buffer_parse_success_final", attributes={
+                                        "total_length": len(line)
+                                    })
+                                # Fall through to process
+                            except json.JSONDecodeError:
+                                # Give up on this buffer
+                                if span:
+                                    span.add_event("incomplete_json_line_final", attributes={
+                                        "line_preview": incomplete_json_buffer[:200],
+                                        "line_length": len(incomplete_json_buffer)
+                                    })
+                                logger.debug(f"Skipping incomplete JSON buffer on final line: {len(incomplete_json_buffer)} chars")
+                                incomplete_json_buffer = ""
+                                # Don't continue - let final line logic handle it
+                                # Fall through to final line processing below
+                        else:
+                            # Continue accumulating
+                            if span:
+                                span.add_event("continuing_accumulation", attributes={
+                                    "buffer_length": len(incomplete_json_buffer)
+                                })
+                            continue
+                else:
+                    # No buffer and not JSON - skip it (shell output)
+                    # BUT: if this is the final line, we need to process it
+                    if span:
+                        span.add_event("skipping_non_json_line", attributes={
+                            "line_preview": line[:100] if line else "empty",
+                            "is_final": is_final_line
+                        })
+                    if not is_final_line:
+                        continue
+                    # If it's the final line, skip JSON parsing and go straight to final line processing
+                    # We'll handle it in the final line processing block below
+            
+            # We have a line that starts with { - try to parse it
+            # First, if we have a buffer, prepend it
+            if incomplete_json_buffer:
+                line = incomplete_json_buffer + line
+                incomplete_json_buffer = ""
+            
+            # Skip JSON parsing if this line doesn't start with { (it's a final non-JSON line)
+            json_obj = None  # Initialize to None
+            if not line or not line.startswith('{'):
+                # This is a final non-JSON line with no buffer - go to final line processing
+                # Don't try to parse it, just fall through
+                pass
+            else:
+                # Try to parse the line
+                try:
+                    json_obj = json.loads(line)
+                    # Successfully parsed - process it
+                    json_line_count += 1
+                    last_json_line_time = current_time
+                    obj_type = json_obj.get('type', 'unknown')
+                    logger.debug(f"Successfully parsed JSON line #{json_line_count}: type={obj_type}")
+                    if span:
+                        span.add_event("json_parse_success", attributes={
+                            "line_number": json_line_count,
+                            "type": obj_type,
+                            "line_length": len(line)
+                        })
+                except json.JSONDecodeError as e:
+                    # Incomplete JSON - accumulate it
+                    incomplete_json_buffer = line
+                    logger.debug(f"JSON parse failed (incomplete?), accumulating: {len(line)} chars, error: {str(e)[:50]}")
+                    if span:
+                        span.add_event("json_parse_failed_accumulating", attributes={
+                            "line_length": len(line),
+                            "error": str(e)[:100],
+                            "is_final": is_final_line
+                        })
+                    if is_final_line:
+                        # Final line - try one more time
+                        try:
+                            json_obj = json.loads(incomplete_json_buffer)
+                            line = incomplete_json_buffer
+                            incomplete_json_buffer = ""
+                            json_line_count += 1
+                            last_json_line_time = current_time
+                            logger.debug(f"Successfully parsed incomplete JSON on final line")
+                            if span:
+                                span.add_event("json_parse_success_final_retry", attributes={
+                                    "line_number": json_line_count,
+                                    "type": json_obj.get('type', 'unknown')
+                                })
+                        except json.JSONDecodeError:
+                            # Still incomplete even on final line
+                            if span:
+                                span.add_event("incomplete_json_line_final", attributes={
+                                    "line_preview": incomplete_json_buffer[:200],
+                                    "line_length": len(incomplete_json_buffer)
+                                })
+                            logger.debug(f"Skipping incomplete JSON on final line: {len(incomplete_json_buffer)} chars")
+                            incomplete_json_buffer = ""
+                            # Don't continue - let final line logic handle it
+                            # Fall through to final line processing
+                    else:
+                        # Continue accumulating
+                        if span:
+                            span.add_event("continuing_accumulation_after_fail", attributes={
+                                "buffer_length": len(incomplete_json_buffer)
+                            })
+                        continue
+            
+            # Only process JSON if we successfully parsed it
+            if json_obj is not None:
+                # Track first JSON line
+                if span and first_json_line:
+                    first_json_line = False
+                    span.add_event("first_json_line_received", attributes={
+                        "line_preview": line[:200],
+                        "elapsed_ms": elapsed * 1000
+                    })
+                
+                # Process the parsed JSON object
+                # Check if this is a result message (full accumulated text)
+                obj_type = json_obj.get("type", "")
+                is_result = obj_type == "result" and json_obj.get("subtype") == "success"
+                
+                if span:
+                    if is_result:
+                        result_message_received = True
+                        span.add_event("result_message_received", attributes={
+                            "result_length": len(json_obj.get("result", "")),
+                            "result_preview": str(json_obj.get("result", ""))[:200]
+                        })
+                    elif obj_type == "assistant":
+                        span.add_event("assistant_message_received", attributes={
+                            "message_preview": str(json_obj.get("message", {}).get("content", []))[:200]
+                        })
+                
+                message = _extract_human_readable_from_json_line(line)
+                if message:
+                    message_updated = False
+                    
+                    if is_result:
+                        # Result message contains the full accumulated text - this is authoritative
+                        # Store it separately and use it for final output
+                        old_accumulated = accumulated_message
+                        result_message = message
+                        accumulated_message = message
+                        message_updated = True
+                        logger.info(f"Received authoritative result message: {len(message)} chars")
+                        
+                        # Validate that our chunk appending worked correctly (for debugging)
+                        if old_accumulated and old_accumulated != message:
+                            # Log the difference for debugging
+                            appended_normalized = old_accumulated.replace('\n\n', '\n').strip()
+                            result_normalized = message.replace('\n\n', '\n').strip()
+                            if appended_normalized != result_normalized:
+                                logger.warning(
+                                    f"⚠️ Chunk appending mismatch: "
+                                    f"appended={len(old_accumulated)} chars, result={len(message)} chars. "
+                                    f"Using result as authoritative."
+                                )
+                            else:
+                                logger.info(f"✅ Chunk appending validated: appended chunks match result ({len(old_accumulated)} chars)")
+                    else:
+                        # Assistant message: check if it's a delta chunk or full accumulated
+                        logger.info(f"Extracted assistant chunk: length={len(message)}, preview={message[:100]}...")
+                        if accumulated_message:
+                            # If this chunk contains the accumulated message, it's the full accumulated - replace
+                            if accumulated_message in message:
+                                logger.info(f"Assistant chunk contains accumulated - replacing: {len(accumulated_message)} -> {len(message)} chars")
+                                accumulated_message = message
+                                message_updated = True
+                            elif message in accumulated_message:
+                                # This chunk is a prefix/substring of what we already have - skip it (duplicate/restart)
+                                logger.debug(f"Skipping duplicate/restart chunk: {len(message)} chars (already have {len(accumulated_message)} chars)")
+                                message_updated = False
+                            elif len(message) > len(accumulated_message) * 0.8 and message.startswith(accumulated_message[:20] if len(accumulated_message) >= 20 else accumulated_message):
+                                # Chunk is significantly long and starts with the same pattern - likely full accumulated
+                                # This handles cases where cursor-agent sends the full message after sending partial chunks
+                                logger.info(f"Detected full accumulated message (long restart pattern): {len(accumulated_message)} -> {len(message)} chars")
+                                accumulated_message = message
+                                message_updated = True
+                            else:
+                                # Delta chunk - check if it's actually a continuation
+                                # If the new chunk starts with text that's already at the end of accumulated, it's likely a duplicate/restart
+                                # Only append if it looks like a genuine continuation
+                                
+                                # Check if chunk is a fragment that doesn't fit (very short and doesn't continue naturally)
+                                is_fragment = (
+                                    len(message) < 15 and  # Very short
+                                    not message[0].isupper() and  # Doesn't start with capital
+                                    not message.strip().startswith(("1.", "2.", "3.", "-", "*", "#", ">", "`", "\n")) and  # Not a list/code start
+                                    not accumulated_message.rstrip().endswith((" ", ".", ",", ":", ";", "!", "?"))  # Doesn't continue naturally
+                                )
+                                
+                                if is_fragment:
+                                    logger.debug(f"Skipping fragment chunk: {message[:50]}... (doesn't fit naturally)")
+                                    message_updated = False
+                                elif len(message) < 20 and accumulated_message.endswith(message[:min(10, len(message))]):
+                                    # Very short chunk that matches the end - likely a duplicate, skip it
+                                    logger.debug(f"Skipping likely duplicate chunk: {message[:50]}... (matches end of accumulated)")
+                                    message_updated = False
+                                elif accumulated_message[-20:].strip() and message[:20].strip() and accumulated_message[-20:].strip() == message[:20].strip():
+                                    # Chunk starts with text that's already at the end - duplicate/restart, skip it
+                                    logger.debug(f"Skipping duplicate/restart chunk: starts with text already at end")
+                                    message_updated = False
+                                else:
+                                    # Delta chunk - append directly (no separators, chunks should fit together)
+                                    old_accumulated = accumulated_message
+                                    accumulated_message = accumulated_message + message
+                                    message_updated = True
+                                    logger.info(
+                                        f"Appending assistant delta chunk. "
+                                        f"Old: {old_accumulated[:50]}... ({len(old_accumulated)} chars), "
+                                        f"New chunk: {message[:50]}... ({len(message)} chars), "
+                                        f"Combined: {len(accumulated_message)} chars"
+                                    )
+                        else:
+                            # First message - check if it looks like a fragment (doesn't start with capital or common start)
+                            # If it's a fragment, wait for a proper beginning
+                            is_fragment = (
+                                len(message) < 50 and  # Short chunks are often fragments
+                                not message[0].isupper() and  # Doesn't start with capital
+                                not message.strip().startswith(("1.", "2.", "3.", "-", "*", "#", ">", "`"))  # Not a list/code start
+                            )
+                            
+                            if is_fragment:
+                                logger.debug(f"Skipping first chunk (likely fragment): {message[:50]}...")
+                                message_updated = False
+                            else:
+                                accumulated_message = message
+                                message_updated = True
+                                logger.info(f"First assistant chunk: {len(accumulated_message)} chars")
+                    
+                    # Always yield the accumulated message when it updates, so Telegram can update in place
+                    if message_updated:
+                        # Update seen_messages with the accumulated message
+                        seen_messages.discard(accumulated_message)  # Remove old if exists
+                        seen_messages.add(accumulated_message)
+                        
+                        # Clear pending and add the new accumulated message
+                        pending_messages = [(accumulated_message, current_time)]
+                        
+                        # Determine message type for the handler
+                        message_type = "result" if is_result else "assistant"
+                        
+                        # If this is the first message and we've waited long enough, send it immediately
+                        if not first_message_sent and elapsed >= max_wait_for_first_message:
+                            first_message_sent = True
+                            logger.info(f"Yielding first message after {elapsed:.2f}s: length={len(accumulated_message)}, type={message_type}")
+                            if span:
+                                span.add_event("yielding_first_message", attributes={
+                                    "length": len(accumulated_message),
+                                    "type": message_type,
+                                    "elapsed_seconds": elapsed
+                                })
+                            yield (accumulated_message, False, message_type)
+                            last_message_yield_time = current_time
+                            # Remove from pending since we just sent it
+                            pending_messages = []
+                        elif first_message_sent:
+                            # We've already sent a message, yield the updated one immediately
+                            # This allows Telegram to update the message in place
+                            # If this is a result message, it's authoritative and should overwrite regardless of length
+                            if is_result:
+                                logger.info(f"Yielding result message (authoritative): length={len(accumulated_message)} chars")
+                            else:
+                                logger.info(f"Yielding updated accumulated message: length={len(accumulated_message)}, type={message_type}")
+                            if span:
+                                span.add_event("yielding_updated_message", attributes={
+                                    "length": len(accumulated_message),
+                                    "type": message_type,
+                                    "is_result": is_result
+                                })
+                            yield (accumulated_message, False, message_type)
+                            last_message_yield_time = current_time
+                            pending_messages = []
             
             # Yield pending messages if enough time has passed (pacing)
             if pending_messages:
                 time_since_last_yield = current_time - last_message_yield_time
                 if time_since_last_yield >= min_message_interval:
-                    # Send the oldest pending message
+                    # Send the accumulated message (should be the longest/fullest version)
                     message, _ = pending_messages.pop(0)
                     first_message_sent = True
-                    yield (message, False)
+                    logger.info(f"Yielding pending message after {time_since_last_yield:.2f}s: length={len(message)}")
+                    yield (message, False, "assistant")  # Pending messages are from assistant chunks
                     last_message_yield_time = current_time
             
-            # If process is done, break
-            if process_done:
+            # If this is the final line from the generator, process remaining messages
+            if is_final_line:
+                logger.info(f"Received final line from generator. pending_messages={len(pending_messages)}, seen_messages={len(seen_messages)}")
+                if span:
+                    span.add_event("final_line_received", attributes={
+                        "pending_messages": len(pending_messages),
+                        "seen_messages": len(seen_messages),
+                        "json_lines_processed": json_line_count,
+                        "accumulated_length": len(accumulated_message),
+                        "has_result_message": result_message is not None,
+                        "first_message_sent": first_message_sent
+                    })
                 # Process any remaining pending messages quickly
                 for message, _ in pending_messages:
                     if message not in seen_messages or not first_message_sent:
-                        yield (message, False)
+                        logger.info(f"Yielding remaining pending message: length={len(message)}")
+                        if span:
+                            span.add_event("yielding_pending_message", attributes={
+                                "length": len(message)
+                            })
+                        yield (message, False, "assistant")  # Pending messages are from assistant chunks
                         first_message_sent = True
+                
+                # Check for timeout on final line
+                time_since_last_json = current_time - last_json_line_time
+                if time_since_last_json > line_timeout and last_json_line_time > start_time:
+                    logger.warning(f"No JSON line received for {time_since_last_json}s before final line")
+                    if span:
+                        span.add_event("json_timeout_warning", attributes={
+                            "time_since_last_json": time_since_last_json
+                        })
+                
+                # Final message indicating completion
+                # If we have a result message, yield it one more time as the authoritative final message
+                if span:
+                    span.set_attribute("json_lines_processed", json_line_count)
+                    span.set_attribute("result_message_received", result_message_received)
+                    span.set_attribute("accumulated_message_length", len(accumulated_message))
+                    span.set_attribute("total_elapsed_seconds", elapsed)
+                    if not result_message_received:
+                        span.add_event("no_result_message_received", attributes={
+                            "accumulated_preview": accumulated_message[:200]
+                        })
+                
+                if result_message:
+                    logger.info(f"Yielding final authoritative result message: {len(result_message)} chars")
+                    if span:
+                        span.add_event("yielding_final_result", attributes={
+                            "length": len(result_message)
+                        })
+                    yield (result_message, True, "result")
+                elif first_message_sent:
+                    # We've already sent messages, just mark as final
+                    logger.info(f"Yielding final signal. Total messages sent: {len(seen_messages)}")
+                    if span:
+                        span.add_event("yielding_final_signal", attributes={
+                            "total_messages": len(seen_messages)
+                        })
+                    yield ("", True, None)  # Empty message with is_final=True to signal completion
+                else:
+                    # No messages were extracted, send error
+                    logger.warning("No messages were extracted from stream")
+                    if span:
+                        span.add_event("no_messages_extracted", attributes={
+                            "json_lines_processed": json_line_count,
+                            "accumulated_length": len(accumulated_message),
+                            "has_result": result_message is not None
+                        })
+                    yield ("⚠️ I received your message but couldn't generate a response. Please try again.", True, None)
                 break
-        
-        # Wait for process to finish if not already done
-        if returncode is None:
-            try:
-                _, status = os.waitpid(process_pid, 0)
-                returncode = os.WEXITSTATUS(status)
-            except OSError:
-                returncode = 1
-        
-        # Close PTY
-        try:
-            os.close(process_fd)
-        except:
-            pass
-        
-        if returncode != 0:
-            logger.error(f"Agent script failed with exit code {returncode}")
-            if not first_message_sent:
-                yield ("❌ I encountered an error processing your request. Please try again.", True)
-            return
-        
-        # Final message indicating completion
-        if first_message_sent:
-            # We've already sent messages, just mark as final
-            yield ("", True)  # Empty message with is_final=True to signal completion
-        else:
-            # No messages were extracted, send error
-            yield ("⚠️ I received your message but couldn't generate a response. Please try again.", True)
     
     except Exception as e:
         logger.error(f"Error streaming agent response: {e}", exc_info=True)
-        try:
-            if 'process_pid' in locals():
-                os.kill(process_pid, 15)  # SIGTERM
-        except:
-            pass
-        try:
-            if 'process_fd' in locals():
-                os.close(process_fd)
-        except:
-            pass
-        yield ("❌ I encountered an error processing your message. Please try again.", True)
+        if span:
+            try:
+                span.record_exception(e)
+                span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+            except Exception as span_err:
+                logger.warning(f"Failed to record exception in span: {span_err}")
+        yield ("❌ I encountered an error processing your message. Please try again.", True, None)
+    finally:
+        if span:
+            try:
+                span.end()
+                logger.debug("Span ended successfully")
+            except Exception as e:
+                logger.warning(f"Failed to end span: {e}")
 
 
 def _extract_human_readable_from_json_line(line: str) -> Optional[str]:
@@ -620,6 +974,8 @@ def _extract_human_readable_from_json_line(line: str) -> Optional[str]:
                             if text and len(text) > 5:  # Lower threshold for earlier messages
                                 # Filter out descriptions but allow partial responses
                                 if not text.strip().startswith(("Writing", "Wrote", "Created", "Updated", "Response written")):
+                                    # Return the full text, not just the first chunk
+                                    # The streaming function will handle chunking if needed
                                     return text.strip()
         
         # 3. Check for result objects (but be careful - these might be descriptions)

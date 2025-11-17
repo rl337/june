@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import text
 import asyncpg
-from minio import Minio
+# MinIO removed - not needed for MVP
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST
 from prometheus_client.exposition import start_http_server
 from pathlib import Path
@@ -57,6 +57,19 @@ from inference_core import config, setup_logging, Timer, HealthChecker, Circular
 from inference_core.llm.qwen3_strategy import Qwen3LlmStrategy
 from inference_core.strategies import InferenceRequest, InferenceResponse
 
+# Initialize tracing early
+try:
+    import sys
+    from pathlib import Path
+    # Add essence package to path for tracing import
+    essence_path = Path(__file__).parent.parent.parent / "essence"
+    if str(essence_path) not in sys.path:
+        sys.path.insert(0, str(essence_path))
+    from essence.chat.utils.tracing import setup_tracing
+    setup_tracing(service_name="june-inference-api")
+except ImportError:
+    pass
+
 # Setup logging first
 setup_logging(config.monitoring.log_level, "inference-api")
 logger = logging.getLogger(__name__)
@@ -91,7 +104,7 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
         self.embedding_model = None
         self.embedding_tokenizer = None
         self.db_engine = None
-        self.minio_client = None
+        # MinIO removed - not needed for MVP
         self.nats_client = None
         self.health_checker = HealthChecker()
         self.conversation_buffer = CircularBuffer(1000)
@@ -100,7 +113,7 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
         # Add health checks
         self.health_checker.add_check("model", self._check_model_health)
         self.health_checker.add_check("database", self._check_database_health)
-        self.health_checker.add_check("minio", self._check_minio_health)
+        # MinIO health check removed - not needed for MVP
         self.health_checker.add_check("nats", self._check_nats_health)
     
     async def GenerateStream(self, request: GenerationRequest, context: grpc.aio.ServicerContext) -> AsyncGenerator[GenerationChunk, None]:
@@ -613,18 +626,19 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                 f"(size={pool_size}, max_overflow={max_overflow})"
             )
             
-            # Connect to MinIO
-            self.minio_client = Minio(
-                config.minio.endpoint,
-                access_key=config.minio.access_key,
-                secret_key=config.minio.secret_key,
-                secure=config.minio.secure
-            )
-            logger.info("Connected to MinIO")
+            # MinIO connection removed - not needed for MVP
             
-            # Connect to NATS
-            self.nats_client = await nats.connect(config.nats.url)
-            logger.info("Connected to NATS")
+            # Connect to NATS (optional - not required for MVP)
+            if config.nats.url:
+                try:
+                    self.nats_client = await nats.connect(config.nats.url)
+                    logger.info("Connected to NATS")
+                except Exception as e:
+                    logger.warning(f"NATS connection failed (optional): {e}. Continuing without NATS.")
+                    self.nats_client = None
+            else:
+                logger.debug("NATS_URL not configured, skipping NATS connection (not required for MVP)")
+                self.nats_client = None
             
         except Exception as e:
             logger.error(f"Failed to connect to services: {e}")
@@ -643,12 +657,7 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
         except Exception:
             return False
     
-    async def _check_minio_health(self) -> bool:
-        """Check MinIO connection health."""
-        try:
-            return self.minio_client.bucket_exists(config.minio.bucket_name)
-        except Exception:
-            return False
+    # MinIO health check removed - not needed for MVP
     
     async def _check_nats_health(self) -> bool:
         """Check NATS connection health."""
@@ -688,10 +697,12 @@ async def serve():
         rate_limit_config = RateLimitConfig(
             default_per_minute=int(os.getenv("RATE_LIMIT_INFERENCE_PER_MINUTE", "60")),
             default_per_hour=int(os.getenv("RATE_LIMIT_INFERENCE_PER_HOUR", "1000")),
+            use_redis=False,  # Use in-memory rate limiting for MVP (Redis not required)
+            fallback_to_memory=True,
         )
         rate_limit_interceptor = RateLimitInterceptor(config=rate_limit_config)
         interceptors.append(rate_limit_interceptor)
-        logger.info("Rate limiting enabled for Inference API")
+        logger.info("Rate limiting enabled for Inference API (in-memory, Redis not required)")
     
     server = aio.server(interceptors=interceptors)
     

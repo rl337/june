@@ -34,7 +34,8 @@ class MessageBuilder:
         service_name: str,
         user_id: Optional[str] = None,
         chat_id: Optional[str] = None,
-        translator: Optional[PlatformTranslator] = None
+        translator: Optional[PlatformTranslator] = None,
+        format: str = "markdown"
     ):
         """
         Initialize the message builder.
@@ -44,11 +45,12 @@ class MessageBuilder:
             user_id: User ID for logging
             chat_id: Chat ID for logging
             translator: Optional platform translator (auto-detected if None)
+            format: Format to use ('markdown' or 'html' for telegram)
         """
         self.service_name = service_name
         self.user_id = user_id
         self.chat_id = chat_id
-        self.translator = translator or get_translator(service_name)
+        self.translator = translator or get_translator(service_name, format=format)
         self.current_turn: Optional[Turn] = None
     
     def build_turn(

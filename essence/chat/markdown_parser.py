@@ -22,12 +22,12 @@ class MarkdownParser:
     
     def __init__(self):
         # Patterns for different markdown elements
-        # Heading pattern: allow optional space after # (some markdown allows ###Header or ### Header)
-        self.heading_pattern = re.compile(r'^(#{1,6})\s*(.+)$', re.MULTILINE)
+        self.heading_pattern = re.compile(r'^(#{1,6})\s+(.+)$', re.MULTILINE)
         self.code_block_pattern = re.compile(r'```(\w+)?\n(.*?)```', re.DOTALL)
         self.inline_code_pattern = re.compile(r'`([^`]+)`')
         self.bold_pattern = re.compile(r'\*\*([^*]+)\*\*')
         self.italic_pattern = re.compile(r'\*([^*]+)\*')
+        self.strikethrough_pattern = re.compile(r'~~([^~]+)~~')
         self.link_pattern = re.compile(r'\[([^\]]+)\]\(([^)]+)\)')
         self.blockquote_pattern = re.compile(r'^>\s+(.+)$', re.MULTILINE)
         self.horizontal_rule_pattern = re.compile(r'^---+\s*$|^===\s*$', re.MULTILINE)

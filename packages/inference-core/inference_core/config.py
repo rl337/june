@@ -100,8 +100,10 @@ class Config:
         if env_file:
             self._load_env_file(env_file)
 
+        # Database, MinIO, and NATS are not required for MVP
+        # These configs are kept for backward compatibility but are not used
         self.database = DatabaseConfig(
-            url=os.getenv("POSTGRES_URL", "postgresql://june:changeme@localhost:5432/june"),
+            url=os.getenv("POSTGRES_URL", ""),  # Empty string indicates not configured
             host=os.getenv("POSTGRES_HOST", "localhost"),
             port=int(os.getenv("POSTGRES_PORT", "5432")),
             database=os.getenv("POSTGRES_DB", "june"),
@@ -110,7 +112,7 @@ class Config:
         )
 
         self.minio = MinIOConfig(
-            endpoint=os.getenv("MINIO_ENDPOINT", "localhost:9000"),
+            endpoint=os.getenv("MINIO_ENDPOINT", ""),  # Empty string indicates not configured
             access_key=os.getenv("MINIO_ACCESS_KEY", "admin"),
             secret_key=os.getenv("MINIO_SECRET_KEY", "changeme"),
             bucket_name=os.getenv("MINIO_BUCKET", "june-storage"),
@@ -118,7 +120,7 @@ class Config:
         )
 
         self.nats = NATSConfig(
-            url=os.getenv("NATS_URL", "nats://localhost:4222"),
+            url=os.getenv("NATS_URL", ""),  # Empty string indicates not configured
             max_reconnect_attempts=int(os.getenv("NATS_MAX_RECONNECT", "10")),
             reconnect_time_wait=int(os.getenv("NATS_RECONNECT_WAIT", "2"))
         )

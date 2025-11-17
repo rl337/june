@@ -42,10 +42,8 @@ class DiscordServiceCommand(Command):
         # Setup signal handlers
         self.setup_signal_handlers()
         
-        # Import the service class
-        service_path = Path(__file__).parent.parent.parent / "services" / "discord"
-        sys.path.insert(0, str(service_path))
-        from main import DiscordBotService
+        # Import the service class from essence
+        from essence.services.discord.main import DiscordBotService
         
         self.service = DiscordBotService()
         logger.info("Discord service initialized")
