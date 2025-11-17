@@ -631,17 +631,16 @@ This phase focuses on refactoring individual services, building them, testing th
 - ✅ **Transformers bug:** Fixed by importing torch before transformers in qwen3_strategy.py
   - inference-core wheel rebuilt with fix
 - ✅ **Model download:** Qwen3-30B model files downloaded successfully (all 16 shard files present)
-- ⚠️ **Model loading issue:** Qwen3-30B model with 4-bit quantization fails to load due to GPU memory constraints
-  - Error: "Some modules are dispatched on the CPU or the disk" - accelerate tries to offload to CPU/disk
-  - 4-bit quantization doesn't support CPU/disk offloading (bitsandbytes limitation)
-  - Attempted fixes: `device_map={"": 0}`, `device_map="cuda:0"` - both still trigger CPU offloading
-  - Root cause: GPU memory insufficient for full quantized model (~15-20GB needed)
-  - **Next steps needed:**
-    - Check actual GPU memory available
-    - Option A: Use smaller model or reduce quantization (8-bit instead of 4-bit)
-    - Option B: Enable CPU offloading with `llm_int8_enable_fp32_cpu_offload=True` (but this is for 8-bit, not 4-bit)
-    - Option C: Load model without quantization (requires more GPU memory, ~60GB)
-    - Option D: Use model sharding across multiple GPUs (if available)
+- ✅ **Quantization fix:** Switched from 4-bit to 8-bit quantization to support CPU offloading
+  - Added `quantization_bits` parameter to Qwen3LlmStrategy (defaults to 8-bit)
+  - 8-bit quantization supports CPU offloading via `llm_int8_enable_fp32_cpu_offload=True`
+  - Allows accelerate to offload to CPU if GPU memory is insufficient
+  - GPU memory available: 119.70 GB (plenty for the model)
+- ⏳ **Model loading in progress:** Qwen3-30B model is currently loading with 8-bit quantization
+  - Service is starting and model is loading (can take 30-60 minutes for first load)
+  - Using 8-bit quantization with CPU offloading support
+  - Once loading completes, gRPC server will start and health checks will pass
+  - Note: CUDA capability sm_121 warning (NVIDIA GB10) - PyTorch may have compatibility issues, but CUDA is functional
 - ✅ **Coding agent interface:** Created `essence/agents/coding_agent.py` with full tool calling support (Phase 10.4 completed)
 
 #### 10.3: Optimize Model Performance in Container ⏳ TODO

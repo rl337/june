@@ -24,6 +24,7 @@ class Qwen3LlmStrategy(LlmStrategy):
         model_cache_dir: Optional[str] = None,
         local_files_only: Optional[bool] = None,
         use_quantization: Optional[bool] = None,
+        quantization_bits: Optional[int] = None,  # 4 or 8 bits
         use_kv_cache: Optional[bool] = None,
     ) -> None:
         """Initialize Qwen3 LLM strategy.
@@ -36,7 +37,8 @@ class Qwen3LlmStrategy(LlmStrategy):
             huggingface_token: HuggingFace token for private models (defaults to config.model.huggingface_token)
             model_cache_dir: Directory to cache models (defaults to config.model.model_cache_dir)
             local_files_only: If True, only load from local cache (defaults to False)
-            use_quantization: Whether to use 4-bit quantization (defaults to True for CUDA)
+            use_quantization: Whether to use quantization (defaults to True for CUDA)
+            quantization_bits: Number of bits for quantization (4 or 8, defaults to 8 for better compatibility)
             use_kv_cache: Whether to use KV cache for faster inference (defaults to True)
         """
         self.model_name = model_name or config.model.name
@@ -53,6 +55,13 @@ class Qwen3LlmStrategy(LlmStrategy):
             self.use_quantization = self.device.startswith("cuda")
         else:
             self.use_quantization = use_quantization
+        
+        # Default to 8-bit quantization (supports CPU offloading if needed, more compatible)
+        # 4-bit is more memory efficient but doesn't support CPU offloading
+        if quantization_bits is None:
+            self.quantization_bits = 8 if self.use_quantization else None
+        else:
+            self.quantization_bits = quantization_bits if self.use_quantization else None
         
         # Default to KV cache for faster inference
         if use_kv_cache is None:
@@ -118,32 +127,44 @@ class Qwen3LlmStrategy(LlmStrategy):
             if self.huggingface_token:
                 model_kwargs["token"] = self.huggingface_token
 
-            # Apply 4-bit quantization if enabled and CUDA is available
+            # Apply quantization if enabled and CUDA is available
             if self.use_quantization and self.device.startswith("cuda"):
                 try:
                     from transformers import BitsAndBytesConfig
-                    logger.info("Using 4-bit quantization for memory efficiency")
-                    quantization_config = BitsAndBytesConfig(
-                        load_in_4bit=True,
-                        bnb_4bit_compute_dtype=torch.float16,
-                        bnb_4bit_use_double_quant=True,
-                        bnb_4bit_quant_type="nf4"  # NormalFloat4 for optimal performance
-                    )
+                    
+                    if self.quantization_bits == 4:
+                        logger.info("Using 4-bit quantization for maximum memory efficiency")
+                        quantization_config = BitsAndBytesConfig(
+                            load_in_4bit=True,
+                            bnb_4bit_compute_dtype=torch.float16,
+                            bnb_4bit_use_double_quant=True,
+                            bnb_4bit_quant_type="nf4"  # NormalFloat4 for optimal performance
+                        )
+                        # 4-bit quantization doesn't support CPU/disk offloading
+                        # Must fit entirely on GPU
+                        model_kwargs["device_map"] = "cuda:0"
+                        model_kwargs["low_cpu_mem_usage"] = True
+                    elif self.quantization_bits == 8:
+                        logger.info("Using 8-bit quantization (supports CPU offloading if needed)")
+                        quantization_config = BitsAndBytesConfig(
+                            load_in_8bit=True,
+                            llm_int8_threshold=6.0,  # Threshold for outlier detection
+                            llm_int8_enable_fp32_cpu_offload=True,  # Allow CPU offloading for FP32 layers
+                        )
+                        # 8-bit quantization supports CPU offloading, so we can use "auto" device_map
+                        # This allows accelerate to offload to CPU if GPU memory is insufficient
+                        model_kwargs["device_map"] = "auto"
+                        model_kwargs["low_cpu_mem_usage"] = True
+                    else:
+                        raise ValueError(f"Unsupported quantization bits: {self.quantization_bits}. Use 4 or 8.")
+                    
                     model_kwargs["quantization_config"] = quantization_config
                     model_kwargs["torch_dtype"] = torch.float16
-                    # For 4-bit quantization with bitsandbytes, device_map is required
-                    # Use explicit device_map to force all layers to GPU 0, preventing CPU/disk offloading
+                    
                     if torch.cuda.is_available():
                         # Check available GPU memory
                         gpu_memory_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
                         logger.info(f"GPU memory available: {gpu_memory_gb:.2f} GB")
-                        # Use explicit device_map string to force all layers to cuda:0
-                        # This prevents accelerate from trying to offload to CPU/disk
-                        model_kwargs["device_map"] = "cuda:0"  # Force all layers to GPU 0
-                        model_kwargs["low_cpu_mem_usage"] = True
-                    else:
-                        model_kwargs["device_map"] = "auto"
-                        model_kwargs["low_cpu_mem_usage"] = True
                 except ImportError:
                     logger.warning("bitsandbytes not available, falling back to standard loading")
                     model_kwargs["torch_dtype"] = torch.float16 if self.device.startswith("cuda") else torch.float32
