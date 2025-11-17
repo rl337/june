@@ -9,17 +9,12 @@ import os
 import sys
 import time
 import logging
-from pathlib import Path
-
-# Add packages to path
-sys.path.insert(0, str(Path(__file__).parent.parent / "packages"))
 
 try:
-    from prometheus_client import start_http_server, Gauge, Histogram
-    from june_metrics import GPUMetrics, CollectorRegistry
+    from prometheus_client import start_http_server, Gauge, CollectorRegistry
 except ImportError as e:
     print(f"Error importing dependencies: {e}")
-    print("Make sure prometheus-client and june-metrics are installed")
+    print("Make sure prometheus-client is installed")
     sys.exit(1)
 
 try:
@@ -32,9 +27,41 @@ except ImportError:
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Prometheus metrics
+# Prometheus metrics registry
 registry = CollectorRegistry()
-gpu_metrics = GPUMetrics(registry=registry, service_name="gpu_monitor")
+
+# GPU metrics (using prometheus_client directly)
+service_name = "gpu_monitor"
+gpu_utilization = Gauge(
+    f'{service_name}_gpu_utilization_percent',
+    'GPU utilization percentage',
+    ['gpu_id', 'gpu_name'],
+    registry=registry
+)
+gpu_memory_used = Gauge(
+    f'{service_name}_gpu_memory_used_bytes',
+    'GPU memory used in bytes',
+    ['gpu_id', 'gpu_name'],
+    registry=registry
+)
+gpu_memory_total = Gauge(
+    f'{service_name}_gpu_memory_total_bytes',
+    'GPU memory total in bytes',
+    ['gpu_id', 'gpu_name'],
+    registry=registry
+)
+gpu_temperature = Gauge(
+    f'{service_name}_gpu_temperature_celsius',
+    'GPU temperature in Celsius',
+    ['gpu_id', 'gpu_name'],
+    registry=registry
+)
+gpu_power = Gauge(
+    f'{service_name}_gpu_power_watts',
+    'GPU power usage in watts',
+    ['gpu_id', 'gpu_name'],
+    registry=registry
+)
 
 # Additional metrics for monitoring script itself
 gpu_count = Gauge('gpu_count', 'Number of GPUs detected', registry=registry)
@@ -123,17 +150,34 @@ def monitor_loop(interval=5):
             for gpu_id in range(device_count):
                 metrics = get_gpu_metrics(gpu_id)
                 if metrics:
-                    gpu_metrics.update_gpu_metrics(
-                        gpu_id=metrics['gpu_id'],
-                        gpu_name=metrics['gpu_name'],
-                        metrics={
-                            'utilization': metrics['utilization'],
-                            'memory_used': metrics['memory_used'],
-                            'memory_total': metrics['memory_total'],
-                            'temperature': metrics['temperature'],
-                            'power': metrics['power']
-                        }
-                    )
+                    gpu_id_str = metrics['gpu_id']
+                    gpu_name = metrics['gpu_name']
+                    
+                    # Update GPU metrics directly
+                    if 'utilization' in metrics and metrics['utilization'] is not None:
+                        gpu_utilization.labels(gpu_id=gpu_id_str, gpu_name=gpu_name).set(
+                            metrics['utilization']
+                        )
+                    
+                    if 'memory_used' in metrics and metrics['memory_used'] is not None:
+                        gpu_memory_used.labels(gpu_id=gpu_id_str, gpu_name=gpu_name).set(
+                            metrics['memory_used']
+                        )
+                    
+                    if 'memory_total' in metrics and metrics['memory_total'] is not None:
+                        gpu_memory_total.labels(gpu_id=gpu_id_str, gpu_name=gpu_name).set(
+                            metrics['memory_total']
+                        )
+                    
+                    if 'temperature' in metrics and metrics['temperature'] is not None:
+                        gpu_temperature.labels(gpu_id=gpu_id_str, gpu_name=gpu_name).set(
+                            metrics['temperature']
+                        )
+                    
+                    if 'power' in metrics and metrics['power'] is not None:
+                        gpu_power.labels(gpu_id=gpu_id_str, gpu_name=gpu_name).set(
+                            metrics['power']
+                        )
             
             time.sleep(interval)
         except KeyboardInterrupt:
