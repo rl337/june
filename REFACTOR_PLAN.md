@@ -630,11 +630,18 @@ This phase focuses on refactoring individual services, building them, testing th
   - Note: Warning about CUDA capability sm_121, but CUDA is functional
 - ✅ **Transformers bug:** Fixed by importing torch before transformers in qwen3_strategy.py
   - inference-core wheel rebuilt with fix
-- ⏳ **Model loading:** Qwen3-30B model is currently loading with 4-bit quantization (can take 30-60 minutes)
-  - Model loading started successfully at 18:48:41
-  - Service is running but unhealthy (expected while model loads)
-  - gRPC server will start once model loading completes
-  - Once loaded, will verify GPU memory usage (~15-20GB expected for quantized model)
+- ✅ **Model download:** Qwen3-30B model files downloaded successfully (all 16 shard files present)
+- ⚠️ **Model loading issue:** Qwen3-30B model with 4-bit quantization fails to load due to GPU memory constraints
+  - Error: "Some modules are dispatched on the CPU or the disk" - accelerate tries to offload to CPU/disk
+  - 4-bit quantization doesn't support CPU/disk offloading (bitsandbytes limitation)
+  - Attempted fixes: `device_map={"": 0}`, `device_map="cuda:0"` - both still trigger CPU offloading
+  - Root cause: GPU memory insufficient for full quantized model (~15-20GB needed)
+  - **Next steps needed:**
+    - Check actual GPU memory available
+    - Option A: Use smaller model or reduce quantization (8-bit instead of 4-bit)
+    - Option B: Enable CPU offloading with `llm_int8_enable_fp32_cpu_offload=True` (but this is for 8-bit, not 4-bit)
+    - Option C: Load model without quantization (requires more GPU memory, ~60GB)
+    - Option D: Use model sharding across multiple GPUs (if available)
 - ✅ **Coding agent interface:** Created `essence/agents/coding_agent.py` with full tool calling support (Phase 10.4 completed)
 
 #### 10.3: Optimize Model Performance in Container ⏳ TODO

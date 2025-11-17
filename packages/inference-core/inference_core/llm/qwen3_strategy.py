@@ -131,9 +131,19 @@ class Qwen3LlmStrategy(LlmStrategy):
                     )
                     model_kwargs["quantization_config"] = quantization_config
                     model_kwargs["torch_dtype"] = torch.float16
-                    # When using quantization, device_map should be "auto"
-                    model_kwargs["device_map"] = "auto"
-                    model_kwargs["low_cpu_mem_usage"] = True
+                    # For 4-bit quantization with bitsandbytes, device_map is required
+                    # Use explicit device_map to force all layers to GPU 0, preventing CPU/disk offloading
+                    if torch.cuda.is_available():
+                        # Check available GPU memory
+                        gpu_memory_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                        logger.info(f"GPU memory available: {gpu_memory_gb:.2f} GB")
+                        # Use explicit device_map string to force all layers to cuda:0
+                        # This prevents accelerate from trying to offload to CPU/disk
+                        model_kwargs["device_map"] = "cuda:0"  # Force all layers to GPU 0
+                        model_kwargs["low_cpu_mem_usage"] = True
+                    else:
+                        model_kwargs["device_map"] = "auto"
+                        model_kwargs["low_cpu_mem_usage"] = True
                 except ImportError:
                     logger.warning("bitsandbytes not available, falling back to standard loading")
                     model_kwargs["torch_dtype"] = torch.float16 if self.device.startswith("cuda") else torch.float32
@@ -156,9 +166,11 @@ class Qwen3LlmStrategy(LlmStrategy):
                 **model_kwargs,
             )
 
-            # Move to device if not using device_map="auto" and not quantized
-            if (not self.device.startswith("cuda") or "device_map" not in model_kwargs) and not self.use_quantization:
-                self._model = self._model.to(self.device)
+            # Move to device if not using device_map and not quantized
+            # For quantized models with device_map, layers are already placed correctly
+            if not self.use_quantization:
+                if (not self.device.startswith("cuda") or model_kwargs.get("device_map") is None):
+                    self._model = self._model.to(self.device)
 
             # Configure YaRN if enabled
             if self.use_yarn and self.max_context_length:
