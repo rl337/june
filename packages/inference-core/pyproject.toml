@@ -38,6 +38,7 @@ packages = [
   "inference_core.stt",
   "inference_core.tts",
   "inference_core.llm",
+  "inference_core.utils",
 ]
 
 

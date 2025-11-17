@@ -4,11 +4,13 @@ Inference API Service - LLM orchestration with RAG and tool invocation.
 import asyncio
 import logging
 import os
+import sys
 import json
 import uuid
 from typing import Dict, List, Optional, Any, AsyncGenerator
 from datetime import datetime
 import numpy as np
+from pathlib import Path
 
 import grpc
 from grpc import aio
@@ -24,12 +26,21 @@ import asyncpg
 # MinIO removed - not needed for MVP
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST
 from prometheus_client.exposition import start_http_server
-from pathlib import Path
 
-# Import generated protobuf classes
-import sys
-sys.path.append('../../proto')
-from llm_pb2 import (
+# Import gRPC authentication and protobuf classes
+# grpc_auth.py is copied to /app/grpc_auth.py in the Dockerfile
+try:
+    from grpc_auth import create_auth_interceptor, get_user_from_metadata, is_service_request
+except ImportError:
+    # Fallback: disable auth if grpc_auth not available
+    def create_auth_interceptor(*args, **kwargs):
+        return None
+    def get_user_from_metadata(*args, **kwargs):
+        return None
+    def is_service_request(*args, **kwargs):
+        return True
+
+from june_grpc_api.llm_pb2 import (
     GenerationRequest, GenerationResponse, GenerationChunk,
     ChatRequest, ChatResponse, ChatChunk, ChatMessage,
     EmbeddingRequest, EmbeddingResponse,
@@ -37,21 +48,7 @@ from llm_pb2 import (
     GenerationParameters, Context, ToolDefinition,
     FinishReason, UsageStats
 )
-import llm_pb2_grpc
-
-# Import gRPC authentication
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "packages" / "june-grpc-api"))
-from grpc_auth import create_auth_interceptor, get_user_from_metadata, is_service_request
-
-# Import rate limiting
-try:
-    from june_rate_limit import RateLimitInterceptor, RateLimitConfig
-    RATE_LIMIT_AVAILABLE = True
-except ImportError:
-    logger.warning("june-rate-limit package not available, rate limiting disabled for gRPC")
-    RATE_LIMIT_AVAILABLE = False
-    RateLimitInterceptor = None
-    RateLimitConfig = None
+from june_grpc_api import llm_pb2_grpc
 
 from inference_core import config, setup_logging, Timer, HealthChecker, CircularBuffer
 from inference_core.llm.qwen3_strategy import Qwen3LlmStrategy
@@ -59,8 +56,6 @@ from inference_core.strategies import InferenceRequest, InferenceResponse
 
 # Initialize tracing early
 try:
-    import sys
-    from pathlib import Path
     # Add essence package to path for tracing import
     essence_path = Path(__file__).parent.parent.parent / "essence"
     if str(essence_path) not in sys.path:
@@ -73,6 +68,16 @@ except ImportError:
 # Setup logging first
 setup_logging(config.monitoring.log_level, "inference-api")
 logger = logging.getLogger(__name__)
+
+# Import rate limiting (after logger is initialized)
+try:
+    from june_rate_limit import RateLimitInterceptor, RateLimitConfig
+    RATE_LIMIT_AVAILABLE = True
+except ImportError:
+    logger.warning("june-rate-limit package not available, rate limiting disabled for gRPC")
+    RATE_LIMIT_AVAILABLE = False
+    RateLimitInterceptor = None
+    RateLimitConfig = None
 
 # Import input validation
 try:

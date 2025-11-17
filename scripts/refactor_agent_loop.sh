@@ -156,6 +156,7 @@ You are working on refactoring the june project. Your task is to:
 - **Container-first:** For Phase 10 tasks (Qwen3 setup), all model operations must happen in Docker containers - use `docker compose run` or `docker compose exec` for all model-related work
 - **Sandbox isolation:** For benchmark tasks (Phase 10.5), ensure each task runs in an isolated sandbox (container/chroot) with full activity logging and reviewability
 - **Efficiency evaluation:** When working on benchmarks, capture not just correctness but also efficiency metrics (commands executed, time to solution, resource usage)
+- **CRITICAL** Check system memory when doing operations. Avoid loading LLMs multiple times in memory and unload LLMs when they're not being used.
 
 **Current Context:**
 - Project root: /home/rlee/dev/june
