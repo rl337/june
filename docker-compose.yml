@@ -18,6 +18,7 @@ services:
     - HUGGINGFACE_CACHE_DIR=/models/huggingface
     - TRANSFORMERS_CACHE_DIR=/models/transformers
     - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+    - MODEL_NAME=${MODEL_NAME:-Qwen/Qwen3-30B-A3B-Thinking-2507}
     volumes:
     - ${MODEL_CACHE_DIR:-/home/rlee/models}:/models
     - ${JUNE_DATA_DIR:-/home/rlee/june_data}:/data
@@ -27,6 +28,15 @@ services:
     - /var/log/june/cli-tools:/logs
     extra_hosts:
     - host.docker.internal:host-gateway
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            device_ids:
+            - '0'
+            capabilities:
+            - gpu
     networks:
     - june_network
     profiles:
