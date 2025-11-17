@@ -81,8 +81,8 @@ class Qwen3LlmStrategy(LlmStrategy):
     def warmup(self) -> None:
         """Load and initialize the Qwen3 model."""
         try:
-            from transformers import AutoModelForCausalLM, AutoTokenizer
             import torch
+            from transformers import AutoModelForCausalLM, AutoTokenizer
 
             logger.info(
                 "Loading Qwen3 model: %s on device: %s",
