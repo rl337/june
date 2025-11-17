@@ -126,6 +126,9 @@ You are working on refactoring the june project. Your task is to:
    - Cleaning up code
    - Writing tests
    - Building services
+   - **Setting up Qwen3 model on GPU (Phase 10.1-10.2) - NEW PRIORITY**
+   - **Developing coding agent (Phase 10.4) - NEW PRIORITY**
+   - **Setting up benchmark evaluation with sandboxes (Phase 10.5) - NEW PRIORITY**
    - Any other task from the plan
 
 4. **Update REFACTOR_PLAN.md** - After completing the task:
@@ -150,13 +153,20 @@ You are working on refactoring the june project. Your task is to:
 - If a task is too large, break it down and update the plan
 - Always verify your changes work before marking tasks complete
 - All operations must run as the rlee user on the host. There is no sudo access or running as root.
+- **Container-first:** For Phase 10 tasks (Qwen3 setup), all model operations must happen in Docker containers - use `docker compose run` or `docker compose exec` for all model-related work
+- **Sandbox isolation:** For benchmark tasks (Phase 10.5), ensure each task runs in an isolated sandbox (container/chroot) with full activity logging and reviewability
+- **Efficiency evaluation:** When working on benchmarks, capture not just correctness but also efficiency metrics (commands executed, time to solution, resource usage)
 
 **Current Context:**
 - Project root: /home/rlee/dev/june
 - Refactor plan: REFACTOR_PLAN.md
-- Goal: Pare down june to bare essentials for Telegram/Discord voice round trip
+- **Primary Goal:** Pare down june to bare essentials for Telegram/Discord voice round trip
+- **Extended Goal:** Get Qwen3-30B-A3B-Thinking-2507 running on GPU in containers and develop coding agent for benchmark evaluation
 - Services to keep: telegram, discord, stt, tts, inference-api
 - Services removed: gateway, postgres, minio, redis, nats, orchestrator, webapp
+- **NEW PRIORITY:** Phase 10 (Qwen3 setup and coding agent) - see REFACTOR_PLAN.md Phase 10
+- **Container-first requirement:** All model operations, downloads, and inference must happen in Docker containers - no host system pollution
+- **Sandbox requirement:** All benchmark executions must run in isolated sandboxes (containers/chroot) with full reviewability
 
 **CRITICAL:** Run tests at the start and end of every turn and fix any breakages.
 
@@ -183,7 +193,17 @@ You are working on refactoring the june project. Your task is to:
 - After committing, check if there are unpushed commits and push them upstream
 - DO NOT leave uncommitted changes - always commit your work before moving to the next task
 
-Now, read REFACTOR_PLAN.md and begin working on an unfinished task.
+**Priority Order:**
+1. Phase 10.1-10.2: Qwen3 model setup on GPU (if not yet done)
+2. Phase 10.4: Coding agent development (if model is ready)
+3. Phase 10.5: Benchmark evaluation setup (if coding agent is ready)
+4. Other phases from the plan
+
+**Reference Documents:**
+- REFACTOR_PLAN.md - Main refactoring plan with all phases
+- QWEN3_SETUP_PLAN.md - Detailed Qwen3 setup instructions (referenced in Phase 10)
+
+Now, read REFACTOR_PLAN.md and begin working on an unfinished task, prioritizing Phase 10 if applicable.
 PROMPT_EOF
 }
 
