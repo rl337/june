@@ -81,15 +81,29 @@ get_session_id() {
     fi
 }
 
-# Function to check if output contains ConnectError
-check_for_connect_error() {
-    local output_file="$1"
-    # Check for various ConnectError patterns
-    if grep -qiE "(ConnectError|ConnectionError|connection error|unavailable.*Error)" "$output_file" 2>/dev/null; then
-        return 0  # Found ConnectError
+# File to track consecutive error count (non-zero exit codes)
+ERROR_COUNT_FILE="$PROJECT_ROOT/.refactor_agent_error_count"
+
+# Function to get current error count
+get_error_count() {
+    if [[ -f "$ERROR_COUNT_FILE" ]]; then
+        cat "$ERROR_COUNT_FILE" | tr -d '[:space:]'
     else
-        return 1  # No ConnectError
+        echo "0"
     fi
+}
+
+# Function to increment error count
+increment_error_count() {
+    local current_count=$(get_error_count)
+    local new_count=$((current_count + 1))
+    echo "$new_count" > "$ERROR_COUNT_FILE"
+    echo "$new_count"
+}
+
+# Function to reset error count
+reset_error_count() {
+    echo "0" > "$ERROR_COUNT_FILE"
 }
 
 
@@ -230,18 +244,21 @@ main() {
         if [[ $SESSION_EXISTS -eq 0 ]] && [[ $ITERATION -eq 1 ]]; then
             # First iteration and no existing session: create new session (don't use --resume)
             log "Creating new chat session..."
-            CURSOR_AGENT_ARGS=("agent" "--print" "--force" "--output-format" "text" "--stream-partial-output")
+            # For new sessions, use text format (stream-partial-output requires stream-json)
+            CURSOR_AGENT_ARGS=("agent" "--print" "--force" "--output-format" "text")
             # After first iteration, we'll resume
             SESSION_EXISTS=1
         elif [[ $SESSION_EXISTS -eq 0 ]]; then
             # Session file was removed (likely due to ConnectError) - create new session
             log "Creating new chat session (previous session was removed)..."
-            CURSOR_AGENT_ARGS=("agent" "--print" "--force" "--output-format" "text" "--stream-partial-output")
+            # For new sessions, use text format (stream-partial-output requires stream-json)
+            CURSOR_AGENT_ARGS=("agent" "--print" "--force" "--output-format" "text")
             # After this iteration, we'll resume
             SESSION_EXISTS=1
         else
             # Session exists: resume existing session
             log "Resuming chat session: $SESSION_ID"
+            # For resumed sessions, use stream-json format with stream-partial-output for real-time visibility
             CURSOR_AGENT_ARGS=("agent" "--print" "--force" "--output-format" "stream-json" "--stream-partial-output" "--resume" "$SESSION_ID")
         fi
         
@@ -255,25 +272,22 @@ main() {
         # Run cursor-agent, capturing output to both temp file and log, while also showing on stdout
         # Use unbuffered output so we can see progress in real-time
         if echo "$PROMPT" | "$CURSOR_AGENT_CMD" "${CURSOR_AGENT_ARGS[@]}" 2>&1 | tee "$TEMP_OUTPUT" | tee -a "$LOG_FILE"; then
-            # Check for ConnectError even on success (sometimes it exits 0 but has errors)
-            if check_for_connect_error "$TEMP_OUTPUT"; then
-                log "WARNING: ConnectError detected in output - will create new session on next iteration"
-                # Remove old session file - next iteration will detect it's missing and create new session
-                rm -f "$SESSION_ID_FILE"
-                log "Removed stuck session file - new session will be created on next iteration"
-            else
-                log "Iteration $ITERATION completed successfully"
-            fi
+            # Success - reset error count
+            reset_error_count
+            log "Iteration $ITERATION completed successfully"
         else
             EXIT_CODE=$?
-            # Check if the error was a ConnectError
-            if check_for_connect_error "$TEMP_OUTPUT"; then
-                log "WARNING: ConnectError detected (exit code: $EXIT_CODE) - will create new session on next iteration"
+            ERROR_COUNT=$(increment_error_count)
+            log "WARNING: Iteration $ITERATION encountered an error (exit code: $EXIT_CODE) - consecutive error count: $ERROR_COUNT"
+            
+            # If we have 3 or more consecutive non-zero exit codes, create a new session
+            if [[ $ERROR_COUNT -ge 3 ]]; then
+                log "WARNING: $ERROR_COUNT consecutive errors detected - will create new session on next iteration"
                 # Remove old session file - next iteration will detect it's missing and create new session
                 rm -f "$SESSION_ID_FILE"
-                log "Removed stuck session file - new session will be created on next iteration"
+                reset_error_count
+                log "Removed stuck session file and reset error count - new session will be created on next iteration"
             else
-                log "WARNING: Iteration $ITERATION encountered an error (exit code: $EXIT_CODE)"
                 log "Continuing to next iteration..."
             fi
         fi
