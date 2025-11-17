@@ -1,0 +1,176 @@
+# Minimal docker-compose.yml for Telegram/Discord voice round trip
+# This is the bare essentials - 5 services needed (4 core + 1 platform service)
+
+services:
+  # STT Service - Speech-to-Text
+  stt:
+    build:
+      context: .
+      dockerfile: ./services/stt/Dockerfile
+    restart: unless-stopped
+    ports:
+      - 50052:50052
+    environment:
+      - MODEL_NAME=${STT_MODEL:-openai/whisper-large-v3}
+      - MODEL_DEVICE=${STT_DEVICE:-cuda:0}
+      - MODEL_CACHE_DIR=/models
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['0']
+              capabilities: [gpu]
+    volumes:
+      - ${MODEL_CACHE_DIR:-/home/rlee/models}:/models
+      - ${JUNE_DATA_DIR:-/home/rlee/june_data}/model_artifacts/stt:/app/model_artifacts
+      - /var/log/june/stt:/logs
+    networks:
+      - june_network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import grpc; grpc.insecure_channel('localhost:50052').check_connectivity_state(True)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # TTS Service - Text-to-Speech
+  tts:
+    build:
+      context: .
+      dockerfile: ./services/tts/Dockerfile
+    restart: unless-stopped
+    ports:
+      - 50053:50053
+    environment:
+      - MODEL_NAME=${TTS_MODEL:-facebook/fastspeech2-en-ljspeech}
+      - MODEL_DEVICE=${TTS_DEVICE:-cuda:0}
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['0']
+              capabilities: [gpu]
+    volumes:
+      - ${MODEL_CACHE_DIR:-/home/rlee/models}:/models
+      - ${JUNE_DATA_DIR:-/home/rlee/june_data}/model_artifacts/tts:/app/model_artifacts
+      - ./services/tts:/app
+      - /var/log/june/tts:/logs
+    networks:
+      - june_network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import grpc; grpc.insecure_channel('localhost:50053').check_connectivity_state(True)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Inference API - LLM
+  inference-api:
+    build:
+      context: .
+      dockerfile: ./services/inference-api/Dockerfile
+    restart: unless-stopped
+    ports:
+      - 50051:50051
+    environment:
+      - MODEL_NAME=${MODEL_NAME:-Qwen/Qwen3-30B-A3B-Thinking-2507}
+      - MODEL_DEVICE=${MODEL_DEVICE:-cuda:0}
+      - MAX_CONTEXT_LENGTH=${MAX_CONTEXT_LENGTH:-131072}
+      - USE_YARN=${USE_YARN:-true}
+      - MODEL_TEMPERATURE=${MODEL_TEMPERATURE:-0.7}
+      - MODEL_MAX_TOKENS=${MODEL_MAX_TOKENS:-2048}
+      - MODEL_TOP_P=${MODEL_TOP_P:-0.9}
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ['0']
+              capabilities: [gpu]
+    volumes:
+      - ${MODEL_CACHE_DIR:-/home/rlee/models}:/models
+      - ${JUNE_DATA_DIR:-/home/rlee/june_data}/model_artifacts/inference-api:/app/model_artifacts
+      - /var/log/june/inference-api:/logs
+    networks:
+      - june_network
+
+  # Telegram Bot Service - Orchestrates the pipeline
+  telegram:
+    build:
+      context: .
+      dockerfile: ./services/telegram/Dockerfile
+    restart: unless-stopped
+    ports:
+      - 8080:8080
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_SERVICE_PORT=8080
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - STT_URL=grpc://stt:50052
+      - TTS_URL=grpc://tts:50053
+      - LLM_URL=grpc://inference-api:50051
+      # Conversation API is optional - telegram service has fallback
+      # - CONVERSATION_API_URL=http://gateway:8080
+    depends_on:
+      - stt
+      - tts
+      - inference-api
+    volumes:
+      - /var/log/june/telegram:/logs
+    networks:
+      - june_network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Discord Bot Service - Orchestrates the pipeline (shares code with telegram)
+  discord:
+    build:
+      context: .
+      dockerfile: ./services/discord/Dockerfile
+    restart: unless-stopped
+    ports:
+      - 8081:8081
+    environment:
+      - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      - DISCORD_SERVICE_PORT=8081
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - STT_URL=grpc://stt:50052
+      - TTS_URL=grpc://tts:50053
+      - LLM_URL=grpc://inference-api:50051
+      # Conversation API is optional - discord service has fallback
+      # - CONVERSATION_API_URL=http://gateway:8080
+    depends_on:
+      - stt
+      - tts
+      - inference-api
+    volumes:
+      - /var/log/june/discord:/logs
+    networks:
+      - june_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+networks:
+  june_network:
+    driver: bridge
+
+# That's it! Only 5 services needed for the core functionality (4 core + 1 platform service).
+# Telegram and Discord share code via essence/chat/ module.
+# No PostgreSQL, Redis, MinIO, NATS, Gateway, Webapp, etc.
+

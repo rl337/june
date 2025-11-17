@@ -9,10 +9,8 @@ USER root
 COPY pyproject.toml poetry.lock ./
 
 # Copy essence package (needed for poetry install and command execution)
+# This includes all service code now (essence/services/telegram)
 COPY essence ./essence
-
-# Copy service code
-COPY services/telegram .
 
 # Install dependencies using poetry (skip installing project itself with --no-root)
 # Use environment variables to disable virtualenv creation
