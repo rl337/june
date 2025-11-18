@@ -30,6 +30,15 @@ class WhisperSttStrategy(SttStrategy):
 
     def warmup(self) -> None:
         """Load and initialize the Whisper model."""
+        # Check if model is already loaded
+        if self._model is not None:
+            logger.info(
+                "Whisper model already loaded: %s on device: %s. Skipping reload.",
+                self.model_name,
+                self.device,
+            )
+            return
+        
         if self._adapter is None:
             try:
                 self._model = WhisperModelImpl(self.model_name, self.device)
