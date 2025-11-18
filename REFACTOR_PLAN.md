@@ -74,6 +74,19 @@ Pare down the june project to bare essentials for the **voice message → STT �
 - Documentation updated
 - **Best Practice:** Keep scripts/ minimal - only infrastructure/automation scripts; use commands for reusable tools
 
+### Phase 12: Test Infrastructure and Integration Test Service ✅
+- Created integration test service with REST API
+- Migrated existing integration tests to work with test service
+- Comprehensive testing documentation
+- **Best Practice:** Integration tests run in background via test service; use REST API for management
+
+### Phase 13: Running and Checking Integration Test Runs ✅
+- Deployed integration test service to docker-compose.yml
+- Set up Prometheus metrics and alerting
+- Created Grafana dashboard for test monitoring
+- Comprehensive workflow documentation
+- **Best Practice:** Monitor test runs via Prometheus/Grafana; set up alerts for failures
+
 ## Current Priorities
 
 ### Phase 12: Test Infrastructure and Integration Test Service ✅ COMPLETED
@@ -121,7 +134,7 @@ Pare down the june project to bare essentials for the **voice message → STT �
    - ✅ Document how to check integration test results (COMPLETED - added REST API reference with examples for checking status, retrieving results, viewing logs, listing runs, and cancelling tests)
    - ✅ Document test service REST API (COMPLETED - added complete REST API reference with all 8 endpoints, request/response examples, status values, and usage examples in bash and Python)
 
-### Phase 13: Running and Checking Integration Test Runs ⏳ TODO
+### Phase 13: Running and Checking Integration Test Runs ✅ COMPLETED
 
 **Goal:** Establish workflow for running and monitoring integration tests.
 
@@ -208,7 +221,9 @@ Pare down the june project to bare essentials for the **voice message → STT �
 
 ## Next Steps
 
-1. **Phase 11:** Clean up scripts directory and migrate to commands
-2. **Phase 12:** Create integration test service infrastructure
-3. **Phase 13:** Establish workflow for running and checking integration tests
-4. **Ongoing:** Maintain minimal architecture and follow established best practices
+1. **Ongoing:** Maintain minimal architecture and follow established best practices
+2. **Future enhancements (optional):**
+   - Consider persistent storage for test results (currently in-memory)
+   - Add test result export functionality
+   - Enhance Grafana dashboards with additional visualizations
+   - Set up automated test runs on code changes (CI/CD integration)
