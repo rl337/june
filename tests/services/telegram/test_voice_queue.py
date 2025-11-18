@@ -23,7 +23,7 @@ async def test_voice_queue_connect(mock_nats):
     """Test queue connection."""
     mock_nc, mock_js = mock_nats
     
-    with patch('voice_queue.nats.connect', return_value=mock_nc):
+    with patch('essence.services.telegram.voice_queue.nats.connect', return_value=mock_nc):
         queue = VoiceMessageQueue(nats_url="nats://localhost:4222")
         
         # Mock stream_info to raise NotFoundError (stream doesn't exist)
@@ -47,7 +47,7 @@ async def test_voice_queue_publish(mock_nats):
     mock_ack.seq = 123
     mock_js.publish = AsyncMock(return_value=mock_ack)
     
-    with patch('voice_queue.nats.connect', return_value=mock_nc):
+    with patch('essence.services.telegram.voice_queue.nats.connect', return_value=mock_nc):
         queue = VoiceMessageQueue(nats_url="nats://localhost:4222")
         queue.nc = mock_nc
         queue.js = mock_js
@@ -94,7 +94,7 @@ async def test_voice_queue_status(mock_nats):
     mock_js.stream_info = AsyncMock(return_value=mock_stream_info)
     mock_js.consumer_info = AsyncMock(side_effect=Exception("NotFound"))
     
-    with patch('voice_queue.nats.connect', return_value=mock_nc):
+    with patch('essence.services.telegram.voice_queue.nats.connect', return_value=mock_nc):
         queue = VoiceMessageQueue(nats_url="nats://localhost:4222")
         queue.nc = mock_nc
         queue.js = mock_js
@@ -147,7 +147,7 @@ async def test_worker_subscription(mock_nats):
     async def process_callback(msg_data):
         processed_messages.append(msg_data)
     
-    with patch('voice_queue.nats.connect', return_value=mock_nc):
+    with patch('essence.services.telegram.voice_queue.nats.connect', return_value=mock_nc):
         queue = VoiceMessageQueue(nats_url="nats://localhost:4222")
         queue.nc = mock_nc
         queue.js = mock_js
