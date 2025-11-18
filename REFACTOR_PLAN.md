@@ -205,6 +205,12 @@ These are not needed for the core voice round trip:
    - ✅ **COMPLETED:** Added tracing spans to TTS service gRPC handlers
      - ✅ `tts.synthesize` span with attributes (text_length, voice_id, language, audio_size_bytes, sample_rate, duration_ms)
      - ✅ Span includes error handling with `record_exception()` and error status
+   - ✅ **COMPLETED:** Added tracing spans to inference-api service gRPC handlers
+     - ✅ `llm.generate` span for one-shot generation with attributes (method, prompt_length, max_tokens, temperature, response_length, completion_tokens, total_tokens, tokens_per_second)
+     - ✅ `llm.generate_stream` span for streaming generation with attributes (method, prompt_length, max_tokens, temperature, chunk_count)
+     - ✅ `llm.chat` span for one-shot chat with attributes (method, message_count, max_tokens, temperature, formatted_prompt_length, response_length, completion_tokens, total_tokens, tokens_per_second)
+     - ✅ `llm.chat_stream` span for streaming chat with attributes (method, message_count, max_tokens, temperature, formatted_prompt_length, chunk_count)
+     - ✅ All spans include error handling with `record_exception()` and error status
    - ✅ **COMPLETED:** Added tracing spans to HTTP requests via FastAPI middleware
      - ✅ telegram service: Added HTTP tracing middleware that wraps all FastAPI requests (health, metrics, agent message endpoints)
      - ✅ discord service: Added HTTP tracing middleware that wraps all FastAPI requests (health, metrics, agent message endpoints)

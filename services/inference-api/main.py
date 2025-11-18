@@ -55,13 +55,16 @@ from inference_core.llm.qwen3_strategy import Qwen3LlmStrategy
 from inference_core.strategies import InferenceRequest, InferenceResponse
 
 # Initialize tracing early
+tracer = None
 try:
     # Add essence package to path for tracing import
     essence_path = Path(__file__).parent.parent.parent / "essence"
     if str(essence_path) not in sys.path:
         sys.path.insert(0, str(essence_path))
-    from essence.chat.utils.tracing import setup_tracing
+    from essence.chat.utils.tracing import setup_tracing, get_tracer
+    from opentelemetry import trace
     setup_tracing(service_name="june-inference-api")
+    tracer = get_tracer(__name__)
 except ImportError:
     pass
 
@@ -123,8 +126,17 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
     
     async def GenerateStream(self, request: GenerationRequest, context: grpc.aio.ServicerContext) -> AsyncGenerator[GenerationChunk, None]:
         """Streaming text generation."""
-        with Timer("generation_stream"):
-            try:
+        span = None
+        if tracer is not None:
+            span = tracer.start_span("llm.generate_stream")
+            span.set_attribute("llm.method", "stream")
+            span.set_attribute("llm.prompt_length", len(request.prompt))
+            if request.params:
+                span.set_attribute("llm.max_tokens", request.params.max_tokens)
+                span.set_attribute("llm.temperature", request.params.temperature)
+        
+        try:
+            with Timer("generation_stream"):
                 # Validate input
                 if VALIDATION_AVAILABLE and input_validator:
                     try:
@@ -136,6 +148,9 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                         )
                         request.prompt = validated_prompt
                     except InputValidationError as e:
+                        if span:
+                            span.set_status(trace.Status(trace.StatusCode.ERROR, f"Invalid prompt: {str(e)}"))
+                            span.record_exception(e)
                         context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
                         context.set_details(f"Invalid prompt: {str(e)}")
                         error_chunk = GenerationChunk(
@@ -150,26 +165,48 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                 context_data = await self._prepare_context(request.context)
                 
                 # Generate tokens
+                chunk_count = 0
                 async for chunk in self._generate_tokens_stream(
                     request.prompt, 
                     request.params, 
                     context_data
                 ):
+                    chunk_count += 1
                     yield chunk
+                
+                # Update span with results
+                if span:
+                    span.set_attribute("llm.chunk_count", chunk_count)
+                    span.set_status(trace.Status(trace.StatusCode.OK))
                     
-            except Exception as e:
-                logger.error(f"Generation stream error: {e}")
-                error_chunk = GenerationChunk(
-                    token="",
-                    is_final=True,
-                    finish_reason=FinishReason.ERROR
-                )
-                yield error_chunk
+        except Exception as e:
+            logger.error(f"Generation stream error: {e}")
+            if span:
+                span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                span.record_exception(e)
+            error_chunk = GenerationChunk(
+                token="",
+                is_final=True,
+                finish_reason=FinishReason.ERROR
+            )
+            yield error_chunk
+        finally:
+            if span:
+                span.end()
     
     async def Generate(self, request: GenerationRequest, context: grpc.aio.ServicerContext) -> GenerationResponse:
         """One-shot text generation."""
-        with Timer("generation"):
-            try:
+        span = None
+        if tracer is not None:
+            span = tracer.start_span("llm.generate")
+            span.set_attribute("llm.method", "oneshot")
+            span.set_attribute("llm.prompt_length", len(request.prompt))
+            if request.params:
+                span.set_attribute("llm.max_tokens", request.params.max_tokens)
+                span.set_attribute("llm.temperature", request.params.temperature)
+        
+        try:
+            with Timer("generation"):
                 # Validate input
                 if VALIDATION_AVAILABLE and input_validator:
                     try:
@@ -181,6 +218,9 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                         )
                         request.prompt = validated_prompt
                     except InputValidationError as e:
+                        if span:
+                            span.set_status(trace.Status(trace.StatusCode.ERROR, f"Invalid prompt: {str(e)}"))
+                            span.record_exception(e)
                         context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
                         context.set_details(f"Invalid prompt: {str(e)}")
                         return GenerationResponse()
@@ -194,6 +234,14 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                     request.params,
                     context_data
                 )
+                
+                # Update span with results
+                if span:
+                    span.set_attribute("llm.response_length", len(response_text))
+                    span.set_attribute("llm.completion_tokens", usage_stats.completion_tokens)
+                    span.set_attribute("llm.total_tokens", usage_stats.total_tokens)
+                    span.set_attribute("llm.tokens_per_second", tokens_per_second)
+                    span.set_status(trace.Status(trace.StatusCode.OK))
                 
                 return GenerationResponse(
                     text=response_text,
@@ -211,6 +259,11 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                 elif "timeout" in error_msg or "timed out" in error_msg:
                     error_type = "timeout"
                 
+                # Update span for error
+                if span:
+                    span.set_status(trace.Status(trace.StatusCode.ERROR, error_msg))
+                    span.record_exception(e)
+                
                 # Attempt recovery
                 await self.recover_from_error(error_type)
                 
@@ -219,6 +272,11 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                 context.set_details(str(e))
                 return GenerationResponse()
             except Exception as e:
+                # Update span for error
+                if span:
+                    span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                    span.record_exception(e)
+                
                 # Attempt recovery for unknown errors
                 await self.recover_from_error("unknown")
                 
@@ -226,11 +284,23 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(str(e))
                 return GenerationResponse()
+        finally:
+            if span:
+                span.end()
     
     async def ChatStream(self, request: ChatRequest, context: grpc.aio.ServicerContext) -> AsyncGenerator[ChatChunk, None]:
         """Streaming chat with conversation history."""
-        with Timer("chat_stream"):
-            try:
+        span = None
+        if tracer is not None:
+            span = tracer.start_span("llm.chat_stream")
+            span.set_attribute("llm.method", "chat_stream")
+            span.set_attribute("llm.message_count", len(request.messages))
+            if request.params:
+                span.set_attribute("llm.max_tokens", request.params.max_tokens)
+                span.set_attribute("llm.temperature", request.params.temperature)
+        
+        try:
+            with Timer("chat_stream"):
                 # Validate input messages
                 if VALIDATION_AVAILABLE and input_validator:
                     try:
@@ -244,6 +314,9 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                                 )
                                 message.content = validated_content
                     except InputValidationError as e:
+                        if span:
+                            span.set_status(trace.Status(trace.StatusCode.ERROR, f"Invalid message content: {str(e)}"))
+                            span.record_exception(e)
                         context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
                         context.set_details(f"Invalid message content: {str(e)}")
                         error_chunk = ChatChunk(
@@ -261,12 +334,17 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                 # Format conversation
                 formatted_prompt = await self._format_conversation(request.messages, context_data)
                 
+                if span:
+                    span.set_attribute("llm.formatted_prompt_length", len(formatted_prompt))
+                
                 # Generate response
+                chunk_count = 0
                 async for chunk in self._generate_tokens_stream(
                     formatted_prompt,
                     request.params,
                     context_data
                 ):
+                    chunk_count += 1
                     chat_chunk = ChatChunk(
                         content_delta=chunk.token,
                         role="assistant",
@@ -274,9 +352,17 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                         finish_reason=chunk.finish_reason
                     )
                     yield chat_chunk
+                
+                # Update span with results
+                if span:
+                    span.set_attribute("llm.chunk_count", chunk_count)
+                    span.set_status(trace.Status(trace.StatusCode.OK))
                     
             except Exception as e:
                 logger.error(f"Chat stream error: {e}")
+                if span:
+                    span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                    span.record_exception(e)
                 error_chunk = ChatChunk(
                     content_delta="",
                     role="assistant",
@@ -284,11 +370,23 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                     finish_reason=FinishReason.ERROR
                 )
                 yield error_chunk
+        finally:
+            if span:
+                span.end()
     
     async def Chat(self, request: ChatRequest, context: grpc.aio.ServicerContext) -> ChatResponse:
         """One-shot chat with conversation history."""
-        with Timer("chat"):
-            try:
+        span = None
+        if tracer is not None:
+            span = tracer.start_span("llm.chat")
+            span.set_attribute("llm.method", "chat")
+            span.set_attribute("llm.message_count", len(request.messages))
+            if request.params:
+                span.set_attribute("llm.max_tokens", request.params.max_tokens)
+                span.set_attribute("llm.temperature", request.params.temperature)
+        
+        try:
+            with Timer("chat"):
                 # Validate input messages
                 if VALIDATION_AVAILABLE and input_validator:
                     try:
@@ -302,6 +400,9 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                                 )
                                 message.content = validated_content
                     except InputValidationError as e:
+                        if span:
+                            span.set_status(trace.Status(trace.StatusCode.ERROR, f"Invalid message content: {str(e)}"))
+                            span.record_exception(e)
                         context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
                         context.set_details(f"Invalid message content: {str(e)}")
                         return ChatResponse()
@@ -312,12 +413,23 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                 # Format conversation
                 formatted_prompt = await self._format_conversation(request.messages, context_data)
                 
+                if span:
+                    span.set_attribute("llm.formatted_prompt_length", len(formatted_prompt))
+                
                 # Generate response
                 response_text, usage_stats, tokens_per_second = await self._generate_text(
                     formatted_prompt,
                     request.params,
                     context_data
                 )
+                
+                # Update span with results
+                if span:
+                    span.set_attribute("llm.response_length", len(response_text))
+                    span.set_attribute("llm.completion_tokens", usage_stats.completion_tokens)
+                    span.set_attribute("llm.total_tokens", usage_stats.total_tokens)
+                    span.set_attribute("llm.tokens_per_second", tokens_per_second)
+                    span.set_status(trace.Status(trace.StatusCode.OK))
                 
                 # Create assistant message
                 assistant_message = ChatMessage(
@@ -334,9 +446,15 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                 
             except Exception as e:
                 logger.error(f"Chat error: {e}")
+                if span:
+                    span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                    span.record_exception(e)
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(str(e))
                 return ChatResponse()
+        finally:
+            if span:
+                span.end()
     
     async def Embed(self, request: EmbeddingRequest, context: grpc.aio.ServicerContext) -> EmbeddingResponse:
         """Generate embeddings for text."""
