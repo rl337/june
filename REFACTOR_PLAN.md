@@ -707,11 +707,15 @@ This phase focuses on refactoring individual services, building them, testing th
    - ✅ All tools are sandboxed within workspace directory (path validation prevents escaping)
    - ✅ Tool execution results are returned to model for continued conversation
 
-4. **⏳ TODO: Create coding agent service:**
-   - ⏳ Optionally create separate `coding-agent` service in docker-compose.yml
-   - ⏳ Or integrate into existing inference-api service
-   - ⏳ Ensure all dependencies are containerized
-   - **Note:** Coding agent can be used as a library from other services or scripts - no separate service required for MVP
+4. **✅ COMPLETED: Create coding agent service:**
+   - ✅ **COMPLETED:** Coding agent is used as a library (no separate service required for MVP)
+     - ✅ Coding agent (`essence/agents/coding_agent.py`) is imported and used in `essence/agents/evaluator.py`
+     - ✅ Coding agent is used in benchmark evaluation system as a library
+     - ✅ All dependencies are containerized (runs in cli-tools container via docker compose)
+     - ✅ Coding agent connects to inference-api via gRPC (container-to-container communication)
+   - ⏳ **Optional future enhancement:** Create separate `coding-agent` service in docker-compose.yml if standalone service is needed
+     - ⏳ This is optional and not required for MVP
+     - ⏳ Current library-based approach is sufficient for benchmark evaluation
 
 #### 10.5: Benchmark Evaluation Setup ⏳ IN PROGRESS
 
