@@ -48,7 +48,7 @@ EXPOSE 50053
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD python -c "import grpc; grpc.insecure_channel('localhost:50053').check_connectivity_state(True)" || exit 1
 
-# Run the application
-CMD ["poetry", "run", "python", "main.py"]
+# Run the TTS service via essence command system
+CMD ["poetry", "run", "python", "-m", "essence", "tts"]
 
 

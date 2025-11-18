@@ -38,9 +38,9 @@ EXPOSE 50052
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD python -c "import grpc; grpc.insecure_channel('localhost:50052').check_connectivity_state(True)" || exit 1
 
-# Run the Whisper-based STT application
+# Run the STT service via essence command system
 ENV STT_MODEL_NAME=base.en
 ENV STT_DEVICE=cpu
-CMD ["poetry", "run", "python", "main_whisper.py"]
+CMD ["poetry", "run", "python", "-m", "essence", "stt"]
 
 

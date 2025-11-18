@@ -59,7 +59,7 @@ EXPOSE 50051
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD poetry run python -c "import grpc; grpc.insecure_channel('localhost:50051').check_connectivity_state(True)" || exit 1
 
-# Run the inference API service
-CMD ["poetry", "run", "python", "main.py"]
+# Run the inference API service via essence command system
+CMD ["poetry", "run", "python", "-m", "essence", "inference-api"]
 
 
