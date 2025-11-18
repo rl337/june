@@ -277,19 +277,19 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                                 await status_message.edit_text(error_text, parse_mode="HTML")
                             except:
                                 pass
+                else:
+                    # No response received
+                    span.set_attribute("response_received", False)
+                    if status_message:
+                        try:
+                            await status_message.edit_text("⚠️ No response generated")
+                        except:
+                            pass
                     else:
-                        # No response received
-                        span.set_attribute("response_received", False)
-                        if status_message:
-                            try:
-                                await status_message.edit_text("⚠️ No response generated")
-                            except:
-                                pass
-                        else:
-                            try:
-                                await update.message.reply_text("⚠️ No response generated")
-                            except:
-                                pass
+                        try:
+                            await update.message.reply_text("⚠️ No response generated")
+                        except:
+                            pass
                 
             except Exception as stream_error:
                 logger.error(f"Error streaming agent response: {stream_error}", exc_info=True)

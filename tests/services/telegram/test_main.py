@@ -175,6 +175,21 @@ mock_deps_config.get_tts_address = MagicMock(return_value="tts:50052")
 mock_deps_config.get_metrics_storage = MagicMock()
 sys.modules['dependencies.config'] = mock_deps_config
 
+# Mock opentelemetry before importing essence (essence.chat.utils.tracing requires it)
+# Note: conftest.py also mocks this, but we ensure it's mocked here too for safety
+if 'opentelemetry' not in sys.modules or not hasattr(sys.modules['opentelemetry'], 'trace'):
+    sys.modules['opentelemetry'] = MagicMock()
+    sys.modules['opentelemetry.trace'] = MagicMock()
+    sys.modules['opentelemetry.sdk'] = MagicMock()
+    sys.modules['opentelemetry.sdk.trace'] = MagicMock()
+    sys.modules['opentelemetry.sdk.trace.export'] = MagicMock()
+    sys.modules['opentelemetry.sdk.resources'] = MagicMock()
+    sys.modules['opentelemetry.exporter'] = MagicMock()
+    sys.modules['opentelemetry.exporter.jaeger'] = MagicMock()
+    sys.modules['opentelemetry.exporter.jaeger.thrift'] = MagicMock()
+    sys.modules['opentelemetry.instrumentation'] = MagicMock()
+    sys.modules['opentelemetry.instrumentation.grpc'] = MagicMock()
+
 from essence.services.telegram.main import TelegramBotService
 from essence.services.telegram.audio_utils import AudioValidationError, prepare_audio_for_stt
 from essence.services.telegram.handlers.commands import start_command, help_command, status_command

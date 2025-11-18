@@ -387,8 +387,9 @@ The june project has been successfully refactored from a complex microservices a
 - ✅ **COMPLETED:** All unit tests in `tests/essence/` continue to pass (100/100)
 
 **Remaining Work (Optional/Future):**
-- ⏳ TODO (Optional): Fix dependencies for `tests/services/` tests for active services (telegram, discord, stt, tts, inference-api) - these may be integration tests that need running services
-  - **Note:** These tests currently fail with `ModuleNotFoundError: No module named 'opentelemetry'` because system Python doesn't have dependencies installed and PEP 668 prevents installation. These tests are excluded from pytest collection and are optional. They may need to be run in a containerized environment or with proper virtualenv setup.
+- ✅ **COMPLETED:** Fixed opentelemetry import errors in `tests/services/telegram/` and `tests/services/discord/` tests by adding opentelemetry mocking to conftest.py and test files before importing from essence modules. Tests can now be collected successfully.
+- ⏳ TODO (Optional): Fix import path issues in `tests/services/stt/` tests (ModuleNotFoundError: No module named 'main') - these tests have different import path issues unrelated to opentelemetry
+- ⏳ TODO (Optional): Fix dependencies for remaining `tests/services/` tests (tts, inference-api) if they have similar issues - these may be integration tests that need running services
 
 **Note:** These TODO items are also listed in the "Refactoring Status Summary" section above. All remaining work is optional and does not block core functionality.
 

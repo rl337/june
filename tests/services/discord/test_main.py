@@ -98,9 +98,18 @@ sys.modules['prometheus_client.generate_latest'] = MagicMock(return_value=b'# me
 sys.modules['prometheus_client.CollectorRegistry'] = MagicMock()
 sys.modules['prometheus_client.CONTENT_TYPE_LATEST'] = 'text/plain'
 
-# Mock opentelemetry (needed by main.py)
+# Mock opentelemetry before importing essence (essence.chat.utils.tracing requires it)
 sys.modules['opentelemetry'] = MagicMock()
 sys.modules['opentelemetry.trace'] = MagicMock()
+sys.modules['opentelemetry.sdk'] = MagicMock()
+sys.modules['opentelemetry.sdk.trace'] = MagicMock()
+sys.modules['opentelemetry.sdk.trace.export'] = MagicMock()
+sys.modules['opentelemetry.sdk.resources'] = MagicMock()
+sys.modules['opentelemetry.exporter'] = MagicMock()
+sys.modules['opentelemetry.exporter.jaeger'] = MagicMock()
+sys.modules['opentelemetry.exporter.jaeger.thrift'] = MagicMock()
+sys.modules['opentelemetry.instrumentation'] = MagicMock()
+sys.modules['opentelemetry.instrumentation.grpc'] = MagicMock()
 
 # Mock essence.chat modules
 sys.modules['essence.chat.message_builder'] = MagicMock()
