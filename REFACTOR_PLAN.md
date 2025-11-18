@@ -116,7 +116,7 @@ Pare down the june project to bare essentials for the **voice message → STT �
    - ⏳ Update to use test service API
 
 3. **Documentation:**
-   - ⏳ Document how to run unit tests (pytest)
+   - ✅ Document how to run unit tests (pytest) (COMPLETED - created docs/guides/TESTING.md with comprehensive testing guide including unit test requirements, examples, best practices, and troubleshooting)
    - ⏳ Document how to start integration test service
    - ⏳ Document how to check integration test results
    - ⏳ Document test service REST API
