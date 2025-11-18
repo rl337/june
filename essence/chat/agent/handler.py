@@ -16,8 +16,16 @@ logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)
 
 
-def find_agenticness_directory(script_name: str = "telegram_response_agent.sh"):
-    """Find the agenticness directory from various possible locations."""
+def find_agenticness_directory(script_name: str = "telegram_response_agent.sh") -> Optional[str]:
+    """
+    Find the agenticness directory from various possible locations.
+    
+    Args:
+        script_name: Name of the script file to look for (default: "telegram_response_agent.sh")
+        
+    Returns:
+        Path to the agenticness directory as a string, or None if not found
+    """
     service_dir = Path(__file__).parent.parent.parent
     possible_paths = [
         Path("/app/agenticness"),  # Mounted volume in container

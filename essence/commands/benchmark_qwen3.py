@@ -461,8 +461,14 @@ def generate_summary(report: PerformanceReport) -> Dict:
     return summary
 
 
-def save_report(report: PerformanceReport, output_dir: Path):
-    """Save performance report to JSON and text files."""
+def save_report(report: PerformanceReport, output_dir: Path) -> None:
+    """
+    Save performance report to JSON and text files.
+    
+    Args:
+        report: Performance report to save
+        output_dir: Directory where reports will be saved
+    """
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Save JSON report
