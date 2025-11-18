@@ -2,6 +2,12 @@
 """
 End-to-End Text Passthrough Test
 
+⚠️ **OBSOLETE:** This test is obsolete because it depends on the gateway service,
+which has been removed as part of the refactoring. The gateway service was
+removed to achieve a minimal architecture with direct gRPC communication between
+services.
+
+**Original Purpose:**
 Tests the complete pipeline:
 1. Input text → TTS → audio
 2. Audio → Gateway (with full_round_trip=true)
@@ -9,8 +15,11 @@ Tests the complete pipeline:
 4. Gateway audio response → STT → text
 5. Assert: final text == input text
 
-This validates that the passthrough LLM correctly preserves the input text
+This validated that the passthrough LLM correctly preserves the input text
 through the entire audio processing pipeline.
+
+**Status:** This test file is kept for reference but is not functional.
+To test the pipeline without gateway, use direct gRPC calls to STT, LLM, and TTS services.
 """
 import os
 import sys
