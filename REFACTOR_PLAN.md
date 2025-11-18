@@ -725,7 +725,7 @@ This phase focuses on refactoring individual services, building them, testing th
      - ⏳ This is optional and not required for MVP
      - ⏳ Current library-based approach is sufficient for benchmark evaluation
 
-#### 10.5: Benchmark Evaluation Setup ⏳ IN PROGRESS
+#### 10.5: Benchmark Evaluation Setup ✅ COMPLETED
 
 1. **✅ COMPLETED: Select benchmark datasets:**
    - ✅ **COMPLETED:** **HumanEval** - Python coding problems (164 problems)
@@ -788,9 +788,7 @@ This phase focuses on refactoring individual services, building them, testing th
      - ✅ Shell script wrapper for docker compose execution
      - ✅ Handles both container and host execution
      - ✅ Automatically starts inference-api if needed
-   - ⏳ **Remaining tasks:**
-     - ⏳ Sandbox review tools (analyze what agent did) - can be added as separate script
-     - ⏳ Comparison with baseline models - can be added to report generation
+   - **Note:** Sandbox review tools are completed in task 6, baseline comparison is completed in task 4
 
 4. **✅ COMPLETED: Run evaluations:**
    - ✅ **COMPLETED:** Download benchmark datasets (in container or volume)
@@ -1090,10 +1088,10 @@ june/
 5. **Refactor, build, and test individual services** (Phase 9.1-9.3)
 6. **Create and run end-to-end integration tests** (Phase 9.4)
 7. **Document test suite** (Phase 9.5)
-8. **Set up Qwen3-30B-A3B-Thinking-2507 on GPU** (Phase 10.1-10.2) - **NEW PRIORITY** - ⏳ IN PROGRESS (model loading)
+8. **Set up Qwen3-30B-A3B-Thinking-2507 on GPU** (Phase 10.1-10.2) - **NEW PRIORITY** - ✅ COMPLETED
 9. **Develop coding agent and run benchmarks** (Phase 10.3-10.5) - **NEW PRIORITY**
    - ✅ Phase 10.4: Coding agent interface completed
-   - ⏳ Phase 10.5: Benchmark evaluation setup (waiting for model to finish loading)
+   - ✅ Phase 10.5: Benchmark evaluation setup completed
 10. **Continue with subsequent phases** from the plan
 
 ## Test Requirements Summary
