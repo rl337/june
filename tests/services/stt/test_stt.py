@@ -13,6 +13,59 @@ sys.modules['torchaudio'] = MagicMock()
 sys.modules['grpc'] = MagicMock()
 sys.modules['grpc.aio'] = MagicMock()
 
+# Mock other dependencies that main.py imports
+sys.modules['whisper'] = MagicMock()
+sys.modules['webrtcvad'] = MagicMock()
+sys.modules['nats'] = MagicMock()
+sys.modules['librosa'] = MagicMock()
+sys.modules['soundfile'] = MagicMock()
+sys.modules['prometheus_client'] = MagicMock()
+sys.modules['prometheus_client.exposition'] = MagicMock()
+sys.modules['inference_core'] = MagicMock()
+sys.modules['inference_core.config'] = MagicMock()
+sys.modules['inference_core.setup_logging'] = MagicMock()
+sys.modules['inference_core.Timer'] = MagicMock()
+sys.modules['inference_core.HealthChecker'] = MagicMock()
+sys.modules['inference_core.CircularBuffer'] = MagicMock()
+
+# Mock opentelemetry (needed by main.py for tracing)
+sys.modules['opentelemetry'] = MagicMock()
+sys.modules['opentelemetry.trace'] = MagicMock()
+sys.modules['opentelemetry.sdk'] = MagicMock()
+sys.modules['opentelemetry.sdk.trace'] = MagicMock()
+sys.modules['opentelemetry.sdk.trace.export'] = MagicMock()
+sys.modules['opentelemetry.sdk.resources'] = MagicMock()
+sys.modules['opentelemetry.exporter'] = MagicMock()
+sys.modules['opentelemetry.exporter.jaeger'] = MagicMock()
+sys.modules['opentelemetry.exporter.jaeger.thrift'] = MagicMock()
+sys.modules['opentelemetry.instrumentation'] = MagicMock()
+sys.modules['opentelemetry.instrumentation.grpc'] = MagicMock()
+
+# Mock june_rate_limit and june_security (optional dependencies)
+sys.modules['june_rate_limit'] = MagicMock()
+sys.modules['june_security'] = MagicMock()
+
+# Mock june_grpc_api before importing main (main.py imports from it)
+# Create mock protobuf classes that main.py expects
+class MockAsrPb2:
+    AudioChunk = MagicMock
+    RecognitionRequest = MagicMock
+    RecognitionResponse = MagicMock
+    RecognitionResult = MagicMock
+    RecognitionConfig = MagicMock
+    WordInfo = MagicMock
+    HealthRequest = MagicMock
+    HealthResponse = MagicMock
+
+class MockJuneGrpcApiGenerated:
+    asr_pb2 = MockAsrPb2()
+    asr_pb2_grpc = MagicMock()
+
+mock_june_grpc_api = MagicMock()
+mock_june_grpc_api_generated = MockJuneGrpcApiGenerated()
+sys.modules['june_grpc_api'] = mock_june_grpc_api
+sys.modules['june_grpc_api.generated'] = mock_june_grpc_api_generated
+
 # Import grpc after mocking (for type hints)
 try:
     import grpc
@@ -23,7 +76,8 @@ except ImportError:
 
 # Add packages directory to path for june_grpc_api import
 import os
-_project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# From tests/services/stt/test_stt.py, go up 4 levels to get to project root
+_project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 _packages_dir = os.path.join(_project_root, 'packages')
 if _packages_dir not in sys.path:
     sys.path.insert(0, _packages_dir)
@@ -60,7 +114,8 @@ HealthResponse = asr_pb2.HealthResponse
 
 # Import STT service from services/stt/main.py
 # Add services/stt directory to path to import main
-stt_service_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../services/stt'))
+# Reuse _project_root already calculated above
+stt_service_dir = os.path.join(_project_root, 'services', 'stt')
 if stt_service_dir not in sys.path:
     sys.path.insert(0, stt_service_dir)
 from main import STTService, stt_service

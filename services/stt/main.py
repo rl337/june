@@ -358,9 +358,9 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(str(e))
                 return RecognitionResponse()
-            finally:
-                if span:
-                    span.end()
+        finally:
+            if span:
+                span.end()
     
     async def HealthCheck(self, request: HealthRequest, context: grpc.aio.ServicerContext) -> HealthResponse:
         """Health check endpoint."""

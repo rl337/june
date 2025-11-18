@@ -388,7 +388,12 @@ The june project has been successfully refactored from a complex microservices a
 
 **Remaining Work (Optional/Future):**
 - ✅ **COMPLETED:** Fixed opentelemetry import errors in `tests/services/telegram/` and `tests/services/discord/` tests by adding opentelemetry mocking to conftest.py and test files before importing from essence modules. Tests can now be collected successfully.
-- ⏳ TODO (Optional): Fix import path issues in `tests/services/stt/` tests (ModuleNotFoundError: No module named 'main') - these tests have different import path issues unrelated to opentelemetry
+- ✅ **COMPLETED:** Fixed import path issues in `tests/services/stt/` tests by:
+  - Correcting `_project_root` calculation (needed 4 levels up, not 3)
+  - Adding comprehensive module mocking (whisper, webrtcvad, nats, librosa, soundfile, prometheus_client, inference_core, opentelemetry, june_rate_limit, june_security, june_grpc_api)
+  - Creating proper mock structure for `june_grpc_api.generated` with required protobuf classes
+  - Fixed syntax error in `services/stt/main.py` (incorrect indentation of `finally` block)
+  - Tests can now be collected successfully (36 tests)
 - ⏳ TODO (Optional): Fix dependencies for remaining `tests/services/` tests (tts, inference-api) if they have similar issues - these may be integration tests that need running services
 
 **Note:** These TODO items are also listed in the "Refactoring Status Summary" section above. All remaining work is optional and does not block core functionality.
