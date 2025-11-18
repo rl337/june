@@ -581,8 +581,12 @@ This phase focuses on refactoring individual services, building them, testing th
        - ⏳ Test files in `tests/services/stt/`, `tests/services/tts/`, `tests/services/inference-api/` may have similar import issues (these services still use `services/<service>/main.py` structure, so imports may be correct)
      - ⏳ Add tracing span tests for all services (verify spans are created with correct attributes)
      - ⏳ Add metrics collection tests for telegram, tts services (stt and inference-api have some metrics tests)
-     - ⏳ Create complete test suite for discord service (currently no tests exist)
-     - ⏳ Add rate limiting tests for telegram service
+     - ✅ **COMPLETED:** Create complete test suite for discord service (test_main.py with 14 tests, all passing)
+     - ✅ **COMPLETED:** Add rate limiting tests for telegram service (test_rate_limit.py with 15 tests, all passing)
+       - ✅ Tests for per-minute, per-hour, and per-day rate limiting
+       - ✅ Tests for user statistics and clearing user history
+       - ✅ Tests for concurrent requests and independent user limits
+       - ✅ Tests for RateLimiter wrapper and get_rate_limiter singleton
 
 2. **Integration tests for each service:**
    - ⏳ Test service can start and connect to dependencies
