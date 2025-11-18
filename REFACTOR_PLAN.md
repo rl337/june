@@ -132,9 +132,9 @@ Pare down the june project to bare essentials for the **voice message → STT �
    - ✅ Set up log aggregation for test service (COMPLETED - logs mounted to `/var/log/june/integration-test:/logs` volume, service writes logs to stdout/stderr which are captured by Docker)
 
 2. **Monitoring and alerting:**
-   - ⏳ Set up alerts for test failures
-   - ⏳ Dashboard for test run status
-   - ⏳ Integration with existing monitoring (Prometheus/Grafana)
+   - ✅ Set up alerts for test failures (COMPLETED - added 5 Prometheus alert rules in config/prometheus-alerts.yml: service down, test failures, high failure rate, long duration, service unhealthy)
+   - ✅ Dashboard for test run status (COMPLETED - created Grafana dashboard JSON in config/grafana/integration-test-dashboard.json with 6 panels: active test runs, success rate, service health, test runs by status, test duration, failure rate)
+   - ✅ Integration with existing monitoring (Prometheus/Grafana) (COMPLETED - added Prometheus scrape config for integration-test service, added test-specific metrics (integration_test_runs_total, integration_test_run_duration_seconds, integration_test_runs_active), created comprehensive monitoring guide in docs/guides/MONITORING.md)
 
 3. **Workflow documentation:**
    - ✅ How to start integration test service (COMPLETED - documented in docs/guides/TESTING.md with command usage, environment variables, and service endpoints)

@@ -247,3 +247,58 @@ groups:
         annotations:
           summary: "Low request throughput"
           description: "Request throughput is below 0.1 requests/second for more than 15 minutes."
+
+  # Integration Test Alerts
+  - name: integration_test_alerts
+    interval: 30s
+    rules:
+      - alert: IntegrationTestServiceDown
+        expr: up{job="integration-test"} == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Integration test service is down"
+          description: "Integration test service has been down for more than 1 minute."
+
+      - alert: IntegrationTestFailures
+        expr: |
+          rate(integration_test_runs_total{status="failed"}[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Integration test failures detected"
+          description: "Integration tests are failing. {{ $value }} failed test runs per second in the last 5 minutes."
+
+      - alert: IntegrationTestHighFailureRate
+        expr: |
+          (
+            rate(integration_test_runs_total{status="failed"}[5m]) /
+            rate(integration_test_runs_total[5m])
+          ) > 0.5
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High integration test failure rate"
+          description: "More than 50% of integration tests are failing for more than 10 minutes."
+
+      - alert: IntegrationTestLongDuration
+        expr: |
+          histogram_quantile(0.95, rate(integration_test_run_duration_seconds_bucket[5m])) > 1800
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Integration tests taking too long"
+          description: "Integration tests are taking longer than 30 minutes (p95) for more than 5 minutes."
+
+      - alert: IntegrationTestServiceUnhealthy
+        expr: service_health{service="integration-test"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Integration test service unhealthy"
+          description: "Integration test service health check is failing for more than 2 minutes."

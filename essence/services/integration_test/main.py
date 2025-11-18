@@ -32,8 +32,29 @@ from essence.services.shared_metrics import (
     SERVICE_HEALTH,
     REGISTRY
 )
-from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, Counter, Histogram, Gauge
 from fastapi.responses import Response
+
+# Test-specific metrics
+TEST_RUNS_TOTAL = Counter(
+    'integration_test_runs_total',
+    'Total integration test runs',
+    ['status', 'test_path'],
+    registry=REGISTRY
+)
+
+TEST_RUN_DURATION_SECONDS = Histogram(
+    'integration_test_run_duration_seconds',
+    'Integration test run duration in seconds',
+    ['status', 'test_path'],
+    registry=REGISTRY
+)
+
+TEST_RUNS_ACTIVE = Gauge(
+    'integration_test_runs_active',
+    'Number of active (running or pending) test runs',
+    registry=REGISTRY
+)
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +163,10 @@ class IntegrationTestService:
             with self._lock:
                 self.test_runs[run_id] = test_run
                 self.test_logs[run_id] = []
+                # Update active test runs gauge
+                active_count = sum(1 for r in self.test_runs.values() 
+                                 if r.status in [TestRunStatus.PENDING, TestRunStatus.RUNNING])
+                TEST_RUNS_ACTIVE.set(active_count)
             
             # Start test run in background
             background_tasks.add_task(self._run_tests, run_id, test_path, test_name)
@@ -285,9 +310,16 @@ class IntegrationTestService:
     
     async def _run_tests(self, run_id: str, test_path: Optional[str], test_name: Optional[str]):
         """Run tests in background."""
+        start_time = time.time()
+        test_path_label = test_path or "all"
+        
         with self._lock:
             test_run = self.test_runs[run_id]
             test_run.status = TestRunStatus.RUNNING
+            # Update active test runs gauge
+            active_count = sum(1 for r in self.test_runs.values() 
+                             if r.status in [TestRunStatus.PENDING, TestRunStatus.RUNNING])
+            TEST_RUNS_ACTIVE.set(active_count)
         
         logger.info(f"Starting test run {run_id}: path={test_path}, name={test_name}")
         
@@ -338,6 +370,9 @@ class IntegrationTestService:
             exit_code = process.wait()
             output = "\n".join(output_lines)
             
+            # Calculate duration
+            duration = time.time() - start_time
+            
             # Update test run status
             with self._lock:
                 test_run = self.test_runs[run_id]
@@ -347,16 +382,27 @@ class IntegrationTestService:
                 
                 if exit_code == 0:
                     test_run.status = TestRunStatus.COMPLETED
+                    status_label = "completed"
                 else:
                     test_run.status = TestRunStatus.FAILED
+                    status_label = "failed"
                     test_run.error = f"Tests failed with exit code {exit_code}"
                 
                 if run_id in self.test_processes:
                     del self.test_processes[run_id]
+                
+                # Update metrics
+                TEST_RUNS_TOTAL.labels(status=status_label, test_path=test_path_label).inc()
+                TEST_RUN_DURATION_SECONDS.labels(status=status_label, test_path=test_path_label).observe(duration)
+                # Update active test runs gauge
+                active_count = sum(1 for r in self.test_runs.values() 
+                                 if r.status in [TestRunStatus.PENDING, TestRunStatus.RUNNING])
+                TEST_RUNS_ACTIVE.set(active_count)
             
-            logger.info(f"Test run {run_id} completed with exit code {exit_code}")
+            logger.info(f"Test run {run_id} completed with exit code {exit_code} in {duration:.2f}s")
             
         except Exception as e:
+            duration = time.time() - start_time
             logger.error(f"Error running tests for {run_id}: {e}", exc_info=True)
             with self._lock:
                 test_run = self.test_runs[run_id]
@@ -365,6 +411,14 @@ class IntegrationTestService:
                 test_run.error = str(e)
                 if run_id in self.test_processes:
                     del self.test_processes[run_id]
+                
+                # Update metrics
+                TEST_RUNS_TOTAL.labels(status="failed", test_path=test_path_label).inc()
+                TEST_RUN_DURATION_SECONDS.labels(status="failed", test_path=test_path_label).observe(duration)
+                # Update active test runs gauge
+                active_count = sum(1 for r in self.test_runs.values() 
+                                 if r.status in [TestRunStatus.PENDING, TestRunStatus.RUNNING])
+                TEST_RUNS_ACTIVE.set(active_count)
     
     def run(self, host: str = "0.0.0.0"):
         """Run the FastAPI server."""

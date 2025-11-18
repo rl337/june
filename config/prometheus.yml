@@ -87,6 +87,16 @@ scrape_configs:
     metrics_path: '/metrics'
     scrape_interval: 10s
 
+  - job_name: 'integration-test'
+    static_configs:
+      - targets: ['integration-test:8082']
+        labels:
+          service: 'integration-test'
+          component: 'testing'
+          tier: 'infrastructure'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+
   - job_name: 'todo-mcp-service'
     static_configs:
       - targets: ['todo-mcp-service:8004']
