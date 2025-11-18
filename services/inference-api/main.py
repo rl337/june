@@ -4,6 +4,7 @@ Inference API Service - LLM orchestration with RAG and tool invocation.
 import asyncio
 import logging
 import os
+import re
 import sys
 import json
 import uuid
@@ -120,6 +121,7 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
         
         # Add health checks
         self.health_checker.add_check("model", self._check_model_health)
+        self.health_checker.add_check("gpu", self._check_gpu_health)
         self.health_checker.add_check("database", self._check_database_health)
         # MinIO health check removed - not needed for MVP
         self.health_checker.add_check("nats", self._check_nats_health)
@@ -250,40 +252,39 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                     finish_reason=FinishReason.STOP,
                     usage=usage_stats
                 )
-                
-            except RuntimeError as e:
-                error_msg = str(e).lower()
-                error_type = "unknown"
-                if "out of memory" in error_msg or "oom" in error_msg:
-                    error_type = "out_of_memory"
-                elif "timeout" in error_msg or "timed out" in error_msg:
-                    error_type = "timeout"
-                
-                # Update span for error
-                if span:
-                    span.set_status(trace.Status(trace.StatusCode.ERROR, error_msg))
-                    span.record_exception(e)
-                
-                # Attempt recovery
-                await self.recover_from_error(error_type)
-                
-                logger.error(f"Generation error: {e}")
-                context.set_code(grpc.StatusCode.INTERNAL)
-                context.set_details(str(e))
-                return GenerationResponse()
-            except Exception as e:
-                # Update span for error
-                if span:
-                    span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
-                    span.record_exception(e)
-                
-                # Attempt recovery for unknown errors
-                await self.recover_from_error("unknown")
-                
-                logger.error(f"Generation error: {e}")
-                context.set_code(grpc.StatusCode.INTERNAL)
-                context.set_details(str(e))
-                return GenerationResponse()
+        except RuntimeError as e:
+            error_msg = str(e).lower()
+            error_type = "unknown"
+            if "out of memory" in error_msg or "oom" in error_msg:
+                error_type = "out_of_memory"
+            elif "timeout" in error_msg or "timed out" in error_msg:
+                error_type = "timeout"
+            
+            # Update span for error
+            if span:
+                span.set_status(trace.Status(trace.StatusCode.ERROR, error_msg))
+                span.record_exception(e)
+            
+            # Attempt recovery
+            await self.recover_from_error(error_type)
+            
+            logger.error(f"Generation error: {e}")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return GenerationResponse()
+        except Exception as e:
+            # Update span for error
+            if span:
+                span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                span.record_exception(e)
+            
+            # Attempt recovery for unknown errors
+            await self.recover_from_error("unknown")
+            
+            logger.error(f"Generation error: {e}")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return GenerationResponse()
         finally:
             if span:
                 span.end()
@@ -891,6 +892,97 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
     async def _check_nats_health(self) -> bool:
         """Check NATS connection health."""
         return self.nats_client is not None and self.nats_client.is_connected
+    
+    async def _check_gpu_health(self) -> bool:
+        """Check GPU availability for large models (30B+).
+        
+        For large models, GPU is required. This check verifies GPU is available
+        and compatible before accepting requests.
+        """
+        try:
+            import torch
+            
+            # Only check GPU for large models (30B+)
+            if self.llm_strategy is None:
+                # Model not loaded yet, can't determine if it's large
+                return True  # Don't fail health check if model isn't loaded yet
+            
+            # Check if this is a large model
+            if not hasattr(self.llm_strategy, '_is_large_model'):
+                # Fallback: check model name directly
+                model_name = getattr(self.llm_strategy, 'model_name', '') or config.model.name
+                is_large = self._is_large_model_from_name(model_name)
+            else:
+                is_large = self.llm_strategy._is_large_model()
+            
+            if not is_large:
+                # Small models can run on CPU, GPU check not required
+                return True
+            
+            # For large models, GPU is mandatory
+            if not torch.cuda.is_available():
+                logger.error("GPU required for large models (30B+), but CUDA is not available")
+                return False
+            
+            # Check if device is set to CUDA
+            device = getattr(self.llm_strategy, 'device', self.device) or config.model.device
+            if not device.startswith("cuda"):
+                logger.error(f"GPU required for large models (30B+), but device is set to '{device}'")
+                return False
+            
+            # Verify GPU is actually usable
+            try:
+                device_capability = torch.cuda.get_device_capability(0)
+                # PyTorch 2.5.1 supports up to sm_90a (compute capability 9.0)
+                # If GPU has compute capability >= 12, it's not supported
+                if device_capability[0] >= 12:
+                    logger.error(
+                        f"GPU compute capability {device_capability} is not supported by PyTorch 2.5.1. "
+                        "PyTorch supports up to sm_90a. GPU required for large models."
+                    )
+                    return False
+                
+                # Test GPU with a simple operation
+                test_tensor = torch.zeros(10, device=device)
+                test_result = test_tensor.sum().item()
+                del test_tensor
+                torch.cuda.empty_cache()
+                if test_result != 0:
+                    logger.error("GPU tensor test failed. GPU required for large models.")
+                    return False
+                
+                logger.debug("GPU health check passed")
+                return True
+            except RuntimeError as e:
+                error_msg = str(e).lower()
+                if "no kernel image" in error_msg or "cuda" in error_msg or "kernel" in error_msg:
+                    logger.error(f"GPU not compatible: {e}. GPU required for large models.")
+                    return False
+                raise
+        except Exception as e:
+            logger.error(f"GPU health check failed: {e}")
+            return False
+    
+    def _is_large_model_from_name(self, model_name: str) -> bool:
+        """Check if model name indicates a large model (30B+ parameters)."""
+        if not model_name:
+            return False
+        
+        model_name_lower = model_name.lower()
+        # Match patterns like "30B", "30-B", "30b", "70B", etc.
+        large_model_pattern = r'(\d+)[-_\s]?b\b'
+        match = re.search(large_model_pattern, model_name_lower)
+        if match:
+            param_count = int(match.group(1))
+            return param_count >= 30
+        
+        # Also check for explicit indicators
+        if "30b" in model_name_lower or "30-b" in model_name_lower:
+            return True
+        if "70b" in model_name_lower or "70-b" in model_name_lower:
+            return True
+        
+        return False
     
     async def disconnect_services(self):
         """Disconnect from external services."""
