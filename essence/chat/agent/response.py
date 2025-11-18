@@ -498,6 +498,8 @@ def stream_chat_response_agent(
         max_wait_for_first_message = 2.0
         
         first_message_sent = False
+        # Track previous accumulated messages to yield them when threshold is met
+        previous_accumulated_messages = []  # List of (message, timestamp) tuples
         
         # Use the streaming_popen_generator utility
         first_json_line = True
@@ -813,21 +815,46 @@ def stream_chat_response_agent(
                             pending_messages = [(accumulated_message, current_time)]
                         else:
                             # For assistant messages, yield immediately if conditions are met
+                            # Track accumulated message history for yielding when threshold is met
+                            if accumulated_message and accumulated_message not in [msg for msg, _ in previous_accumulated_messages]:
+                                previous_accumulated_messages.append((accumulated_message, current_time))
+                            
                             # Clear pending and add the new accumulated message
                             pending_messages = [(accumulated_message, current_time)]
                             
-                            # If this is the first message and we've waited long enough, send it immediately
+                            # If this is the first message and we've waited long enough, send all accumulated states
                             if not first_message_sent and elapsed >= max_wait_for_first_message:
                                 first_message_sent = True
-                                logger.info(f"Yielding first message after {elapsed:.2f}s: length={len(accumulated_message)}, type={message_type}")
-                                if span:
-                                    span.add_event("yielding_first_message", attributes={
-                                        "length": len(accumulated_message),
-                                        "type": message_type,
-                                        "elapsed_seconds": elapsed
-                                    })
-                                yield (accumulated_message, False, message_type)
-                                last_message_yield_time = current_time
+                                # Yield all previous accumulated messages in sequence
+                                last_yielded_msg = None
+                                for msg, msg_time in previous_accumulated_messages:
+                                    logger.info(f"Yielding accumulated message from history: length={len(msg)}, type={message_type}")
+                                    if span:
+                                        span.add_event("yielding_accumulated_from_history", attributes={
+                                            "length": len(msg),
+                                            "type": message_type
+                                        })
+                                    yield (msg, False, message_type)
+                                    last_message_yield_time = msg_time
+                                    last_yielded_msg = msg
+                                # Clear history after yielding
+                                previous_accumulated_messages = []
+                                # Also yield current message if it's different from the last one yielded
+                                if last_yielded_msg and accumulated_message != last_yielded_msg:
+                                    logger.info(f"Yielding current message after history: length={len(accumulated_message)}, type={message_type}")
+                                    yield (accumulated_message, False, message_type)
+                                    last_message_yield_time = current_time
+                                elif not last_yielded_msg:
+                                    # No history, just yield current message
+                                    logger.info(f"Yielding first message after {elapsed:.2f}s: length={len(accumulated_message)}, type={message_type}")
+                                    if span:
+                                        span.add_event("yielding_first_message", attributes={
+                                            "length": len(accumulated_message),
+                                            "type": message_type,
+                                            "elapsed_seconds": elapsed
+                                        })
+                                    yield (accumulated_message, False, message_type)
+                                    last_message_yield_time = current_time
                                 # Remove from pending since we just sent it
                                 pending_messages = []
                             elif first_message_sent:
@@ -867,6 +894,27 @@ def stream_chat_response_agent(
                         "has_result_message": result_message is not None,
                         "first_message_sent": first_message_sent
                     })
+                # If we haven't sent the first message yet and threshold is met, yield from history
+                if not first_message_sent and elapsed >= max_wait_for_first_message and previous_accumulated_messages:
+                    first_message_sent = True
+                    # Yield all previous accumulated messages in sequence
+                    last_yielded_msg = None
+                    for msg, msg_time in previous_accumulated_messages:
+                        logger.info(f"Yielding accumulated message from history (final line): length={len(msg)}")
+                        if span:
+                            span.add_event("yielding_accumulated_from_history_final", attributes={
+                                "length": len(msg)
+                            })
+                        yield (msg, False, "assistant")
+                        last_message_yield_time = msg_time
+                        last_yielded_msg = msg
+                    # Clear history after yielding
+                    previous_accumulated_messages = []
+                    # Also yield current message if it's different from the last one yielded
+                    if last_yielded_msg and accumulated_message and accumulated_message != last_yielded_msg:
+                        logger.info(f"Yielding current message after history (final line): length={len(accumulated_message)}")
+                        yield (accumulated_message, False, "assistant")
+                        last_message_yield_time = current_time
                 # Process any remaining pending messages quickly
                 for message, _ in pending_messages:
                     if message not in seen_messages or not first_message_sent:
