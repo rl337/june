@@ -246,8 +246,9 @@ Pare down the june project to bare essentials for the **voice message → STT �
 
 **Status:** ⏳ TODO - Mostly fixed, one test still needs refinement
 
-**Issue:** 1 test failure remaining in `tests/essence/chat/agent/test_response_accumulation.py`:
+**Issue:** 2 test failures remaining in `tests/essence/chat/agent/test_response_accumulation.py`:
 - `test_json_accumulation_logic[multiple_assistant_chunks]` - Expected 4 outputs, got 2. Expected: [("Hello", False, "assistant"), ("Hello world", False, "assistant"), ("Hello world!", False, "assistant"), ("", True, None)]. Got: [("Hello", False, "assistant"), ("", True, None)]
+- `test_json_accumulation_logic[no_json_lines_only_shell]` - Expected error message, got empty message. This may be a regression from history tracking changes.
 
 **Progress:** Fixed 4 of 5 previously failing tests:
 - ✅ `test_json_accumulation_logic[complete_json_single_assistant]` - Now passing
@@ -258,7 +259,7 @@ Pare down the june project to bare essentials for the **voice message → STT �
 
 **Root Cause:** History tracking for accumulated messages when threshold is met needs refinement. The logic tracks message history but doesn't yield all intermediate states correctly when chunks arrive quickly before the threshold is met.
 
-**Impact:** This failure affects the response accumulation logic for multiple assistant chunks but doesn't block the core refactoring goals. Most test cases (11/12) are now passing.
+**Impact:** These failures affect the response accumulation logic but don't block the core refactoring goals. Most test cases (10/12) are passing.
 
 **Action Required:** Refine history tracking logic in `stream_chat_response_agent` to properly yield all intermediate accumulated states when the threshold is met at the final line.
 
