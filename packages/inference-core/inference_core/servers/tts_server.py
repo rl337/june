@@ -5,11 +5,30 @@ import asyncio
 import grpc
 from grpc import aio
 from typing import Optional
+import logging
 
 from ..strategies import TtsStrategy, InferenceRequest
 from ..utils import setup_logging
 from ..config import config
 from june_grpc_api.generated import tts_pb2, tts_pb2_grpc
+
+logger = logging.getLogger(__name__)
+
+# Try to import tracing
+tracer = None
+try:
+    import sys
+    from pathlib import Path
+    # Add essence package to path for tracing import
+    essence_path = Path(__file__).parent.parent.parent.parent / "essence"
+    if str(essence_path) not in sys.path:
+        sys.path.insert(0, str(essence_path))
+    from essence.chat.utils.tracing import get_tracer
+    from opentelemetry import trace
+    tracer = get_tracer(__name__)
+except (ImportError, Exception) as e:
+    logger.debug(f"Tracing not available: {e}")
+    tracer = None
 
 
 class _TtsServicer(tts_pb2_grpc.TextToSpeechServicer):
@@ -18,22 +37,48 @@ class _TtsServicer(tts_pb2_grpc.TextToSpeechServicer):
         self._sample_rate = 16000
 
     async def Synthesize(self, request: tts_pb2.SynthesisRequest, context: aio.ServicerContext) -> tts_pb2.AudioResponse:
-        result = self._strategy.infer(
-            InferenceRequest(
-                payload=request.text,
-                metadata={"voice_id": request.voice_id, "language": request.language}
-            )
-        )
-        audio_bytes = result.payload if isinstance(result.payload, bytes) else bytes(result.payload)
-        sample_rate = result.metadata.get("sample_rate", self._sample_rate)
-        duration_ms = result.metadata.get("duration_ms", int(len(audio_bytes) / sample_rate / 2 * 1000))
+        span = None
+        if tracer is not None:
+            span = tracer.start_span("tts.synthesize")
+            span.set_attribute("tts.text_length", len(request.text))
+            if request.voice_id:
+                span.set_attribute("tts.voice_id", request.voice_id)
+            if request.language:
+                span.set_attribute("tts.language", request.language)
         
-        return tts_pb2.AudioResponse(
-            audio_data=audio_bytes,
-            sample_rate=sample_rate,
-            encoding="pcm16",
-            duration_ms=duration_ms
-        )
+        try:
+            result = self._strategy.infer(
+                InferenceRequest(
+                    payload=request.text,
+                    metadata={"voice_id": request.voice_id, "language": request.language}
+                )
+            )
+            audio_bytes = result.payload if isinstance(result.payload, bytes) else bytes(result.payload)
+            sample_rate = result.metadata.get("sample_rate", self._sample_rate)
+            duration_ms = result.metadata.get("duration_ms", int(len(audio_bytes) / sample_rate / 2 * 1000))
+            
+            # Update span with results
+            if span:
+                span.set_attribute("tts.audio_size_bytes", len(audio_bytes))
+                span.set_attribute("tts.sample_rate", sample_rate)
+                span.set_attribute("tts.duration_ms", duration_ms)
+                span.set_status(trace.Status(trace.StatusCode.OK))
+            
+            return tts_pb2.AudioResponse(
+                audio_data=audio_bytes,
+                sample_rate=sample_rate,
+                encoding="pcm16",
+                duration_ms=duration_ms
+            )
+        except Exception as e:
+            logger.error(f"TTS synthesis error: {e}", exc_info=True)
+            if span:
+                span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                span.record_exception(e)
+            raise
+        finally:
+            if span:
+                span.end()
 
 
 class TtsGrpcApp:

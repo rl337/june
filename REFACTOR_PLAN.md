@@ -196,6 +196,13 @@ These are not needed for the core voice round trip:
      - ✅ TTS: Added `tts.synthesize` span with attributes (text_length, language, voice_id, audio_size_bytes) - updated both occurrences
      - ✅ All spans include error handling with `record_exception()` and error status
      - ✅ All spans include user_id and chat_id for correlation
+   - ✅ **COMPLETED:** Added tracing spans to STT service gRPC handlers
+     - ✅ `stt.recognize` span for one-shot recognition with attributes (method, sample_rate, audio_size_bytes, encoding, language, transcript_length, confidence, detected_language, audio_duration_seconds, processing_time_ms)
+     - ✅ `stt.recognize_stream` span for streaming recognition with attributes (method, session_id, chunk_count, total_audio_size_bytes, transcript_length, confidence, detected_language, interim_transcript_length)
+     - ✅ All spans include error handling with `record_exception()` and error status
+   - ✅ **COMPLETED:** Added tracing spans to TTS service gRPC handlers
+     - ✅ `tts.synthesize` span with attributes (text_length, voice_id, language, audio_size_bytes, sample_rate, duration_ms)
+     - ✅ Span includes error handling with `record_exception()` and error status
    - ✅ **COMPLETED:** Added tracing spans to HTTP requests via FastAPI middleware
      - ✅ telegram service: Added HTTP tracing middleware that wraps all FastAPI requests (health, metrics, agent message endpoints)
      - ✅ discord service: Added HTTP tracing middleware that wraps all FastAPI requests (health, metrics, agent message endpoints)

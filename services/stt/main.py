@@ -35,6 +35,7 @@ import asr_pb2_grpc
 from inference_core import config, setup_logging, Timer, HealthChecker, CircularBuffer
 
 # Initialize tracing early
+tracer = None
 try:
     import sys
     from pathlib import Path
@@ -42,8 +43,10 @@ try:
     essence_path = Path(__file__).parent.parent.parent / "essence"
     if str(essence_path) not in sys.path:
         sys.path.insert(0, str(essence_path))
-    from essence.chat.utils.tracing import setup_tracing
+    from essence.chat.utils.tracing import setup_tracing, get_tracer
+    from opentelemetry import trace
     setup_tracing(service_name="june-stt")
+    tracer = get_tracer(__name__)
 except ImportError:
     pass
 
@@ -108,12 +111,25 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
     
     async def RecognizeStream(self, request_iterator: AsyncGenerator[AudioChunk, None], context: grpc.aio.ServicerContext) -> AsyncGenerator[RecognitionResult, None]:
         """Streaming speech recognition."""
-        with Timer("recognition_stream"):
-            try:
+        span = None
+        if tracer is not None:
+            span = tracer.start_span("stt.recognize_stream")
+            span.set_attribute("stt.method", "stream")
+        
+        try:
+            with Timer("recognition_stream"):
                 audio_buffer = []
                 session_id = str(uuid.uuid4())
+                chunk_count = 0
+                total_audio_size = 0
+                
+                if span:
+                    span.set_attribute("stt.session_id", session_id)
                 
                 async for chunk in request_iterator:
+                    chunk_count += 1
+                    total_audio_size += len(chunk.audio_data)
+                    
                     # Process audio chunk
                     audio_data = await self._process_audio_chunk(chunk)
                     audio_buffer.extend(audio_data)
@@ -130,6 +146,8 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
                     if len(audio_buffer) > self.sample_rate * 5:  # 5 seconds
                         interim_result = await self._transcribe_audio(audio_buffer, is_final=False)
                         if interim_result:
+                            if span:
+                                span.set_attribute("stt.interim_transcript_length", len(interim_result.transcript))
                             yield interim_result
                             audio_buffer = []  # Clear buffer after interim result
                 
@@ -137,59 +155,88 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
                 if audio_buffer:
                     final_result = await self._transcribe_audio(audio_buffer, is_final=True)
                     if final_result:
+                        if span:
+                            span.set_attribute("stt.transcript_length", len(final_result.transcript))
+                            span.set_attribute("stt.confidence", final_result.confidence)
+                            span.set_attribute("stt.detected_language", final_result.detected_language or "unknown")
+                            span.set_attribute("stt.chunk_count", chunk_count)
+                            span.set_attribute("stt.total_audio_size_bytes", total_audio_size)
                         yield final_result
+                    elif span:
+                        span.set_status(trace.Status(trace.StatusCode.ERROR, "Empty transcription result"))
                 
-            except Exception as e:
-                logger.error(f"Recognition stream error: {e}")
-                error_result = RecognitionResult(
-                    transcript="",
-                    is_final=True,
-                    confidence=0.0,
-                    start_time_us=0,
-                    end_time_us=0
-                )
-                yield error_result
+                if span:
+                    span.set_status(trace.Status(trace.StatusCode.OK))
+                
+        except Exception as e:
+            logger.error(f"Recognition stream error: {e}")
+            if span:
+                span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                span.record_exception(e)
+            error_result = RecognitionResult(
+                transcript="",
+                is_final=True,
+                confidence=0.0,
+                start_time_us=0,
+                end_time_us=0
+            )
+            yield error_result
+        finally:
+            if span:
+                span.end()
     
     async def Recognize(self, request: RecognitionRequest, context: grpc.aio.ServicerContext) -> RecognitionResponse:
         """One-shot speech recognition."""
-        with Timer("recognition"):
-            start_time = datetime.now()
-            
-            # Validate audio data
-            if VALIDATION_AVAILABLE and input_validator:
-                try:
-                    # Validate audio data size
-                    if len(request.audio_data) > input_validator.MAX_AUDIO_FILE_SIZE:
-                        context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-                        context.set_details(f"Audio file size ({len(request.audio_data)} bytes) exceeds maximum allowed size ({input_validator.MAX_AUDIO_FILE_SIZE} bytes)")
-                        return RecognitionResponse()
-                    
-                    # Validate sample rate
-                    if request.sample_rate <= 0 or request.sample_rate > 48000:
-                        context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-                        context.set_details(f"Invalid sample rate: {request.sample_rate}. Must be between 1 and 48000")
-                        return RecognitionResponse()
-                    
-                    # Validate encoding if provided
-                    if request.encoding:
-                        allowed_encodings = ['pcm', 'wav', 'ogg', 'flac', 'mp3']
-                        try:
-                            validated_encoding = input_validator.validate_enum(
-                                request.encoding,
-                                allowed_encodings,
-                                field_name="encoding",
-                                case_sensitive=False
-                            )
-                            request.encoding = validated_encoding
-                        except InputValidationError as e:
+        span = None
+        if tracer is not None:
+            span = tracer.start_span("stt.recognize")
+            span.set_attribute("stt.method", "oneshot")
+            span.set_attribute("stt.sample_rate", request.sample_rate)
+            span.set_attribute("stt.audio_size_bytes", len(request.audio_data))
+            if request.encoding:
+                span.set_attribute("stt.encoding", request.encoding)
+            if request.config and hasattr(request.config, "language") and request.config.language:
+                span.set_attribute("stt.language", request.config.language)
+        
+        try:
+            with Timer("recognition"):
+                start_time = datetime.now()
+                
+                # Validate audio data
+                if VALIDATION_AVAILABLE and input_validator:
+                    try:
+                        # Validate audio data size
+                        if len(request.audio_data) > input_validator.MAX_AUDIO_FILE_SIZE:
                             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-                            context.set_details(f"Invalid encoding: {str(e)}")
+                            context.set_details(f"Audio file size ({len(request.audio_data)} bytes) exceeds maximum allowed size ({input_validator.MAX_AUDIO_FILE_SIZE} bytes)")
                             return RecognitionResponse()
-                except Exception as e:
-                    logger.error(f"Input validation error: {e}")
-                    context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-                    context.set_details(f"Input validation failed: {str(e)}")
-                    return RecognitionResponse()
+                        
+                        # Validate sample rate
+                        if request.sample_rate <= 0 or request.sample_rate > 48000:
+                            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                            context.set_details(f"Invalid sample rate: {request.sample_rate}. Must be between 1 and 48000")
+                            return RecognitionResponse()
+                        
+                        # Validate encoding if provided
+                        if request.encoding:
+                            allowed_encodings = ['pcm', 'wav', 'ogg', 'flac', 'mp3']
+                            try:
+                                validated_encoding = input_validator.validate_enum(
+                                    request.encoding,
+                                    allowed_encodings,
+                                    field_name="encoding",
+                                    case_sensitive=False
+                                )
+                                request.encoding = validated_encoding
+                            except InputValidationError as e:
+                                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                                context.set_details(f"Invalid encoding: {str(e)}")
+                                return RecognitionResponse()
+                    except Exception as e:
+                        logger.error(f"Input validation error: {e}")
+                        context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                        context.set_details(f"Input validation failed: {str(e)}")
+                        return RecognitionResponse()
             
             audio_format = request.encoding if request.encoding else "pcm"
             audio_size = len(request.audio_data)
@@ -222,6 +269,15 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
                     transcript_length = len(result.transcript)
                     confidence = result.confidence
                     
+                    # Update tracing span with results
+                    if span:
+                        span.set_attribute("stt.transcript_length", transcript_length)
+                        span.set_attribute("stt.confidence", confidence)
+                        span.set_attribute("stt.detected_language", result.detected_language or "unknown")
+                        span.set_attribute("stt.audio_duration_seconds", audio_duration)
+                        span.set_attribute("stt.processing_time_ms", processing_time_ms)
+                        span.set_status(trace.Status(trace.StatusCode.OK))
+                    
                     # Record metrics
                     try:
                         metrics = get_metrics_storage()
@@ -243,6 +299,10 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
                         processing_time_ms=processing_time_ms
                     )
                 else:
+                    # Update tracing span for empty result
+                    if span:
+                        span.set_status(trace.Status(trace.StatusCode.ERROR, "Empty transcription result"))
+                    
                     # Record failed transcription
                     try:
                         metrics = get_metrics_storage()
@@ -269,6 +329,11 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
                 error_message = str(e)
                 logger.error(f"Recognition error: {e}")
                 
+                # Update tracing span for error
+                if span:
+                    span.set_status(trace.Status(trace.StatusCode.ERROR, error_message))
+                    span.record_exception(e)
+                
                 # Record error metrics
                 try:
                     processing_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
@@ -290,6 +355,9 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(str(e))
                 return RecognitionResponse()
+            finally:
+                if span:
+                    span.end()
     
     async def HealthCheck(self, request: HealthRequest, context: grpc.aio.ServicerContext) -> HealthResponse:
         """Health check endpoint."""
