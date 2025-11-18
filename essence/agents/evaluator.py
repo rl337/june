@@ -519,17 +519,28 @@ if __name__ == "__main__":
         passed_tests = sum(1 for r in results if r.passed_tests)
         
         # Calculate pass@k
-        # For pass@k, we need multiple attempts per task
-        # For now, we'll calculate pass@1 (single attempt)
+        # pass@k measures the probability that at least one of k attempts passes the tests.
+        # For pass@k, we need multiple independent attempts per task (each with different
+        # random seeds or model sampling parameters). The current implementation only runs
+        # each task once, so we can only calculate pass@1 accurately.
+        #
+        # To properly implement pass@k for k > 1, we would need to:
+        # 1. Run each task k times with different random seeds/sampling parameters
+        # 2. For each task, check if at least one of the k attempts passed
+        # 3. Calculate: pass@k = (# of tasks with at least one passing attempt) / total_tasks
+        #
+        # This is a known limitation documented in REFACTOR_PLAN.md. For now, we use
+        # pass@1 as a placeholder for all k values to maintain API compatibility.
         pass_at_1 = passed_tests / total_tasks if total_tasks > 0 else 0.0
         
         # Calculate pass@k for k in [1, 5, 10, 100]
-        # This is a simplified version - real implementation would need multiple attempts
+        # NOTE: Currently only pass@1 is accurate. For k > 1, this is a placeholder.
+        # See REFACTOR_PLAN.md "Known limitation" section for details.
         pass_at_k = {
             1: pass_at_1,
-            5: pass_at_1,  # TODO: Calculate properly with multiple attempts
-            10: pass_at_1,  # TODO: Calculate properly with multiple attempts
-            100: pass_at_1,  # TODO: Calculate properly with multiple attempts
+            5: pass_at_1,  # TODO: Calculate properly with multiple attempts (future enhancement)
+            10: pass_at_1,  # TODO: Calculate properly with multiple attempts (future enhancement)
+            100: pass_at_1,  # TODO: Calculate properly with multiple attempts (future enhancement)
         }
         
         # Calculate efficiency metrics
