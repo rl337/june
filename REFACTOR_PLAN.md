@@ -446,31 +446,24 @@ This phase focuses on refactoring individual services, building them, testing th
 #### 9.2: Build Individual Services ⏳ TODO
 
 1. **Build and verify each service:**
-   - ⏳ **Build telegram service:**
-     - `docker compose build telegram`
-     - Verify Dockerfile builds successfully
-     - Verify no missing dependencies
-     - Verify service starts without errors
-   - ⏳ **Build discord service:**
-     - `docker compose build discord`
-     - Verify Dockerfile builds successfully
-     - Verify no missing dependencies
-     - Verify service starts without errors
-   - ⏳ **Build stt service:**
-     - `docker compose build stt`
-     - Verify Dockerfile builds successfully
-     - Verify no missing dependencies
-     - Verify service starts without errors
-   - ⏳ **Build tts service:**
-     - `docker compose build tts`
-     - Verify Dockerfile builds successfully
-     - Verify no missing dependencies
-     - Verify service starts without errors
-   - ⏳ **Build inference-api service:**
-     - `docker compose build inference-api`
-     - Verify Dockerfile builds successfully
-     - Verify no missing dependencies
-     - Verify service starts without errors
+   - ✅ **COMPLETED:** Verify Dockerfiles are correctly configured
+     - ✅ All Dockerfiles exist for essential services (telegram, discord, stt, tts, inference-api)
+     - ✅ All Dockerfiles updated to use Command pattern via `python -m essence <service-name>`
+     - ✅ telegram service: Uses `python -m essence telegram-service`
+     - ✅ discord service: Uses `python -m essence discord-service`
+     - ✅ stt service: Uses `python -m essence stt` (updated from `main_whisper.py`)
+     - ✅ tts service: Uses `python -m essence tts` (updated from `main.py`)
+     - ✅ inference-api service: Uses `python -m essence inference-api` (updated from `main.py`)
+     - ✅ All Dockerfiles copy essence package and install dependencies correctly
+     - ✅ Health checks configured in all Dockerfiles
+   - ⏳ **Remaining build tasks (require docker compose):**
+     - ⏳ Build telegram service: `docker compose build telegram`
+     - ⏳ Build discord service: `docker compose build discord`
+     - ⏳ Build stt service: `docker compose build stt`
+     - ⏳ Build tts service: `docker compose build tts`
+     - ⏳ Build inference-api service: `docker compose build inference-api`
+     - ⏳ Verify no missing dependencies during build
+     - ⏳ Verify services start without errors
 
 2. **Verify service health:**
    - ✅ **COMPLETED:** Each service should expose `/health` endpoint
