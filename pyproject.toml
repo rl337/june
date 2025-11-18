@@ -140,9 +140,8 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 pythonpath = ["."]
 # Exclude problematic test directories that have import errors
+# Note: Run tests with `pytest tests/essence/` to avoid collection errors from other test directories
 norecursedirs = ["tests/integration", "tests/services", "tests/scripts", "tests/agentic"]
-# Also ignore test files in root tests/ directory that have import errors
-ignore = ["test_voice_validation.py"]
 addopts = "-v --tb=short --strict-markers"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
