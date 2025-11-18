@@ -535,18 +535,50 @@ def save_report(report: PerformanceReport, output_dir: Path):
 
 
 class BenchmarkQwen3Command(Command):
-    """Command for benchmarking Qwen3-30B-A3B performance."""
+    """
+    Command for benchmarking Qwen3-30B-A3B performance.
+    
+    Runs comprehensive performance benchmarks on the Qwen3 model including:
+    - Model loading time and memory usage
+    - Latency benchmarks for different prompt types (short, medium, long, code)
+    - Throughput benchmarks with concurrent requests
+    - GPU utilization and memory metrics
+    
+    Generates detailed reports with metrics for performance analysis and optimization.
+    Essential for validating model performance and identifying bottlenecks.
+    """
     
     @classmethod
     def get_name(cls) -> str:
+        """
+        Get the command name.
+        
+        Returns:
+            Command name: "benchmark-qwen3"
+        """
         return "benchmark-qwen3"
     
     @classmethod
     def get_description(cls) -> str:
+        """
+        Get the command description.
+        
+        Returns:
+            Description of what this command does
+        """
         return "Benchmark Qwen3-30B-A3B model performance"
     
     @classmethod
     def add_args(cls, parser: argparse.ArgumentParser) -> None:
+        """
+        Add command-line arguments to the argument parser.
+        
+        Configures benchmark execution options including output directory,
+        iteration counts, and optional benchmark skipping.
+        
+        Args:
+            parser: Argument parser to add arguments to
+        """
         parser.add_argument(
             "--output-dir",
             type=str,
@@ -571,7 +603,15 @@ class BenchmarkQwen3Command(Command):
         )
     
     def init(self) -> None:
-        """Initialize benchmark Qwen3 command."""
+        """
+        Initialize benchmark Qwen3 command.
+        
+        Validates that required dependencies (torch, psutil) and the inference_core
+        package are available before proceeding with benchmarks.
+        
+        Raises:
+            RuntimeError: If required dependencies or inference_core package are not available
+        """
         if not DEPENDENCIES_AVAILABLE:
             error_msg = f"Required dependencies not available: {IMPORT_ERROR}"
             logger.error(error_msg)
@@ -582,7 +622,21 @@ class BenchmarkQwen3Command(Command):
             raise RuntimeError(f"{error_msg}\nThis command must be run in a container with inference_core installed")
     
     def run(self) -> None:
-        """Run the benchmark."""
+        """
+        Run the benchmark.
+        
+        Executes comprehensive performance benchmarks including:
+        1. Model loading time and memory usage (unless skipped)
+        2. Latency benchmarks across different prompt types
+        3. Throughput benchmarks with concurrent requests (unless skipped)
+        4. GPU and system resource monitoring
+        
+        Generates detailed performance reports in both JSON and text formats
+        saved to the specified output directory.
+        
+        Exits:
+            sys.exit(1): If model loading fails during load test
+        """
         output_dir = Path(self.args.output_dir)
         
         logger.info("Starting Qwen3-30B-A3B performance benchmarks...")
@@ -657,6 +711,12 @@ class BenchmarkQwen3Command(Command):
         print(f"  Text: {txt_path}")
     
     def cleanup(self) -> None:
-        """Clean up benchmark Qwen3 command."""
+        """
+        Clean up benchmark Qwen3 command.
+        
+        Releases any resources held by the benchmark command, including
+        model instances and GPU monitoring connections. Actual cleanup is
+        handled automatically when the command completes.
+        """
         # No cleanup needed for this tool
         pass

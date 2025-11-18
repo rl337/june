@@ -282,18 +282,47 @@ def generate_report(env_vars: Dict[str, Any], torch_info: Dict[str, Any],
 
 
 class VerifyQwen3Command(Command):
-    """Command for verifying Qwen3 quantization settings and model performance."""
+    """
+    Command for verifying Qwen3 quantization settings and model performance.
+    
+    Validates the Qwen3 model setup by checking environment variables, PyTorch/CUDA
+    availability, BitsAndBytes quantization support, and model quantization status.
+    Generates a comprehensive report of the model configuration and readiness.
+    
+    Useful for troubleshooting model loading issues and verifying that quantization
+    is properly configured before running inference workloads.
+    """
     
     @classmethod
     def get_name(cls) -> str:
+        """
+        Get the command name.
+        
+        Returns:
+            Command name: "verify-qwen3"
+        """
         return "verify-qwen3"
     
     @classmethod
     def get_description(cls) -> str:
+        """
+        Get the command description.
+        
+        Returns:
+            Description of what this command does
+        """
         return "Verify Qwen3 quantization settings and monitor model performance"
     
     @classmethod
     def add_args(cls, parser: argparse.ArgumentParser) -> None:
+        """
+        Add command-line arguments to the argument parser.
+        
+        Configures output format options for the verification report.
+        
+        Args:
+            parser: Argument parser to add arguments to
+        """
         parser.add_argument(
             "--json",
             action="store_true",
@@ -301,12 +330,28 @@ class VerifyQwen3Command(Command):
         )
     
     def init(self) -> None:
-        """Initialize verify Qwen3 command."""
+        """
+        Initialize verify Qwen3 command.
+        
+        No initialization is needed for this read-only verification tool.
+        The command checks system configuration without requiring service setup.
+        """
         # No initialization needed for this tool
         pass
     
     def run(self) -> None:
-        """Run the verification and generate report."""
+        """
+        Run the verification and generate report.
+        
+        Performs comprehensive checks of:
+        - Environment variables (model configuration, cache directories)
+        - PyTorch and CUDA availability and versions
+        - BitsAndBytes quantization library availability
+        - Model quantization status and configuration
+        
+        Outputs a human-readable report and optionally JSON format for
+        programmatic processing.
+        """
         logger.info("Starting Qwen3 quantization verification...")
         
         # Check environment variables
@@ -339,6 +384,11 @@ class VerifyQwen3Command(Command):
             print(json.dumps(output, indent=2, default=str))
     
     def cleanup(self) -> None:
-        """Clean up verify Qwen3 command."""
+        """
+        Clean up verify Qwen3 command.
+        
+        No cleanup is needed for this read-only tool. The command only checks
+        system configuration and does not maintain any persistent resources.
+        """
         # No cleanup needed for this tool
         pass
