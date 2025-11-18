@@ -407,7 +407,11 @@ This phase focuses on refactoring individual services, building them, testing th
      - ✅ inference-api service: Created `InferenceAPIServiceCommand` (essence/commands/inference_api_service.py) - wraps async serve() function
      - ✅ All commands registered in essence/commands/__init__.py for discovery
      - ✅ All services can now be run via `poetry run python -m essence <service-name>`
-   - ⏳ Remove duplicate code (consolidate into `essence/`)
+   - ✅ **COMPLETED:** Remove duplicate code (consolidate into `essence/`)
+     - ✅ Created `essence/services/http_middleware.py` with shared `create_tracing_and_metrics_middleware()` function
+     - ✅ Consolidated duplicate HTTP tracing/metrics middleware code from telegram and discord services
+     - ✅ Both services now use the shared middleware utility, reducing code duplication
+     - ✅ ~60 lines of duplicate code removed and consolidated into reusable utility
    - ⏳ Add proper error handling
    - ⏳ Add proper logging with structured format
    - ⏳ Ensure all imports are from `essence` package
