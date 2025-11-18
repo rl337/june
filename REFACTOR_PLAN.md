@@ -594,7 +594,13 @@ This phase focuses on refactoring individual services, building them, testing th
          - ✅ Added proper mocking and fallback imports for torch, transformers, grpc dependencies
          - ✅ Added fallback imports for june_grpc_api protobuf classes
          - ✅ Tests now handle missing dependencies gracefully
-       - ⏳ **Remaining:** Some test files still have import errors (likely dependency-related, e.g., missing opentelemetry module)
+       - ✅ **COMPLETED:** Created conftest.py for telegram service tests to handle package name conflicts
+         - ✅ Added conftest.py in tests/services/telegram/ to prioritize installed python-telegram-bot package
+         - ✅ Tests work correctly when run individually or in small groups
+         - ⏳ **Known limitation:** Pytest collection from directory (`pytest tests/services/telegram/`) fails with `ModuleNotFoundError: No module named 'telegram.test_*'` due to package name conflict between python-telegram-bot and test directory structure
+         - ⏳ **Workaround:** Run tests explicitly by file path (e.g., `pytest tests/services/telegram/test_tracing.py`) or in small groups
+         - ⏳ **Future fix:** May require pytest configuration changes or test directory restructuring to avoid package name conflicts
+       - ⏳ **Remaining:** Some test files still have import errors when collecting all tests together (individual test files work correctly)
        - ⏳ Test files in `tests/services/stt/`, `tests/services/tts/`, `tests/services/inference-api/` may have similar import issues (these services still use `services/<service>/main.py` structure, so imports may be correct)
      - ✅ **COMPLETED:** Add tracing span tests for telegram service (test_tracing.py with 10 tests, all passing)
        - ✅ Tests for STT span creation with attributes (stt.recognize_stream)
