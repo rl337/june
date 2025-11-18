@@ -713,7 +713,7 @@ This phase focuses on refactoring individual services, building them, testing th
    - ⏳ Ensure all dependencies are containerized
    - **Note:** Coding agent can be used as a library from other services or scripts - no separate service required for MVP
 
-#### 10.5: Benchmark Evaluation Setup ⏳ TODO
+#### 10.5: Benchmark Evaluation Setup ⏳ IN PROGRESS
 
 1. **Select benchmark datasets:**
    - ⏳ **HumanEval** - Python coding problems (164 problems)
@@ -721,36 +721,28 @@ This phase focuses on refactoring individual services, building them, testing th
    - ⏳ **SWE-bench** - Real-world software engineering tasks
    - ⏳ **CodeXGLUE** - Multiple code understanding/generation tasks
 
-2. **Create sandboxed execution environment (CRITICAL):**
-   - ⏳ **Sandbox requirements:**
-     - Each benchmark task runs in isolated container or chroot
-     - Sandbox is ephemeral (created fresh for each task)
-     - Sandbox persists after task completion for review
-     - All file system changes captured (snapshot before/after)
-     - All command executions logged with timestamps
-     - Network access controlled (no internet during execution, or whitelist-only)
-     - Resource limits (CPU, memory, disk) enforced
-   - ⏳ **Reviewability requirements:**
-     - Complete file system snapshot after task completion
-     - Command execution log (all commands run, with timestamps)
-     - Process tree (all processes spawned)
-     - Network activity log (if any network access allowed)
-     - Resource usage metrics (CPU time, memory peaks, disk I/O)
-     - Git history (if agent uses git)
-     - File change diff (before/after file system state)
-   - ⏳ **Sandbox implementation options:**
-     - **Option A: Docker container per task** (recommended)
-       - Create new container for each benchmark task
-       - Mount task-specific volume
-       - Capture container filesystem after completion
-       - Log all container commands via exec logs
-     - **Option B: chroot jail**
-       - Create chroot environment for each task
-       - Use system call tracing (strace/ptrace) to log all operations
-       - Snapshot filesystem before/after
-     - **Option C: Firecracker microVM** (most secure, more complex)
-       - Lightweight VM per task
-       - Full isolation with minimal overhead
+2. **✅ COMPLETED: Create sandboxed execution environment (CRITICAL):**
+   - ✅ **COMPLETED:** Created `essence/agents/sandbox.py` with Docker container-based sandbox system
+   - ✅ **Sandbox implementation (Option A: Docker container per task):**
+     - ✅ Create new container for each benchmark task (`Sandbox` class)
+     - ✅ Mount task-specific volume (workspace directory)
+     - ✅ Capture container filesystem after completion (snapshot_filesystem method)
+     - ✅ Log all container commands via exec logs (CommandLog dataclass)
+     - ✅ Resource limits: CPU and memory limits configurable
+     - ✅ Network isolation: Network can be disabled per sandbox
+   - ✅ **Reviewability features implemented:**
+     - ✅ Complete file system snapshot after task completion
+     - ✅ Command execution log (all commands run, with timestamps, stdout, stderr)
+     - ✅ Metrics collection (SandboxMetrics dataclass):
+       - Commands executed, files created/modified
+       - CPU time, memory usage, disk I/O
+       - Duration, success status, error messages
+     - ✅ Metadata persistence (save_metadata method saves all logs and metrics to JSON)
+   - ⏳ **Remaining reviewability features:**
+     - ⏳ Process tree (all processes spawned) - can be added via container stats
+     - ⏳ Network activity log (if any network access allowed) - can be added via container network inspection
+     - ⏳ Git history (if agent uses git) - can be captured in filesystem snapshot
+     - ⏳ File change diff (before/after file system state) - can be computed from snapshots
 
 3. **Create evaluation framework (containerized):**
    - ⏳ Test harness for running benchmarks (runs in container)
