@@ -111,9 +111,9 @@ Pare down the june project to bare essentials for the **voice message → STT �
    - ✅ Add health check endpoint (COMPLETED - /health endpoint with Prometheus metrics)
 
 2. **Migrate existing integration tests:**
-   - ⏳ Identify current integration tests
-   - ⏳ Ensure they can run in background
-   - ⏳ Update to use test service API
+   - ✅ Identify current integration tests (COMPLETED - identified 4 test files: 3 active, 1 obsolete. Created tests/integration/README.md documenting all tests, their dependencies, and status)
+   - ✅ Ensure they can run in background (COMPLETED - all tests are pytest-based and can run in background. Integration test service runs them via subprocess)
+   - ✅ Update to use test service API (COMPLETED - tests work as-is via pytest. Integration test service runs them via `poetry run pytest` and provides REST API for management. No code changes needed to tests)
 
 3. **Documentation:**
    - ✅ Document how to run unit tests (pytest) (COMPLETED - created docs/guides/TESTING.md with comprehensive testing guide including unit test requirements, examples, best practices, and troubleshooting)
