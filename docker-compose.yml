@@ -310,6 +310,37 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+  integration-test:
+    build:
+      context: .
+      dockerfile: ./services/integration-test/Dockerfile
+    container_name: june-integration-test
+    restart: unless-stopped
+    ports:
+    - 8082:8082
+    environment:
+    - INTEGRATION_TEST_SERVICE_PORT=8082
+    - INTEGRATION_TEST_SERVICE_HOST=0.0.0.0
+    - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    - ENABLE_TRACING=${ENABLE_TRACING:-true}
+    - JAEGER_ENDPOINT=http://common-jaeger:14268/api/traces
+    - JAEGER_AGENT_HOST=common-jaeger
+    - JAEGER_AGENT_PORT=6831
+    volumes:
+    - /var/log/june/integration-test:/logs
+    networks:
+    - june_network
+    - shared-network
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:8082/health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 networks:
   june_network:
     driver: bridge

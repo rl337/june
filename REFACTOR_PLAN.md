@@ -76,7 +76,7 @@ Pare down the june project to bare essentials for the **voice message → STT �
 
 ## Current Priorities
 
-### Phase 12: Test Infrastructure and Integration Test Service ⏳ TODO
+### Phase 12: Test Infrastructure and Integration Test Service ✅ COMPLETED
 
 **Goal:** Establish proper test infrastructure with unit tests (mocked) and integration tests (background service).
 
@@ -127,9 +127,9 @@ Pare down the june project to bare essentials for the **voice message → STT �
 
 **Tasks:**
 1. **Test service deployment:**
-   - ⏳ Add test service to docker-compose.yml
-   - ⏳ Configure test service to run integration tests
-   - ⏳ Set up log aggregation for test service
+   - ✅ Add test service to docker-compose.yml (COMPLETED - added integration-test service with Dockerfile, health checks, port 8082, log volume mount, and network configuration)
+   - ✅ Configure test service to run integration tests (COMPLETED - service runs via `poetry run python -m essence integration-test-service` which executes pytest in background via subprocess)
+   - ✅ Set up log aggregation for test service (COMPLETED - logs mounted to `/var/log/june/integration-test:/logs` volume, service writes logs to stdout/stderr which are captured by Docker)
 
 2. **Monitoring and alerting:**
    - ⏳ Set up alerts for test failures
