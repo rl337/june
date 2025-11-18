@@ -122,8 +122,13 @@ class GPUMonitor:
         reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # MB
         return allocated, reserved
     
-    def reset_peak_stats(self):
-        """Reset peak memory statistics."""
+    def reset_peak_stats(self) -> None:
+        """
+        Reset peak memory statistics.
+        
+        Resets CUDA peak memory statistics for the GPU device if available.
+        Has no effect if running on CPU.
+        """
         if self.has_gpu:
             torch.cuda.reset_peak_memory_stats(self.device)
     

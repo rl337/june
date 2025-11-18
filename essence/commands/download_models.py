@@ -245,8 +245,13 @@ class ModelDownloader:
         
         return success
     
-    def list_authorized_models(self):
-        """List all authorized models."""
+    def list_authorized_models(self) -> None:
+        """
+        List all authorized models.
+        
+        Prints a formatted list of all authorized models organized by category
+        (LLM, STT, TTS, Embedding) with their descriptions, sizes, and status.
+        """
         print("\nAuthorized Models for June Agent:")
         print("=" * 50)
         
@@ -278,8 +283,13 @@ class ModelDownloader:
         
         return False
     
-    def get_cache_status(self):
-        """Get status of all models in cache."""
+    def get_cache_status(self) -> None:
+        """
+        Get status of all models in cache.
+        
+        Prints a formatted status report showing which authorized models are
+        currently cached and which are missing, organized by category.
+        """
         print("\nModel Cache Status:")
         print("=" * 30)
         
