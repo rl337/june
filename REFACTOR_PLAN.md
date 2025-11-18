@@ -299,6 +299,8 @@ All major refactoring phases have been completed:
 - ✅ **COMPLETED:** Removed leftover gateway references from essence module (essence/gateway/, essence/README.md, essence/__init__.py, essence/pyproject.toml)
 - ✅ **COMPLETED:** Archived gateway API documentation (docs/API/gateway.md → gateway.md.obsolete)
 - ✅ **COMPLETED:** Updated docs/README.md to remove gateway API references
+- ✅ **COMPLETED:** Removed obsolete backup file (REFACTOR_PLAN.md.20251118)
+- ✅ **COMPLETED:** Removed leftover gateway service directory (services/gateway/ with test cache)
 
 **Note:** Script tests in `tests/scripts/` are e2e/integration tests that require running services and dependencies. They are excluded from pytest collection and should be run manually or via the integration test service. Some tests reference removed services (gateway) and may need updates in the future.
 
