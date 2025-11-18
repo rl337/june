@@ -1,7 +1,21 @@
 #!/usr/bin/env python3
 """
 Penetration Testing Script for June Agent System
-Performs automated and manual security testing across all services.
+
+⚠️ **OBSOLETE:** This script is obsolete in its current form because it tests
+the gateway service, which has been removed as part of the refactoring. The
+gateway service was removed to achieve a minimal architecture with direct
+gRPC communication between services.
+
+**Original Purpose:**
+Performs automated and manual security testing across all services via the
+gateway HTTP API endpoints.
+
+**Status:** This script is kept for reference but is not functional in its
+current form. All tests target the removed gateway service (`GATEWAY_URL`).
+The script could potentially be updated to test the remaining services
+(telegram, discord) which may have HTTP endpoints, or adapted to test gRPC
+services using different security testing approaches.
 """
 import asyncio
 import json

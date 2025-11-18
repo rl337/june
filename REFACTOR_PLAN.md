@@ -273,7 +273,7 @@ All major refactoring phases have been completed:
 
 **Remaining Work:**
 - ⏳ Optional: Fix dependencies for `tests/services/` tests (integration tests that need running services)
-- ⏳ Optional: Update other script tests that reference removed services (gateway) - see `penetration_test.py` and shell scripts (`diagnose_test_failures.sh`, `run_tests_with_artifacts.sh`) (✅ `test_e2e_text_passthrough.py` and `test_pipeline_modes.py` marked as obsolete)
+- ⏳ Optional: Update shell scripts that reference removed services (gateway) - see `diagnose_test_failures.sh`, `run_tests_with_artifacts.sh` (✅ `test_e2e_text_passthrough.py`, `test_pipeline_modes.py`, and `penetration_test.py` marked as obsolete)
 - ⏳ Optional: End-to-end testing and verification (Phase 8, 9.2-9.4) - requires running system
 
 **Current State:**
@@ -307,7 +307,7 @@ All major refactoring phases have been completed:
 
 **Remaining Work (Optional/Future):**
 - ⏳ TODO (Optional): Fix dependencies for `tests/services/` tests for active services (telegram, discord, stt, tts, inference-api) - these may be integration tests that need running services
-- ⏳ TODO (Optional): Update other script tests that reference removed services (gateway) - see `penetration_test.py` and shell scripts (`diagnose_test_failures.sh`, `run_tests_with_artifacts.sh`) in `tests/scripts/` (✅ `test_e2e_text_passthrough.py` and `test_pipeline_modes.py` marked as obsolete)
+- ⏳ TODO (Optional): Update shell scripts that reference removed services (gateway) - see `diagnose_test_failures.sh`, `run_tests_with_artifacts.sh` in `tests/scripts/` (✅ `test_e2e_text_passthrough.py`, `test_pipeline_modes.py`, and `penetration_test.py` marked as obsolete)
 
 **Note:** These TODO items are also listed in the "Refactoring Status Summary" section above. All remaining work is optional and does not block core functionality.
 
@@ -318,6 +318,7 @@ All major refactoring phases have been completed:
 - ✅ **COMPLETED:** Removed obsolete backup file (REFACTOR_PLAN.md.20251118)
 - ✅ **COMPLETED:** Marked `test_e2e_text_passthrough.py` as obsolete (depends on removed gateway service, kept for reference only)
 - ✅ **COMPLETED:** Marked `test_pipeline_modes.py` as obsolete (depends on removed gateway service, imports non-existent `test_round_trip_gateway` module, kept for reference only)
+- ✅ **COMPLETED:** Marked `penetration_test.py` as obsolete (tests removed gateway service, could be updated to test remaining services if needed)
 - ⚠️ **PARTIAL:** `services/gateway/` directory contains a test cache file owned by root - cannot remove without sudo (can be safely ignored as it's just a cache file)
 
 **Note:** Script tests in `tests/scripts/` are e2e/integration tests that require running services and dependencies. They are excluded from pytest collection and should be run manually or via the integration test service. Some tests reference removed services (gateway) and may need updates in the future.
