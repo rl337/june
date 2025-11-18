@@ -41,12 +41,11 @@ if 'telegram' in sys.modules:
             if 'telegram.error' in sys.modules:
                 del sys.modules['telegram.error']
 
-# Save original sys.path and remove local telegram directory from path to prevent shadowing
-_original_sys_path = sys.path[:]
-if _local_telegram_dir and _local_telegram_dir in sys.path:
-    sys.path.remove(_local_telegram_dir)
-
 # Temporarily move site-packages to front of sys.path for telegram import
+_original_sys_path = sys.path[:]
+_test_dir = os.path.dirname(os.path.abspath(__file__))
+if _test_dir in sys.path:
+    sys.path.remove(_test_dir)
 if _site_packages and _site_packages in sys.path:
     sys.path.remove(_site_packages)
 if _site_packages:
@@ -56,12 +55,12 @@ if _site_packages:
 from telegram import Message
 from telegram.error import TelegramError, TimedOut
 
-# Restore original sys.path and ensure parent directory (services/telegram) is in path for local imports
+# Restore original sys.path
 sys.path[:] = _original_sys_path
 if _local_telegram_dir and _local_telegram_dir not in sys.path:
     sys.path.insert(0, _local_telegram_dir)
 
-from telegram_utils import stream_text_message, stream_llm_response_to_telegram, TELEGRAM_MAX_MESSAGE_LENGTH
+from essence.services.telegram.telegram_utils import stream_text_message, stream_llm_response_to_telegram, TELEGRAM_MAX_MESSAGE_LENGTH
 
 
 @pytest.fixture

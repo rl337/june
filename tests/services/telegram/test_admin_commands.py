@@ -1,10 +1,48 @@
 """Tests for admin commands."""
 import pytest
+import sys
+import os
+import importlib
+import site
 from unittest.mock import Mock, patch, AsyncMock, MagicMock
+
+# Fix import conflict: ensure we import from installed python-telegram-bot, not local telegram dir
+# Find site-packages directory with telegram
+_site_packages = None
+for sp_dir in list(site.getsitepackages()) + [site.getusersitepackages()]:
+    if sp_dir and 'site-packages' in sp_dir:
+        _telegram_pkg_path = os.path.join(sp_dir, 'telegram', '__init__.py')
+        if os.path.exists(_telegram_pkg_path):
+            _site_packages = sp_dir
+            break
+
+# Clear local telegram from module cache if it was imported
+if 'telegram' in sys.modules:
+    mod = sys.modules['telegram']
+    if hasattr(mod, '__file__') and mod.__file__:
+        if 'tests/services/telegram' in mod.__file__ or 'essence/services/telegram' in mod.__file__:
+            del sys.modules['telegram']
+            if 'telegram.ext' in sys.modules:
+                del sys.modules['telegram.ext']
+
+# Temporarily move site-packages to front of sys.path for telegram import
+_original_sys_path = sys.path[:]
+_test_dir = os.path.dirname(os.path.abspath(__file__))
+if _test_dir in sys.path:
+    sys.path.remove(_test_dir)
+if _site_packages and _site_packages in sys.path:
+    sys.path.remove(_site_packages)
+if _site_packages:
+    sys.path.insert(0, _site_packages)
+
+# Now import telegram from installed package
 from telegram import Update, Message, User, Chat
 
-from admin_auth import is_admin, require_admin, add_admin, remove_admin
-from admin_db import (
+# Restore original sys.path
+sys.path[:] = _original_sys_path
+
+from essence.services.telegram.admin_auth import is_admin, require_admin, add_admin, remove_admin
+from essence.services.telegram.admin_db import (
     block_user, unblock_user, is_user_blocked, get_blocked_users,
     clear_conversation, clear_user_conversations,
     log_audit_action, get_audit_logs
@@ -33,7 +71,7 @@ def mock_context():
 class TestAdminAuth:
     """Tests for admin authentication."""
     
-    @patch('admin_auth.get_db_connection')
+    @patch('essence.services.telegram.admin_auth.get_db_connection')
     def test_is_admin_true(self, mock_conn):
         """Test is_admin returns True for admin user."""
         mock_cursor = Mock()
@@ -47,7 +85,7 @@ class TestAdminAuth:
         result = is_admin("123456789")
         assert result is True
     
-    @patch('admin_auth.get_db_connection')
+    @patch('essence.services.telegram.admin_auth.get_db_connection')
     def test_is_admin_false(self, mock_conn):
         """Test is_admin returns False for non-admin user."""
         mock_cursor = Mock()
@@ -59,21 +97,21 @@ class TestAdminAuth:
         result = is_admin("123456789")
         assert result is False
     
-    @patch('admin_auth.is_admin')
+    @patch('essence.services.telegram.admin_auth.is_admin')
     def test_require_admin_success(self, mock_is_admin):
         """Test require_admin succeeds for admin user."""
         mock_is_admin.return_value = True
         result = require_admin("123456789")
         assert result is True
     
-    @patch('admin_auth.is_admin')
+    @patch('essence.services.telegram.admin_auth.is_admin')
     def test_require_admin_failure(self, mock_is_admin):
         """Test require_admin raises PermissionError for non-admin."""
         mock_is_admin.return_value = False
         with pytest.raises(PermissionError):
             require_admin("123456789")
     
-    @patch('admin_auth.get_db_connection')
+    @patch('essence.services.telegram.admin_auth.get_db_connection')
     def test_add_admin(self, mock_conn):
         """Test adding an admin user."""
         mock_cursor = Mock()
@@ -86,7 +124,7 @@ class TestAdminAuth:
         assert result is True
         mock_db.commit.assert_called_once()
     
-    @patch('admin_auth.get_db_connection')
+    @patch('essence.services.telegram.admin_auth.get_db_connection')
     def test_remove_admin(self, mock_conn):
         """Test removing an admin user."""
         mock_cursor = Mock()
@@ -103,7 +141,7 @@ class TestAdminAuth:
 class TestAdminDB:
     """Tests for admin database operations."""
     
-    @patch('admin_db.get_db_connection')
+    @patch('essence.services.telegram.admin_db.get_db_connection')
     def test_block_user(self, mock_conn):
         """Test blocking a user."""
         mock_cursor = Mock()
@@ -116,7 +154,7 @@ class TestAdminDB:
         assert result is True
         mock_db.commit.assert_called_once()
     
-    @patch('admin_db.get_db_connection')
+    @patch('essence.services.telegram.admin_db.get_db_connection')
     def test_unblock_user(self, mock_conn):
         """Test unblocking a user."""
         mock_cursor = Mock()
@@ -129,7 +167,7 @@ class TestAdminDB:
         assert result is True
         mock_db.commit.assert_called_once()
     
-    @patch('admin_db.get_db_connection')
+    @patch('essence.services.telegram.admin_db.get_db_connection')
     def test_is_user_blocked_true(self, mock_conn):
         """Test is_user_blocked returns True for blocked user."""
         mock_cursor = Mock()
@@ -141,7 +179,7 @@ class TestAdminDB:
         result = is_user_blocked("123456789")
         assert result is True
     
-    @patch('admin_db.get_db_connection')
+    @patch('essence.services.telegram.admin_db.get_db_connection')
     def test_is_user_blocked_false(self, mock_conn):
         """Test is_user_blocked returns False for non-blocked user."""
         mock_cursor = Mock()
@@ -153,7 +191,7 @@ class TestAdminDB:
         result = is_user_blocked("123456789")
         assert result is False
     
-    @patch('admin_db.get_db_connection')
+    @patch('essence.services.telegram.admin_db.get_db_connection')
     def test_clear_conversation(self, mock_conn):
         """Test clearing a conversation."""
         mock_cursor = Mock()
@@ -166,7 +204,7 @@ class TestAdminDB:
         assert result is True
         mock_db.commit.assert_called_once()
     
-    @patch('admin_db.get_db_connection')
+    @patch('essence.services.telegram.admin_db.get_db_connection')
     def test_clear_user_conversations(self, mock_conn):
         """Test clearing all conversations for a user."""
         mock_cursor = Mock()
@@ -180,7 +218,7 @@ class TestAdminDB:
         assert result == 2
         mock_db.commit.assert_called_once()
     
-    @patch('admin_db.get_db_connection')
+    @patch('essence.services.telegram.admin_db.get_db_connection')
     def test_log_audit_action(self, mock_conn):
         """Test logging an audit action."""
         mock_cursor = Mock()

@@ -9,12 +9,7 @@ import time
 import pytest
 from pathlib import Path
 
-# Add chat-service-base to path for imports
-# Path: services/telegram/tests/test_streaming_popen.py -> services/telegram/tests -> services/telegram -> services -> chat-service-base
-base_dir = Path(__file__).parent.parent.parent / "chat-service-base"
-sys.path.insert(0, str(base_dir))
-
-from utils.streaming_popen import streaming_popen_generator
+from essence.chat.utils.streaming_popen import streaming_popen_generator
 
 
 @pytest.fixture

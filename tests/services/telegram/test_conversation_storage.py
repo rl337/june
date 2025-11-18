@@ -12,16 +12,13 @@ sys.modules['psycopg2'] = MagicMock()
 sys.modules['psycopg2.extras'] = MagicMock()
 sys.modules['psycopg2.extras'].RealDictCursor = MagicMock
 
-# Add parent directory to path for imports
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from conversation_storage import ConversationStorage, DEFAULT_LANGUAGE
+from essence.services.telegram.conversation_storage import ConversationStorage, DEFAULT_LANGUAGE
 
 
 class TestConversationStorage:
     """Test ConversationStorage methods."""
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_get_language_preference_existing(self, mock_get_conn):
         """Test getting language preference when it exists in metadata."""
         # Mock database connection and cursor
@@ -47,7 +44,7 @@ class TestConversationStorage:
         mock_cursor.execute.assert_called_once()
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_get_language_preference_default(self, mock_get_conn):
         """Test getting language preference when not set (should default to 'en')."""
         # Mock database connection and cursor
@@ -66,7 +63,7 @@ class TestConversationStorage:
         assert result == DEFAULT_LANGUAGE
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_get_language_preference_empty_metadata(self, mock_get_conn):
         """Test getting language preference when metadata is empty."""
         # Mock database connection and cursor
@@ -89,7 +86,7 @@ class TestConversationStorage:
         assert result == DEFAULT_LANGUAGE
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_set_language_preference_existing_conversation(self, mock_get_conn):
         """Test setting language preference for existing conversation."""
         # Mock database connection and cursor
@@ -116,7 +113,7 @@ class TestConversationStorage:
         mock_conn.commit.assert_called_once()
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_set_language_preference_new_conversation(self, mock_get_conn):
         """Test setting language preference for new conversation."""
         # Mock database connection and cursor
@@ -138,7 +135,7 @@ class TestConversationStorage:
         mock_conn.commit.assert_called_once()
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_set_language_preference_preserves_metadata(self, mock_get_conn):
         """Test that setting language preference preserves other metadata."""
         # Mock database connection and cursor
@@ -172,7 +169,7 @@ class TestConversationStorage:
         mock_conn.commit.assert_called_once()
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_set_language_preference_lowercase(self, mock_get_conn):
         """Test that language code is normalized to lowercase."""
         # Mock database connection and cursor
@@ -198,7 +195,7 @@ class TestConversationStorage:
         mock_conn.commit.assert_called_once()
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_get_language_preference_error_handling(self, mock_get_conn):
         """Test error handling in get_language_preference."""
         # Mock database connection to raise exception
@@ -210,7 +207,7 @@ class TestConversationStorage:
         # Verify - should return default
         assert result == DEFAULT_LANGUAGE
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_set_language_preference_error_handling(self, mock_get_conn):
         """Test error handling in set_language_preference."""
         # Mock database connection to raise exception
@@ -222,7 +219,7 @@ class TestConversationStorage:
         # Verify - should return False
         assert result is False
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_get_conversation_analytics_with_messages(self, mock_get_conn):
         """Test getting conversation analytics with messages."""
         from datetime import datetime, timedelta
@@ -277,7 +274,7 @@ class TestConversationStorage:
         assert 'engagement_score' in result
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_get_conversation_analytics_no_conversation(self, mock_get_conn):
         """Test getting analytics for non-existent conversation."""
         # Mock database connection and cursor
@@ -298,7 +295,7 @@ class TestConversationStorage:
         assert result['average_response_time_seconds'] == 0.0
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_get_dashboard_analytics(self, mock_get_conn):
         """Test getting dashboard analytics."""
         # Mock database connection and cursor
@@ -349,7 +346,7 @@ class TestConversationStorage:
         assert result['active_users'] == 5
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_get_dashboard_analytics_with_date_filter(self, mock_get_conn):
         """Test getting dashboard analytics with date filters."""
         from datetime import datetime
@@ -389,7 +386,7 @@ class TestConversationStorage:
         assert 'end_date' in result
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_generate_analytics_report_json(self, mock_get_conn):
         """Test generating JSON analytics report."""
         # Mock database connection and cursor
@@ -424,7 +421,7 @@ class TestConversationStorage:
         assert 'total_conversations' in data
         assert 'total_messages' in data
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_generate_analytics_report_csv(self, mock_get_conn):
         """Test generating CSV analytics report."""
         # Mock database connection and cursor
@@ -494,7 +491,7 @@ class TestConversationStorage:
         assert is_valid is False
         assert "cannot be empty" in error
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_create_prompt_template(self, mock_get_conn):
         """Test creating a prompt template."""
         mock_conn = MagicMock()
@@ -514,7 +511,7 @@ class TestConversationStorage:
         mock_conn.commit.assert_called_once()
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_create_prompt_template_invalid_syntax(self, mock_get_conn):
         """Test creating template with invalid syntax."""
         template_id = ConversationStorage.create_prompt_template(
@@ -525,7 +522,7 @@ class TestConversationStorage:
         
         assert template_id is None
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_get_prompt_template(self, mock_get_conn):
         """Test getting a prompt template by ID."""
         mock_conn = MagicMock()
@@ -554,7 +551,7 @@ class TestConversationStorage:
         assert template['name'] == 'test_template'
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_get_prompt_template_not_found(self, mock_get_conn):
         """Test getting non-existent template."""
         mock_conn = MagicMock()
@@ -568,7 +565,7 @@ class TestConversationStorage:
         assert template is None
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_get_prompt_template_for_user(self, mock_get_conn):
         """Test getting user-specific template."""
         mock_conn = MagicMock()
@@ -596,7 +593,7 @@ class TestConversationStorage:
         assert template['user_id'] == 'user123'
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_get_prompt_template_for_conversation(self, mock_get_conn):
         """Test getting conversation-specific template with fallback."""
         mock_conn = MagicMock()
@@ -632,7 +629,7 @@ class TestConversationStorage:
         assert template['conversation_id'] == 'conv-123'
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_list_prompt_templates(self, mock_get_conn):
         """Test listing prompt templates."""
         mock_conn = MagicMock()
@@ -663,7 +660,7 @@ class TestConversationStorage:
         assert len(templates) == 2
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_update_prompt_template(self, mock_get_conn):
         """Test updating a prompt template."""
         mock_conn = MagicMock()
@@ -683,7 +680,7 @@ class TestConversationStorage:
         mock_conn.commit.assert_called_once()
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_delete_prompt_template(self, mock_get_conn):
         """Test deleting a prompt template."""
         mock_conn = MagicMock()
@@ -699,7 +696,7 @@ class TestConversationStorage:
         mock_conn.commit.assert_called_once()
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_export_conversation_json(self, mock_get_conn):
         """Test exporting conversation to JSON format."""
         from datetime import datetime
@@ -756,7 +753,7 @@ class TestConversationStorage:
         assert data['messages'][1]['content'] == 'Hi there!'
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_export_conversation_txt(self, mock_get_conn):
         """Test exporting conversation to TXT format."""
         from datetime import datetime
@@ -801,7 +798,7 @@ class TestConversationStorage:
         assert 'Test message' in text
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_export_conversation_pdf(self, mock_get_conn):
         """Test exporting conversation to PDF format."""
         from datetime import datetime
@@ -843,7 +840,7 @@ class TestConversationStorage:
         assert result.startswith(b'%PDF')
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_export_conversation_not_found(self, mock_get_conn):
         """Test exporting conversation when conversation doesn't exist."""
         # Mock database connection and cursor
@@ -861,7 +858,7 @@ class TestConversationStorage:
         
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_export_conversation_invalid_format(self, mock_get_conn):
         """Test exporting conversation with invalid format."""
         from datetime import datetime
@@ -891,7 +888,7 @@ class TestConversationStorage:
         
         mock_conn.close.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_export_conversation_with_date_filter(self, mock_get_conn):
         """Test exporting conversation with date range filter."""
         from datetime import datetime
@@ -934,7 +931,7 @@ class TestConversationStorage:
     
     # ==================== A/B Testing Tests ====================
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_create_ab_test(self, mock_get_conn):
         """Test creating an A/B test."""
         mock_conn = MagicMock()
@@ -959,7 +956,7 @@ class TestConversationStorage:
         mock_cursor.execute.assert_called_once()
         mock_conn.commit.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_get_ab_test(self, mock_get_conn):
         """Test getting an A/B test."""
         mock_conn = MagicMock()
@@ -986,7 +983,7 @@ class TestConversationStorage:
         assert result['name'] == 'test_ab'
         assert isinstance(result['variants'], list)
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_list_ab_tests(self, mock_get_conn):
         """Test listing A/B tests."""
         mock_conn = MagicMock()
@@ -1015,7 +1012,7 @@ class TestConversationStorage:
         assert len(result) == 2
         assert result[0]['name'] == 'test1'
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_assign_ab_variant(self, mock_get_conn):
         """Test assigning A/B test variant to conversation."""
         # Mock get_ab_test first
@@ -1046,7 +1043,7 @@ class TestConversationStorage:
             mock_cursor.execute.assert_called()
             mock_conn.commit.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_record_ab_metric(self, mock_get_conn):
         """Test recording A/B test metric."""
         mock_conn = MagicMock()
@@ -1066,7 +1063,7 @@ class TestConversationStorage:
         mock_cursor.execute.assert_called_once()
         mock_conn.commit.assert_called_once()
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_get_ab_metrics(self, mock_get_conn):
         """Test getting A/B test metrics."""
         mock_conn = MagicMock()
@@ -1094,7 +1091,7 @@ class TestConversationStorage:
         assert len(result) == 1
         assert result[0]['variant_name'] == 'A'
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_get_ab_statistics(self, mock_get_conn):
         """Test getting A/B test statistics."""
         with patch.object(ConversationStorage, 'get_ab_test') as mock_get_test:
@@ -1125,7 +1122,7 @@ class TestConversationStorage:
             assert 'A' in result['variants']
             assert 'B' in result['variants']
     
-    @patch('conversation_storage.get_db_connection')
+    @patch('essence.services.telegram.conversation_storage.get_db_connection')
     def test_get_ab_test_variant_config(self, mock_get_conn):
         """Test getting A/B test variant configuration."""
         with patch.object(ConversationStorage, 'assign_ab_variant') as mock_assign, \

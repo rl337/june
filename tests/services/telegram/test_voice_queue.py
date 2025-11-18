@@ -5,7 +5,7 @@ import json
 import base64
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from voice_queue import VoiceMessageQueue, create_worker_subscription
+from essence.services.telegram.voice_queue import VoiceMessageQueue, create_worker_subscription
 
 
 @pytest.fixture

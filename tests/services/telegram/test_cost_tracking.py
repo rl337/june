@@ -7,10 +7,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime, timedelta
 
-# Add parent directory to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from cost_tracking import (
+from essence.services.telegram.cost_tracking import (
     calculate_stt_cost,
     calculate_tts_cost,
     calculate_llm_cost,
@@ -74,7 +71,7 @@ class TestCostCalculation:
 class TestCostRecording:
     """Tests for cost recording functions."""
     
-    @patch('cost_tracking.get_db_connection')
+    @patch('essence.services.telegram.cost_tracking.get_db_connection')
     def test_record_cost(self, mock_get_conn):
         """Test recording a cost entry."""
         # Mock database connection
@@ -97,7 +94,7 @@ class TestCostRecording:
         mock_conn.commit.assert_called_once()
         mock_conn.close.assert_called_once()
     
-    @patch('cost_tracking.get_db_connection')
+    @patch('essence.services.telegram.cost_tracking.get_db_connection')
     def test_record_cost_without_conversation(self, mock_get_conn):
         """Test recording cost without conversation_id."""
         # Mock database connection
@@ -121,7 +118,7 @@ class TestCostRecording:
 class TestCostQueries:
     """Tests for cost query functions."""
     
-    @patch('cost_tracking.get_db_connection')
+    @patch('essence.services.telegram.cost_tracking.get_db_connection')
     def test_get_user_costs(self, mock_get_conn):
         """Test getting user costs."""
         # Mock database connection
@@ -148,7 +145,7 @@ class TestCostQueries:
         assert 'llm' in costs['services']
         assert costs['services']['stt']['usage_count'] == 10
     
-    @patch('cost_tracking.get_db_connection')
+    @patch('essence.services.telegram.cost_tracking.get_db_connection')
     def test_get_conversation_costs(self, mock_get_conn):
         """Test getting conversation costs."""
         # Mock database connection
@@ -172,7 +169,7 @@ class TestCostQueries:
         assert costs['total_cost'] == 0.002
         assert 'stt' in costs['services']
     
-    @patch('cost_tracking.get_db_connection')
+    @patch('essence.services.telegram.cost_tracking.get_db_connection')
     def test_generate_billing_report(self, mock_get_conn):
         """Test generating billing report."""
         # Mock database connection
@@ -219,7 +216,7 @@ class TestCostQueries:
 class TestConversationID:
     """Tests for conversation ID helper function."""
     
-    @patch('cost_tracking.get_db_connection')
+    @patch('essence.services.telegram.cost_tracking.get_db_connection')
     def test_get_conversation_id_from_user_chat(self, mock_get_conn):
         """Test getting conversation ID from user_id and chat_id."""
         # Mock database connection
@@ -237,7 +234,7 @@ class TestConversationID:
         mock_cursor.execute.assert_called_once()
         mock_conn.close.assert_called_once()
     
-    @patch('cost_tracking.get_db_connection')
+    @patch('essence.services.telegram.cost_tracking.get_db_connection')
     def test_get_conversation_id_not_found(self, mock_get_conn):
         """Test getting conversation ID when not found."""
         # Mock database connection

@@ -15,13 +15,10 @@ import wave
 import sys
 from pathlib import Path
 
-# Add parent directory to path to import audio_utils
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from pydub import AudioSegment
 from pydub.generators import Sine
 
-from audio_utils import (
+from essence.services.telegram.audio_utils import (
     convert_ogg_to_wav,
     convert_to_16khz_mono,
     validate_audio,

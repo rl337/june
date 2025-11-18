@@ -15,13 +15,10 @@ import struct
 import sys
 from pathlib import Path
 
-# Add parent directory to path to import voice_quality
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from pydub import AudioSegment
 from pydub.generators import Sine, WhiteNoise
 
-from voice_quality import VoiceQualityScorer, VoiceQualityError
+from essence.services.telegram.voice_quality import VoiceQualityScorer, VoiceQualityError
 
 
 @pytest.fixture
