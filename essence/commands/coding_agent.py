@@ -159,7 +159,11 @@ class CodingAgentCommand(Command):
         """Run in interactive mode."""
         print("\n🤖 Coding Agent - Interactive Mode")
         print("=" * 50)
-        print("Enter coding tasks (or 'quit' to exit)")
+        print("Enter coding tasks or commands:")
+        print("  - Type a coding task to execute it")
+        print("  - 'help' or '?' - Show this help message")
+        print("  - 'reset' - Reset conversation history")
+        print("  - 'quit', 'exit', or 'q' - Exit interactive mode")
         print("=" * 50)
         
         try:
@@ -170,11 +174,17 @@ class CodingAgentCommand(Command):
                 if not task:
                     continue
                 
-                if task.lower() in ["quit", "exit", "q"]:
+                task_lower = task.lower()
+                
+                if task_lower in ["quit", "exit", "q"]:
                     print("\n👋 Goodbye!")
                     break
                 
-                if task.lower() == "reset":
+                if task_lower in ["help", "?"]:
+                    self._show_help()
+                    continue
+                
+                if task_lower == "reset":
                     self._agent.reset_conversation()
                     print("✅ Conversation reset")
                     continue
@@ -190,11 +200,30 @@ class CodingAgentCommand(Command):
                 except Exception as e:
                     logger.error(f"Error executing task: {e}", exc_info=True)
                     print(f"\n❌ Error: {e}")
+                    print("💡 Tip: Use 'help' to see available commands")
         
         except KeyboardInterrupt:
             print("\n\n👋 Interrupted by user")
         except EOFError:
             print("\n\n👋 Goodbye!")
+    
+    def _show_help(self) -> None:
+        """Show help message for interactive mode."""
+        print("\n" + "=" * 50)
+        print("📖 Coding Agent - Help")
+        print("=" * 50)
+        print("\nCommands:")
+        print("  help, ?          Show this help message")
+        print("  reset            Reset conversation history (start fresh)")
+        print("  quit, exit, q    Exit interactive mode")
+        print("\nUsage:")
+        print("  Simply type a coding task and press Enter.")
+        print("  The agent will process your task and provide a response.")
+        print("\nExamples:")
+        print("  > Write a Python function to calculate factorial")
+        print("  > Create a REST API endpoint for user authentication")
+        print("  > Implement a binary search tree in Python")
+        print("\n" + "=" * 50)
     
     def cleanup(self) -> None:
         """Clean up coding agent resources."""
