@@ -68,13 +68,13 @@ These are reusable Python tools that should be converted to commands:
    - **Priority:** Low (used for testing)
    - **Status:** ⏳ TODO
 
-3. **`run_benchmarks.py`** 🔄 CONVERT TO COMMAND
+3. **`run_benchmarks.py`** ✅ CONVERTED TO COMMAND
    - **Purpose:** Orchestrate benchmark evaluation with sandboxed execution
-   - **Action:** Create `essence/commands/run_benchmarks.py` (or rename existing benchmark_qwen3 command)
+   - **Action:** ✅ Created `essence/commands/run_benchmarks.py` (command name: `run-benchmarks`)
    - **Reason:** Reusable tool for running benchmarks
    - **Priority:** High (actively used)
-   - **Status:** ⏳ TODO
-   - **Note:** `run_benchmarks.sh` should be updated to call the command instead
+   - **Status:** ✅ COMPLETED
+   - **Note:** ✅ `run_benchmarks.sh` updated to call the command
 
 ### 📦 Move to Tests (Test Utilities)
 

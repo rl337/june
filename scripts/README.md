@@ -34,6 +34,7 @@ Reusable tools have been migrated to commands. Use these instead of scripts:
 - **`poetry run -m essence review-sandbox`** - Review sandbox snapshots (replaces `scripts/review_sandbox.py`)
 - **`poetry run -m essence verify-qwen3`** - Verify Qwen3 quantization (replaces `scripts/verify_qwen3_quantization.py`)
 - **`poetry run -m essence benchmark-qwen3`** - Benchmark Qwen3 performance (replaces `scripts/benchmark_qwen3_performance.py`)
+- **`poetry run -m essence run-benchmarks`** - Run benchmark evaluations with sandboxed execution (replaces `scripts/run_benchmarks.py`)
 
 ## Remaining Scripts
 

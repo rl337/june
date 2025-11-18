@@ -125,10 +125,10 @@ fi
 
 # Check if running in container or on host
 if [[ -f /.dockerenv ]] || [[ -n "${DOCKER_CONTAINER:-}" ]]; then
-    # Running in container - use Python directly
+    # Running in container - use command directly
     echo "Running benchmarks in container..."
     cd "$PROJECT_ROOT"
-    poetry run python scripts/run_benchmarks.py "${ARGS[@]}"
+    poetry run -m essence run-benchmarks "${ARGS[@]}"
 else
     # Running on host - use docker compose
     echo "Running benchmarks via docker compose..."
@@ -163,7 +163,7 @@ else
         fi
     fi
     
-    # Run benchmark script in cli-tools container
+    # Run benchmark command in cli-tools container
     docker compose run --rm \
         -v "$PROJECT_ROOT:/workspace" \
         -v "$OUTPUT_DIR:$OUTPUT_DIR" \
@@ -179,7 +179,7 @@ else
         -e MAX_ITERATIONS="$MAX_ITERATIONS" \
         -e ENABLE_NETWORK="$ENABLE_NETWORK" \
         cli-tools \
-        bash -c "cd /workspace && poetry run python scripts/run_benchmarks.py ${ARGS[*]}"
+        bash -c "cd /workspace && poetry run -m essence run-benchmarks ${ARGS[*]}"
 fi
 
 echo "Benchmark evaluation completed!"
