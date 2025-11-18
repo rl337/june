@@ -93,7 +93,7 @@ Pare down the june project to bare essentials for the **voice message → STT �
 - ✅ Benchmark evaluator implemented (`essence/agents/evaluator.py`)
 - ✅ Sandbox isolation implemented (`essence/agents/sandbox.py`)
 - ✅ Verification tools implemented (`essence/commands/verify_qwen3.py`, `benchmark_qwen3.py`)
-- ⏳ **Operational tasks:** Model download, service startup, and testing can be done when ready to use
+- ⏳ **Operational tasks:** Model download, service startup, and testing can be done when ready to use (requires running system with GPU)
 
 **Operational Guide (When Ready to Use):**
 
@@ -345,7 +345,7 @@ All code changes, cleanup, and refactoring tasks have been completed:
 
 **Remaining Work (All Optional):**
 - ⏳ **Operational tasks (Phase 10):** Model download, service startup, and testing - can be done when ready to use (requires running system)
-- ⏳ **Optional:** Fix dependencies for `tests/services/` tests (integration tests that need running services)
+- ✅ **COMPLETED:** Fixed dependencies for `tests/services/` tests - All main test files for active services (telegram, discord, stt, tts, inference-api) can now be collected successfully when run individually. Some collection issues may occur when running the entire suite together due to import conflicts, but individual test files work correctly.
 - ⏳ **Optional:** End-to-end testing and verification (Phase 8, 9.2-9.4) - requires running system
 
 **Note:** All remaining tasks are operational/runtime tasks that require a running system. No further code changes are needed for the core refactoring goals.
