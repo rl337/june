@@ -78,58 +78,7 @@ Pare down the june project to bare essentials for the **voice message → STT �
 
 ### Phase 12: Test Infrastructure and Integration Test Service ⏳ TODO
 
-**Goal:** Minimize `scripts/` directory by converting reusable tools to commands and moving test utilities to `tests/`.
-
-**Guidelines:**
-- **Scripts directory (`scripts/`):** Only for shell scripts that help with passing complex options to container runs or other tools
-  - Examples: `setup_docker.sh`, `refactor_agent_loop.sh`, `run_all_checks.sh`
-  - These are infrastructure/automation scripts, not reusable tools
-- **Commands (`essence/commands/`):** All reusable tools that users/agents might run
-  - Run via: `poetry run -m essence <command-name>`
-  - Examples: `download_models`, `monitor_gpu`, `review_sandbox`, `benchmark_qwen3`
-- **Tests (`tests/`):** All test code, runnable via pytest
-  - Test utilities should be in `tests/` or `tests/scripts/`
-  - All tests must be runnable via pytest
-  - No custom test runners
-
-**Tasks:**
-1. **Audit scripts directory:**
-   - ✅ Categorize each script: keep as script, convert to command, move to tests, or remove (COMPLETED - reviewed all 16 remaining scripts)
-   - ✅ Document categorization decisions (COMPLETED - updated scripts/SCRIPTS_AUDIT.md with comprehensive audit including current state, categorization, priorities, and notes)
-
-2. **Convert reusable tools to commands:**
-   - ✅ `review_sandbox.py` → `essence/commands/review_sandbox.py` (COMPLETED - runnable via `poetry run -m essence review-sandbox`)
-   - ✅ `monitor_gpu.py` → `essence/commands/monitor_gpu.py` (COMPLETED - runnable via `poetry run -m essence monitor-gpu`)
-   - ✅ `verify_qwen3_quantization.py` → `essence/commands/verify_qwen3.py` (COMPLETED - runnable via `poetry run -m essence verify-qwen3`)
-   - ✅ `download_models.py` → `essence/commands/download_models.py` (COMPLETED - runnable via `poetry run -m essence download-models`)
-   - ✅ `benchmark_qwen3_performance.py` → `essence/commands/benchmark_qwen3.py` (COMPLETED - runnable via `poetry run -m essence benchmark-qwen3`)
-   - ✅ `run_benchmarks.py` → `essence/commands/run_benchmarks.py` (COMPLETED - runnable via `poetry run -m essence run-benchmarks`)
-   - ✅ `download_qwen3.py` → Merged into `essence/commands/download_models.py` (COMPLETED - enhanced download-models command to support MODEL_CACHE_DIR and HUGGINGFACE_TOKEN, removed redundant script)
-   - ✅ `generate_alice_dataset.py` → `essence/commands/generate_alice_dataset.py` (COMPLETED - runnable via `poetry run -m essence generate-alice-dataset`)
-   - ✅ All reusable Python tools converted to commands (COMPLETED)
-
-3. **Move test utilities to tests/:**
-   - ✅ `test_*.py` files → `tests/scripts/` (COMPLETED - moved 8 test Python files)
-   - ✅ `run_audio_tests.sh` → `tests/scripts/` (COMPLETED)
-   - ✅ `test_artifact_collection.sh` → `tests/scripts/` (COMPLETED)
-   - ✅ `test_audio_services.sh` → `tests/scripts/` (COMPLETED)
-   - ✅ `validate_stt.sh` → `tests/scripts/` (COMPLETED)
-   - ✅ `diagnose_test_failures.sh` → `tests/scripts/` (COMPLETED)
-   - ✅ `run_tests_with_artifacts.sh` → `tests/scripts/` (COMPLETED)
-   - ✅ `set_test_mode.sh` → `tests/scripts/` (COMPLETED - removed GATEWAY_MODE references)
-   - ✅ `penetration_test.py` → `tests/scripts/` (COMPLETED)
-   - ✅ Updated references in `scripts/deploy_audio_services.sh`, `tests/scripts/run_audio_tests.sh`, `docs/guides/AGENTS.md`, `tests/scripts/diagnose_test_failures.sh`, and `tests/scripts/set_test_mode.sh` (COMPLETED)
-
-4. **Remove obsolete scripts:**
-   - ✅ Scripts referencing removed services (COMPLETED - removed validate_gateway.sh, test_round_trip_gateway.py, optimize_database_queries.py, encrypt_existing_data.py)
-   - ✅ Duplicate functionality (COMPLETED - removed profile_performance.py, duplicate of benchmark_qwen3_performance.py)
-   - ✅ Scripts superseded by commands (COMPLETED - removed review_sandbox.py, monitor_gpu.py, verify_qwen3_quantization.py, download_models.py, benchmark_qwen3_performance.py from scripts/ after verification; updated review_sandbox.sh to call command)
-   - ✅ Obsolete build scripts (COMPLETED - removed build_inference_core_wheel.sh and build_june_grpc_api_wheel.sh after Poetry migration; updated run_all_checks.sh to remove wheel building step)
-
-5. **Update documentation:**
-   - ✅ Document scripts/ directory purpose and guidelines (COMPLETED - updated scripts/README.md)
-   - ✅ Document command pattern and how to add new commands (COMPLETED - enhanced docs/guides/COMMANDS.md with comprehensive documentation including discovery mechanism, best practices, examples, error handling, testing, and migration guide)
-   - ✅ Update any references to moved scripts (COMPLETED - updated README.md, docs/guides/AGENTS.md, run_checks.sh, services/cli-tools/README.md, run_tests_with_artifacts.sh)
+**Goal:** Establish proper test infrastructure with unit tests (mocked) and integration tests (background service).
 
 ### Phase 12: Test Infrastructure and Integration Test Service ⏳ TODO
 
