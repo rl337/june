@@ -119,7 +119,7 @@ Pare down the june project to bare essentials for the **voice message → STT �
 - ✅ Modified GPU compatibility checks to raise RuntimeError instead of falling back to CPU for large models
 - ✅ Clear error messages explaining GPU requirement and why CPU fallback is forbidden
 - ✅ All GPU compatibility failure paths now check if model is large and fail fast if so
-- ⏳ TODO: Add health check that verifies GPU availability before accepting requests (optional enhancement)
+- ✅ Added health check that verifies GPU availability before accepting requests (COMPLETED - implemented in inference-api service)
 
 ## Current Priorities
 
@@ -245,29 +245,26 @@ Pare down the june project to bare essentials for the **voice message → STT �
 
 ### Pre-existing Test Failures
 
-**Status:** ⏳ TODO - Mostly fixed, one test still needs refinement
+**Status:** ✅ COMPLETED - All tests now passing
 
-**Issue:** 1 test failure remaining in `tests/essence/chat/agent/test_response_accumulation.py`:
+**Issue:** Previously had 1 test failure in `tests/essence/chat/agent/test_response_accumulation.py`:
 - `test_json_accumulation_logic[multiple_assistant_chunks]` - Expected 4 outputs, got 2. Expected: [("Hello", False, "assistant"), ("Hello world", False, "assistant"), ("Hello world!", False, "assistant"), ("", True, None)]. Got: [("Hello", False, "assistant"), ("", True, None)]
 
-**Progress:** Fixed 5 of 6 previously failing tests:
+**Progress:** Fixed all 6 previously failing tests:
 - ✅ `test_json_accumulation_logic[complete_json_single_assistant]` - Now passing
 - ✅ `test_json_accumulation_logic[complete_json_with_result]` - Now passing
 - ✅ `test_json_accumulation_logic[shell_output_skipped]` - Now passing
 - ✅ `test_json_accumulation_logic[very_long_result_message]` - Now passing
 - ✅ `test_json_accumulation_logic[no_json_lines_only_shell]` - Now passing (fixed error message handling)
-- ⏳ `test_json_accumulation_logic[multiple_assistant_chunks]` - Still failing (history tracking needs refinement)
+- ✅ `test_json_accumulation_logic[multiple_assistant_chunks]` - Now passing (fixed text extraction and fragment detection)
 
-**Root Cause:** History tracking for accumulated messages when threshold is met needs refinement. The logic tracks message history but doesn't yield all intermediate states correctly when chunks arrive quickly before the threshold is met.
+**Root Cause:** Two issues were identified:
+1. **Text extraction was stripping leading spaces:** The `_extract_human_readable_from_json_line` function was using `.strip()` which removed leading spaces from continuation chunks like " world", making them appear as fragments.
+2. **Single-character punctuation was being filtered out:** The extraction function required `len(text_stripped) >= 5`, which filtered out single-character punctuation like "!" that should be allowed as continuation chunks.
 
-**Impact:** This failure affects the response accumulation logic but doesn't block the core refactoring goals. Most test cases (11/12) are passing.
+**Solution:**
+1. **Preserved leading/trailing spaces in text extraction:** Modified `_extract_human_readable_from_json_line` to preserve spaces in the returned text (only strip for length checks and filtering), allowing space-prefixed continuation chunks to be detected correctly.
+2. **Allowed single-character punctuation:** Added check for single-character punctuation (`!`, `?`, `.`, `,`, `:`, `;`) in the extraction function, allowing these to pass the length check.
+3. **Improved fragment detection:** Enhanced fragment detection logic to better identify continuation chunks, including space-prefixed chunks and single-character punctuation.
 
-**Action Required:** Refine history tracking logic in `stream_chat_response_agent` to properly yield all intermediate accumulated states when the threshold is met at the final line.
-
-**Recent Attempts:**
-- Added logic to track old accumulated message in history before updating (line 779-781)
-- Added logic to ensure current accumulated message is in history at final line (line 916-918)
-- Added first message to history immediately when set (line 807-809)
-- Added new accumulated message to history immediately after updating (line 785-787)
-- Still need to debug why history only contains first message instead of all intermediate states
-- Issue: When chunks arrive quickly (before 2-second threshold), history should accumulate all intermediate states ("Hello", "Hello world", "Hello world!"), but only "Hello" is being yielded. Need to trace why "Hello world" and "Hello world!" are not in history when final line arrives.
+**Impact:** All tests (12/12) are now passing. The response accumulation logic correctly handles all intermediate states when chunks arrive quickly.

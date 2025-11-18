@@ -749,15 +749,25 @@ def stream_chat_response_agent(
                                 # Check if chunk is a fragment that doesn't fit (very short and doesn't continue naturally)
                                 # Allow chunks that start with space (common in streaming where words are split)
                                 # Allow single-character punctuation (e.g., "!" after "Hello world")
-                                message_starts_with_space = message and message[0] == " "
+                                # Also allow chunks that should be appended (continuations of accumulated message)
+                                message_starts_with_space = message and len(message) > 0 and message[0] == " "
                                 is_single_punctuation = len(message.strip()) == 1 and message.strip() in ("!", "?", ".", ",", ":", ";")
+                                # Check if this looks like a continuation (should be appended, not skipped)
+                                is_likely_continuation = (
+                                    message_starts_with_space or  # Starts with space (common continuation pattern)
+                                    (len(message.strip()) < 10 and accumulated_message and not accumulated_message.rstrip().endswith((" ", ".", ",", ":", ";", "!", "?"))) or  # Short chunk that continues naturally
+                                    (len(message.strip()) == 1 and message.strip() in ("!", "?", ".", ",", ":", ";"))  # Single punctuation
+                                )
+                                message_stripped = message.strip()
+                                starts_with_capital = message_stripped and message_stripped[0].isupper() if message_stripped else False
                                 is_fragment = (
-                                    len(message) < 15 and  # Very short
-                                    not message[0].isupper() and  # Doesn't start with capital
+                                    len(message_stripped) < 15 and  # Very short
+                                    not starts_with_capital and  # Doesn't start with capital (after stripping)
                                     not message_starts_with_space and  # Doesn't start with space (space-prefixed chunks are continuations)
                                     not is_single_punctuation and  # Not single punctuation (these are valid continuations)
-                                    not message.strip().startswith(("1.", "2.", "3.", "-", "*", "#", ">", "`", "\n")) and  # Not a list/code start
-                                    not accumulated_message.rstrip().endswith((" ", ".", ",", ":", ";", "!", "?"))  # Doesn't continue naturally
+                                    not message_stripped.startswith(("1.", "2.", "3.", "-", "*", "#", ">", "`", "\n")) and  # Not a list/code start
+                                    not accumulated_message.rstrip().endswith((" ", ".", ",", ":", ";", "!", "?")) and  # Doesn't continue naturally
+                                    not is_likely_continuation  # Not a likely continuation
                                 )
                                 
                                 if is_fragment:
@@ -918,12 +928,15 @@ def stream_chat_response_agent(
                         logger.info(f"Added current accumulated message to history (final line): length={len(accumulated_message)}")
                     
                     # Yield all previous accumulated messages in sequence
+                    # Sort by timestamp to ensure correct order
+                    sorted_history = sorted(previous_accumulated_messages, key=lambda x: x[1])
                     last_yielded_msg = None
-                    for msg, msg_time in previous_accumulated_messages:
-                        logger.info(f"Yielding accumulated message from history (final line): length={len(msg)}")
+                    for msg, msg_time in sorted_history:
+                        logger.info(f"Yielding accumulated message from history (final line): length={len(msg)}, timestamp={msg_time}")
                         if span:
                             span.add_event("yielding_accumulated_from_history_final", attributes={
-                                "length": len(msg)
+                                "length": len(msg),
+                                "timestamp": msg_time
                             })
                         yield (msg, False, "assistant")
                         last_message_yield_time = msg_time
@@ -1058,13 +1071,18 @@ def _extract_human_readable_from_json_line(line: str) -> Optional[str]:
                 if isinstance(content, list):
                     for item in content:
                         if isinstance(item, dict) and item.get("type") == "text":
-                            text = item.get("text", "").strip()
-                            if text and len(text) >= 5:  # Allow 5+ character messages (changed from > 5 to >= 5)
+                            text = item.get("text", "")
+                            # Preserve leading/trailing spaces for continuation detection
+                            # Only strip for length check and filtering
+                            text_stripped = text.strip()
+                            # Allow single-character punctuation (e.g., "!" after "Hello world")
+                            is_single_punctuation = len(text_stripped) == 1 and text_stripped in ("!", "?", ".", ",", ":", ";")
+                            if text_stripped and (len(text_stripped) >= 5 or is_single_punctuation):  # Allow 5+ character messages or single punctuation
                                 # Filter out descriptions but allow partial responses
-                                if not text.strip().startswith(("Writing", "Wrote", "Created", "Updated", "Response written")):
-                                    # Return the full text, not just the first chunk
+                                if not text_stripped.startswith(("Writing", "Wrote", "Created", "Updated", "Response written")):
+                                    # Return the text with spaces preserved (important for continuation detection)
                                     # The streaming function will handle chunking if needed
-                                    return text.strip()
+                                    return text
         
         # 3. Check for result objects (but be careful - these might be descriptions)
         if obj_type == "result" and subtype == "success":
