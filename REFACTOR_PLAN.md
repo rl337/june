@@ -585,6 +585,15 @@ This phase focuses on refactoring individual services, building them, testing th
        - ✅ Updated `test_streaming_popen.py` to import from `essence.chat.utils.streaming_popen`
        - ✅ Updated `test_telegram_utils.py` to import from `essence.services.telegram.telegram_utils` and fixed telegram import
        - ✅ Updated `test_voice_quality.py` to import from `essence.services.telegram.voice_quality`
+       - ✅ **COMPLETED:** Fixed import errors in test files for removed services
+         - ✅ Updated `tests/services/chat-service-base/agent/test_response_streaming.py` to import from `essence.chat.agent.response` instead of `services/chat-service-base`
+         - ✅ Updated patch paths from `agent.response` to `essence.chat.agent.response`
+         - ✅ Updated tuple unpacking to handle 3 values (message, is_final, message_type) instead of 2
+         - ✅ All 14 tests in test_response_streaming.py now passing
+       - ✅ **COMPLETED:** Fixed import errors in test files for stt, tts, inference-api services
+         - ✅ Added proper mocking and fallback imports for torch, transformers, grpc dependencies
+         - ✅ Added fallback imports for june_grpc_api protobuf classes
+         - ✅ Tests now handle missing dependencies gracefully
        - ⏳ **Remaining:** Some test files still have import errors (likely dependency-related, e.g., missing opentelemetry module)
        - ⏳ Test files in `tests/services/stt/`, `tests/services/tts/`, `tests/services/inference-api/` may have similar import issues (these services still use `services/<service>/main.py` structure, so imports may be correct)
      - ✅ **COMPLETED:** Add tracing span tests for telegram service (test_tracing.py with 10 tests, all passing)
