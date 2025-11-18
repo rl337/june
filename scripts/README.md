@@ -1,99 +1,65 @@
 # Scripts Directory
 
-This directory contains authorized scripts for June Agent system management.
+This directory contains **shell scripts for infrastructure and automation only**.
 
-## Model Management
+## Purpose
 
-### `download_models.py`
-**The ONLY authorized way to download models for June Agent.**
+The `scripts/` directory is for:
+- **Shell scripts** that help with passing complex options to container runs or other tools
+- **Infrastructure/automation scripts** (not reusable tools)
+- Examples: `setup_docker.sh`, `refactor_agent_loop.sh`, `run_all_checks.sh`
 
-This script enforces strict model management policies:
-- Only downloads models from the AUTHORIZED_MODELS list
-- Downloads to the designated cache directory (`/home/rlee/models`)
-- Prevents accidental downloads during runtime
-- Provides model cache status and management
+## What Goes Where
 
-**Usage:**
-```bash
-# Download all required models
-python scripts/download_models.py --all
+### Scripts (`scripts/`)
+- Shell scripts for infrastructure/automation
+- Complex container operations
+- Build and deployment scripts
 
-# Download specific model
-python scripts/download_models.py --model Qwen/Qwen3-30B-A3B-Thinking-2507
+### Commands (`essence/commands/`)
+- **All reusable Python tools** that users/agents might run
+- Run via: `poetry run -m essence <command-name>`
+- Examples: `download-models`, `monitor-gpu`, `review-sandbox`, `benchmark-qwen3`, `verify-qwen3`
 
-# Check cache status
-python scripts/download_models.py --status
+### Tests (`tests/`)
+- All test code, runnable via pytest
+- Test utilities should be in `tests/` or `tests/scripts/`
 
-# List authorized models
-python scripts/download_models.py --list
-```
+## Available Commands
 
-**Security Features:**
-- Whitelist of authorized models only
-- No internet access during runtime
-- Centralized model cache management
-- Audit trail for model downloads
+Reusable tools have been migrated to commands. Use these instead of scripts:
 
-## Important Notes
+- **`poetry run -m essence download-models`** - Download models (replaces `scripts/download_models.py`)
+- **`poetry run -m essence monitor-gpu`** - Monitor GPU metrics (replaces `scripts/monitor_gpu.py`)
+- **`poetry run -m essence review-sandbox`** - Review sandbox snapshots (replaces `scripts/review_sandbox.py`)
+- **`poetry run -m essence verify-qwen3`** - Verify Qwen3 quantization (replaces `scripts/verify_qwen3_quantization.py`)
+- **`poetry run -m essence benchmark-qwen3`** - Benchmark Qwen3 performance (replaces `scripts/benchmark_qwen3_performance.py`)
 
-- **NEVER** modify services to download models automatically
-- **ALWAYS** use this script for model acquisition
-- **VERIFY** models exist in cache before starting services
-- **AUDIT** model cache directory regularly
+## Remaining Scripts
 
-## Model Cache Structure
+### Infrastructure Scripts (Keep)
+- `setup_docker.sh` - Docker setup
+- `setup_docker_permissions.sh` - Docker permissions setup
+- `refactor_agent_loop.sh` - Agent loop automation
+- `run_all_checks.sh` - Run all checks
+- `run_benchmarks.sh` - Benchmark automation wrapper
+- `review_sandbox.sh` - Shell wrapper for review_sandbox command
+- `deploy_audio_services.sh` - Audio services deployment
+- `build_inference_core_wheel.sh` - Build script (may be obsolete)
+- `build_june_grpc_api_wheel.sh` - Build script (may be obsolete)
 
-```
-/home/rlee/models/
-├── huggingface/          # Hugging Face models
-├── transformers/         # Transformers cache
-├── whisper/              # Whisper models
-└── tts/                  # TTS models
-```
+### Test Utilities (Should Move to tests/)
+- `test_*.py` files - Should be moved to `tests/scripts/` or converted to pytest
+- `run_audio_tests.sh` - Should be moved to `tests/scripts/` or converted to pytest
+- `test_artifact_collection.sh` - Should be moved to `tests/scripts/` or converted to pytest
 
-## Dataset Management
+### Dataset/Data Scripts
+- `generate_alice_dataset.py` - Dataset generation (may stay as script or become command)
+- `download_qwen3.py` - Model download (may be merged into download-models command)
 
-### `generate_alice_dataset.py`
-**Generates test dataset from Alice's Adventures in Wonderland.**
+## Guidelines
 
-This script downloads Alice's Adventures in Wonderland from Project Gutenberg and extracts random 2-3 sentence passages for audio testing.
-
-**Usage:**
-```bash
-# Generate dataset (downloads book if needed)
-python scripts/generate_alice_dataset.py
-```
-
-**Output:**
-- Book stored at: `${JUNE_DATA_DIR}/datasets/alice_in_wonderland/alice_adventures_in_wonderland.txt`
-- Dataset stored at: `${JUNE_DATA_DIR}/datasets/alice_in_wonderland/alice_dataset.json`
-
-**Features:**
-- Downloads book from Project Gutenberg (automatically cached locally)
-- Extracts random 2-3 sentence passages
-- Filters by length (50-500 characters)
-- Generates 100 unique passages
-- Stores metadata and statistics
-
-### `test_round_trip_alice.py`
-**Runs round-trip audio validation tests using Alice dataset.**
-
-Tests the complete audio pipeline: Text → TTS → Audio → STT → Text using the Alice in Wonderland passages.
-
-**Usage:**
-```bash
-# Run round-trip tests (requires generated dataset)
-python scripts/test_round_trip_alice.py
-```
-
-**Features:**
-- Tests all passages in the dataset (or subset)
-- Calculates accuracy metrics (exact match, word accuracy, char accuracy)
-- Generates comprehensive test reports
-- Stores results in JSON format
-
-**Output:**
-- Results stored at: `${JUNE_DATA_DIR}/datasets/alice_in_wonderland/round_trip_test_results.json`
-
-**Note:** The test uses espeak for TTS (if available) or falls back to synthetic audio generation. Real STT uses duration-based estimation for now (to be replaced with Whisper).
-
+1. **New reusable tools** → Create as `essence/commands/<command_name>.py`
+2. **New test utilities** → Create in `tests/scripts/` or as pytest tests
+3. **New infrastructure scripts** → Create in `scripts/` (shell scripts only)
+4. **Never add Python tools to scripts/** → Use commands instead
