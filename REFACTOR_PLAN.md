@@ -244,17 +244,20 @@ Pare down the june project to bare essentials for the **voice message → STT �
 
 ### Pre-existing Test Failures
 
-**Status:** ⏳ TODO - Not blocking refactoring work
+**Status:** ⏳ TODO - Mostly fixed, one test still needs refinement
 
-**Issue:** 5 test failures in `tests/essence/chat/agent/test_response_accumulation.py`:
-- `test_json_accumulation_logic[complete_json_single_assistant]` - Expected 2 outputs, got 1 (fallback error message)
-- `test_json_accumulation_logic[complete_json_with_result]` - Expected "Hello", got "Hello world" (text accumulation issue)
-- `test_json_accumulation_logic[shell_output_skipped]` - Expected 2 outputs, got 1 (fallback error message)
-- `test_json_accumulation_logic[very_long_result_message]` - Expected 1 output, got 2 (splitting issue)
-- `test_json_accumulation_logic[multiple_assistant_chunks]` - Expected 4 outputs, got 1 (fallback error message)
+**Issue:** 1 test failure remaining in `tests/essence/chat/agent/test_response_accumulation.py`:
+- `test_json_accumulation_logic[multiple_assistant_chunks]` - Expected 4 outputs, got 2. Expected: [("Hello", False, "assistant"), ("Hello world", False, "assistant"), ("Hello world!", False, "assistant"), ("", True, None)]. Got: [("Hello", False, "assistant"), ("", True, None)]
 
-**Root Cause:** JSON parsing logic in `essence/chat/agent/response.py` not extracting messages correctly in test scenarios. Tests show warnings: "No messages were extracted from stream".
+**Progress:** Fixed 4 of 5 previously failing tests:
+- ✅ `test_json_accumulation_logic[complete_json_single_assistant]` - Now passing
+- ✅ `test_json_accumulation_logic[complete_json_with_result]` - Now passing
+- ✅ `test_json_accumulation_logic[shell_output_skipped]` - Now passing
+- ✅ `test_json_accumulation_logic[very_long_result_message]` - Now passing
+- ⏳ `test_json_accumulation_logic[multiple_assistant_chunks]` - Still failing (history tracking needs refinement)
 
-**Impact:** These failures are pre-existing and not related to the refactoring work. They affect the response accumulation logic but don't block the core refactoring goals.
+**Root Cause:** History tracking for accumulated messages when threshold is met needs refinement. The logic tracks message history but doesn't yield all intermediate states correctly when chunks arrive quickly before the threshold is met.
 
-**Action Required:** Investigate and fix JSON parsing/extraction logic in `stream_chat_response_agent` function to properly handle test cases.
+**Impact:** This failure affects the response accumulation logic for multiple assistant chunks but doesn't block the core refactoring goals. Most test cases (11/12) are now passing.
+
+**Action Required:** Refine history tracking logic in `stream_chat_response_agent` to properly yield all intermediate accumulated states when the threshold is met at the final line.
