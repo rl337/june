@@ -187,6 +187,124 @@ All services expose Prometheus metrics:
 - `/status` - Check service health status
 - `/language <code>` - Set language preference (e.g., `/language en`)
 
+## 🧠 Qwen3 Model Setup
+
+### Overview
+
+June uses Qwen3-30B-A3B-Thinking-2507 for LLM inference. The model runs in Docker containers with GPU support.
+
+### Prerequisites
+
+- **NVIDIA GPU** with 20GB+ VRAM (for Qwen3-30B with quantization)
+- **NVIDIA Container Toolkit** installed and configured
+- **Docker** with GPU support enabled
+
+### Quick Setup
+
+1. **Download the model (containerized):**
+   ```bash
+   # Download model in container (no host pollution)
+   docker compose run --rm cli-tools \
+     poetry run python scripts/download_qwen3.py
+   ```
+
+2. **Start inference-api service:**
+   ```bash
+   docker compose up -d inference-api
+   ```
+
+3. **Verify model is loaded:**
+   ```bash
+   # Check logs for "Model loaded successfully"
+   docker compose logs -f inference-api
+   
+   # Or check health endpoint
+   curl http://localhost:8001/health
+   ```
+
+### Model Configuration
+
+Key environment variables in `docker-compose.yml`:
+
+```yaml
+MODEL_NAME: "Qwen/Qwen3-30B-A3B-Thinking-2507"
+MODEL_DEVICE: "cuda:0"
+MAX_CONTEXT_LENGTH: 131072
+QUANTIZATION_BITS: 8  # 8-bit quantization for memory efficiency
+```
+
+### GPU Requirements
+
+- **Minimum**: 20GB VRAM (with 8-bit quantization)
+- **Recommended**: 24GB+ VRAM for optimal performance
+- **CPU Fallback**: Model can run on CPU if GPU is not compatible (slower)
+
+### Container-First Approach
+
+**All model operations happen in containers:**
+- ✅ Model downloads in containers
+- ✅ Model files in Docker volumes (`/home/rlee/models` → `/models` in container)
+- ✅ All Python dependencies in container images
+- ✅ No host system pollution
+
+See `QWEN3_SETUP_PLAN.md` for detailed setup instructions.
+
+## 🤖 Coding Agent
+
+### Overview
+
+The coding agent provides an interface for sending coding tasks to the Qwen3 model. It supports:
+- **Tool calling** - File operations, code execution, directory listing
+- **Multi-turn conversations** - Maintains context across interactions
+- **Sandboxed execution** - All operations run in isolated containers
+
+### Usage
+
+```python
+from essence.agents.coding_agent import CodingAgent
+
+# Initialize agent
+agent = CodingAgent(
+    inference_api_url="inference-api:50051",
+    model_name="Qwen/Qwen3-30B-A3B-Thinking-2507",
+)
+
+# Set workspace directory
+agent.set_workspace("/workspace")
+
+# Send a coding task
+response = agent.send_coding_task(
+    task_description="Write a function to calculate fibonacci numbers",
+    context={"language": "python"},
+)
+
+# Process streaming response
+for chunk in response:
+    print(chunk, end="", flush=True)
+```
+
+### Available Tools
+
+- `read_file` - Read file contents
+- `write_file` - Write/create files
+- `list_files` - List directory contents
+- `read_directory` - Get detailed directory information
+- `execute_command` - Run shell commands (sandboxed, 30s timeout)
+
+### Benchmark Evaluation
+
+Run coding benchmarks to evaluate the agent:
+
+```bash
+# Run HumanEval benchmark
+./scripts/run_benchmarks.sh --dataset humaneval --max-tasks 10
+
+# Review results
+./scripts/review_sandbox.sh /tmp/benchmarks/results humaneval_0
+```
+
+See `docs/guides/QWEN3_BENCHMARK_EVALUATION.md` for detailed benchmark evaluation guide.
+
 ## 💬 Discord Bot Setup
 
 ### Getting Started
