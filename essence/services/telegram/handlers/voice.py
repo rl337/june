@@ -1330,7 +1330,7 @@ async def handle_voice_message(
                 return
             
             # Conversation history storage removed (gateway removed for MVP)
-            # Language preference is still stored via ConversationStorage if PostgreSQL is available
+            # Language preference is stored via in-memory ConversationStorage
             logger.debug(f"Conversation history not saved (gateway removed for MVP)")
             
             logger.info(f"LLM response: {llm_response}")
@@ -2129,7 +2129,7 @@ async def handle_voice_message_from_queue(
                 return
             
             # Conversation history storage removed (gateway removed for MVP)
-            # Language preference is still stored via ConversationStorage if PostgreSQL is available
+            # Language preference is stored via in-memory ConversationStorage
             logger.debug(f"Conversation history not saved (gateway removed for MVP)")
             
             logger.info(f"LLM response: {llm_response}")

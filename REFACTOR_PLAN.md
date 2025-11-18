@@ -319,6 +319,7 @@ All major refactoring phases have been completed:
 - ✅ **COMPLETED:** Marked `penetration_test.py` as obsolete (tests removed gateway service, could be updated to test remaining services if needed)
 - ✅ **COMPLETED:** Marked `diagnose_test_failures.sh` as obsolete (references removed gateway service, could be updated for remaining services)
 - ✅ **COMPLETED:** Marked `run_tests_with_artifacts.sh` as obsolete (orchestrates gateway tests, could be updated for remaining services)
+- ✅ **COMPLETED:** Cleaned up code references to removed services (updated `allowed_services` list in inference-api to remove gateway/webapp, updated comments in telegram handlers to reflect in-memory storage)
 - ⚠️ **PARTIAL:** `services/gateway/` directory contains a test cache file owned by root - cannot remove without sudo (can be safely ignored as it's just a cache file)
 
 **Note:** Script tests in `tests/scripts/` are e2e/integration tests that require running services and dependencies. They are excluded from pytest collection and should be run manually or via the integration test service. Some tests reference removed services (gateway) and may need updates in the future.

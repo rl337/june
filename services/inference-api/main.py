@@ -1029,12 +1029,12 @@ async def serve():
         logger.warning(f"Failed to start metrics server on port {metrics_port}: {e}")
     
     # Add authentication interceptor
-    # Allow service-to-service auth from gateway, stt, tts services
+    # Allow service-to-service auth from telegram, discord, stt, tts services
     # For MVP/testing, allow disabling auth via environment variable
     require_auth = os.getenv("REQUIRE_AUTH", "false").lower() == "true"
     auth_interceptor = create_auth_interceptor(
         require_auth=require_auth,
-        allowed_services=["gateway", "stt", "tts", "telegram", "webapp"]
+        allowed_services=["telegram", "discord", "stt", "tts"]
     )
     if not require_auth:
         logger.info("Authentication disabled (REQUIRE_AUTH=false) - for testing only")
