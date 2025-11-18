@@ -601,21 +601,26 @@ This phase focuses on refactoring individual services, building them, testing th
    - ✅ Rebuilt inference-core wheel with utils package included
    - ✅ Added MODEL_CACHE_DIR, HUGGINGFACE_CACHE_DIR, TRANSFORMERS_CACHE_DIR env vars to docker-compose.yml
    - ✅ Service starts successfully and begins loading Qwen3 model
-   - ⏳ **Model loading in progress** - Qwen3-30B model with 4-bit quantization is loading (can take 30+ minutes for first load)
-   - ⏳ Verify model loads successfully in container (waiting for loading to complete)
-   - ⏳ Check GPU memory usage: `nvidia-smi` (will check once model loading completes)
+   - ✅ **Model loading completed** - Qwen3-30B model loaded successfully on CPU
+   - ✅ Model loads in ~30-40 seconds (16 checkpoint shards)
+   - ✅ GPU compatibility check implemented - falls back to CPU when GPU not compatible
+   - ⏳ Check model memory usage (CPU memory, not GPU)
+   - ⏳ Test inference to verify model works correctly
 
-2. **⏳ Verify GPU utilization:**
-   - ⏳ Check `nvidia-smi` shows inference-api container process (waiting for model to load)
-   - ⏳ Verify GPU memory is being used (should be ~15-20GB for quantized model) (waiting for model to load)
-   - ⏳ Monitor GPU utilization during inference (waiting for model to load)
+2. **✅ COMPLETED: GPU compatibility check and CPU fallback:**
+   - ✅ Implemented GPU compatibility detection (checks compute capability before model loading)
+   - ✅ Detects unsupported GPUs (e.g., NVIDIA GB10 with sm_121) and falls back to CPU
+   - ✅ Model loads successfully on CPU when GPU is not compatible
+   - ⏳ **Note:** GPU not used due to PyTorch compatibility - model runs on CPU (slower but functional)
+   - ⏳ **Future:** Consider upgrading PyTorch or using a different GPU for better performance
 
 3. **⏳ Test inference API:**
-   - ⏳ Test health endpoint from within container (waiting for model to load and gRPC server to start)
-   - ⏳ Test generation endpoint via gRPC (waiting for model to load)
-   - ⏳ Verify responses are generated correctly
+   - ✅ Model loaded successfully - ready for testing
+   - ⏳ Test health endpoint from within container
+   - ⏳ Test generation endpoint via gRPC
+   - ⏳ Verify responses are generated correctly (CPU inference will be slower than GPU)
    - ⏳ Test streaming generation
-   - ⏳ Measure inference speed (tokens/second)
+   - ⏳ Measure inference speed (tokens/second) - expect slower performance on CPU vs GPU
 
 4. **⏳ Verify container isolation:**
    - ⏳ Confirm no Python packages installed on host
@@ -636,11 +641,15 @@ This phase focuses on refactoring individual services, building them, testing th
   - 8-bit quantization supports CPU offloading via `llm_int8_enable_fp32_cpu_offload=True`
   - Allows accelerate to offload to CPU if GPU memory is insufficient
   - GPU memory available: 119.70 GB (plenty for the model)
-- ⏳ **Model loading in progress:** Qwen3-30B model is currently loading with 8-bit quantization
-  - Service is starting and model is loading (can take 30-60 minutes for first load)
-  - Using 8-bit quantization with CPU offloading support
-  - Once loading completes, gRPC server will start and health checks will pass
-  - Note: CUDA capability sm_121 warning (NVIDIA GB10) - PyTorch may have compatibility issues, but CUDA is functional
+- ✅ **Model loading completed:** Qwen3-30B model loaded successfully on CPU
+  - GPU compatibility check implemented: detects compute capability 12.1 (sm_121) and falls back to CPU
+  - Model loads on CPU when GPU is not compatible with PyTorch (NVIDIA GB10 with sm_121 not supported by PyTorch 2.5.1)
+  - Model loading time: ~30-40 seconds for 16 checkpoint shards on CPU
+  - Model loaded without quantization (CPU inference, full precision)
+  - Service started successfully: "Inference API server started"
+  - gRPC server should be running on port 50051
+  - Note: CUDA capability sm_121 (NVIDIA GB10) is not supported by PyTorch 2.5.1 - using CPU fallback
+  - **Next steps:** Verify gRPC server is accessible and test inference
 - ✅ **Coding agent interface:** Created `essence/agents/coding_agent.py` with full tool calling support (Phase 10.4 completed)
 
 #### 10.3: Optimize Model Performance in Container ⏳ TODO

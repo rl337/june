@@ -581,55 +581,78 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
     async def _load_models(self):
         """Load the main LLM and embedding models."""
         with Timer("model_loading"):
-            logger.info(f"Loading LLM model using Qwen3LlmStrategy: {config.model.name}")
+            # Check if models are already loaded
+            if (self.llm_strategy is not None and 
+                hasattr(self.llm_strategy, '_model') and 
+                self.llm_strategy._model is not None and
+                hasattr(self.llm_strategy, '_tokenizer') and
+                self.llm_strategy._tokenizer is not None):
+                logger.info("LLM model already loaded. Skipping reload.")
+            else:
+                logger.info(f"Loading LLM model using Qwen3LlmStrategy: {config.model.name}")
+                
+                # Initialize and warmup Qwen3LlmStrategy
+                self.llm_strategy = Qwen3LlmStrategy(
+                    model_name=config.model.name,
+                    device=config.model.device,
+                    max_context_length=config.model.max_context_length,
+                    use_yarn=config.model.use_yarn if hasattr(config.model, 'use_yarn') else None,
+                    huggingface_token=config.model.huggingface_token if hasattr(config.model, 'huggingface_token') else None,
+                    model_cache_dir=config.model.model_cache_dir if hasattr(config.model, 'model_cache_dir') else None,
+                    local_files_only=config.model.local_files_only if hasattr(config.model, 'local_files_only') else None,
+                )
+                
+                # Warmup the strategy (loads model and tokenizer)
+                self.llm_strategy.warmup()
+                
+                logger.info("LLM model loaded successfully via Qwen3LlmStrategy")
             
-            # Initialize and warmup Qwen3LlmStrategy
-            self.llm_strategy = Qwen3LlmStrategy(
-                model_name=config.model.name,
-                device=config.model.device,
-                max_context_length=config.model.max_context_length,
-                use_yarn=config.model.use_yarn if hasattr(config.model, 'use_yarn') else None,
-                huggingface_token=config.model.huggingface_token if hasattr(config.model, 'huggingface_token') else None,
-                model_cache_dir=config.model.model_cache_dir if hasattr(config.model, 'model_cache_dir') else None,
-                local_files_only=config.model.local_files_only if hasattr(config.model, 'local_files_only') else None,
-            )
-            
-            # Warmup the strategy (loads model and tokenizer)
-            self.llm_strategy.warmup()
-            
-            logger.info("LLM model loaded successfully via Qwen3LlmStrategy")
-            
-            # Load embedding model (smaller model for efficiency)
-            # Note: Embedding model is still loaded directly as it's separate from LLM strategy
-            embedding_model_name = "sentence-transformers/all-MiniLM-L6-v2"
-            logger.info(f"Loading embedding model: {embedding_model_name}")
-            self.embedding_model = AutoModelForCausalLM.from_pretrained(embedding_model_name)
-            self.embedding_tokenizer = AutoTokenizer.from_pretrained(embedding_model_name)
+            # Check if embedding model is already loaded
+            if self.embedding_model is not None and self.embedding_tokenizer is not None:
+                logger.info("Embedding model already loaded. Skipping reload.")
+            else:
+                # Load embedding model (smaller model for efficiency)
+                # Note: Embedding model is still loaded directly as it's separate from LLM strategy
+                embedding_model_name = "sentence-transformers/all-MiniLM-L6-v2"
+                logger.info(f"Loading embedding model: {embedding_model_name}")
+                self.embedding_model = AutoModelForCausalLM.from_pretrained(embedding_model_name)
+                self.embedding_tokenizer = AutoTokenizer.from_pretrained(embedding_model_name)
+                logger.info("Embedding model loaded successfully")
             
             logger.info("All models loaded successfully")
     
     async def _connect_services(self):
         """Connect to external services."""
         try:
-            # Connect to database with connection pooling
-            import os
-            pool_size = int(os.getenv("POSTGRES_POOL_SIZE", "20"))
-            max_overflow = int(os.getenv("POSTGRES_MAX_OVERFLOW", "10"))
-            pool_timeout = int(os.getenv("POSTGRES_POOL_TIMEOUT", "30"))
-            
-            self.db_engine = create_async_engine(
-                config.database.url,
-                pool_size=pool_size,
-                max_overflow=max_overflow,
-                pool_timeout=pool_timeout,
-                pool_pre_ping=True,  # Verify connections before using
-                pool_recycle=3600,  # Recycle connections after 1 hour
-                echo=False
-            )
-            logger.info(
-                f"Connected to database with connection pool "
-                f"(size={pool_size}, max_overflow={max_overflow})"
-            )
+            # Connect to database (optional - not required for MVP)
+            # PostgreSQL was removed from MVP, but connection code remains for optional use
+            db_url = getattr(config.database, 'url', '') if hasattr(config, 'database') else ''
+            if db_url and db_url.strip() and db_url.strip() != '':
+                try:
+                    import os
+                    pool_size = int(os.getenv("POSTGRES_POOL_SIZE", "20"))
+                    max_overflow = int(os.getenv("POSTGRES_MAX_OVERFLOW", "10"))
+                    pool_timeout = int(os.getenv("POSTGRES_POOL_TIMEOUT", "30"))
+                    
+                    self.db_engine = create_async_engine(
+                        config.database.url,
+                        pool_size=pool_size,
+                        max_overflow=max_overflow,
+                        pool_timeout=pool_timeout,
+                        pool_pre_ping=True,  # Verify connections before using
+                        pool_recycle=3600,  # Recycle connections after 1 hour
+                        echo=False
+                    )
+                    logger.info(
+                        f"Connected to database with connection pool "
+                        f"(size={pool_size}, max_overflow={max_overflow})"
+                    )
+                except Exception as e:
+                    logger.warning(f"Database connection failed (optional): {e}. Continuing without database.")
+                    self.db_engine = None
+            else:
+                logger.debug("POSTGRES_URL not configured, skipping database connection (not required for MVP)")
+                self.db_engine = None
             
             # MinIO connection removed - not needed for MVP
             

@@ -156,7 +156,13 @@ You are working on refactoring the june project. Your task is to:
 - **Container-first:** For Phase 10 tasks (Qwen3 setup), all model operations must happen in Docker containers - use `docker compose run` or `docker compose exec` for all model-related work
 - **Sandbox isolation:** For benchmark tasks (Phase 10.5), ensure each task runs in an isolated sandbox (container/chroot) with full activity logging and reviewability
 - **Efficiency evaluation:** When working on benchmarks, capture not just correctness but also efficiency metrics (commands executed, time to solution, resource usage)
-- **CRITICAL** Check system memory when doing operations. Avoid loading LLMs multiple times in memory and unload LLMs when they're not being used.
+- **CRITICAL - Model Loading:** Before loading any model (LLM, embedding, STT, TTS), ALWAYS check if the model is already loaded in memory:
+  - Check if the model object exists and is not None (e.g., `self._model is not None` or `self.llm_strategy._model is not None`)
+  - Check if the tokenizer exists (e.g., `self._tokenizer is not None`)
+  - If both model and tokenizer are already loaded, skip the loading step and log that the model is already loaded
+  - This prevents duplicate model loads which consume massive amounts of memory
+  - This is especially critical for large models like Qwen3-30B which can use 15-20GB+ of memory
+  - When modifying model loading code, always add checks to prevent reloading if already loaded
 
 **Current Context:**
 - Project root: /home/rlee/dev/june

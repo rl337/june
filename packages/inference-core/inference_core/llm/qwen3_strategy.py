@@ -89,6 +89,15 @@ class Qwen3LlmStrategy(LlmStrategy):
 
     def warmup(self) -> None:
         """Load and initialize the Qwen3 model."""
+        # Check if model is already loaded
+        if self._model is not None and self._tokenizer is not None:
+            logger.info(
+                "Qwen3 model already loaded: %s on device: %s. Skipping reload.",
+                self.model_name,
+                self.device,
+            )
+            return
+        
         try:
             import torch
             from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -99,8 +108,57 @@ class Qwen3LlmStrategy(LlmStrategy):
                 self.device,
             )
 
-            # Set device for torch
-            device_map = "auto" if self.device.startswith("cuda") else self.device
+            # Check GPU compatibility early - before attempting any GPU operations
+            # Some GPUs (e.g., NVIDIA GB10 with sm_121) may not be supported by PyTorch
+            gpu_compatible = False
+            if self.device.startswith("cuda") and torch.cuda.is_available():
+                try:
+                    device_capability = torch.cuda.get_device_capability(0)
+                    device_name = torch.cuda.get_device_name(0)
+                    logger.info(f"GPU detected: {device_name} with compute capability {device_capability}")
+                    
+                    # PyTorch 2.5.1 supports: sm_50, sm_80, sm_86, sm_89, sm_90, sm_90a
+                    # If GPU has compute capability >= 12 (e.g., sm_121), it's not supported
+                    if device_capability[0] >= 12:
+                        logger.warning(
+                            f"GPU compute capability {device_capability} is not supported by PyTorch 2.5.1. "
+                            "PyTorch supports up to sm_90a. Falling back to CPU."
+                        )
+                        self.device = "cpu"
+                        gpu_compatible = False
+                    else:
+                        # Test if we can actually use the GPU
+                        try:
+                            test_tensor = torch.zeros(10, device=self.device)
+                            test_result = test_tensor.sum().item()
+                            del test_tensor
+                            torch.cuda.empty_cache()
+                            if test_result == 0:
+                                gpu_compatible = True
+                                logger.info("GPU compatibility test passed")
+                            else:
+                                logger.warning("GPU tensor test failed, falling back to CPU")
+                                self.device = "cpu"
+                                gpu_compatible = False
+                        except RuntimeError as e:
+                            error_msg = str(e).lower()
+                            if "no kernel image" in error_msg or "cuda" in error_msg or "kernel" in error_msg:
+                                logger.warning(f"GPU not compatible: {e}. Falling back to CPU.")
+                                self.device = "cpu"
+                                gpu_compatible = False
+                            else:
+                                raise
+                except Exception as e:
+                    logger.warning(f"Error checking GPU compatibility: {e}. Falling back to CPU.")
+                    self.device = "cpu"
+                    gpu_compatible = False
+            elif not self.device.startswith("cuda"):
+                gpu_compatible = False
+            else:
+                gpu_compatible = False
+
+            # Set device for torch based on compatibility check
+            device_map = "auto" if (self.device.startswith("cuda") and gpu_compatible) else self.device
 
             # Load tokenizer
             logger.info("Loading tokenizer...")
@@ -127,8 +185,9 @@ class Qwen3LlmStrategy(LlmStrategy):
             if self.huggingface_token:
                 model_kwargs["token"] = self.huggingface_token
 
-            # Apply quantization if enabled and CUDA is available
-            if self.use_quantization and self.device.startswith("cuda"):
+            # Apply quantization if enabled and GPU is compatible
+            # Note: After compatibility check, self.device may have been changed to "cpu"
+            if self.use_quantization and self.device.startswith("cuda") and gpu_compatible:
                 try:
                     from transformers import BitsAndBytesConfig
                     
@@ -145,26 +204,39 @@ class Qwen3LlmStrategy(LlmStrategy):
                         model_kwargs["device_map"] = "cuda:0"
                         model_kwargs["low_cpu_mem_usage"] = True
                     elif self.quantization_bits == 8:
-                        logger.info("Using 8-bit quantization (supports CPU offloading if needed)")
-                        quantization_config = BitsAndBytesConfig(
-                            load_in_8bit=True,
-                            llm_int8_threshold=6.0,  # Threshold for outlier detection
-                            llm_int8_enable_fp32_cpu_offload=True,  # Allow CPU offloading for FP32 layers
-                        )
-                        # 8-bit quantization supports CPU offloading, so we can use "auto" device_map
-                        # This allows accelerate to offload to CPU if GPU memory is insufficient
-                        model_kwargs["device_map"] = "auto"
+                        # GPU compatibility was already checked earlier
+                        if gpu_compatible:
+                            logger.info("Using 8-bit quantization (supports CPU offloading if needed)")
+                            quantization_config = BitsAndBytesConfig(
+                                load_in_8bit=True,
+                                llm_int8_threshold=6.0,  # Threshold for outlier detection
+                                llm_int8_enable_fp32_cpu_offload=True,  # Allow CPU offloading for FP32 layers
+                            )
+                            model_kwargs["quantization_config"] = quantization_config
+                            model_kwargs["device_map"] = "auto"
+                            logger.info("Using GPU with auto device_map for 8-bit quantization")
+                        else:
+                            # GPU not compatible or using CPU - disable quantization for CPU
+                            logger.warning("GPU not compatible or using CPU. Disabling quantization for CPU inference.")
+                            # Don't set quantization_config - model will load in full precision on CPU
+                            model_kwargs["device_map"] = "cpu"
+                            model_kwargs["torch_dtype"] = torch.float32  # Use float32 for CPU
                         model_kwargs["low_cpu_mem_usage"] = True
                     else:
                         raise ValueError(f"Unsupported quantization bits: {self.quantization_bits}. Use 4 or 8.")
                     
-                    model_kwargs["quantization_config"] = quantization_config
-                    model_kwargs["torch_dtype"] = torch.float16
+                    # Set torch_dtype based on device (float16 for GPU, float32 for CPU)
+                    if not gpu_compatible or self.device == "cpu":
+                        model_kwargs["torch_dtype"] = torch.float32
+                    else:
+                        model_kwargs["torch_dtype"] = torch.float16
                     
-                    if torch.cuda.is_available():
+                    if torch.cuda.is_available() and gpu_compatible:
                         # Check available GPU memory
                         gpu_memory_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
                         logger.info(f"GPU memory available: {gpu_memory_gb:.2f} GB")
+                    elif not gpu_compatible:
+                        logger.info("Using CPU for model loading (GPU not compatible)")
                 except ImportError:
                     logger.warning("bitsandbytes not available, falling back to standard loading")
                     model_kwargs["torch_dtype"] = torch.float16 if self.device.startswith("cuda") else torch.float32
@@ -175,12 +247,15 @@ class Qwen3LlmStrategy(LlmStrategy):
                         model_kwargs["device_map"] = None
             else:
                 # Standard loading without quantization
-                model_kwargs["torch_dtype"] = torch.float16 if self.device.startswith("cuda") else torch.float32
-                if self.device.startswith("cuda"):
+                if gpu_compatible and self.device.startswith("cuda"):
+                    model_kwargs["torch_dtype"] = torch.float16
                     model_kwargs["device_map"] = "auto"
                     model_kwargs["low_cpu_mem_usage"] = True
                 else:
-                    model_kwargs["device_map"] = None
+                    model_kwargs["torch_dtype"] = torch.float32
+                    model_kwargs["device_map"] = "cpu" if not gpu_compatible else None
+                    if not gpu_compatible:
+                        logger.info("Using CPU for model loading (GPU not compatible, no quantization)")
 
             self._model = AutoModelForCausalLM.from_pretrained(
                 self.model_name,
