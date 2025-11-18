@@ -122,14 +122,26 @@ class AuthInterceptor(grpc.aio.ServerInterceptor):
             grpc.RpcError: If authentication fails
         """
         # Extract metadata
-        metadata = handler_call_details.metadata or tuple()
+        # In newer gRPC versions, metadata is accessed via invocation_metadata
+        if hasattr(handler_call_details, 'invocation_metadata'):
+            metadata = handler_call_details.invocation_metadata or tuple()
+        elif hasattr(handler_call_details, 'metadata'):
+            metadata = handler_call_details.metadata or tuple()
+        else:
+            metadata = tuple()
         
         # Extract token
         token = extract_token_from_metadata(metadata)
         
         if not token:
             if self.require_auth:
+                # Allow HealthCheck endpoint without authentication (for health checks)
+                method = getattr(handler_call_details, 'method', None)
+                if method and ("HealthCheck" in str(method) or "/HealthCheck" in str(method)):
+                    logger.debug(f"HealthCheck endpoint ({method}) - allowing without authentication")
+                    return await continuation(handler_call_details)
                 # No token provided and auth is required
+                logger.debug(f"Authentication required for method: {method}")
                 raise grpc.RpcError(
                     grpc.StatusCode.UNAUTHENTICATED,
                     "Authentication required"

@@ -67,7 +67,13 @@ class RateLimitInterceptor(grpc.aio.ServerInterceptor):
             grpc.RpcError: If rate limit is exceeded
         """
         # Extract metadata
-        metadata = handler_call_details.metadata or tuple()
+        # In newer gRPC versions, metadata is accessed via invocation_metadata
+        if hasattr(handler_call_details, 'invocation_metadata'):
+            metadata = handler_call_details.invocation_metadata or tuple()
+        elif hasattr(handler_call_details, 'metadata'):
+            metadata = handler_call_details.metadata or tuple()
+        else:
+            metadata = tuple()
         
         # Extract identifier
         identifier_value, identifier_type = self._extract_identifier_from_metadata(metadata)

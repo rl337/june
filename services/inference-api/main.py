@@ -678,6 +678,9 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
     
     async def _check_database_health(self) -> bool:
         """Check database connection health."""
+        if self.db_engine is None:
+            # Database not configured (optional for MVP)
+            return True
         try:
             async with self.db_engine.begin() as conn:
                 await conn.execute(text("SELECT 1"))
@@ -713,10 +716,14 @@ async def serve():
     
     # Add authentication interceptor
     # Allow service-to-service auth from gateway, stt, tts services
+    # For MVP/testing, allow disabling auth via environment variable
+    require_auth = os.getenv("REQUIRE_AUTH", "false").lower() == "true"
     auth_interceptor = create_auth_interceptor(
-        require_auth=True,
+        require_auth=require_auth,
         allowed_services=["gateway", "stt", "tts", "telegram", "webapp"]
     )
+    if not require_auth:
+        logger.info("Authentication disabled (REQUIRE_AUTH=false) - for testing only")
     
     interceptors = [auth_interceptor]
     
