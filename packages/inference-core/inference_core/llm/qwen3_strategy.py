@@ -4,12 +4,33 @@ import logging
 import os
 import time
 from typing import Dict, Any, Optional
+from contextlib import contextmanager
 
 from ..strategies import LlmStrategy, InferenceRequest, InferenceResponse
 from ..config import config
 from ..utils.inference_cache import get_llm_cache
 
 logger = logging.getLogger(__name__)
+
+
+class TimeoutError(Exception):
+    """Raised when inference exceeds timeout."""
+    pass
+
+
+@contextmanager
+def timeout_context(seconds: float):
+    """Context manager for timeout handling.
+    
+    Note: This is a best-effort timeout. For true interruption, 
+    use async/await with asyncio.wait_for or threading-based timeout.
+    This implementation checks elapsed time and raises if exceeded.
+    """
+    start_time = time.time()
+    yield
+    elapsed = time.time() - start_time
+    if elapsed > seconds:
+        raise TimeoutError(f"Operation timed out after {seconds} seconds (actual: {elapsed:.2f}s)")
 
 
 class Qwen3LlmStrategy(LlmStrategy):
@@ -420,16 +441,51 @@ class Qwen3LlmStrategy(LlmStrategy):
             # Measure inference performance
             inference_start_time = time.time()
             
-            # Generate
-            with torch.no_grad():
-                outputs = self._model.generate(
-                    inputs.input_ids,
-                    **generation_kwargs
-                )
-                
-                # Store past_key_values for potential reuse in future calls
-                # Note: This requires the model to return past_key_values in outputs
-                # For now, we enable use_cache which improves performance within a single generation
+            # Get timeout from config or request metadata (default: 300 seconds = 5 minutes)
+            timeout_seconds = params.get("timeout", config.model.get("inference_timeout", 300) if hasattr(config.model, "get") else 300)
+            if isinstance(request, InferenceRequest) and request.metadata:
+                timeout_seconds = request.metadata.get("timeout_seconds", timeout_seconds)
+            
+            # Generate with timeout and OOM handling
+            try:
+                with torch.no_grad():
+                    # Use timeout context if timeout is specified and reasonable
+                    if timeout_seconds > 0 and timeout_seconds < 3600:  # Max 1 hour
+                        with timeout_context(timeout_seconds):
+                            outputs = self._model.generate(
+                                inputs.input_ids,
+                                **generation_kwargs
+                            )
+                    else:
+                        outputs = self._model.generate(
+                            inputs.input_ids,
+                            **generation_kwargs
+                        )
+                    
+                    # Store past_key_values for potential reuse in future calls
+                    # Note: This requires the model to return past_key_values in outputs
+                    # For now, we enable use_cache which improves performance within a single generation
+            except TimeoutError as e:
+                logger.error(f"Inference timeout after {timeout_seconds}s: {e}")
+                # Clear CUDA cache if available
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                raise RuntimeError(f"Inference timed out after {timeout_seconds} seconds. Try reducing max_tokens or increasing timeout.") from e
+            except RuntimeError as e:
+                error_msg = str(e).lower()
+                # Check for OOM errors
+                if "out of memory" in error_msg or "cuda out of memory" in error_msg or "oom" in error_msg:
+                    logger.error(f"Out of memory error during inference: {e}")
+                    # Clear CUDA cache
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                    raise RuntimeError(
+                        f"Out of memory error during inference. "
+                        f"Try reducing max_tokens (current: {max_tokens}), "
+                        f"input length, or enable quantization."
+                    ) from e
+                # Re-raise other RuntimeErrors
+                raise
 
             inference_end_time = time.time()
             inference_duration = inference_end_time - inference_start_time
@@ -488,6 +544,16 @@ class Qwen3LlmStrategy(LlmStrategy):
                 },
             )
 
+        except RuntimeError:
+            # Re-raise RuntimeErrors (OOM, timeout) as-is
+            raise
         except Exception as e:
             logger.error("Failed to generate text with Qwen3: %s", e, exc_info=True)
+            # Clear CUDA cache on any error
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+            except Exception:
+                pass
             raise RuntimeError(f"Generation failed: {e}") from e

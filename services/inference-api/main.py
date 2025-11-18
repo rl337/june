@@ -203,7 +203,25 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                     usage=usage_stats
                 )
                 
+            except RuntimeError as e:
+                error_msg = str(e).lower()
+                error_type = "unknown"
+                if "out of memory" in error_msg or "oom" in error_msg:
+                    error_type = "out_of_memory"
+                elif "timeout" in error_msg or "timed out" in error_msg:
+                    error_type = "timeout"
+                
+                # Attempt recovery
+                await self.recover_from_error(error_type)
+                
+                logger.error(f"Generation error: {e}")
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(str(e))
+                return GenerationResponse()
             except Exception as e:
+                # Attempt recovery for unknown errors
+                await self.recover_from_error("unknown")
+                
                 logger.error(f"Generation error: {e}")
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(str(e))
@@ -574,8 +592,33 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
             
             return response_text, usage_stats, tokens_per_second
             
+        except RuntimeError as e:
+            error_msg = str(e).lower()
+            # Handle specific error types
+            if "out of memory" in error_msg or "oom" in error_msg:
+                ERROR_COUNT.labels(error_type="out_of_memory").inc()
+                logger.error(f"Out of memory error: {e}")
+                # Try to recover by clearing CUDA cache
+                try:
+                    import torch
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                        logger.info("Cleared CUDA cache after OOM error")
+                except Exception:
+                    pass
+                # Re-raise with user-friendly message
+                raise RuntimeError(f"Out of memory error. Try reducing max_tokens or input length.") from e
+            elif "timeout" in error_msg or "timed out" in error_msg:
+                ERROR_COUNT.labels(error_type="timeout").inc()
+                logger.error(f"Inference timeout: {e}")
+                raise RuntimeError(f"Inference timed out. Try reducing max_tokens or increasing timeout.") from e
+            else:
+                ERROR_COUNT.labels(error_type="runtime_error").inc()
+                logger.error(f"Runtime error during generation: {e}")
+                raise
         except Exception as e:
-            logger.error(f"Text generation error: {e}")
+            ERROR_COUNT.labels(error_type="unknown_error").inc()
+            logger.error(f"Text generation error: {e}", exc_info=True)
             raise
     
     async def _generate_embeddings(self, texts: List[str]) -> np.ndarray:
@@ -698,7 +741,20 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
     
     async def _check_model_health(self) -> bool:
         """Check if model is loaded and ready."""
-        return self.llm_strategy is not None and self.llm_strategy._model is not None and self.llm_strategy._tokenizer is not None
+        try:
+            if self.llm_strategy is None:
+                return False
+            # Check if model and tokenizer are loaded
+            if not hasattr(self.llm_strategy, '_model') or self.llm_strategy._model is None:
+                return False
+            if not hasattr(self.llm_strategy, '_tokenizer') or self.llm_strategy._tokenizer is None:
+                return False
+            # Optionally test model with a simple operation
+            # For now, just check if objects exist
+            return True
+        except Exception as e:
+            logger.warning(f"Model health check failed: {e}")
+            return False
     
     async def _check_database_health(self) -> bool:
         """Check database connection health."""
@@ -724,6 +780,30 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
             await self.nats_client.close()
         if self.db_engine:
             await self.db_engine.dispose()
+    
+    async def recover_from_error(self, error_type: str = "unknown"):
+        """Attempt to recover from errors by clearing caches and resetting state.
+        
+        Args:
+            error_type: Type of error ("out_of_memory", "timeout", "unknown")
+        """
+        logger.info(f"Attempting recovery from {error_type} error...")
+        
+        try:
+            # Clear CUDA cache if available
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                logger.info("Cleared CUDA cache during recovery")
+        except Exception as e:
+            logger.warning(f"Failed to clear CUDA cache during recovery: {e}")
+        
+        # For OOM errors, we might want to reload the model with lower memory settings
+        # For now, just clear caches and let the next request try again
+        if error_type == "out_of_memory":
+            logger.info("OOM recovery: Cleared caches. Next request should use lower max_tokens.")
+        
+        logger.info("Recovery completed")
 
 # Global service instance
 inference_service = InferenceAPIService()
