@@ -143,5 +143,5 @@ docs/
 
 ---
 
-**Last Updated**: 2025-11-10  
+**Last Updated**: 2025-11-18  
 **Documentation Version**: 1.0.0

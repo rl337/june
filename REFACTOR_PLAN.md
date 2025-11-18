@@ -96,6 +96,8 @@ Pare down the june project to bare essentials for the **voice message → STT �
 ### Phase 7: Documentation Cleanup ✅
 - Simplified README.md to reflect minimal architecture
 - Removed references to removed services
+- ✅ Fixed documentation inconsistencies: Updated `docs/guides/AGENTS.md` to reference `REFACTOR_PLAN.md` instead of outdated `TODO.md` as the source of truth
+- ✅ Updated `docs/README.md` last updated date to 2025-11-18
 - **Best Practice:** Keep documentation minimal and aligned with actual architecture
 
 ### Phase 9.1: Service Refactoring ✅

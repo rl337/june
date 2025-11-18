@@ -4,19 +4,22 @@ This document provides essential information for AI agents working on the June A
 
 ## 📋 Task Management
 
-**IMPORTANT:** Always check and update `TODO.md` before and after working on tasks.
+**IMPORTANT:** Always check and update `REFACTOR_PLAN.md` before and after working on tasks.
 
-- **Before starting work:** Review `TODO.md` for current tasks and priorities
-- **After completing work:** Update `TODO.md` to mark completed tasks and add new tasks as needed
-- **Keep TODO.md current:** This is the single source of truth for what needs to be done
+- **Before starting work:** Review `REFACTOR_PLAN.md` for current tasks and priorities
+- **After completing work:** Update `REFACTOR_PLAN.md` to mark completed tasks and add new tasks as needed
+- **Keep REFACTOR_PLAN.md current:** This is the single source of truth for what needs to be done
 
-The `TODO.md` file contains:
+The `REFACTOR_PLAN.md` file contains:
 - Detailed task breakdowns for major features
 - Implementation phases and dependencies
 - Technical specifications and requirements
 - Testing and deployment checklists
+- Current refactoring status and remaining work
 
-See `TODO.md` for the current Telegram voice-to-text-to-voice service implementation plan.
+See `REFACTOR_PLAN.md` for the current project status and implementation plan.
+
+**Note:** `TODO.md` is outdated and kept for historical reference only. All current tasks are tracked in `REFACTOR_PLAN.md`.
 
 ### TODO MCP Service Integration (For Agentic Capabilities)
 
