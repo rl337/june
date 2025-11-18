@@ -146,9 +146,9 @@ run_round_trip_tests() {
 run_comprehensive_tests() {
     print_header "Running Comprehensive Audio Tests"
     
-    if [ -f "scripts/test_audio_services.sh" ]; then
+    if [ -f "tests/scripts/test_audio_services.sh" ]; then
         print_info "Running comprehensive audio tests..."
-        ./scripts/test_audio_services.sh
+        ./tests/scripts/test_audio_services.sh
         
         if [ $? -eq 0 ]; then
             print_success "Comprehensive audio tests passed!"

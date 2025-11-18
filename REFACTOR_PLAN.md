@@ -99,9 +99,12 @@ Pare down the june project to bare essentials for the **voice message → STT �
    - ⏳ Any other reusable Python tools
 
 3. **Move test utilities to tests/:**
-   - ⏳ `test_*.py` files → `tests/scripts/` or appropriate test location
-   - ⏳ `run_audio_tests.sh` → `tests/scripts/` (if needed, or convert to pytest)
-   - ⏳ `test_artifact_collection.sh` → `tests/scripts/` (if needed, or convert to pytest)
+   - ✅ `test_*.py` files → `tests/scripts/` (COMPLETED - moved 8 test Python files)
+   - ✅ `run_audio_tests.sh` → `tests/scripts/` (COMPLETED)
+   - ✅ `test_artifact_collection.sh` → `tests/scripts/` (COMPLETED)
+   - ✅ `test_audio_services.sh` → `tests/scripts/` (COMPLETED)
+   - ✅ `validate_stt.sh` → `tests/scripts/` (COMPLETED)
+   - ✅ Updated references in `scripts/deploy_audio_services.sh`, `tests/scripts/run_audio_tests.sh`, and `docs/guides/AGENTS.md` (COMPLETED)
 
 4. **Remove obsolete scripts:**
    - ✅ Scripts referencing removed services (COMPLETED - removed validate_gateway.sh, test_round_trip_gateway.py, optimize_database_queries.py, encrypt_existing_data.py)

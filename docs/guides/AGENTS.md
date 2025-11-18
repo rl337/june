@@ -1083,7 +1083,7 @@ docker compose --profile tools up -d cli-tools
 docker compose up -d stt
 
 # Download dataset and run validation (script orchestrates both steps)
-./scripts/validate_stt.sh
+./tests/scripts/validate_stt.sh
 ```
 
 ### Notes

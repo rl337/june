@@ -171,9 +171,9 @@ test_services() {
     print_header "Testing Audio Services"
     
     # Run the audio test script
-    if [ -f "scripts/test_audio_services.sh" ]; then
+    if [ -f "tests/scripts/test_audio_services.sh" ]; then
         print_info "Running comprehensive audio tests..."
-        if ./scripts/test_audio_services.sh; then
+        if ./tests/scripts/test_audio_services.sh; then
             print_success "Audio service tests passed"
         else
             print_warning "Some audio service tests failed"
