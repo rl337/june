@@ -744,20 +744,33 @@ This phase focuses on refactoring individual services, building them, testing th
      - ⏳ Git history (if agent uses git) - can be captured in filesystem snapshot
      - ⏳ File change diff (before/after file system state) - can be computed from snapshots
 
-3. **Create evaluation framework (containerized):**
-   - ⏳ Test harness for running benchmarks (runs in container)
-   - ⏳ Sandbox orchestration (creates/manages sandboxes)
-   - ⏳ Result collection and analysis
-   - ⏳ Sandbox review tools (analyze what agent did)
-   - ⏳ Efficiency metrics collection:
-     - Number of commands executed
-     - Number of files created/modified
-     - Time to solution
-     - Number of iterations/attempts
-     - Resource usage (CPU, memory, disk)
-     - Code quality metrics (lines of code, complexity)
-   - ⏳ Comparison with baseline models
-   - ⏳ All evaluation code and dependencies in containers
+3. **✅ COMPLETED: Create evaluation framework (containerized):**
+   - ✅ **COMPLETED:** Created `essence/agents/evaluator.py` with BenchmarkEvaluator class
+     - ✅ Test harness for running benchmarks (runs in container)
+     - ✅ Sandbox orchestration (creates/manages sandboxes via Sandbox class)
+     - ✅ Result collection and analysis (TaskResult, EvaluationReport classes)
+     - ✅ Efficiency metrics collection:
+       - Number of commands executed (from sandbox metrics)
+       - Number of files created/modified (tracked in TaskResult)
+       - Time to solution (execution_time_seconds)
+       - Number of iterations/attempts (agent_iterations)
+       - Resource usage (CPU, memory, disk from SandboxMetrics)
+       - Efficiency score (composite metric combining correctness and resource usage)
+     - ✅ All evaluation code and dependencies in containers
+   - ✅ **COMPLETED:** Created `essence/agents/dataset_loader.py` for loading benchmark datasets
+     - ✅ HumanEval dataset loader (downloads from GitHub, loads JSONL format)
+     - ✅ MBPP dataset loader (placeholder - requires manual download or HuggingFace)
+   - ✅ **COMPLETED:** Created `scripts/run_benchmarks.py` for running evaluations
+     - ✅ Command-line interface with all configuration options
+     - ✅ Supports multiple datasets (humaneval, mbpp, all)
+     - ✅ Generates evaluation reports with pass@k and efficiency metrics
+   - ✅ **COMPLETED:** Created `scripts/run_benchmarks.sh` for automation
+     - ✅ Shell script wrapper for docker compose execution
+     - ✅ Handles both container and host execution
+     - ✅ Automatically starts inference-api if needed
+   - ⏳ **Remaining tasks:**
+     - ⏳ Sandbox review tools (analyze what agent did) - can be added as separate script
+     - ⏳ Comparison with baseline models - can be added to report generation
 
 4. **Run evaluations:**
    - ⏳ Download benchmark datasets (in container or volume)
