@@ -80,10 +80,6 @@ Pare down the june project to bare essentials for the **voice message → STT �
 
 **Goal:** Establish proper test infrastructure with unit tests (mocked) and integration tests (background service).
 
-### Phase 12: Test Infrastructure and Integration Test Service ⏳ TODO
-
-**Goal:** Establish proper test infrastructure with unit tests (mocked) and integration tests (background service).
-
 **Unit Test Requirements:**
 - ⏳ All unit tests must mock external services and libraries
 - ⏳ All tests runnable via pytest
