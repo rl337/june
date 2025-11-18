@@ -98,6 +98,7 @@ Pare down the june project to bare essentials for the **voice message → STT �
 - ✅ Verification tools implemented (`essence/commands/verify_qwen3.py`, `benchmark_qwen3.py`)
 - ✅ File modification tracking implemented in benchmark evaluator - tracks files created and modified during task execution
 - ✅ Language auto-detection support implemented in Telegram voice handler - STT service now receives None for auto-detection when language preference is not set
+- ⚠️ **Known limitation:** pass@k calculation (for k > 1) currently uses pass@1 as placeholder - proper implementation would require running each task multiple times (future enhancement)
 - ⏳ **Operational tasks:** Model download, service startup, and testing can be done when ready to use (requires running system with GPU)
 
 **Operational Guide (When Ready to Use):**
