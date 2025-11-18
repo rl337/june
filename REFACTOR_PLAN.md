@@ -137,7 +137,10 @@ When ready to use the Qwen3 model and coding agent, follow these steps:
 5. **Run benchmark evaluation:**
    ```bash
    # Run benchmark evaluation with sandbox isolation
-   poetry run python -m essence benchmark-qwen3 --help
+   poetry run -m essence benchmark-qwen3 --help
+   
+   # Run benchmark evaluations
+   poetry run -m essence run-benchmarks --dataset humaneval --max-tasks 10
    ```
 
 **Prerequisites:**
