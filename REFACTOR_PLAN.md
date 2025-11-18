@@ -110,15 +110,16 @@ Pare down the june project to bare essentials for the **voice message → STT �
    - Consult HuggingFace documentation for model loading best practices
 
 **Current Issue:**
-- Qwen3-30B model is falling back to CPU due to GPU compute capability mismatch (sm_121 not supported by PyTorch 2.5.1)
-- This causes 100GB+ memory usage and system instability
-- **Action Required:** Fix GPU compatibility or prevent CPU fallback (fail fast instead)
+- ~~Qwen3-30B model is falling back to CPU due to GPU compute capability mismatch (sm_121 not supported by PyTorch 2.5.1)~~
+- ~~This causes 100GB+ memory usage and system instability~~
+- ✅ **FIXED:** CPU fallback is now prevented for large models (30B+) - service fails fast with clear error message
 
-**Implementation Guidelines:**
-- In `qwen3_strategy.py`, if GPU is not compatible, raise an exception instead of falling back to CPU
-- Add explicit checks: `if not gpu_compatible: raise RuntimeError("GPU required for large models")`
-- Document GPU requirements in service README
-- Add health check that verifies GPU availability before accepting requests
+**Implementation:**
+- ✅ Added `_is_large_model()` method to detect 30B+ models from model name
+- ✅ Modified GPU compatibility checks to raise RuntimeError instead of falling back to CPU for large models
+- ✅ Clear error messages explaining GPU requirement and why CPU fallback is forbidden
+- ✅ All GPU compatibility failure paths now check if model is large and fail fast if so
+- ⏳ TODO: Add health check that verifies GPU availability before accepting requests (optional enhancement)
 
 ## Current Priorities
 

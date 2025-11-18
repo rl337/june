@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 from typing import Dict, Any, Optional
 from contextlib import contextmanager
@@ -109,6 +110,36 @@ class Qwen3LlmStrategy(LlmStrategy):
         if not cache_enabled:
             self._cache.enable_cache = False
 
+    def _is_large_model(self) -> bool:
+        """Check if this is a large model (30B+ parameters) that requires GPU.
+        
+        Large models must NEVER be loaded on CPU as they consume 100GB+ memory.
+        
+        Returns:
+            True if model is 30B+ parameters, False otherwise
+        """
+        if not self.model_name:
+            return False
+        
+        model_name_lower = self.model_name.lower()
+        # Check for common large model indicators in model name
+        # Examples: "30B", "30-B", "30b", "70B", "70-B", etc.
+        # Match patterns like "30B", "30-B", "30b", "70B", etc.
+        large_model_pattern = r'(\d+)[-_\s]?b\b'
+        match = re.search(large_model_pattern, model_name_lower)
+        if match:
+            param_count = int(match.group(1))
+            # Consider 30B+ as large models
+            return param_count >= 30
+        
+        # Also check for explicit indicators
+        if "30b" in model_name_lower or "30-b" in model_name_lower:
+            return True
+        if "70b" in model_name_lower or "70-b" in model_name_lower:
+            return True
+        
+        return False
+
     def warmup(self) -> None:
         """Load and initialize the Qwen3 model."""
         # Check if model is already loaded
@@ -132,7 +163,10 @@ class Qwen3LlmStrategy(LlmStrategy):
 
             # Check GPU compatibility early - before attempting any GPU operations
             # Some GPUs (e.g., NVIDIA GB10 with sm_121) may not be supported by PyTorch
+            # CRITICAL: For large models (30B+), CPU fallback is FORBIDDEN - fail fast instead
             gpu_compatible = False
+            is_large_model = self._is_large_model()
+            
             if self.device.startswith("cuda") and torch.cuda.is_available():
                 try:
                     device_capability = torch.cuda.get_device_capability(0)
@@ -142,12 +176,21 @@ class Qwen3LlmStrategy(LlmStrategy):
                     # PyTorch 2.5.1 supports: sm_50, sm_80, sm_86, sm_89, sm_90, sm_90a
                     # If GPU has compute capability >= 12 (e.g., sm_121), it's not supported
                     if device_capability[0] >= 12:
-                        logger.warning(
+                        error_msg = (
                             f"GPU compute capability {device_capability} is not supported by PyTorch 2.5.1. "
-                            "PyTorch supports up to sm_90a. Falling back to CPU."
+                            f"PyTorch supports up to sm_90a. Model: {self.model_name}"
                         )
-                        self.device = "cpu"
-                        gpu_compatible = False
+                        if is_large_model:
+                            logger.error(error_msg)
+                            raise RuntimeError(
+                                f"GPU required for large models (30B+). {error_msg} "
+                                "CPU fallback is FORBIDDEN for large models as it consumes 100GB+ memory. "
+                                "Please use a compatible GPU or upgrade PyTorch to support your GPU architecture."
+                            )
+                        else:
+                            logger.warning(f"{error_msg} Falling back to CPU.")
+                            self.device = "cpu"
+                            gpu_compatible = False
                     else:
                         # Test if we can actually use the GPU
                         try:
@@ -159,24 +202,70 @@ class Qwen3LlmStrategy(LlmStrategy):
                                 gpu_compatible = True
                                 logger.info("GPU compatibility test passed")
                             else:
-                                logger.warning("GPU tensor test failed, falling back to CPU")
-                                self.device = "cpu"
-                                gpu_compatible = False
+                                error_msg = "GPU tensor test failed"
+                                if is_large_model:
+                                    logger.error(error_msg)
+                                    raise RuntimeError(
+                                        f"GPU required for large models (30B+). {error_msg} "
+                                        "CPU fallback is FORBIDDEN for large models. "
+                                        "Please fix GPU compatibility issues."
+                                    )
+                                else:
+                                    logger.warning(f"{error_msg}, falling back to CPU")
+                                    self.device = "cpu"
+                                    gpu_compatible = False
                         except RuntimeError as e:
                             error_msg = str(e).lower()
                             if "no kernel image" in error_msg or "cuda" in error_msg or "kernel" in error_msg:
-                                logger.warning(f"GPU not compatible: {e}. Falling back to CPU.")
-                                self.device = "cpu"
-                                gpu_compatible = False
+                                full_error = f"GPU not compatible: {e}"
+                                if is_large_model:
+                                    logger.error(full_error)
+                                    raise RuntimeError(
+                                        f"GPU required for large models (30B+). {full_error} "
+                                        "CPU fallback is FORBIDDEN for large models. "
+                                        "Please use a compatible GPU or upgrade PyTorch."
+                                    )
+                                else:
+                                    logger.warning(f"{full_error}. Falling back to CPU.")
+                                    self.device = "cpu"
+                                    gpu_compatible = False
                             else:
                                 raise
+                except RuntimeError:
+                    # Re-raise RuntimeError (from large model checks above)
+                    raise
                 except Exception as e:
-                    logger.warning(f"Error checking GPU compatibility: {e}. Falling back to CPU.")
-                    self.device = "cpu"
-                    gpu_compatible = False
+                    error_msg = f"Error checking GPU compatibility: {e}"
+                    if is_large_model:
+                        logger.error(error_msg)
+                        raise RuntimeError(
+                            f"GPU required for large models (30B+). {error_msg} "
+                            "CPU fallback is FORBIDDEN for large models. "
+                            "Please fix GPU compatibility issues."
+                        )
+                    else:
+                        logger.warning(f"{error_msg}. Falling back to CPU.")
+                        self.device = "cpu"
+                        gpu_compatible = False
             elif not self.device.startswith("cuda"):
+                # Device is not CUDA - check if large model requires GPU
+                if is_large_model:
+                    error_msg = f"Large model (30B+) requires GPU, but device is set to '{self.device}'"
+                    logger.error(error_msg)
+                    raise RuntimeError(
+                        f"{error_msg}. CPU fallback is FORBIDDEN for large models. "
+                        "Please set device to 'cuda:0' or a compatible CUDA device."
+                    )
                 gpu_compatible = False
             else:
+                # CUDA device requested but not available
+                if is_large_model:
+                    error_msg = f"Large model (30B+) requires GPU, but CUDA is not available"
+                    logger.error(error_msg)
+                    raise RuntimeError(
+                        f"{error_msg}. CPU fallback is FORBIDDEN for large models. "
+                        "Please ensure CUDA is available and properly configured."
+                    )
                 gpu_compatible = False
 
             # Set device for torch based on compatibility check
