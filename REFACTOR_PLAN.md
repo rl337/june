@@ -473,9 +473,22 @@ This phase focuses on refactoring individual services, building them, testing th
      - Verify service starts without errors
 
 2. **Verify service health:**
-   - ⏳ Each service should expose `/health` endpoint
-   - ⏳ Health checks should verify service dependencies (gRPC services)
-   - ⏳ Health checks should return proper status codes
+   - ✅ **COMPLETED:** Each service should expose `/health` endpoint
+     - ✅ telegram service: HTTP `/health` endpoint on port 8080 (checks environment variables, STT/TTS/LLM connectivity)
+     - ✅ discord service: HTTP `/health` endpoint on port 8081 (checks environment variables, bot status)
+     - ✅ stt service: gRPC `HealthCheck` method (checks model health, NATS health)
+     - ✅ tts service: gRPC `HealthCheck` method (checks strategy health, available voices) - **ADDED** HealthCheck implementation to `_TtsServicer`
+     - ✅ inference-api service: gRPC `HealthCheck` method (checks model health, database health, NATS health)
+   - ✅ **COMPLETED:** Health checks verify service dependencies (gRPC services)
+     - ✅ telegram service: Health check verifies STT, TTS, and LLM service connectivity via gRPC pool
+     - ✅ discord service: Health check verifies bot status (Discord connection)
+     - ✅ stt service: Health check verifies model is loaded
+     - ✅ tts service: Health check verifies strategy is available
+     - ✅ inference-api service: Health check verifies model, database, and NATS (all optional with graceful fallbacks)
+   - ✅ **COMPLETED:** Health checks return proper status codes
+     - ✅ HTTP services (telegram, discord): Return 200 for healthy, 503 for unhealthy
+     - ✅ gRPC services (stt, tts, inference-api): Return `HealthResponse` with `healthy` boolean field
+     - ✅ All health checks include version information and service-specific details
 
 #### 9.3: Test Individual Services ⏳ TODO
 

@@ -79,6 +79,57 @@ class _TtsServicer(tts_pb2_grpc.TextToSpeechServicer):
         finally:
             if span:
                 span.end()
+    
+    async def HealthCheck(self, request: tts_pb2.HealthRequest, context: aio.ServicerContext) -> tts_pb2.HealthResponse:
+        """Health check endpoint."""
+        span = None
+        if tracer is not None:
+            span = tracer.start_span("tts.health_check")
+        
+        try:
+            # Check if strategy is available and healthy
+            is_healthy = self._strategy is not None
+            
+            # Try to check strategy health if it has a health check method
+            if is_healthy and hasattr(self._strategy, 'is_healthy'):
+                try:
+                    is_healthy = self._strategy.is_healthy()
+                except Exception as e:
+                    logger.warning(f"Strategy health check failed: {e}")
+                    is_healthy = False
+            
+            # Get available voices if strategy supports it
+            available_voices = []
+            if is_healthy and hasattr(self._strategy, 'get_available_voices'):
+                try:
+                    available_voices = self._strategy.get_available_voices()
+                except Exception:
+                    # If not supported, use default
+                    available_voices = ["default"]
+            
+            if span:
+                span.set_attribute("tts.healthy", is_healthy)
+                span.set_attribute("tts.available_voices_count", len(available_voices))
+                span.set_status(trace.Status(trace.StatusCode.OK if is_healthy else trace.StatusCode.ERROR))
+            
+            return tts_pb2.HealthResponse(
+                healthy=is_healthy,
+                version="0.2.0",
+                available_voices=available_voices if available_voices else ["default"]
+            )
+        except Exception as e:
+            logger.error(f"Health check error: {e}", exc_info=True)
+            if span:
+                span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                span.record_exception(e)
+            return tts_pb2.HealthResponse(
+                healthy=False,
+                version="0.2.0",
+                available_voices=[]
+            )
+        finally:
+            if span:
+                span.end()
 
 
 class TtsGrpcApp:
