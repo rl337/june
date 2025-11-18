@@ -177,26 +177,278 @@ Integration tests follow these requirements (Phase 12):
 
 ### Integration Test Service
 
-**Status:** ⏳ TODO (Phase 12)
+**Status:** ✅ COMPLETED (Phase 12)
 
-The integration test service will provide:
+The integration test service provides:
 - REST API for starting test runs
 - Status checking endpoint
 - Results retrieval
 - Log viewing
 - Test run history
+- Health check and metrics endpoints
 
-**Once implemented, usage will be:**
+#### Starting the Integration Test Service
+
+**Using the command:**
 
 ```bash
-# Start integration test run
+# Start the integration test service
+poetry run python -m essence integration-test-service
+
+# With custom port
+poetry run python -m essence integration-test-service --port 8082
+
+# With custom host and port
+poetry run python -m essence integration-test-service --host 0.0.0.0 --port 8082
+```
+
+**Using environment variables:**
+
+```bash
+export INTEGRATION_TEST_SERVICE_PORT=8082
+export INTEGRATION_TEST_SERVICE_HOST=0.0.0.0
+poetry run python -m essence integration-test-service
+```
+
+**Service endpoints:**
+- Default port: `8082`
+- Health check: `http://localhost:8082/health`
+- Metrics: `http://localhost:8082/metrics`
+
+#### REST API Reference
+
+**1. Start a Test Run**
+
+Start a new integration test run:
+
+```bash
+# Run all integration tests
 curl -X POST http://localhost:8082/tests/run
 
-# Check test status
-curl http://localhost:8082/tests/status
+# Run specific test file
+curl -X POST "http://localhost:8082/tests/run?test_path=tests/integration/test_voice_message_integration.py"
 
-# Get test results
-curl http://localhost:8082/tests/results
+# Run specific test by name
+curl -X POST "http://localhost:8082/tests/run?test_name=test_voice_processing"
+
+# Run specific test in specific file
+curl -X POST "http://localhost:8082/tests/run?test_path=tests/integration/test_voice_message_integration.py&test_name=test_voice_processing"
+```
+
+**Response:**
+```json
+{
+  "run_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "pending",
+  "started_at": "2024-01-15T10:30:00"
+}
+```
+
+**2. Check Test Run Status**
+
+Get the current status of a test run:
+
+```bash
+curl http://localhost:8082/tests/status/550e8400-e29b-41d4-a716-446655440000
+```
+
+**Response:**
+```json
+{
+  "run_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "running",
+  "started_at": "2024-01-15T10:30:00",
+  "completed_at": null,
+  "exit_code": null,
+  "test_path": "tests/integration/test_voice_message_integration.py",
+  "test_name": null
+}
+```
+
+**Status values:**
+- `pending` - Test run queued but not started
+- `running` - Test run in progress
+- `completed` - Test run finished successfully
+- `failed` - Test run failed
+- `cancelled` - Test run was cancelled
+
+**3. Get Test Results**
+
+Get complete results of a test run (including output and logs):
+
+```bash
+curl http://localhost:8082/tests/results/550e8400-e29b-41d4-a716-446655440000
+```
+
+**Response:**
+```json
+{
+  "run_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "completed",
+  "started_at": "2024-01-15T10:30:00",
+  "completed_at": "2024-01-15T10:35:00",
+  "exit_code": 0,
+  "output": "=== test session starts ===\n...",
+  "error": null,
+  "logs": ["...", "..."],
+  "test_path": "tests/integration/test_voice_message_integration.py",
+  "test_name": null
+}
+```
+
+**4. Get Test Logs**
+
+Get logs for a test run (last N lines):
+
+```bash
+# Get last 100 lines (default)
+curl http://localhost:8082/tests/logs/550e8400-e29b-41d4-a716-446655440000
+
+# Get last 50 lines
+curl "http://localhost:8082/tests/logs/550e8400-e29b-41d4-a716-446655440000?lines=50"
+
+# Get all logs
+curl "http://localhost:8082/tests/logs/550e8400-e29b-41d4-a716-446655440000?lines=0"
+```
+
+**Response:**
+```json
+{
+  "run_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "running",
+  "logs": ["[INFO] Starting test...", "[INFO] Test passed", "..."]
+}
+```
+
+**5. List All Test Runs**
+
+List all test runs (most recent first):
+
+```bash
+# List last 50 runs (default)
+curl http://localhost:8082/tests/runs
+
+# List last 10 runs
+curl "http://localhost:8082/tests/runs?limit=10"
+```
+
+**Response:**
+```json
+{
+  "runs": [
+    {
+      "run_id": "550e8400-e29b-41d4-a716-446655440000",
+      "status": "completed",
+      "started_at": "2024-01-15T10:30:00",
+      "completed_at": "2024-01-15T10:35:00",
+      "exit_code": 0,
+      "test_path": "tests/integration/test_voice_message_integration.py",
+      "test_name": null
+    }
+  ],
+  "total": 1
+}
+```
+
+**6. Cancel a Running Test**
+
+Cancel a test run that is currently running:
+
+```bash
+curl -X DELETE http://localhost:8082/tests/runs/550e8400-e29b-41d4-a716-446655440000
+```
+
+**Response:**
+```json
+{
+  "run_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "cancelled",
+  "message": "Test run cancelled"
+}
+```
+
+**7. Health Check**
+
+Check if the integration test service is healthy:
+
+```bash
+curl http://localhost:8082/health
+```
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "service": "integration-test"
+}
+```
+
+**8. Prometheus Metrics**
+
+Get Prometheus metrics:
+
+```bash
+curl http://localhost:8082/metrics
+```
+
+#### Using the Integration Test Service
+
+**Example workflow:**
+
+```bash
+# 1. Start the integration test service (in one terminal)
+poetry run python -m essence integration-test-service
+
+# 2. Start a test run (in another terminal)
+RUN_ID=$(curl -s -X POST http://localhost:8082/tests/run | jq -r '.run_id')
+echo "Test run started: $RUN_ID"
+
+# 3. Check status periodically
+while true; do
+  STATUS=$(curl -s http://localhost:8082/tests/status/$RUN_ID | jq -r '.status')
+  echo "Status: $STATUS"
+  if [ "$STATUS" != "running" ] && [ "$STATUS" != "pending" ]; then
+    break
+  fi
+  sleep 5
+done
+
+# 4. Get results when complete
+curl http://localhost:8082/tests/results/$RUN_ID | jq '.'
+
+# 5. View logs
+curl http://localhost:8082/tests/logs/$RUN_ID | jq '.logs[]'
+```
+
+**Using Python client:**
+
+```python
+import requests
+import time
+
+BASE_URL = "http://localhost:8082"
+
+# Start test run
+response = requests.post(f"{BASE_URL}/tests/run", params={
+    "test_path": "tests/integration/test_voice_message_integration.py"
+})
+run_id = response.json()["run_id"]
+print(f"Test run started: {run_id}")
+
+# Poll for completion
+while True:
+    status_response = requests.get(f"{BASE_URL}/tests/status/{run_id}")
+    status = status_response.json()["status"]
+    print(f"Status: {status}")
+    
+    if status not in ["pending", "running"]:
+        break
+    time.sleep(5)
+
+# Get results
+results = requests.get(f"{BASE_URL}/tests/results/{run_id}").json()
+print(f"Exit code: {results['exit_code']}")
+print(f"Output:\n{results['output']}")
 ```
 
 ### Current Integration Tests
@@ -208,7 +460,7 @@ Integration tests are located in `tests/integration/`:
 - `test_llm_grpc_endpoints.py` - LLM gRPC endpoint tests
 - `test_telegram_bot_qwen3_integration.py` - Telegram bot with Qwen3 tests
 
-**Running current integration tests:**
+**Running integration tests directly (for development):**
 
 ```bash
 # Run all integration tests (requires services running)
@@ -218,7 +470,15 @@ poetry run pytest tests/integration/ -v
 poetry run pytest tests/integration/test_voice_message_integration.py -v
 ```
 
-**Note:** Current integration tests run synchronously. They will be migrated to use the integration test service (Phase 12 task 2).
+**Running integration tests via service (recommended):**
+
+```bash
+# Start test service
+poetry run python -m essence integration-test-service
+
+# Start test run via API
+curl -X POST http://localhost:8082/tests/run
+```
 
 ## Test Structure
 

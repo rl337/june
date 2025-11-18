@@ -117,9 +117,9 @@ Pare down the june project to bare essentials for the **voice message → STT �
 
 3. **Documentation:**
    - ✅ Document how to run unit tests (pytest) (COMPLETED - created docs/guides/TESTING.md with comprehensive testing guide including unit test requirements, examples, best practices, and troubleshooting)
-   - ⏳ Document how to start integration test service
-   - ⏳ Document how to check integration test results
-   - ⏳ Document test service REST API
+   - ✅ Document how to start integration test service (COMPLETED - added comprehensive documentation to docs/guides/TESTING.md including command usage, environment variables, and service endpoints)
+   - ✅ Document how to check integration test results (COMPLETED - added REST API reference with examples for checking status, retrieving results, viewing logs, listing runs, and cancelling tests)
+   - ✅ Document test service REST API (COMPLETED - added complete REST API reference with all 8 endpoints, request/response examples, status values, and usage examples in bash and Python)
 
 ### Phase 13: Running and Checking Integration Test Runs ⏳ TODO
 
