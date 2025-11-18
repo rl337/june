@@ -9,15 +9,23 @@ import torch
 import grpc
 from grpc import aio
 
-# Import generated protobuf classes
-import sys
-sys.path.append('../../proto')
-from tts_pb2 import (
-    SynthesisRequest, SynthesisConfig, AudioChunk, AudioResponse,
-    HealthRequest, HealthResponse
-)
-import tts_pb2_grpc
+# Import generated protobuf classes from june_grpc_api package
+from june_grpc_api.generated import tts_pb2, tts_pb2_grpc
+# Import specific classes for convenience
+SynthesisRequest = tts_pb2.SynthesisRequest
+SynthesisConfig = tts_pb2.SynthesisConfig
+AudioChunk = tts_pb2.AudioChunk
+AudioResponse = tts_pb2.AudioResponse
+HealthRequest = tts_pb2.HealthRequest
+HealthResponse = tts_pb2.HealthResponse
 
+# Import TTS service from services/tts/main.py
+import sys
+import os
+# Add services/tts directory to path to import main
+tts_service_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../services/tts'))
+if tts_service_dir not in sys.path:
+    sys.path.insert(0, tts_service_dir)
 from main import TTSService, tts_service
 
 @pytest.fixture

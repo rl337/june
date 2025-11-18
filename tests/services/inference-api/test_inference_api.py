@@ -9,19 +9,33 @@ import torch
 import grpc
 from grpc import aio
 
-# Import generated protobuf classes
-import sys
-sys.path.append('../../proto')
-from llm_pb2 import (
-    GenerationRequest, GenerationResponse, GenerationChunk,
-    ChatRequest, ChatResponse, ChatChunk, ChatMessage,
-    EmbeddingRequest, EmbeddingResponse,
-    HealthRequest, HealthResponse,
-    GenerationParameters, Context, ToolDefinition,
-    FinishReason, UsageStats
-)
-import llm_pb2_grpc
+# Import generated protobuf classes from june_grpc_api package
+from june_grpc_api.generated import llm_pb2, llm_pb2_grpc
+# Import specific classes for convenience
+GenerationRequest = llm_pb2.GenerationRequest
+GenerationResponse = llm_pb2.GenerationResponse
+GenerationChunk = llm_pb2.GenerationChunk
+ChatRequest = llm_pb2.ChatRequest
+ChatResponse = llm_pb2.ChatResponse
+ChatChunk = llm_pb2.ChatChunk
+ChatMessage = llm_pb2.ChatMessage
+EmbeddingRequest = llm_pb2.EmbeddingRequest
+EmbeddingResponse = llm_pb2.EmbeddingResponse
+HealthRequest = llm_pb2.HealthRequest
+HealthResponse = llm_pb2.HealthResponse
+GenerationParameters = llm_pb2.GenerationParameters
+Context = llm_pb2.Context
+ToolDefinition = llm_pb2.ToolDefinition
+FinishReason = llm_pb2.FinishReason
+UsageStats = llm_pb2.UsageStats
 
+# Import inference-api service from services/inference-api/main.py
+import sys
+import os
+# Add services/inference-api directory to path to import main
+inference_api_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../services/inference-api'))
+if inference_api_dir not in sys.path:
+    sys.path.insert(0, inference_api_dir)
 from main import InferenceAPIService, inference_service
 from inference_core.strategies import InferenceRequest, InferenceResponse
 

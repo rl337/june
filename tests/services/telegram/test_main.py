@@ -32,38 +32,54 @@ for sp_dir in list(site.getsitepackages()) + [site.getusersitepackages()]:
             _site_packages = sp_dir
             break
 
-# Find local services/telegram directory
+# Find local essence/services/telegram directory
 _local_telegram_dir = None
-_current_dir = os.path.dirname(os.path.abspath(__file__))  # tests/ directory
-_parent_dir = os.path.dirname(_current_dir)  # services/telegram/ directory
-if os.path.basename(_parent_dir) == 'telegram':
-    _local_telegram_dir = _parent_dir
+_current_dir = os.path.dirname(os.path.abspath(__file__))  # tests/services/telegram/ directory
+_project_root = os.path.dirname(os.path.dirname(os.path.dirname(_current_dir)))  # project root
+_essence_telegram_dir = os.path.join(_project_root, 'essence', 'services', 'telegram')
+if os.path.exists(_essence_telegram_dir):
+    _local_telegram_dir = _essence_telegram_dir
 
 # Clear local telegram from module cache if it was imported
 if 'telegram' in sys.modules:
     mod = sys.modules['telegram']
     if hasattr(mod, '__file__') and mod.__file__:
+        # Remove if it's from test directory or essence directory (not installed package)
         if _local_telegram_dir and _local_telegram_dir in mod.__file__:
             del sys.modules['telegram']
-            if 'telegram.ext' in sys.modules:
-                del sys.modules['telegram.ext']
+        elif 'tests/services/telegram' in mod.__file__ or 'essence/services/telegram' in mod.__file__:
+            del sys.modules['telegram']
+        if 'telegram.ext' in sys.modules:
+            del sys.modules['telegram.ext']
 
-# Save original sys.path and remove local telegram directory from path to prevent shadowing
+# Save original sys.path
 _original_sys_path = sys.path[:]
-if _local_telegram_dir and _local_telegram_dir in sys.path:
-    sys.path.remove(_local_telegram_dir)
+
+# Remove test directory from path to prevent shadowing installed telegram package
+_test_dir = os.path.dirname(os.path.abspath(__file__))  # tests/services/telegram/
+if _test_dir in sys.path:
+    sys.path.remove(_test_dir)
+# Also remove parent directories that might cause issues
+_test_parent = os.path.dirname(_test_dir)  # tests/services/
+if _test_parent in sys.path:
+    sys.path.remove(_test_parent)
 
 # Temporarily move site-packages to front of sys.path for telegram import
 if _site_packages and _site_packages in sys.path:
     sys.path.remove(_site_packages)
-sys.path.insert(0, _site_packages) if _site_packages else None
+if _site_packages:
+    sys.path.insert(0, _site_packages)
 
 # Now import telegram from installed package
 from telegram import Update, Message, Voice, File, User, Chat
 from telegram.ext import ContextTypes
 
-# Restore original sys.path and ensure parent directory (services/telegram) is in path for local imports
+# Restore original sys.path and ensure essence/services/telegram is in path for local imports
 sys.path[:] = _original_sys_path
+# Add essence directory to path so we can import essence.services.telegram
+_essence_dir = os.path.join(_project_root, 'essence')
+if _essence_dir not in sys.path:
+    sys.path.insert(0, _essence_dir)
 if _local_telegram_dir and _local_telegram_dir not in sys.path:
     sys.path.insert(0, _local_telegram_dir)
 
@@ -159,10 +175,10 @@ mock_deps_config.get_tts_address = MagicMock(return_value="tts:50052")
 mock_deps_config.get_metrics_storage = MagicMock()
 sys.modules['dependencies.config'] = mock_deps_config
 
-from main import TelegramBotService
-from audio_utils import AudioValidationError, prepare_audio_for_stt
-from handlers.commands import start_command, help_command, status_command
-from handlers.voice import handle_voice_message
+from essence.services.telegram.main import TelegramBotService
+from essence.services.telegram.audio_utils import AudioValidationError, prepare_audio_for_stt
+from essence.services.telegram.handlers.commands import start_command, help_command, status_command
+from essence.services.telegram.handlers.voice import handle_voice_message
 
 
 # Test fixtures
@@ -234,9 +250,9 @@ def mock_telegram_file():
 class TestTelegramBotServiceInitialization:
     """Tests for TelegramBotService initialization."""
     
-    @patch('main.get_service_config')
-    @patch('main.get_stt_address')
-    @patch('main.Application')
+    @patch('essence.services.telegram.main.get_service_config')
+    @patch('essence.services.telegram.main.get_stt_address')
+    @patch('essence.services.telegram.main.Application')
     @patch.dict(os.environ, {'TELEGRAM_BOT_TOKEN': 'test-token'})
     def test_init_success(self, mock_app_class, mock_get_stt_address, mock_get_service_config):
         """Test successful initialization."""
@@ -256,9 +272,9 @@ class TestTelegramBotServiceInitialization:
         assert service.config.bot_token == "test-token"
         mock_app_class.builder.assert_called_once()
     
-    @patch('main.get_service_config')
-    @patch('main.get_stt_address')
-    @patch('main.Application')
+    @patch('essence.services.telegram.main.get_service_config')
+    @patch('essence.services.telegram.main.get_stt_address')
+    @patch('essence.services.telegram.main.Application')
     @patch.dict(os.environ, {}, clear=True)
     def test_init_missing_token(self, mock_app_class, mock_get_stt_address, mock_get_service_config):
         """Test initialization fails without bot token."""
@@ -270,9 +286,9 @@ class TestTelegramBotServiceInitialization:
         with pytest.raises(ValueError, match="TELEGRAM_BOT_TOKEN"):
             TelegramBotService()
     
-    @patch('main.get_service_config')
-    @patch('main.get_stt_address')
-    @patch('main.Application')
+    @patch('essence.services.telegram.main.get_service_config')
+    @patch('essence.services.telegram.main.get_stt_address')
+    @patch('essence.services.telegram.main.Application')
     @patch.dict(os.environ, {'TELEGRAM_BOT_TOKEN': 'test-token', 'STT_URL': 'grpc://custom-stt:50052'})
     def test_init_custom_service_urls(self, mock_app_class, mock_get_stt_address, mock_get_service_config):
         """Test initialization with custom service URLs."""

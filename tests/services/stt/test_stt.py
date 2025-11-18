@@ -9,21 +9,25 @@ import torch
 import grpc
 from grpc import aio
 
-# Import generated protobuf classes
+# Import generated protobuf classes from june_grpc_api package
+from june_grpc_api.generated import asr_pb2, asr_pb2_grpc
+# Import specific classes for convenience
+AudioChunk = asr_pb2.AudioChunk
+RecognitionRequest = asr_pb2.RecognitionRequest
+RecognitionResponse = asr_pb2.RecognitionResponse
+RecognitionResult = asr_pb2.RecognitionResult
+RecognitionConfig = asr_pb2.RecognitionConfig
+WordInfo = asr_pb2.WordInfo
+HealthRequest = asr_pb2.HealthRequest
+HealthResponse = asr_pb2.HealthResponse
+
+# Import STT service from services/stt/main.py
 import sys
 import os
-# Add path to generated protobuf files
-proto_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../packages/june-grpc-api/june_grpc_api/generated'))
-if os.path.exists(proto_path):
-    sys.path.insert(0, proto_path)
-from asr_pb2 import (
-    AudioChunk, RecognitionRequest, RecognitionResponse, RecognitionResult,
-    RecognitionConfig, WordInfo, HealthRequest, HealthResponse
-)
-import asr_pb2_grpc
-
-# Add parent directory to path to import main
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Add services/stt directory to path to import main
+stt_service_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../services/stt'))
+if stt_service_dir not in sys.path:
+    sys.path.insert(0, stt_service_dir)
 from main import STTService, stt_service
 
 @pytest.fixture
