@@ -8,14 +8,9 @@ import json
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 from typing import Iterator, Tuple
-import sys
-from pathlib import Path
 
-# Add parent directories to path
-base_path = Path(__file__).parent.parent.parent.parent
-sys.path.insert(0, str(base_path / "services" / "chat-service-base"))
-
-from agent.response import (
+# Import from essence package (code moved from services/chat-service-base to essence/chat/agent)
+from essence.chat.agent.response import (
     stream_chat_response_agent,
     _extract_human_readable_from_json_line
 )
@@ -165,9 +160,9 @@ class TestStreamAccumulation:
                 is_final = (i == len(json_lines) - 1)
                 yield (line, is_final)
         
-        with patch('agent.response.streaming_popen_generator', mock_generator):
-            with patch('agent.response.os.path.exists', return_value=True):
-                with patch('agent.response.os.access', return_value=True):
+        with patch('essence.chat.agent.response.streaming_popen_generator', mock_generator):
+            with patch('essence.chat.agent.response.os.path.exists', return_value=True):
+                with patch('essence.chat.agent.response.os.access', return_value=True):
                     results = list(stream_chat_response_agent(
                         "test message",
                         user_id=123,
@@ -180,7 +175,7 @@ class TestStreamAccumulation:
         assert len(results) > 0
         
         # Check that messages are accumulated (each should be longer or equal)
-        message_lengths = [len(msg) for msg, is_final in results if msg]
+        message_lengths = [len(msg) for msg, is_final, msg_type in results if msg]
         if len(message_lengths) > 1:
             # Messages should generally increase in length (accumulation)
             # But we might get the same length if it's the same accumulated message
@@ -217,9 +212,9 @@ class TestStreamAccumulation:
                 is_final = (i == len(json_lines) - 1)
                 yield (line, is_final)
         
-        with patch('agent.response.streaming_popen_generator', mock_generator):
-            with patch('agent.response.os.path.exists', return_value=True):
-                with patch('agent.response.os.access', return_value=True):
+        with patch('essence.chat.agent.response.streaming_popen_generator', mock_generator):
+            with patch('essence.chat.agent.response.os.path.exists', return_value=True):
+                with patch('essence.chat.agent.response.os.access', return_value=True):
                     results = list(stream_chat_response_agent(
                         "test message",
                         user_id=123,
@@ -230,7 +225,7 @@ class TestStreamAccumulation:
         
         # The problem: we should NOT yield "order or not al" as a separate message
         # We should only yield the accumulated longest message
-        messages = [msg for msg, is_final in results if msg]
+        messages = [msg for msg, is_final, msg_type in results if msg]
         
         # Check that we don't have the middle chunk as a standalone message
         # (unless it's longer than what we had before)
@@ -241,7 +236,7 @@ class TestStreamAccumulation:
                 pytest.fail("Should not yield standalone middle chunk 'order or not al'")
         
         # The final message should contain the full text
-        final_messages = [msg for msg, is_final in results if msg and not is_final]
+        final_messages = [msg for msg, is_final, msg_type in results if msg and not is_final]
         if final_messages:
             longest = max(final_messages, key=len)
             assert "Hi. How can" in longest or "order or not" in longest, \
@@ -276,9 +271,9 @@ class TestStreamAccumulation:
                 is_final = (i == len(json_lines) - 1)
                 yield (line, is_final)
         
-        with patch('agent.response.streaming_popen_generator', mock_generator):
-            with patch('agent.response.os.path.exists', return_value=True):
-                with patch('agent.response.os.access', return_value=True):
+        with patch('essence.chat.agent.response.streaming_popen_generator', mock_generator):
+            with patch('essence.chat.agent.response.os.path.exists', return_value=True):
+                with patch('essence.chat.agent.response.os.access', return_value=True):
                     results = list(stream_chat_response_agent(
                         "test message",
                         user_id=123,
@@ -288,7 +283,7 @@ class TestStreamAccumulation:
                     ))
         
         # Should yield the longest message we've seen
-        messages = [msg for msg, is_final in results if msg and not is_final]
+        messages = [msg for msg, is_final, msg_type in results if msg and not is_final]
         if messages:
             longest_yielded = max(messages, key=len)
             # Should contain the longest message we saw
@@ -351,9 +346,9 @@ class TestMiddleChunkProblem:
                 is_final = (i == len(json_lines) - 1)
                 yield (line, is_final)
         
-        with patch('agent.response.streaming_popen_generator', mock_generator):
-            with patch('agent.response.os.path.exists', return_value=True):
-                with patch('agent.response.os.access', return_value=True):
+        with patch('essence.chat.agent.response.streaming_popen_generator', mock_generator):
+            with patch('essence.chat.agent.response.os.path.exists', return_value=True):
+                with patch('essence.chat.agent.response.os.access', return_value=True):
                     results = list(stream_chat_response_agent(
                         "test",
                         user_id=123,
@@ -363,7 +358,7 @@ class TestMiddleChunkProblem:
                     ))
         
         # Extract all non-empty, non-final messages
-        messages = [msg for msg, is_final in results if msg and not is_final]
+        messages = [msg for msg, is_final, msg_type in results if msg and not is_final]
         
         # Should NOT have "order or not al" as a standalone message
         # (unless it's part of a longer accumulated message)
@@ -442,9 +437,9 @@ class TestRealWorldScenario:
                 is_final = (i == len(json_lines) - 1)
                 yield (line, is_final)
         
-        with patch('agent.response.streaming_popen_generator', mock_generator):
-            with patch('agent.response.os.path.exists', return_value=True):
-                with patch('agent.response.os.access', return_value=True):
+        with patch('essence.chat.agent.response.streaming_popen_generator', mock_generator):
+            with patch('essence.chat.agent.response.os.path.exists', return_value=True):
+                with patch('essence.chat.agent.response.os.access', return_value=True):
                     results = list(stream_chat_response_agent(
                         "Hi",
                         user_id=39833618,
@@ -454,7 +449,7 @@ class TestRealWorldScenario:
                     ))
         
         # Should yield incremental updates
-        messages = [msg for msg, is_final in results if msg and not is_final]
+        messages = [msg for msg, is_final, msg_type in results if msg and not is_final]
         
         # Each message should be longer than or equal to the previous (accumulation)
         if len(messages) > 1:
@@ -463,7 +458,7 @@ class TestRealWorldScenario:
                     f"Message {i} should be longer or contain previous: {messages[i-1][:50]} -> {messages[i][:50]}"
         
         # Final non-empty message should be the full message
-        final_non_empty = [msg for msg, is_final in results if msg][-1] if results else None
+        final_non_empty = [msg for msg, is_final, msg_type in results if msg][-1] if results else None
         if final_non_empty and final_non_empty != "":
             # Should contain the full message content
             assert "Tasks & Projects" in final_non_empty
@@ -507,9 +502,9 @@ class TestRealWorldScenario:
                 is_final = (i == len(problematic_json_lines) - 1)
                 yield (line, is_final)
         
-        with patch('agent.response.streaming_popen_generator', mock_generator):
-            with patch('agent.response.os.path.exists', return_value=True):
-                with patch('agent.response.os.access', return_value=True):
+        with patch('essence.chat.agent.response.streaming_popen_generator', mock_generator):
+            with patch('essence.chat.agent.response.os.path.exists', return_value=True):
+                with patch('essence.chat.agent.response.os.access', return_value=True):
                     results = list(stream_chat_response_agent(
                         "test",
                         user_id=123,
@@ -519,7 +514,7 @@ class TestRealWorldScenario:
                     ))
         
         # Extract all yielded messages (non-final)
-        all_messages = [msg for msg, is_final in results if msg and not is_final]
+        all_messages = [msg for msg, is_final, msg_type in results if msg and not is_final]
         
         # The bug: we should NOT yield "order or not al" as a standalone message
         # We should only yield messages that are longer than what we've seen before
