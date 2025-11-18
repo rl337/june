@@ -4,12 +4,15 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_db_connection():
+def get_db_connection() -> None:
     """
     Get PostgreSQL database connection.
     
     Note: PostgreSQL is not available. This function will raise an exception
     if called. All methods in this module handle this gracefully.
+    
+    Raises:
+        RuntimeError: Always raised since PostgreSQL is not available for MVP
     """
     # PostgreSQL is not available - raise an exception that will be caught by callers
     raise RuntimeError("PostgreSQL is not available. Admin auth methods will return defaults.")

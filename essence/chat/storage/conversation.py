@@ -22,8 +22,16 @@ logger = logging.getLogger(__name__)
 DEFAULT_LANGUAGE = "en"
 
 
-def get_db_connection():
-    """Get PostgreSQL database connection."""
+def get_db_connection() -> psycopg2.extensions.connection:
+    """
+    Get PostgreSQL database connection.
+    
+    Returns:
+        PostgreSQL connection object
+        
+    Raises:
+        psycopg2.OperationalError: If connection to database fails
+    """
     db_host = os.getenv("DB_HOST", "localhost")
     db_port = os.getenv("DB_PORT", "5432")
     db_name = os.getenv("DB_NAME", "conversations")
