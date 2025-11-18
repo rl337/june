@@ -67,9 +67,16 @@ Pare down the june project to bare essentials for the **voice message → STT �
 - Benchmark evaluation framework with sandbox isolation
 - **Best Practice:** All model operations must be containerized; use sandboxes for benchmark isolation
 
+### Phase 11: Scripts Directory Cleanup and Command Migration ✅
+- All reusable Python tools converted to commands
+- All test utilities moved to tests/scripts/
+- All obsolete scripts removed
+- Documentation updated
+- **Best Practice:** Keep scripts/ minimal - only infrastructure/automation scripts; use commands for reusable tools
+
 ## Current Priorities
 
-### Phase 11: Scripts Directory Cleanup and Command Migration ⏳ TODO
+### Phase 12: Test Infrastructure and Integration Test Service ⏳ TODO
 
 **Goal:** Minimize `scripts/` directory by converting reusable tools to commands and moving test utilities to `tests/`.
 
