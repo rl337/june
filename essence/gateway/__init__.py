@@ -1,2 +1,0 @@
-"""Gateway and API functionality."""
-

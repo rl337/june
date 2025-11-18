@@ -102,7 +102,6 @@ packages = [
     "essence.chat.storage",
     "essence.chat.utils",
     "essence.audio",
-    "essence.gateway",
     "essence.agent",
     "essence.storage",
     "essence.utils",
