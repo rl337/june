@@ -308,11 +308,16 @@ When ready to use the Qwen3 model and coding agent, follow these steps:
 ## Next Steps
 
 1. **Ongoing:** Maintain minimal architecture and follow established best practices
-2. **Future enhancements (optional):**
+2. **When ready to use the system:**
+   - Follow Phase 10 operational guide for model download and service startup
+   - Run integration tests via integration test service
+   - Perform end-to-end testing and verification
+3. **Future enhancements (optional):**
    - Consider persistent storage for test results (currently in-memory)
    - Add test result export functionality
    - Enhance Grafana dashboards with additional visualizations
    - Set up automated test runs on code changes (CI/CD integration)
+   - Fix dependencies for `tests/services/` tests if integration testing is needed
 
 ## Refactoring Status Summary
 
