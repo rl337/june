@@ -590,7 +590,23 @@ This phase focuses on refactoring individual services, building them, testing th
        - ✅ Tests for user_id and chat_id correlation attributes
        - ✅ Tests for multiple span creation
        - ⏳ **Remaining:** Add tracing span tests for other services (discord, stt, tts, inference-api) - can be added in future
-     - ⏳ Add metrics collection tests for telegram, tts services (stt and inference-api have some metrics tests)
+     - ✅ **COMPLETED:** Add metrics collection tests for telegram service (test_metrics.py with 14 tests, all passing)
+       - ✅ Tests for HTTP request metrics (total, duration)
+       - ✅ Tests for gRPC request metrics (total, duration)
+       - ✅ Tests for voice processing metrics (processed total, duration)
+       - ✅ Tests for STT, TTS, LLM duration metrics
+       - ✅ Tests for error metrics
+       - ✅ Tests for service health metrics
+       - ✅ Tests for metrics endpoint format (Prometheus format)
+       - ✅ Tests for multiple increments and different labels
+     - ✅ **COMPLETED:** Add metrics collection tests for tts service (test_metrics.py with 10 tests, all passing)
+       - ✅ Tests for TTS request metrics (total with status labels)
+       - ✅ Tests for TTS synthesis time histogram
+       - ✅ Tests for TTS audio duration histogram
+       - ✅ Tests for TTS error metrics
+       - ✅ Tests for active connections gauge
+       - ✅ Tests for metrics endpoint format (Prometheus format)
+       - ✅ Tests for histogram aggregation and gauge updates
      - ✅ **COMPLETED:** Create complete test suite for discord service (test_main.py with 14 tests, all passing)
      - ✅ **COMPLETED:** Add rate limiting tests for telegram service (test_rate_limit.py with 15 tests, all passing)
        - ✅ Tests for per-minute, per-hour, and per-day rate limiting
