@@ -36,12 +36,15 @@ _in_memory_storage: Dict[tuple, Dict[str, Any]] = defaultdict(dict)  # (user_id,
 _in_memory_prompt_templates: Dict[tuple, Dict[str, Any]] = {}  # (user_id, template_name) -> template dict
 
 
-def get_db_connection():
+def get_db_connection() -> None:
     """
     Get PostgreSQL database connection.
     
     Note: PostgreSQL is not available for MVP. This function will raise an exception
     if called. All methods in ConversationStorage handle this gracefully.
+    
+    Raises:
+        RuntimeError: Always raised since PostgreSQL is not available for MVP
     """
     # PostgreSQL is not available - raise an exception that will be caught by callers
     raise RuntimeError("PostgreSQL is not available for MVP. ConversationStorage methods will return defaults.")
