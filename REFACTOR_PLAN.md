@@ -785,20 +785,25 @@ This phase focuses on refactoring individual services, building them, testing th
    - ⏳ Generate reports with both correctness and efficiency metrics
    - ⏳ Compare with published baseline results
 
-5. **Evaluation automation:**
-   - ⏳ Create `scripts/run_benchmarks.sh` to orchestrate evaluation
-   - ⏳ Script should:
-     - Start required containers (inference-api, etc.)
-     - For each benchmark task:
-       - Create sandbox container/environment
-       - Run agent task in sandbox
-       - Capture sandbox state (filesystem, logs, metrics)
-       - Save sandbox snapshot for review
-       - Extract results
-     - Collect all results and metrics
-     - Generate comprehensive report
-   - ⏳ Results and sandbox snapshots stored in volume mount
-   - ⏳ Fully automated - no manual steps required
+5. **✅ COMPLETED: Evaluation automation:**
+   - ✅ **COMPLETED:** Created `scripts/run_benchmarks.sh` to orchestrate evaluation
+     - ✅ Starts required containers (inference-api) with health check wait logic
+     - ✅ Runs evaluation in cli-tools container via docker compose
+     - ✅ Handles both container and host execution modes
+     - ✅ Volume mounts for results and workspace
+   - ✅ **COMPLETED:** `scripts/run_benchmarks.py` implements full evaluation workflow
+     - ✅ For each benchmark task:
+       - ✅ Create sandbox container/environment (via BenchmarkEvaluator)
+       - ✅ Run agent task in sandbox (via CodingAgent)
+       - ✅ Capture sandbox state (filesystem, logs, metrics)
+       - ✅ Save sandbox snapshot for review
+       - ✅ Extract results and metrics
+     - ✅ Collect all results and metrics (TaskResult, EvaluationReport)
+     - ✅ Generate comprehensive report (JSON format with pass@k, efficiency metrics)
+   - ✅ Results and sandbox snapshots stored in volume mount (output_dir)
+   - ✅ Fully automated - no manual steps required
+   - ✅ Supports multiple datasets (humaneval, mbpp, all)
+   - ✅ Configurable via command-line arguments (timeout, iterations, resources, etc.)
 
 6. **✅ COMPLETED: Sandbox review tools:**
    - ✅ **COMPLETED:** Created `scripts/review_sandbox.py` Python tool for detailed sandbox analysis

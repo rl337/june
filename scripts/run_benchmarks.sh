@@ -139,7 +139,28 @@ else
         echo "Starting inference-api service..."
         docker compose up -d inference-api
         echo "Waiting for inference-api to be ready..."
-        sleep 10
+        
+        # Wait for container to be healthy (with timeout)
+        MAX_WAIT=120
+        WAIT_INTERVAL=5
+        ELAPSED=0
+        while [ $ELAPSED -lt $MAX_WAIT ]; do
+            if docker compose ps inference-api | grep -q "Up"; then
+                # Container is up, check if it's responding (basic check)
+                if docker compose exec -T inference-api test -f /tmp/.inference_api_ready 2>/dev/null || \
+                   timeout 2 bash -c "echo > /dev/tcp/inference-api/50051" 2>/dev/null; then
+                    echo "Inference API is ready!"
+                    break
+                fi
+            fi
+            echo "  Waiting for inference-api... (${ELAPSED}s/${MAX_WAIT}s)"
+            sleep $WAIT_INTERVAL
+            ELAPSED=$((ELAPSED + WAIT_INTERVAL))
+        done
+        
+        if [ $ELAPSED -ge $MAX_WAIT ]; then
+            echo "Warning: Inference API may not be fully ready, but proceeding anyway..."
+        fi
     fi
     
     # Run benchmark script in cli-tools container
