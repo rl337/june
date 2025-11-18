@@ -391,11 +391,31 @@ class BenchmarkEvaluator:
         Args:
             sandbox: The sandbox container
             solution_code: The solution code to test
-            task: The benchmark task with test code
+            task: The benchmark task with test code (must have test_code set)
             
         Returns:
             Dictionary with 'passed' (bool) and optional 'error' (str)
+            
+        Raises:
+            ValueError: If task.test_code is not provided
         """
+        # Validate inputs
+        if not task.test_code:
+            error_msg = f"Task {task.task_id} does not have test_code set"
+            logger.error(error_msg)
+            return {
+                "passed": False,
+                "error": error_msg,
+            }
+        
+        if not solution_code or not solution_code.strip():
+            error_msg = "Solution code is empty"
+            logger.error(error_msg)
+            return {
+                "passed": False,
+                "error": error_msg,
+            }
+        
         try:
             # Write solution to workspace directory (host path, mounted in container)
             workspace_dir = sandbox.workspace_dir
@@ -403,6 +423,8 @@ class BenchmarkEvaluator:
             solution_file.write_text(solution_code)
             
             # Write test code to a file
+            # Note: This is a simplified version - real implementation would parse test_code
+            # and execute it properly (e.g., using pytest or unittest framework)
             test_file = workspace_dir / "test_solution.py"
             test_code = f"""
 {solution_code}
@@ -436,14 +458,26 @@ if __name__ == "__main__":
             passed = result["returncode"] == 0
             error = None if passed else result.get("stderr", result.get("stdout", "Unknown error"))
             
+            if not passed:
+                logger.debug(f"Tests failed for task {task.task_id}: {error}")
+            
             return {
                 "passed": passed,
                 "error": error,
             }
-        except Exception as e:
+        except FileNotFoundError as e:
+            error_msg = f"Failed to write test files: {e}"
+            logger.error(error_msg, exc_info=True)
             return {
                 "passed": False,
-                "error": str(e),
+                "error": error_msg,
+            }
+        except Exception as e:
+            error_msg = f"Unexpected error running tests: {e}"
+            logger.error(error_msg, exc_info=True)
+            return {
+                "passed": False,
+                "error": error_msg,
             }
     
     def evaluate_dataset(
