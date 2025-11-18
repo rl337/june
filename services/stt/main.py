@@ -23,14 +23,17 @@ from prometheus_client.exposition import start_http_server
 import librosa
 import soundfile as sf
 
-# Import generated protobuf classes
-import sys
-sys.path.append('../../proto')
-from asr_pb2 import (
-    AudioChunk, RecognitionRequest, RecognitionResponse, RecognitionResult,
-    RecognitionConfig, WordInfo, HealthRequest, HealthResponse
-)
-import asr_pb2_grpc
+# Import generated protobuf classes from june_grpc_api package
+from june_grpc_api.generated import asr_pb2, asr_pb2_grpc
+# Import specific classes for convenience
+AudioChunk = asr_pb2.AudioChunk
+RecognitionRequest = asr_pb2.RecognitionRequest
+RecognitionResponse = asr_pb2.RecognitionResponse
+RecognitionResult = asr_pb2.RecognitionResult
+RecognitionConfig = asr_pb2.RecognitionConfig
+WordInfo = asr_pb2.WordInfo
+HealthRequest = asr_pb2.HealthRequest
+HealthResponse = asr_pb2.HealthResponse
 
 from inference_core import config, setup_logging, Timer, HealthChecker, CircularBuffer
 

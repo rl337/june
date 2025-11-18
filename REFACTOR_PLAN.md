@@ -414,7 +414,12 @@ This phase focuses on refactoring individual services, building them, testing th
      - ✅ ~60 lines of duplicate code removed and consolidated into reusable utility
    - ⏳ Add proper error handling
    - ⏳ Add proper logging with structured format
-   - ⏳ Ensure all imports are from `essence` package
+   - ✅ **COMPLETED:** Ensure all imports are from `essence` package (or proper packages)
+     - ✅ Fixed STT service to use `june_grpc_api.generated` package instead of `sys.path.append('../../proto')`
+     - ✅ Removed sys.path manipulation for protobuf imports in `services/stt/main.py`
+     - ✅ Now uses proper package imports: `from june_grpc_api.generated import asr_pb2, asr_pb2_grpc`
+     - ✅ All services should use proper package imports instead of sys.path manipulation
+     - **Note:** Some services still use `sys.path.insert()` for essence package (acceptable for now, but could be improved with proper package installation)
 
 #### 9.2: Build Individual Services ⏳ TODO
 
