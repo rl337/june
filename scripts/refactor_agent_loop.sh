@@ -192,6 +192,46 @@ You are working on refactoring the june project. Your task is to:
   - This is especially critical for large models like Qwen3-30B which can use 15-20GB+ of memory
   - When modifying model loading code, always add checks to prevent reloading if already loaded
 
+**MCP Services for Self-Directed Tasks and Data:**
+- **Use MCP services for task management and data storage** - The project has MCP (Model Context Protocol) services available that you should use for:
+  - **Task Management (todorama service):** Use MCP tools to manage your own tasks and track progress:
+    - `list_available_tasks(agent_type, project_id, limit)` - Find tasks you can work on
+    - `reserve_task(task_id, agent_id)` - Lock a task before working on it (MANDATORY)
+    - `complete_task(task_id, agent_id, notes, ...)` - Mark tasks complete when done (MANDATORY)
+    - `unlock_task(task_id, agent_id)` - Unlock tasks on errors (MANDATORY - always use try/except/finally)
+    - `add_task_update(task_id, agent_id, content, update_type)` - Add progress updates during work
+    - `get_task_context(task_id)` - Get full context for a task
+    - `create_task(...)` - Create new tasks for future work
+    - `query_tasks(...)` - Query tasks by various criteria
+    - The "june" project (project_id=1) is available in the todorama database
+    - **CRITICAL:** Always reserve tasks before working, and always complete or unlock them - never leave tasks in_progress
+  - **Knowledge Storage (bucketofacts service):** Use MCP tools to store and retrieve facts and knowledge:
+    - `create_fact(subject, predicate, object, ...)` - Store facts about the codebase, decisions, or learnings
+    - `query_facts(...)` - Query stored facts
+    - `semantic_search(query, limit, threshold)` - Search facts semantically
+    - `get_fact(fact_id, ...)` - Retrieve specific facts
+    - Use this to remember important decisions, code patterns, architecture choices, etc.
+  - **Documentation (docomatic service):** Use MCP tools to manage documentation:
+    - `create_document(title, ...)` - Create documentation documents
+    - `create_section(document_id, heading, body, ...)` - Add sections to documents
+    - `update_document(document_id, ...)` - Update documentation
+    - `search_sections(query, ...)` - Search documentation
+    - Use this to maintain project documentation, architecture docs, API docs, etc.
+- **How to use MCP services:**
+  - MCP services are accessible via `cursor-agent mcp` commands
+  - You can call MCP tools directly in your agent interactions
+  - Services are available at: http://localhost:8000/mcp/{service-name}/sse
+  - The todorama service has 49 tools, bucketofacts has 17 tools, docomatic has 23 tools
+  - **Best practice:** Use todorama to track your own work, bucketofacts to store learnings, and docomatic for documentation
+- **Self-directed task management:**
+  - Instead of only working from REFACTOR_PLAN.md, you can:
+    - Query available tasks from the todorama service
+    - Create tasks for work you identify needs to be done
+    - Track your progress using task updates
+    - Store learnings in bucketofacts for future reference
+    - Document your work in docomatic
+  - This enables more autonomous operation and better tracking of work across iterations
+
 **Current Context:**
 - Project root: /home/rlee/dev/june
 - Refactor plan: REFACTOR_PLAN.md

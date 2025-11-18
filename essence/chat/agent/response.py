@@ -685,11 +685,27 @@ def stream_chat_response_agent(
                     if is_result:
                         # Result message contains the full accumulated text - this is authoritative
                         # Store it separately and use it for final output
+                        # First, yield any pending assistant message if we haven't sent it yet
                         old_accumulated = accumulated_message
                         result_message = message
+                        
+                        # If we have a pending assistant message that hasn't been sent, yield it first
+                        if old_accumulated and old_accumulated != message and not first_message_sent:
+                            # Yield the assistant message first
+                            logger.info(f"Yielding assistant message before result: {len(old_accumulated)} chars")
+                            if span:
+                                span.add_event("yielding_assistant_before_result", attributes={
+                                    "assistant_length": len(old_accumulated),
+                                    "result_length": len(message)
+                                })
+                            yield (old_accumulated, False, "assistant")
+                            first_message_sent = True
+                            last_message_yield_time = current_time
+                        
+                        # Store result message for final yield (don't yield it now - yield at final line)
                         accumulated_message = message
-                        message_updated = True
-                        logger.info(f"Received authoritative result message: {len(message)} chars")
+                        message_updated = False  # Don't yield result message now - yield it at final line with is_final=True
+                        logger.info(f"Received authoritative result message: {len(message)} chars, previous accumulated: {len(old_accumulated)} chars")
                         
                         # Validate that our chunk appending worked correctly (for debugging)
                         if old_accumulated and old_accumulated != message:
@@ -729,9 +745,15 @@ def stream_chat_response_agent(
                                 # Only append if it looks like a genuine continuation
                                 
                                 # Check if chunk is a fragment that doesn't fit (very short and doesn't continue naturally)
+                                # Allow chunks that start with space (common in streaming where words are split)
+                                # Allow single-character punctuation (e.g., "!" after "Hello world")
+                                message_starts_with_space = message and message[0] == " "
+                                is_single_punctuation = len(message.strip()) == 1 and message.strip() in ("!", "?", ".", ",", ":", ";")
                                 is_fragment = (
                                     len(message) < 15 and  # Very short
                                     not message[0].isupper() and  # Doesn't start with capital
+                                    not message_starts_with_space and  # Doesn't start with space (space-prefixed chunks are continuations)
+                                    not is_single_punctuation and  # Not single punctuation (these are valid continuations)
                                     not message.strip().startswith(("1.", "2.", "3.", "-", "*", "#", ">", "`", "\n")) and  # Not a list/code start
                                     not accumulated_message.rstrip().endswith((" ", ".", ",", ":", ";", "!", "?"))  # Doesn't continue naturally
                                 )
@@ -749,6 +771,7 @@ def stream_chat_response_agent(
                                     message_updated = False
                                 else:
                                     # Delta chunk - append directly (no separators, chunks should fit together)
+                                    # If message starts with space, it's a continuation (e.g., " world" after "Hello")
                                     old_accumulated = accumulated_message
                                     accumulated_message = accumulated_message + message
                                     message_updated = True
@@ -971,7 +994,7 @@ def _extract_human_readable_from_json_line(line: str) -> Optional[str]:
                     for item in content:
                         if isinstance(item, dict) and item.get("type") == "text":
                             text = item.get("text", "").strip()
-                            if text and len(text) > 5:  # Lower threshold for earlier messages
+                            if text and len(text) >= 5:  # Allow 5+ character messages (changed from > 5 to >= 5)
                                 # Filter out descriptions but allow partial responses
                                 if not text.strip().startswith(("Writing", "Wrote", "Created", "Updated", "Response written")):
                                     # Return the full text, not just the first chunk
@@ -981,7 +1004,7 @@ def _extract_human_readable_from_json_line(line: str) -> Optional[str]:
         # 3. Check for result objects (but be careful - these might be descriptions)
         if obj_type == "result" and subtype == "success":
             result_text = json_obj.get("result", "")
-            if result_text and isinstance(result_text, str) and len(result_text.strip()) > 5:  # Lower threshold
+            if result_text and isinstance(result_text, str) and len(result_text.strip()) >= 5:  # Allow 5+ character messages
                 # Filter out descriptions
                 if not result_text.strip().startswith(("Writing", "Wrote", "Created", "Updated", "Response written")):
                     return result_text.strip()
@@ -989,7 +1012,7 @@ def _extract_human_readable_from_json_line(line: str) -> Optional[str]:
         # 4. Check for message/content fields directly
         for field in ["message", "content", "text", "response"]:
             value = json_obj.get(field, "")
-            if value and isinstance(value, str) and len(value.strip()) > 5:  # Lower threshold
+            if value and isinstance(value, str) and len(value.strip()) >= 5:  # Allow 5+ character messages
                 if not value.strip().startswith(("Writing", "Wrote", "Created", "Updated", "Response written")):
                     return value.strip()
         
