@@ -292,6 +292,10 @@ All major refactoring phases have been completed:
 **Remaining Work (Optional/Future):**
 - ⏳ TODO (Optional): Fix dependencies for `tests/services/` tests for active services (telegram, discord, stt, tts, inference-api) - these may be integration tests that need running services
 - ⏳ TODO (Optional): Update script tests that reference removed services (gateway) if needed in the future
+
+**Note:** These TODO items are also listed in the "Refactoring Status Summary" section above. All remaining work is optional and does not block core functionality.
+
+**Completed Cleanup Tasks:**
 - ✅ **COMPLETED:** Removed leftover gateway references from essence module (essence/gateway/, essence/README.md, essence/__init__.py, essence/pyproject.toml)
 - ✅ **COMPLETED:** Archived gateway API documentation (docs/API/gateway.md → gateway.md.obsolete)
 - ✅ **COMPLETED:** Updated docs/README.md to remove gateway API references
