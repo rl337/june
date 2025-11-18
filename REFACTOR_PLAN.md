@@ -579,7 +579,17 @@ This phase focuses on refactoring individual services, building them, testing th
        - ✅ Updated `test_voice_quality.py` to import from `essence.services.telegram.voice_quality`
        - ⏳ **Remaining:** Some test files still have import errors (likely dependency-related, e.g., missing opentelemetry module)
        - ⏳ Test files in `tests/services/stt/`, `tests/services/tts/`, `tests/services/inference-api/` may have similar import issues (these services still use `services/<service>/main.py` structure, so imports may be correct)
-     - ⏳ Add tracing span tests for all services (verify spans are created with correct attributes)
+     - ✅ **COMPLETED:** Add tracing span tests for telegram service (test_tracing.py with 10 tests, all passing)
+       - ✅ Tests for STT span creation with attributes (stt.recognize_stream)
+       - ✅ Tests for LLM span creation with attributes (llm.chat_stream)
+       - ✅ Tests for TTS span creation with attributes (tts.synthesize)
+       - ✅ Tests for voice download span creation with attributes (voice.download)
+       - ✅ Tests for voice enhance audio span creation with attributes (voice.enhance_audio)
+       - ✅ Tests for text message handler span creation with attributes (telegram.text_message.handle)
+       - ✅ Tests for exception recording and error status
+       - ✅ Tests for user_id and chat_id correlation attributes
+       - ✅ Tests for multiple span creation
+       - ⏳ **Remaining:** Add tracing span tests for other services (discord, stt, tts, inference-api) - can be added in future
      - ⏳ Add metrics collection tests for telegram, tts services (stt and inference-api have some metrics tests)
      - ✅ **COMPLETED:** Create complete test suite for discord service (test_main.py with 14 tests, all passing)
      - ✅ **COMPLETED:** Add rate limiting tests for telegram service (test_rate_limit.py with 15 tests, all passing)
