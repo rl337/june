@@ -310,61 +310,13 @@ class DiscordBotService:
     
     def _setup_tracing_middleware(self):
         """Setup tracing and metrics middleware for HTTP requests."""
+        from essence.services.http_middleware import create_tracing_and_metrics_middleware
+        
+        middleware = create_tracing_and_metrics_middleware(tracer, trace)
+        
         @self.health_app.middleware("http")
         async def tracing_and_metrics_middleware(request: Request, call_next):
-            """Add tracing spans and metrics to HTTP requests."""
-            # Start timing for metrics
-            start_time = time.time()
-            
-            # Extract endpoint path (normalize to remove query params and trailing slashes)
-            endpoint = request.url.path.rstrip('/') or '/'
-            method = request.method.upper()
-            
-            status_code = 500  # Default to error if exception occurs
-            try:
-                # Setup tracing span if available
-                if tracer is not None:
-                    span_name = f"http.{method.lower()} {endpoint}"
-                    with tracer.start_as_current_span(span_name) as span:
-                        span.set_attribute("http.method", method)
-                        span.set_attribute("http.url", str(request.url))
-                        span.set_attribute("http.path", endpoint)
-                        span.set_attribute("http.query_string", str(request.url.query) if request.url.query else "")
-                        span.set_attribute("http.scheme", request.url.scheme)
-                        
-                        response = await call_next(request)
-                        status_code = response.status_code
-                        
-                        span.set_attribute("http.status_code", status_code)
-                        span.set_attribute("http.status_text", status_code)
-                        
-                        # Mark as error for 4xx and 5xx status codes
-                        if status_code >= 400:
-                            span.set_status(trace.Status(trace.StatusCode.ERROR, f"HTTP {status_code}"))
-                        
-                        return response
-                else:
-                    # No tracing, just call next
-                    response = await call_next(request)
-                    status_code = response.status_code
-                    return response
-            except Exception as e:
-                status_code = 500
-                # Record exception in tracing if available
-                if tracer is not None:
-                    try:
-                        current_span = trace.get_current_span()
-                        if current_span:
-                            current_span.record_exception(e)
-                            current_span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
-                    except:
-                        pass  # Ignore tracing errors
-                raise
-            finally:
-                # Record metrics
-                duration = time.time() - start_time
-                HTTP_REQUESTS_TOTAL.labels(method=method, endpoint=endpoint, status_code=status_code).inc()
-                HTTP_REQUEST_DURATION_SECONDS.labels(method=method, endpoint=endpoint, status_code=status_code).observe(duration)
+            return await middleware(request, call_next)
     
     def _setup_health_endpoint(self):
         """Setup health check endpoint."""
