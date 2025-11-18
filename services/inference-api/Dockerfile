@@ -17,10 +17,12 @@ ENV POETRY_VIRTUALENVS_CREATE=false
 ENV POETRY_VIRTUALENVS_IN_PROJECT=false
 RUN poetry install --no-interaction --no-ansi --only main --no-root
 
-# Reinstall inference-core and june-grpc-api wheels to ensure latest versions
-COPY packages/inference-core/dist/*.whl /tmp/
-COPY packages/june-grpc-api/dist/*.whl /tmp/
-RUN pip install --force-reinstall --no-deps /tmp/inference_core-*.whl /tmp/june_grpc_api-*.whl
+# Install june-grpc-api and inference-core packages in editable mode from source
+# This allows faster iteration during development without rebuilding wheels
+COPY packages/june-grpc-api /tmp/june-grpc-api
+COPY packages/inference-core /tmp/inference-core
+RUN pip install -e /tmp/june-grpc-api && \
+    pip install -e /tmp/inference-core[llm]
 
 # Install PyTorch with CUDA support (replace CPU-only version installed by poetry)
 # Install AFTER copying service code to ensure it's not overwritten

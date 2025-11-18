@@ -28,10 +28,9 @@ RUN pip install poetry && \
 # Install runtime libs common to services
 RUN pip install grpcio nats-py prometheus-client pydantic uvicorn fastapi scipy
 
-# Install shared wheels: june-grpc-api and inference-core
-COPY ../../packages/june-grpc-api/dist/*.whl /tmp/
-COPY ../../packages/inference-core/dist/*.whl /tmp/
-RUN pip install /tmp/june_grpc_api-*.whl /tmp/inference_core-*.whl
+# Note: Packages (june-grpc-api, inference-core) are now installed in editable mode
+# by individual service Dockerfiles that need them, not in the base image.
+# This allows faster iteration during development without rebuilding wheels.
 
 # Provide default non-root user
 RUN useradd -m -u 1000 june

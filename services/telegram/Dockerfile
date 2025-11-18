@@ -18,6 +18,13 @@ ENV POETRY_VIRTUALENVS_CREATE=false
 ENV POETRY_VIRTUALENVS_IN_PROJECT=false
 RUN poetry install --no-interaction --no-ansi --only main --no-root
 
+# Install june-grpc-api and inference-core packages in editable mode from source
+# This allows faster iteration during development without rebuilding wheels
+COPY packages/june-grpc-api /tmp/june-grpc-api
+COPY packages/inference-core /tmp/inference-core
+RUN pip install -e /tmp/june-grpc-api && \
+    pip install -e /tmp/inference-core
+
 # Ensure permissions
 RUN chown -R june:june /app
 USER june

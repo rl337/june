@@ -302,23 +302,20 @@ These are not needed for the core voice round trip:
      - ✅ Remaining packages: inference-core, june-grpc-api, june-rate-limit, june-security (all actively used)
    - ✅ **COMPLETED:** Package status documented - only essential packages remain
 
-3. **⏳ TODO: Migrate from wheel builds to Poetry in-place installation:**
-   - ⏳ **Current issue:** Dockerfiles are building wheels for `inference-core` and `june-grpc-api` packages, then installing them. This is inefficient and requires rebuilding wheels every time code changes.
-   - ⏳ **Solution:** Instead of building wheels, copy package source code into containers and use Poetry to install packages in editable/development mode directly from source.
-   - ⏳ **Tasks:**
-     - ⏳ Update `services/base/Dockerfile` to remove wheel installation (packages will be installed by individual service Dockerfiles)
-     - ⏳ Update `services/inference-api/Dockerfile` to:
-       - Copy `packages/inference-core` and `packages/june-grpc-api` source code
-       - Use `poetry install` in each package directory to install in editable mode
-       - Remove wheel copying and pip install steps
-     - ⏳ Update `services/cli-tools/Dockerfile` similarly (if it uses these packages)
-     - ⏳ Update any other service Dockerfiles that install wheels
-     - ⏳ Remove or update any Makefiles/scripts that build wheels (if they exist)
-     - ⏳ Verify all services still work correctly after migration
-   - ⏳ **Benefits:**
+3. **✅ COMPLETED: Migrate from wheel builds to Poetry in-place installation:**
+   - ✅ **COMPLETED:** Migrated all Dockerfiles from wheel installation to editable mode installation using `pip install -e`
+   - ✅ **COMPLETED:** Updated `services/base/Dockerfile` to remove wheel installation (packages now installed by individual service Dockerfiles)
+   - ✅ **COMPLETED:** Updated `services/inference-api/Dockerfile` to install packages in editable mode from source
+   - ✅ **COMPLETED:** Updated `services/cli-tools/Dockerfile` to install packages in editable mode from source
+   - ✅ **COMPLETED:** Updated `services/stt/Dockerfile` to install inference-core in editable mode with [audio] extras
+   - ✅ **COMPLETED:** Updated `services/tts/Dockerfile` to install inference-core in editable mode with [audio] extras
+   - ✅ **COMPLETED:** Updated `services/telegram/Dockerfile` to install both packages in editable mode from source
+   - ✅ **COMPLETED:** Updated `services/discord/Dockerfile` to install inference-core in editable mode from source
+   - ⏳ **Note:** Wheel build scripts (`scripts/build_june_grpc_api_wheel.sh`, `scripts/build_inference_core_wheel.sh`) still exist but are no longer required for service builds. They may still be used for package testing or distribution.
+   - ✅ **Benefits achieved:**
      - No need to rebuild wheels when package code changes
      - Faster iteration during development
-     - Simpler build process (just copy source and run poetry install)
+     - Simpler build process (just copy source and run `pip install -e`)
      - More consistent with how other services (telegram, discord) already work
 
 ### Phase 7: Clean Up Documentation ✅ COMPLETED

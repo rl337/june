@@ -22,10 +22,12 @@ COPY services/cli-tools/requirements-cli.txt .
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements-cli.txt
 
-# Install june-grpc-api and inference-core from prebuilt wheels
-COPY packages/june-grpc-api/dist/*.whl /tmp/
-COPY packages/inference-core/dist/*.whl /tmp/
-RUN pip install /tmp/june_grpc_api-*.whl /tmp/inference_core-*.whl
+# Install june-grpc-api and inference-core packages in editable mode from source
+# This allows faster iteration during development without rebuilding wheels
+COPY packages/june-grpc-api /tmp/june-grpc-api
+COPY packages/inference-core /tmp/inference-core
+RUN pip install -e /tmp/june-grpc-api && \
+    pip install -e /tmp/inference-core[llm]
 
 # Copy CLI scripts from repo root scripts
 COPY scripts/ /app/scripts/

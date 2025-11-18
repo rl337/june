@@ -27,6 +27,11 @@ ENV POETRY_VIRTUALENVS_IN_PROJECT=false
 RUN poetry install --no-interaction --no-ansi --only main --no-root && \
     pip install "numpy==1.22.0" "TTS>=0.20.0,<0.23.0"
 
+# Install inference-core package in editable mode from source
+# This allows faster iteration during development without rebuilding wheels
+COPY packages/inference-core /tmp/inference-core
+RUN pip install -e /tmp/inference-core[audio]
+
 ## shared module removed; use inference_core instead
 
 # Copy service code
