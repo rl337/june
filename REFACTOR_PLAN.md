@@ -83,6 +83,51 @@ Pare down the june project to bare essentials for the **voice message → STT �
 - ✅ Verification tools implemented (`essence/commands/verify_qwen3.py`, `benchmark_qwen3.py`)
 - ⏳ **Operational tasks:** Model download, service startup, and testing can be done when ready to use
 
+**Operational Guide (When Ready to Use):**
+
+When ready to use the Qwen3 model and coding agent, follow these steps:
+
+1. **Download the model (containerized):**
+   ```bash
+   # Download model in container (no host pollution)
+   docker compose run --rm cli-tools \
+     poetry run -m essence download-models --model Qwen/Qwen3-30B-A3B-Thinking-2507
+   ```
+   **Note:** This requires a GPU with 20GB+ VRAM and may take significant time depending on network speed.
+
+2. **Start inference-api service:**
+   ```bash
+   docker compose up -d inference-api
+   ```
+
+3. **Verify model is loaded:**
+   ```bash
+   # Check logs for "Model loaded successfully"
+   docker compose logs -f inference-api
+   
+   # Or check health endpoint
+   curl http://localhost:8001/health
+   ```
+
+4. **Test the coding agent:**
+   ```bash
+   # Use the coding agent via Python
+   poetry run python -m essence coding-agent --help
+   ```
+
+5. **Run benchmark evaluation:**
+   ```bash
+   # Run benchmark evaluation with sandbox isolation
+   poetry run python -m essence benchmark-qwen3 --help
+   ```
+
+**Prerequisites:**
+- NVIDIA GPU with 20GB+ VRAM (for Qwen3-30B with quantization)
+- NVIDIA Container Toolkit installed and configured
+- Docker with GPU support enabled
+
+**See also:** `README.md` (Qwen3 Setup section) and `QWEN3_SETUP_PLAN.md` for detailed setup instructions.
+
 ### Phase 11: Scripts Directory Cleanup and Command Migration ✅
 - All reusable Python tools converted to commands
 - All test utilities moved to tests/scripts/
