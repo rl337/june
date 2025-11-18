@@ -95,7 +95,7 @@ Pare down the june project to bare essentials for the **voice message → STT �
    - ✅ `monitor_gpu.py` → `essence/commands/monitor_gpu.py` (COMPLETED - runnable via `poetry run -m essence monitor-gpu`)
    - ✅ `verify_qwen3_quantization.py` → `essence/commands/verify_qwen3.py` (COMPLETED - runnable via `poetry run -m essence verify-qwen3`)
    - ✅ `download_models.py` → `essence/commands/download_models.py` (COMPLETED - runnable via `poetry run -m essence download-models`)
-   - ⏳ `benchmark_qwen3_performance.py` → `essence/commands/benchmark_qwen3.py`
+   - ✅ `benchmark_qwen3_performance.py` → `essence/commands/benchmark_qwen3.py` (COMPLETED - runnable via `poetry run -m essence benchmark-qwen3`)
    - ⏳ Any other reusable Python tools
 
 3. **Move test utilities to tests/:**

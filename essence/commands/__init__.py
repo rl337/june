@@ -20,6 +20,7 @@ from . import review_sandbox  # noqa: F401
 from . import monitor_gpu  # noqa: F401
 from . import verify_qwen3  # noqa: F401
 from . import download_models  # noqa: F401
+from . import benchmark_qwen3  # noqa: F401
 
-__all__ = ["telegram_service", "discord_service", "tts_service", "stt_service", "inference_api_service", "review_sandbox", "monitor_gpu", "verify_qwen3", "download_models"]
+__all__ = ["telegram_service", "discord_service", "tts_service", "stt_service", "inference_api_service", "review_sandbox", "monitor_gpu", "verify_qwen3", "download_models", "benchmark_qwen3"]
 
