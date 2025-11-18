@@ -480,6 +480,215 @@ poetry run python -m essence integration-test-service
 curl -X POST http://localhost:8082/tests/run
 ```
 
+#### Setting Up Periodic Test Runs
+
+**Using cron (host system):**
+
+Create a cron job to run tests periodically:
+
+```bash
+# Edit crontab
+crontab -e
+
+# Run all integration tests daily at 2 AM
+0 2 * * * curl -X POST http://localhost:8082/tests/run > /tmp/integration-test-cron.log 2>&1
+
+# Run specific test file every 6 hours
+0 */6 * * * curl -X POST "http://localhost:8082/tests/run?test_path=tests/integration/test_voice_message_integration.py" > /tmp/integration-test-cron.log 2>&1
+
+# Run tests and send results via email on failure
+0 2 * * * RUN_ID=$(curl -s -X POST http://localhost:8082/tests/run | jq -r '.run_id') && sleep 300 && STATUS=$(curl -s http://localhost:8082/tests/status/$RUN_ID | jq -r '.status') && if [ "$STATUS" = "failed" ]; then curl -s http://localhost:8082/tests/results/$RUN_ID | mail -s "Integration Test Failed" admin@example.com; fi
+```
+
+**Using systemd timer (host system):**
+
+Create a systemd service and timer:
+
+```ini
+# /etc/systemd/system/june-integration-test.service
+[Unit]
+Description=June Integration Test Run
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/curl -X POST http://localhost:8082/tests/run
+StandardOutput=journal
+StandardError=journal
+```
+
+```ini
+# /etc/systemd/system/june-integration-test.timer
+[Unit]
+Description=Run June Integration Tests Daily
+Requires=june-integration-test.service
+
+[Timer]
+OnCalendar=daily
+OnCalendar=02:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+Enable and start the timer:
+
+```bash
+sudo systemctl enable june-integration-test.timer
+sudo systemctl start june-integration-test.timer
+sudo systemctl status june-integration-test.timer
+```
+
+**Using Docker container with cron:**
+
+Create a simple cron container that triggers test runs:
+
+```dockerfile
+# Dockerfile for test scheduler
+FROM curlimages/curl:latest
+
+# Install cron
+RUN apk add --no-cache dcron
+
+# Copy cron script
+COPY test-scheduler.sh /test-scheduler.sh
+RUN chmod +x /test-scheduler.sh
+
+# Add cron job
+RUN echo "0 2 * * * /test-scheduler.sh" | crontab -
+
+CMD ["crond", "-f"]
+```
+
+```bash
+#!/bin/sh
+# test-scheduler.sh
+curl -X POST http://integration-test:8082/tests/run
+```
+
+**Using Python script with schedule library:**
+
+Create a Python script for periodic test runs:
+
+```python
+#!/usr/bin/env python3
+"""Periodic integration test runner."""
+import schedule
+import time
+import requests
+import logging
+
+BASE_URL = "http://localhost:8082"
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def run_integration_tests():
+    """Trigger integration test run."""
+    try:
+        response = requests.post(f"{BASE_URL}/tests/run", timeout=10)
+        response.raise_for_status()
+        run_id = response.json()["run_id"]
+        logger.info(f"Test run started: {run_id}")
+        return run_id
+    except Exception as e:
+        logger.error(f"Failed to start test run: {e}")
+        return None
+
+# Schedule test runs
+schedule.every().day.at("02:00").do(run_integration_tests)
+schedule.every(6).hours.do(run_integration_tests)
+
+# Run scheduler
+logger.info("Test scheduler started")
+while True:
+    schedule.run_pending()
+    time.sleep(60)
+```
+
+Run the scheduler:
+
+```bash
+# Install schedule library
+poetry add schedule
+
+# Run scheduler
+poetry run python test-scheduler.py
+```
+
+**Using Docker Compose with healthcheck-based triggers:**
+
+You can use external monitoring tools (like Prometheus Alertmanager) to trigger test runs based on service health or schedules.
+
+**Best Practices for Periodic Test Runs:**
+
+1. **Start with daily runs:** Run tests once per day during off-peak hours
+2. **Monitor test results:** Set up alerts for test failures
+3. **Log test runs:** Keep history of test runs and results
+4. **Use test service API:** Always use the REST API, not direct pytest calls
+5. **Check service availability:** Ensure integration test service is running before scheduling
+6. **Handle failures gracefully:** Don't let test failures break the scheduler
+7. **Review test history:** Regularly review test run history via `/tests/runs` endpoint
+
+**Example: Complete periodic test setup script:**
+
+```bash
+#!/bin/bash
+# run-periodic-tests.sh
+
+INTEGRATION_TEST_URL="http://localhost:8082"
+
+# Check if service is available
+if ! curl -f -s "${INTEGRATION_TEST_URL}/health" > /dev/null; then
+    echo "ERROR: Integration test service is not available"
+    exit 1
+fi
+
+# Start test run
+RUN_ID=$(curl -s -X POST "${INTEGRATION_TEST_URL}/tests/run" | jq -r '.run_id')
+
+if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+    echo "ERROR: Failed to start test run"
+    exit 1
+fi
+
+echo "Test run started: $RUN_ID"
+
+# Wait for completion (with timeout)
+TIMEOUT=3600  # 1 hour
+ELAPSED=0
+while [ $ELAPSED -lt $TIMEOUT ]; do
+    STATUS=$(curl -s "${INTEGRATION_TEST_URL}/tests/status/${RUN_ID}" | jq -r '.status')
+    
+    if [ "$STATUS" != "pending" ] && [ "$STATUS" != "running" ]; then
+        break
+    fi
+    
+    sleep 30
+    ELAPSED=$((ELAPSED + 30))
+done
+
+# Get results
+RESULTS=$(curl -s "${INTEGRATION_TEST_URL}/tests/results/${RUN_ID}")
+EXIT_CODE=$(echo "$RESULTS" | jq -r '.exit_code')
+STATUS=$(echo "$RESULTS" | jq -r '.status')
+
+echo "Test run completed: status=$STATUS, exit_code=$EXIT_CODE"
+
+# Exit with test exit code
+exit $EXIT_CODE
+```
+
+Make it executable and add to cron:
+
+```bash
+chmod +x run-periodic-tests.sh
+
+# Add to crontab
+crontab -e
+# Add: 0 2 * * * /path/to/run-periodic-tests.sh >> /var/log/june/periodic-tests.log 2>&1
+```
+
 ## Test Structure
 
 ```

@@ -137,11 +137,11 @@ Pare down the june project to bare essentials for the **voice message → STT �
    - ⏳ Integration with existing monitoring (Prometheus/Grafana)
 
 3. **Workflow documentation:**
-   - ⏳ How to start integration test service
-   - ⏳ How to trigger test runs
-   - ⏳ How to check test results via REST API
-   - ⏳ How to view test logs
-   - ⏳ How to set up periodic test runs
+   - ✅ How to start integration test service (COMPLETED - documented in docs/guides/TESTING.md with command usage, environment variables, and service endpoints)
+   - ✅ How to trigger test runs (COMPLETED - documented in docs/guides/TESTING.md with REST API examples and usage workflows)
+   - ✅ How to check test results via REST API (COMPLETED - documented in docs/guides/TESTING.md with complete REST API reference including status, results, and logs endpoints)
+   - ✅ How to view test logs (COMPLETED - documented in docs/guides/TESTING.md with GET /tests/logs endpoint and usage examples)
+   - ✅ How to set up periodic test runs (COMPLETED - added comprehensive documentation to docs/guides/TESTING.md with examples for cron, systemd timers, Docker containers, Python scripts, and best practices)
 
 ## Essential Services
 
