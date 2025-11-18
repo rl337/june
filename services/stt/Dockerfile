@@ -5,6 +5,7 @@ WORKDIR /app
 ENV PYTHONPATH="/app:/app/shared"
 
 # Copy poetry configuration files
+USER root
 COPY pyproject.toml poetry.lock ./
 
 # Copy essence package (if needed)

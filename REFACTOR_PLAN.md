@@ -499,14 +499,22 @@ This phase focuses on refactoring individual services, building them, testing th
      - ✅ inference-api service: Uses `python -m essence inference-api` (updated from `main.py`)
      - ✅ All Dockerfiles copy essence package and install dependencies correctly
      - ✅ Health checks configured in all Dockerfiles
-   - ⏳ **Remaining build tasks (require docker compose):**
-     - ⏳ Build telegram service: `docker compose build telegram`
-     - ⏳ Build discord service: `docker compose build discord`
-     - ⏳ Build stt service: `docker compose build stt`
-     - ⏳ Build tts service: `docker compose build tts`
-     - ⏳ Build inference-api service: `docker compose build inference-api`
-     - ⏳ Verify no missing dependencies during build
-     - ⏳ Verify services start without errors
+   - ✅ **COMPLETED: Build services with docker compose:**
+     - ✅ Updated poetry.lock file to match pyproject.toml (required for builds)
+     - ✅ Fixed STT Dockerfile to run poetry install as root user (permission issue)
+     - ✅ Built base image: `docker compose build base` - SUCCESS
+     - ✅ Built telegram service: `docker compose build telegram` - SUCCESS
+     - ✅ Built discord service: `docker compose build discord` - SUCCESS
+     - ✅ Built stt service: `docker compose build stt` - SUCCESS (fixed USER root issue)
+     - ✅ Built inference-api service: `docker compose build inference-api` - SUCCESS
+     - ✅ **COMPLETED:** Fixed TTS service build by installing Rust compiler
+       - Added Rust installation to TTS Dockerfile (required for sudachipy dependency)
+       - TTS build now succeeds: `docker compose build tts` - SUCCESS
+       - Note: There are numpy version warnings (numpy 2.2.6 vs required 1.22.0), but build completes
+       - All 5 essential services now build successfully
+     - ⏳ **Remaining verification tasks:**
+       - ⏳ Verify services start without errors (requires running services)
+       - ⏳ Test service health endpoints (requires running services)
 
 2. **Verify service health:**
    - ✅ **COMPLETED:** Each service should expose `/health` endpoint

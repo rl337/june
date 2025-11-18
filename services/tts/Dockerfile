@@ -11,7 +11,13 @@ RUN apt-get update && apt-get install -y \
     espeak-data \
     libespeak1 \
     libespeak-dev \
+    curl \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Rust compiler (required for sudachipy dependency in TTS package)
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+    . $HOME/.cargo/env && \
+    rustc --version
 
 # Copy poetry configuration files
 COPY pyproject.toml poetry.lock ./
@@ -24,7 +30,9 @@ COPY essence ./essence
 # Then install TTS separately with compatible numpy
 ENV POETRY_VIRTUALENVS_CREATE=false
 ENV POETRY_VIRTUALENVS_IN_PROJECT=false
-RUN poetry install --no-interaction --no-ansi --only main --no-root && \
+# Source Rust environment for TTS package build
+RUN . $HOME/.cargo/env && \
+    poetry install --no-interaction --no-ansi --only main --no-root && \
     pip install "numpy==1.22.0" "TTS>=0.20.0,<0.23.0"
 
 # Install inference-core package in editable mode from source
