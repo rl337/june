@@ -243,6 +243,26 @@ Pare down the june project to bare essentials for the **voice message → STT �
 
 ## Known Issues
 
+### Test Infrastructure Issues
+
+**Status:** ⏳ TODO - Test infrastructure needs cleanup
+
+**Issue:** Many tests in `tests/services/`, `tests/integration/`, and `tests/scripts/` have import errors due to missing dependencies (`grpc`, `june_grpc_api`, etc.). These tests cannot be collected or run directly via pytest.
+
+**Current State:**
+- ✅ `tests/essence/` tests (100 tests) - All passing
+- ❌ `tests/integration/` tests (4 tests) - Import errors (should run via integration test service, not pytest)
+- ❌ `tests/services/` tests (20+ tests) - Import errors (may be outdated after service refactoring)
+- ❌ `tests/scripts/` tests (6 tests) - Import errors (may need dependencies or updates)
+
+**Solution:**
+- ✅ Updated pytest configuration to skip integration tests by default (they should run via integration test service)
+- ⏳ TODO: Review and update/remove outdated service tests that reference removed services
+- ⏳ TODO: Fix or remove script tests that have missing dependencies
+- ⏳ TODO: Ensure all unit tests in `tests/essence/` continue to pass
+
+**Note:** Integration tests should be run via the integration test service (see Phase 12-13), not directly via pytest. The pytest configuration now skips integration tests by default.
+
 ### Pre-existing Test Failures
 
 **Status:** ✅ COMPLETED - All tests now passing
