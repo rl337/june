@@ -1,6 +1,16 @@
 #!/bin/bash
 # Test Orchestration Script with Artifact Collection
 # Spins up fresh containers, runs tests, collects artifacts, then shuts down
+#
+# ⚠️ **OBSOLETE:** This script is obsolete in its current form because it references
+# the gateway service, which has been removed as part of the refactoring. The gateway
+# service was removed to achieve a minimal architecture with direct gRPC communication
+# between services.
+#
+# **Status:** This script is kept for reference but is not functional in its current
+# form. It starts the gateway container, runs gateway-specific tests, and collects
+# gateway artifacts. The script could potentially be updated to orchestrate tests
+# for the remaining services (telegram, discord, stt, tts, inference-api) if needed.
 
 set -e
 

@@ -1,5 +1,16 @@
 #!/bin/bash
 # Comprehensive diagnostic script for test artifact failures
+#
+# ⚠️ **OBSOLETE:** This script is obsolete in its current form because it references
+# the gateway service, which has been removed as part of the refactoring. The gateway
+# service was removed to achieve a minimal architecture with direct gRPC communication
+# between services.
+#
+# **Status:** This script is kept for reference but is not functional in its current
+# form. It checks for gateway container, tests gateway connectivity, and references
+# gateway-specific test scripts that no longer exist. The script could potentially
+# be updated to diagnose test failures for the remaining services (telegram, discord,
+# stt, tts, inference-api) if needed.
 
 set -e
 
