@@ -12,6 +12,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+import grpc
 
 from essence.command import Command
 
@@ -136,7 +137,12 @@ class CodingAgentCommand(Command):
             sys.exit(1)
     
     def _execute_task(self, task: str) -> None:
-        """Execute a single coding task."""
+        """
+        Execute a single coding task.
+        
+        Args:
+            task: The coding task description to execute
+        """
         logger.info(f"Executing task: {task}")
         print(f"\n📝 Task: {task}\n")
         print("🤖 Agent response:\n")
@@ -150,9 +156,20 @@ class CodingAgentCommand(Command):
             
             print("\n\n✅ Task completed")
             
+        except grpc.RpcError as e:
+            logger.error(f"gRPC error executing task: {e}", exc_info=True)
+            print(f"\n❌ gRPC Error: {e.code()} - {e.details()}")
+            print("💡 Tip: Check that the inference-api service is running and accessible")
+            sys.exit(1)
+        except ConnectionError as e:
+            logger.error(f"Connection error executing task: {e}", exc_info=True)
+            print(f"\n❌ Connection Error: {e}")
+            print(f"💡 Tip: Verify that inference-api is running at {self.args.inference_api_url}")
+            sys.exit(1)
         except Exception as e:
             logger.error(f"Error executing task: {e}", exc_info=True)
             print(f"\n❌ Error: {e}")
+            print("💡 Tip: Use 'help' to see available commands or check logs for details")
             sys.exit(1)
     
     def _run_interactive(self) -> None:
@@ -197,10 +214,18 @@ class CodingAgentCommand(Command):
                         print(chunk, end="", flush=True)
                         response_text += chunk
                     print("\n")
+                except grpc.RpcError as e:
+                    logger.error(f"gRPC error executing task: {e}", exc_info=True)
+                    print(f"\n❌ gRPC Error: {e.code()} - {e.details()}")
+                    print("💡 Tip: Check that the inference-api service is running and accessible")
+                except ConnectionError as e:
+                    logger.error(f"Connection error executing task: {e}", exc_info=True)
+                    print(f"\n❌ Connection Error: {e}")
+                    print(f"💡 Tip: Verify that inference-api is running at {self.args.inference_api_url}")
                 except Exception as e:
                     logger.error(f"Error executing task: {e}", exc_info=True)
                     print(f"\n❌ Error: {e}")
-                    print("💡 Tip: Use 'help' to see available commands")
+                    print("💡 Tip: Use 'help' to see available commands or check logs for details")
         
         except KeyboardInterrupt:
             print("\n\n👋 Interrupted by user")
