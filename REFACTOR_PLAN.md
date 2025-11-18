@@ -104,9 +104,9 @@ Pare down the june project to bare essentials for the **voice message → STT �
    - ⏳ `test_artifact_collection.sh` → `tests/scripts/` (if needed, or convert to pytest)
 
 4. **Remove obsolete scripts:**
-   - ⏳ Scripts referencing removed services
-   - ⏳ Duplicate functionality
-   - ⏳ Scripts superseded by commands
+   - ✅ Scripts referencing removed services (COMPLETED - removed validate_gateway.sh, test_round_trip_gateway.py, optimize_database_queries.py, encrypt_existing_data.py)
+   - ✅ Duplicate functionality (COMPLETED - removed profile_performance.py, duplicate of benchmark_qwen3_performance.py)
+   - ⏳ Scripts superseded by commands (review_sandbox.py, monitor_gpu.py, verify_qwen3_quantization.py, download_models.py, benchmark_qwen3_performance.py can be removed from scripts/ after verification)
 
 5. **Update documentation:**
    - ⏳ Document scripts/ directory purpose and guidelines

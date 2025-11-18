@@ -10,8 +10,12 @@
 #
 # Usage:
 #   ./scripts/refactor_agent_loop.sh
+#   AGENT_TIMEOUT_SECONDS=3600 ./scripts/refactor_agent_loop.sh  # 1 hour timeout
 #
 # The script will run forever, sleeping 60 seconds between each agent invocation.
+# Each agent iteration has a timeout (default: 30 minutes) to prevent stuck processes.
+# Long operations (model downloads, builds, etc.) must be run in background.
+# The timeout can be configured via AGENT_TIMEOUT_SECONDS environment variable.
 
 set -euo pipefail
 
@@ -28,6 +32,12 @@ LOG_FILE="${PROJECT_ROOT}/refactor_agent_loop.log"
 
 # Session ID file to persist session across iterations
 SESSION_ID_FILE="${PROJECT_ROOT}/.refactor_agent_session_id"
+
+# Timeout for each agent iteration (in seconds)
+# Default: 30 minutes (1800 seconds) - prevents stuck processes
+# Long operations (model downloads, builds, etc.) must be run in background
+# Can be overridden via AGENT_TIMEOUT_SECONDS environment variable
+AGENT_TIMEOUT_SECONDS="${AGENT_TIMEOUT_SECONDS:-1800}"
 
 # Function to log with timestamp
 log() {
@@ -146,6 +156,24 @@ You are working on refactoring the june project. Your task is to:
    Add these to REFACTOR_PLAN.md in the appropriate section so the next iteration can understand and act on them.
 
 **Important Guidelines:**
+- **CRITICAL - 30 MINUTE TIMEOUT:** Each iteration has a 30-minute timeout. If an operation takes longer than 30 minutes, it will be terminated. 
+  - **Use timeouts for individual commands:** Always use the `timeout` command for operations that might hang (tests, network operations, etc.):
+    - Tests: `timeout 600 pytest tests/...` (10 minutes for test suites)
+    - Docker operations: `timeout 1800 docker compose build` (30 minutes for builds)
+    - Network requests: `timeout 60 curl ...` (1 minute for HTTP requests)
+    - Any command that might hang: `timeout <seconds> <command>`
+    - If a command times out, investigate why it hung and fix the issue
+  - **For operations that legitimately take longer than 30 minutes**, you MUST run them in the background:
+    - **Primary method:** Use `nohup` and `&` to run commands in background: `nohup command > output.log 2>&1 &`
+    - For Docker operations: `nohup docker compose build > build.log 2>&1 &` or `docker compose build &` (if you don't need output)
+    - For long-running scripts: `nohup python script.py > script.log 2>&1 &`
+    - Check background job status: `ps aux | grep <command>` or check log files (e.g., `tail -f output.log`)
+    - Check if a process is still running: `pgrep -f "<command_pattern>"` or `ps aux | grep <pattern>`
+    - **Important:** Document in REFACTOR_PLAN.md that a long operation is running in background, including:
+      - The command that was started
+      - The log file where output is being written
+      - How to check if it completed (e.g., "check build.log for completion" or "check if docker compose build process is still running")
+    - In the next iteration, check if the background operation completed before proceeding with dependent tasks
 - Work on ONE task per iteration (don't try to do everything at once)
 - Be thorough but focused
 - Update the plan immediately after completing work
@@ -295,17 +323,33 @@ main() {
         
         # Run cursor-agent with the prompt
         log "Invoking cursor-agent with args: ${CURSOR_AGENT_ARGS[*]}"
+        log "Timeout set to ${AGENT_TIMEOUT_SECONDS} seconds ($(($AGENT_TIMEOUT_SECONDS / 60)) minutes)"
         
-        # Run cursor-agent, capturing output to both temp file and log, while also showing on stdout
+        # Record start time for timeout tracking
+        ITERATION_START_TIME=$(date +%s)
+        
+        # Run cursor-agent with timeout, capturing output to both temp file and log, while also showing on stdout
         # Use unbuffered output so we can see progress in real-time
-        if echo "$PROMPT" | "$CURSOR_AGENT_CMD" "${CURSOR_AGENT_ARGS[@]}" 2>&1 | tee "$TEMP_OUTPUT" | tee -a "$LOG_FILE"; then
+        # timeout exit code 124 means the command was terminated due to timeout
+        if echo "$PROMPT" | timeout "$AGENT_TIMEOUT_SECONDS" "$CURSOR_AGENT_CMD" "${CURSOR_AGENT_ARGS[@]}" 2>&1 | tee "$TEMP_OUTPUT" | tee -a "$LOG_FILE"; then
             # Success - reset error count
             reset_error_count
             log "Iteration $ITERATION completed successfully"
         else
             EXIT_CODE=$?
-            ERROR_COUNT=$(increment_error_count)
-            log "WARNING: Iteration $ITERATION encountered an error (exit code: $EXIT_CODE) - consecutive error count: $ERROR_COUNT"
+            ITERATION_END_TIME=$(date +%s)
+            ITERATION_DURATION=$((ITERATION_END_TIME - ITERATION_START_TIME))
+            
+            # Check if timeout occurred (exit code 124 from timeout command)
+            if [[ $EXIT_CODE -eq 124 ]]; then
+                log "ERROR: Iteration $ITERATION timed out after ${AGENT_TIMEOUT_SECONDS} seconds ($(($AGENT_TIMEOUT_SECONDS / 60)) minutes)"
+                log "Long operations (model downloads, builds, etc.) must be run in background. See agent prompt for instructions."
+                # Timeout is treated as an error for error counting
+                ERROR_COUNT=$(increment_error_count)
+            else
+                ERROR_COUNT=$(increment_error_count)
+                log "WARNING: Iteration $ITERATION encountered an error (exit code: $EXIT_CODE) after ${ITERATION_DURATION} seconds - consecutive error count: $ERROR_COUNT"
+            fi
             
             # If we have 3 or more consecutive non-zero exit codes, create a new session
             if [[ $ERROR_COUNT -ge 3 ]]; then
