@@ -358,12 +358,11 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                 if span:
                     span.set_attribute("llm.chunk_count", chunk_count)
                     span.set_status(trace.Status(trace.StatusCode.OK))
-                    
-            except Exception as e:
-                logger.error(f"Chat stream error: {e}")
-                if span:
-                    span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
-                    span.record_exception(e)
+        except Exception as e:
+            logger.error(f"Chat stream error: {e}")
+            if span:
+                span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                span.record_exception(e)
                 error_chunk = ChatChunk(
                     content_delta="",
                     role="assistant",
@@ -444,15 +443,14 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                     tokens_per_second=tokens_per_second,
                     usage=usage_stats
                 )
-                
-            except Exception as e:
-                logger.error(f"Chat error: {e}")
-                if span:
-                    span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
-                    span.record_exception(e)
-                context.set_code(grpc.StatusCode.INTERNAL)
-                context.set_details(str(e))
-                return ChatResponse()
+        except Exception as e:
+            logger.error(f"Chat error: {e}")
+            if span:
+                span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                span.record_exception(e)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details(str(e))
+            return ChatResponse()
         finally:
             if span:
                 span.end()
