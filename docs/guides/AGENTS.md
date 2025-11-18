@@ -453,20 +453,20 @@ June Agent is a microservices-based interactive autonomous agent system optimize
   - `/home/rlee/models/tts/` - TTS models
 
 ### Authorized Model Download
-**ONLY** use `scripts/download_models.py` for model downloads:
+**ONLY** use `poetry run -m essence download-models` for model downloads:
 
 ```bash
 # Download all required models
-python scripts/download_models.py --all
+poetry run -m essence download-models --all
 
 # Download specific model
-python scripts/download_models.py --model Qwen/Qwen3-30B-A3B-Thinking-2507
+poetry run -m essence download-models --model Qwen/Qwen3-30B-A3B-Thinking-2507
 
 # Check cache status
-python scripts/download_models.py --status
+poetry run -m essence download-models --status
 
 # List authorized models
-python scripts/download_models.py --list
+poetry run -m essence download-models --list
 ```
 
 ### Runtime Model Loading
@@ -578,7 +578,7 @@ TEST_LIMIT=5 ./scripts/run_tests_with_artifacts.sh
 - **Access:** `docker exec -it june-cli-tools bash`
 
 **Available Tools:**
-- Model download script (`scripts/download_models.py`)
+- Model download command (`poetry run -m essence download-models`)
 - Development utilities (black, isort, flake8, mypy)
 - Testing tools (pytest, pytest-cov)
 - Audio processing (whisper, TTS, librosa)
@@ -1105,16 +1105,16 @@ docker exec -it june-cli-tools bash
 **Model Management:**
 ```bash
 # Download all models
-docker exec -it june-cli-tools python scripts/download_models.py --all
+docker exec -it june-cli-tools poetry run -m essence download-models --all
 
 # Download specific model
-docker exec -it june-cli-tools python scripts/download_models.py --model Qwen/Qwen3-30B-A3B-Thinking-2507
+docker exec -it june-cli-tools poetry run -m essence download-models --model Qwen/Qwen3-30B-A3B-Thinking-2507
 
 # Check model status
-docker exec -it june-cli-tools python scripts/download_models.py --status
+docker exec -it june-cli-tools poetry run -m essence download-models --status
 
 # List authorized models
-docker exec -it june-cli-tools python scripts/download_models.py --list
+docker exec -it june-cli-tools poetry run -m essence download-models --list
 ```
 
 **Development Tools:**
@@ -1146,9 +1146,9 @@ docker exec -it june-cli-tools pytest /app/scripts/
 5. **Update documentation**
 
 ### Adding New Models
-1. **Add to AUTHORIZED_MODELS** in `scripts/download_models.py`
-2. **Update download script** with new model category
-3. **Test model download** using the script
+1. **Add to AUTHORIZED_MODELS** in `essence/commands/download_models.py`
+2. **Update download command** with new model category
+3. **Test model download** using the command
 4. **Update service code** to use local cache only
 5. **Verify no internet access** during runtime
 6. **Update documentation** with new model info

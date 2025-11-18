@@ -47,16 +47,16 @@ python scripts/audio_test_suite.py --download
 ### Model Download
 ```bash
 # Download all required models
-python scripts/download_models.py --all
+poetry run -m essence download-models --all
 
 # Download specific model
-python scripts/download_models.py --model Qwen/Qwen3-30B-A3B-Thinking-2507
+poetry run -m essence download-models --model Qwen/Qwen3-30B-A3B-Thinking-2507
 
 # Check cache status
-python scripts/download_models.py --status
+poetry run -m essence download-models --status
 
 # List authorized models
-python scripts/download_models.py --list
+poetry run -m essence download-models --list
 ```
 
 ### Development

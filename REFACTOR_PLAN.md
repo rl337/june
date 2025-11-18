@@ -106,12 +106,12 @@ Pare down the june project to bare essentials for the **voice message → STT �
 4. **Remove obsolete scripts:**
    - ✅ Scripts referencing removed services (COMPLETED - removed validate_gateway.sh, test_round_trip_gateway.py, optimize_database_queries.py, encrypt_existing_data.py)
    - ✅ Duplicate functionality (COMPLETED - removed profile_performance.py, duplicate of benchmark_qwen3_performance.py)
-   - ⏳ Scripts superseded by commands (review_sandbox.py, monitor_gpu.py, verify_qwen3_quantization.py, download_models.py, benchmark_qwen3_performance.py can be removed from scripts/ after verification)
+   - ✅ Scripts superseded by commands (COMPLETED - removed review_sandbox.py, monitor_gpu.py, verify_qwen3_quantization.py, download_models.py, benchmark_qwen3_performance.py from scripts/ after verification; updated review_sandbox.sh to call command)
 
 5. **Update documentation:**
-   - ⏳ Document scripts/ directory purpose and guidelines
+   - ✅ Document scripts/ directory purpose and guidelines (COMPLETED - updated scripts/README.md)
    - ⏳ Document command pattern and how to add new commands
-   - ⏳ Update any references to moved scripts
+   - ✅ Update any references to moved scripts (COMPLETED - updated README.md, docs/guides/AGENTS.md, run_checks.sh, services/cli-tools/README.md, run_tests_with_artifacts.sh)
 
 ### Phase 12: Test Infrastructure and Integration Test Service ⏳ TODO
 

@@ -88,13 +88,13 @@ print_success "Model artifacts directories ready"
 MODEL_COUNT=$(find "$MODEL_CACHE_DIR" -name "*.bin" -o -name "*.safetensors" 2>/dev/null | wc -l)
 if [ "$MODEL_COUNT" -eq 0 ]; then
     print_warning "No models found in cache. Downloading models..."
-    if [ -f "scripts/download_models.py" ]; then
+    if command -v poetry &> /dev/null; then
         print_info "Running model download..."
-        python3 scripts/download_models.py --all || {
+        poetry run -m essence download-models --all || {
             print_warning "Model download had issues. Continuing anyway..."
         }
     else
-        print_warning "Model download script not found. Skipping model download."
+        print_warning "Poetry not found. Skipping model download."
     fi
 else
     print_success "Found $MODEL_COUNT model files in cache"

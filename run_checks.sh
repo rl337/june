@@ -483,19 +483,19 @@ check_model_cache() {
     
     if [ ! -d "$model_cache_dir" ]; then
         print_error "Model cache directory not found: $model_cache_dir"
-        print_info "Run: python scripts/download_models.py --all"
+        print_info "Run: poetry run -m essence download-models --all"
         return 1
     fi
     
     print_success "Model cache directory exists: $model_cache_dir"
     
-    # Check if download script exists
-    if [ -f "scripts/download_models.py" ]; then
-        print_success "Model download script is available"
+    # Check if download command is available
+    if command -v poetry &> /dev/null; then
+        print_success "Model download command is available"
         
-        # Check cache status using the script
+        # Check cache status using the command
         print_info "Checking model cache status..."
-        python scripts/download_models.py --status > /dev/null 2>&1
+        poetry run -m essence download-models --status > /dev/null 2>&1
         if [ $? -eq 0 ]; then
             print_success "Model cache status check passed"
         else

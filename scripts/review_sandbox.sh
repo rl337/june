@@ -18,11 +18,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Check if Python tool is available (preferred)
-PYTHON_TOOL="$SCRIPT_DIR/review_sandbox.py"
-if [[ -f "$PYTHON_TOOL" ]] && command -v python3 &> /dev/null; then
-    # Use Python tool for better JSON parsing and formatting
-    exec python3 "$PYTHON_TOOL" "$@"
+# Use the command (preferred)
+if command -v poetry &> /dev/null; then
+    # Use command for better JSON parsing and formatting
+    cd "$PROJECT_ROOT"
+    exec poetry run -m essence review-sandbox "$@"
 fi
 
 # Fallback to shell-based review
@@ -200,5 +200,5 @@ echo "Review complete. Sandbox data at: $SANDBOX_DIR"
 echo "=========================================="
 echo ""
 echo "For more detailed analysis, use:"
-echo "  python3 $PYTHON_TOOL \"$SANDBOX_DIR\""
+echo "  poetry run -m essence review-sandbox \"$SANDBOX_DIR\""
 
