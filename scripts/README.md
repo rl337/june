@@ -35,6 +35,7 @@ Reusable tools have been migrated to commands. Use these instead of scripts:
 - **`poetry run -m essence verify-qwen3`** - Verify Qwen3 quantization (replaces `scripts/verify_qwen3_quantization.py`)
 - **`poetry run -m essence benchmark-qwen3`** - Benchmark Qwen3 performance (replaces `scripts/benchmark_qwen3_performance.py`)
 - **`poetry run -m essence run-benchmarks`** - Run benchmark evaluations with sandboxed execution (replaces `scripts/run_benchmarks.py`)
+- **`poetry run -m essence generate-alice-dataset`** - Generate Alice's Adventures in Wonderland dataset (replaces `scripts/generate_alice_dataset.py`)
 
 ## Remaining Scripts
 
@@ -55,7 +56,7 @@ Reusable tools have been migrated to commands. Use these instead of scripts:
 - `test_artifact_collection.sh` - Should be moved to `tests/scripts/` or converted to pytest
 
 ### Dataset/Data Scripts
-- `generate_alice_dataset.py` - Dataset generation (may stay as script or become command)
+- All dataset generation tools have been converted to commands (see Available Commands above)
 
 ## Guidelines
 

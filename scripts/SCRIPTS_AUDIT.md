@@ -62,12 +62,13 @@ These are reusable Python tools that should be converted to commands:
    - **Status:** ✅ COMPLETED
    - **Note:** ✅ Enhanced download-models command to support container paths via MODEL_CACHE_DIR env var, added HUGGINGFACE_TOKEN support, added model existence check
 
-2. **`generate_alice_dataset.py`** 🔄 CONVERT TO COMMAND
+2. **`generate_alice_dataset.py`** ✅ CONVERTED TO COMMAND
    - **Purpose:** Generate Alice's Adventures in Wonderland dataset for audio testing
-   - **Action:** Create `essence/commands/generate_dataset.py` or `essence/commands/generate_alice_dataset.py`
+   - **Action:** ✅ Created `essence/commands/generate_alice_dataset.py` (command name: `generate-alice-dataset`)
    - **Reason:** Reusable tool for dataset generation
    - **Priority:** Low (used for testing)
-   - **Status:** ⏳ TODO
+   - **Status:** ✅ COMPLETED
+   - **Note:** ✅ Updated references in run_checks.sh, run_tests_with_artifacts.sh, and test scripts
 
 3. **`run_benchmarks.py`** ✅ CONVERTED TO COMMAND
    - **Purpose:** Orchestrate benchmark evaluation with sandboxed execution
@@ -148,25 +149,27 @@ These scripts are obsolete and should be removed:
 
 **Current State:**
 - **Keep as Scripts:** 7 scripts (all infrastructure/automation)
-- **Convert to Commands:** 3 Python scripts
+- **Convert to Commands:** ✅ All Python tools converted (3 completed: run_benchmarks, download_qwen3 merged, generate_alice_dataset)
 - **Move to Tests:** 4 scripts (test utilities)
 - **Remove:** 2 scripts (obsolete build scripts)
 
 **Total Remaining Tasks:**
-- 3 conversions to commands
+- ✅ All conversions to commands completed
 - 4 moves to tests
 - 2 removals
 
 ## Conversion Priority
 
-1. **High Priority:**
-   - `run_benchmarks.py` → Command (actively used)
+1. **✅ High Priority - COMPLETED:**
+   - ✅ `run_benchmarks.py` → Command (actively used)
 
-2. **Medium Priority:**
-   - `download_qwen3.py` → Merge into download-models command or separate command
+2. **✅ Medium Priority - COMPLETED:**
+   - ✅ `download_qwen3.py` → Merged into download-models command
 
-3. **Low Priority:**
-   - `generate_alice_dataset.py` → Command (used for testing)
+3. **✅ Low Priority - COMPLETED:**
+   - ✅ `generate_alice_dataset.py` → Command (used for testing)
+
+**All command conversions completed!** Remaining tasks:
    - Test utilities migration
    - Obsolete script removal
 

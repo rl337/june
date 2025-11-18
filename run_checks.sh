@@ -363,7 +363,7 @@ check_gateway_round_trip() {
     if [ ! -f "$dataset_file" ]; then
         print_warning "Alice dataset not found. Generating dataset..."
         if command -v python3 &> /dev/null; then
-            if python3 scripts/generate_alice_dataset.py 2>/dev/null; then
+            if poetry run -m essence generate-alice-dataset 2>/dev/null; then
                 print_success "Alice dataset generated"
             else
                 print_warning "Failed to generate dataset. Skipping Gateway round-trip test."

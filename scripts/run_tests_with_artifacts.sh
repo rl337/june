@@ -186,7 +186,7 @@ export JUNE_DATA_DIR="$JUNE_DATA_DIR"
 if [ ! -f "${JUNE_DATA_DIR}/datasets/alice_in_wonderland/alice_dataset.json" ]; then
     print_info "Generating Alice dataset..."
     if sg docker -c "docker ps --format '{{.Names}}'" | grep -q "^june-cli-tools$"; then
-        sg docker -c "docker exec -e JUNE_DATA_DIR=/data june-cli-tools python /app/root_scripts/generate_alice_dataset.py" || {
+        sg docker -c "docker exec -e JUNE_DATA_DIR=/data june-cli-tools poetry run -m essence generate-alice-dataset" || {
             print_error "Failed to generate dataset"
             exit 1
         }
