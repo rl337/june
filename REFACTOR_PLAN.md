@@ -325,7 +325,7 @@ All code changes, cleanup, and refactoring tasks have been completed:
 **Completed Cleanup Tasks:**
 - ✅ **COMPLETED:** Removed leftover gateway references from essence module (essence/gateway/, essence/README.md, essence/__init__.py, essence/pyproject.toml)
 - ✅ **COMPLETED:** Archived gateway API documentation (docs/API/gateway.md → gateway.md.obsolete)
-- ✅ **COMPLETED:** Updated docs/README.md to remove gateway API references
+- ✅ **COMPLETED:** Updated docs/README.md to remove gateway API references (removed "Gateway API guide" and "webapp guide", added "Discord bot guide")
 - ✅ **COMPLETED:** Removed obsolete backup file (REFACTOR_PLAN.md.20251118)
 - ✅ **COMPLETED:** Marked `test_e2e_text_passthrough.py` as obsolete (depends on removed gateway service, kept for reference only)
 - ✅ **COMPLETED:** Marked `test_pipeline_modes.py` as obsolete (depends on removed gateway service, imports non-existent `test_round_trip_gateway` module, kept for reference only)

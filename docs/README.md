@@ -7,7 +7,7 @@ Welcome to the comprehensive documentation for June Agent, an interactive autono
 This documentation is organized by audience and purpose to help you find what you need quickly.
 
 ### For Users
-- **[User Guide](guides/USER_GUIDE.md)** - Getting started, webapp guide, Telegram bot guide, Gateway API guide, configuration guide, and feature documentation
+- **[User Guide](guides/USER_GUIDE.md)** - Getting started, Telegram bot guide, Discord bot guide, configuration guide, and feature documentation
 - **[Troubleshooting Guide](guides/TROUBLESHOOTING.md)** - Common issues, service-specific troubleshooting, error reference, performance issues, and debugging procedures
 
 ### For Developers
