@@ -47,8 +47,6 @@ Reusable tools have been migrated to commands. Use these instead of scripts:
 - `run_benchmarks.sh` - Benchmark automation wrapper
 - `review_sandbox.sh` - Shell wrapper for review_sandbox command
 - `deploy_audio_services.sh` - Audio services deployment
-- `build_inference_core_wheel.sh` - Build script (may be obsolete)
-- `build_june_grpc_api_wheel.sh` - Build script (may be obsolete)
 
 ### Test Utilities (Should Move to tests/)
 - `test_*.py` files - Should be moved to `tests/scripts/` or converted to pytest

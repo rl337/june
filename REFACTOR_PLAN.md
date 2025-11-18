@@ -113,6 +113,7 @@ Pare down the june project to bare essentials for the **voice message → STT �
    - ✅ Scripts referencing removed services (COMPLETED - removed validate_gateway.sh, test_round_trip_gateway.py, optimize_database_queries.py, encrypt_existing_data.py)
    - ✅ Duplicate functionality (COMPLETED - removed profile_performance.py, duplicate of benchmark_qwen3_performance.py)
    - ✅ Scripts superseded by commands (COMPLETED - removed review_sandbox.py, monitor_gpu.py, verify_qwen3_quantization.py, download_models.py, benchmark_qwen3_performance.py from scripts/ after verification; updated review_sandbox.sh to call command)
+   - ✅ Obsolete build scripts (COMPLETED - removed build_inference_core_wheel.sh and build_june_grpc_api_wheel.sh after Poetry migration; updated run_all_checks.sh to remove wheel building step)
 
 5. **Update documentation:**
    - ✅ Document scripts/ directory purpose and guidelines (COMPLETED - updated scripts/README.md)

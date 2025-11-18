@@ -112,15 +112,16 @@ These are test utilities that should be moved to `tests/scripts/`:
 
 These scripts are obsolete and should be removed:
 
-1. **`build_inference_core_wheel.sh`** ❌ REMOVE
+1. **`build_inference_core_wheel.sh`** ✅ REMOVED
    - **Purpose:** Build inference-core wheel package
    - **Reason:** Obsolete after Poetry migration (no longer using wheel builds)
-   - **Status:** ⏳ TODO
+   - **Status:** ✅ COMPLETED
 
-2. **`build_june_grpc_api_wheel.sh`** ❌ REMOVE
+2. **`build_june_grpc_api_wheel.sh`** ✅ REMOVED
    - **Purpose:** Build june-grpc-api wheel package
    - **Reason:** Obsolete after Poetry migration (no longer using wheel builds)
-   - **Status:** ⏳ TODO
+   - **Status:** ✅ COMPLETED
+   - **Note:** ✅ Updated scripts/run_all_checks.sh to remove wheel building step
 
 ## Already Completed
 

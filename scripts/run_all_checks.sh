@@ -13,9 +13,8 @@ cp packages/june-grpc-api/dist/*.whl packages/inference-core/ 2>/dev/null || ech
 sg docker -c "docker build -t pkg-inference-core:latest packages/inference-core"
 rm -f packages/inference-core/*.whl 2>/dev/null || true
 
-echo "[3/3] Building wheels via scripts and verifying installation in cli-tools..."
-bash scripts/build_june_grpc_api_wheel.sh >/dev/null
-bash scripts/build_inference_core_wheel.sh >/dev/null
+echo "[3/3] Verifying installation in cli-tools..."
+# Note: Packages are now installed via Poetry (editable mode), no wheel builds needed
 sg docker -c "docker compose build cli-tools"
 sg docker -c "docker run --rm pkg-inference-core:latest python -c 'import inference_core; print(\"inference_core_ok\")'"
 sg docker -c "docker run --rm pkg-june-grpc-api:latest python -c 'import june_grpc_api; print(\"june_grpc_api_ok\")'"
