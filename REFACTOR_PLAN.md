@@ -90,6 +90,7 @@ Pare down the june project to bare essentials for the **voice message → STT �
 - ✅ Model loading with duplicate load prevention implemented
 - ✅ GPU-only loading for large models (30B+) with CPU fallback prevention
 - ✅ Coding agent implemented (`essence/agents/coding_agent.py`)
+- ✅ Coding agent command implemented (`essence/commands/coding_agent.py`) - CLI interface for interactive and single-task execution
 - ✅ Benchmark evaluator implemented (`essence/agents/evaluator.py`)
 - ✅ Sandbox isolation implemented (`essence/agents/sandbox.py`)
 - ✅ Verification tools implemented (`essence/commands/verify_qwen3.py`, `benchmark_qwen3.py`)
@@ -123,8 +124,14 @@ When ready to use the Qwen3 model and coding agent, follow these steps:
 
 4. **Test the coding agent:**
    ```bash
-   # Use the coding agent via Python
-   poetry run python -m essence coding-agent --help
+   # Use the coding agent command
+   poetry run -m essence coding-agent --help
+   
+   # Run a single task
+   poetry run -m essence coding-agent --task "Write a Python function to calculate factorial"
+   
+   # Run in interactive mode
+   poetry run -m essence coding-agent --interactive
    ```
 
 5. **Run benchmark evaluation:**
