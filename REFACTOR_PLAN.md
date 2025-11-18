@@ -92,8 +92,8 @@ Pare down the june project to bare essentials for the **voice message → STT �
 
 2. **Convert reusable tools to commands:**
    - ✅ `review_sandbox.py` → `essence/commands/review_sandbox.py` (COMPLETED - runnable via `poetry run -m essence review-sandbox`)
+   - ✅ `monitor_gpu.py` → `essence/commands/monitor_gpu.py` (COMPLETED - runnable via `poetry run -m essence monitor-gpu`)
    - ⏳ `download_models.py` → `essence/commands/download_models.py`
-   - ⏳ `monitor_gpu.py` → `essence/commands/monitor_gpu.py`
    - ⏳ `verify_qwen3_quantization.py` → `essence/commands/verify_qwen3.py`
    - ⏳ `benchmark_qwen3_performance.py` → `essence/commands/benchmark_qwen3.py`
    - ⏳ Any other reusable Python tools
