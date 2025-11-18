@@ -93,28 +93,7 @@ Pare down the june project to bare essentials for the **voice message → STT �
 
 **Goal:** Establish proper test infrastructure with unit tests (mocked) and integration tests (background service).
 
-**Unit Test Requirements:**
-- ⏳ All unit tests must mock external services and libraries
-- ⏳ All tests runnable via pytest
-- ⏳ No dependencies on running services for unit tests
-- ⏳ Fast execution (< 1 minute for full suite)
-
-**Integration Test Service:**
-- ⏳ Create integration test service that runs tests in background
-- ⏳ REST API for:
-  - Starting test runs
-  - Checking test run status
-  - Retrieving test results
-  - Viewing test logs
-- ⏳ Log aggregation for test runs
-- ⏳ Test run history and results storage
-- ⏳ Health check endpoint for test service status
-
-**Integration Test Requirements:**
-- ⏳ All integration tests run in background (not waited on)
-- ⏳ Tests check end-to-end functionality with real services
-- ⏳ Tests can be checked periodically via REST API or logs
-- ⏳ Test failures are logged and retrievable via API
+**Status:** All requirements met and tasks completed.
 
 **Tasks:**
 1. **Create integration test service:**
