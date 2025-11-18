@@ -1,6 +1,14 @@
 # TODO.md - Telegram Voice-to-Text-to-Voice Service
 
+> **⚠️ NOTE: This file is OUTDATED and kept for historical reference only.**
+> 
+> **All tasks listed in this file have been COMPLETED.** The Telegram bot service is fully implemented and operational.
+> 
+> **For current project status and tasks, see `REFACTOR_PLAN.md` which is the authoritative source.**
+
 This document tracks tasks required to implement a Telegram bot service that enables voice messages to be transcribed, processed by the LLM, and returned as voice responses.
+
+**Status:** ✅ **ALL TASKS COMPLETED** - The Telegram bot service is fully implemented with all features listed below.
 
 ## 🎯 Goal
 Create a Telegram bot that:
@@ -18,103 +26,103 @@ Create a Telegram bot that:
   - [x] Dockerfile for telegram service
   - [x] Requirements file (`requirements.txt`)
   - [x] Configuration management
-- [ ] Set up Telegram Bot API integration
-  - [ ] Install `python-telegram-bot` library
-  - [ ] Configure bot token from environment
-  - [ ] Implement basic command handlers (start, help, status)
-  - [ ] Add webhook or polling configuration
-- [ ] Add Telegram service to `docker-compose.yml`
-  - [ ] Define service configuration
-  - [ ] Set environment variables (TELEGRAM_BOT_TOKEN, etc.)
-  - [ ] Configure network connectivity to other services
-  - [ ] Add health check endpoint
+- [x] Set up Telegram Bot API integration
+  - [x] Install `python-telegram-bot` library
+  - [x] Configure bot token from environment
+  - [x] Implement basic command handlers (start, help, status)
+  - [x] Add webhook or polling configuration
+- [x] Add Telegram service to `docker-compose.yml`
+  - [x] Define service configuration
+  - [x] Set environment variables (TELEGRAM_BOT_TOKEN, etc.)
+  - [x] Configure network connectivity to other services
+  - [x] Add health check endpoint
 
 ### Phase 2: Voice Message Handling
-- [ ] Implement voice message reception
-  - [ ] Handle Telegram `Voice` message type
-  - [ ] Download voice file from Telegram
-  - [ ] Convert Telegram audio format (OGG) to WAV/PCM for STT
-  - [ ] Implement file size and duration limits
-- [ ] Integrate with STT service
-  - [ ] Create gRPC client for STT service
-  - [ ] Send audio to STT `Recognize` endpoint
-  - [ ] Handle STT errors and timeouts
-  - [ ] Extract transcribed text from STT response
-- [ ] Add audio format conversion utilities
-  - [ ] OGG to WAV conversion (using ffmpeg or pydub)
-  - [ ] Sample rate conversion (16kHz for Whisper)
-  - [ ] Mono channel conversion
-  - [ ] Audio validation (duration, size checks)
+- [x] Implement voice message reception
+  - [x] Handle Telegram `Voice` message type
+  - [x] Download voice file from Telegram
+  - [x] Convert Telegram audio format (OGG) to WAV/PCM for STT
+  - [x] Implement file size and duration limits
+- [x] Integrate with STT service
+  - [x] Create gRPC client for STT service
+  - [x] Send audio to STT `Recognize` endpoint
+  - [x] Handle STT errors and timeouts
+  - [x] Extract transcribed text from STT response
+- [x] Add audio format conversion utilities
+  - [x] OGG to WAV conversion (using ffmpeg or pydub)
+  - [x] Sample rate conversion (16kHz for Whisper)
+  - [x] Mono channel conversion
+  - [x] Audio validation (duration, size checks)
 
 ### Phase 3: LLM Integration
-- [ ] Integrate with Inference API service
-  - [ ] Create gRPC client for Inference API
-  - [ ] Send transcribed text to LLM `Chat` or `Generate` endpoint
-  - [ ] Handle streaming vs. one-shot generation
-  - [ ] Implement conversation context/history per user
-- [ ] Implement conversation management
-  - [ ] Store conversation history per user/chat
-  - [ ] Maintain context window limits
-  - [ ] Handle conversation resets (new command)
-  - [ ] Optional: Store conversations in PostgreSQL
+- [x] Integrate with Inference API service
+  - [x] Create gRPC client for Inference API
+  - [x] Send transcribed text to LLM `Chat` or `Generate` endpoint
+  - [x] Handle streaming vs. one-shot generation
+  - [x] Implement conversation context/history per user
+- [x] Implement conversation management
+  - [x] Store conversation history per user/chat
+  - [x] Maintain context window limits
+  - [x] Handle conversation resets (new command)
+  - [x] Optional: Store conversations in PostgreSQL (using in-memory storage instead)
 
 ### Phase 4: TTS Integration
-- [ ] Integrate with TTS service
-  - [ ] Create gRPC client for TTS service
-  - [ ] Send LLM response text to TTS `Synthesize` endpoint
-  - [ ] Handle TTS errors and timeouts
-  - [ ] Receive audio bytes from TTS response
-- [ ] Implement audio format conversion for Telegram
-  - [ ] Convert PCM/WAV to OGG/OPUS (Telegram's preferred format)
-  - [ ] Optimize audio quality and file size
-  - [ ] Handle audio duration limits (Telegram max ~1 minute)
-  - [ ] Compress audio if needed
+- [x] Integrate with TTS service
+  - [x] Create gRPC client for TTS service
+  - [x] Send LLM response text to TTS `Synthesize` endpoint
+  - [x] Handle TTS errors and timeouts
+  - [x] Receive audio bytes from TTS response
+- [x] Implement audio format conversion for Telegram
+  - [x] Convert PCM/WAV to OGG/OPUS (Telegram's preferred format)
+  - [x] Optimize audio quality and file size
+  - [x] Handle audio duration limits (Telegram max ~1 minute)
+  - [x] Compress audio if needed
 
 ### Phase 5: Response Delivery
-- [ ] Send voice response to Telegram
-  - [ ] Upload audio file to Telegram as voice message
-  - [ ] Handle Telegram API rate limits
-  - [ ] Implement retry logic for failed sends
-  - [ ] Provide user feedback (typing indicators, status messages)
-- [ ] Add error handling and user feedback
-  - [ ] Error messages for transcription failures
-  - [ ] Error messages for LLM failures
-  - [ ] Error messages for TTS failures
-  - [ ] Error messages for Telegram API failures
-  - [ ] Progress indicators (e.g., "Transcribing...", "Processing...")
+- [x] Send voice response to Telegram
+  - [x] Upload audio file to Telegram as voice message
+  - [x] Handle Telegram API rate limits
+  - [x] Implement retry logic for failed sends
+  - [x] Provide user feedback (typing indicators, status messages)
+- [x] Add error handling and user feedback
+  - [x] Error messages for transcription failures
+  - [x] Error messages for LLM failures
+  - [x] Error messages for TTS failures
+  - [x] Error messages for Telegram API failures
+  - [x] Progress indicators (e.g., "Transcribing...", "Processing...")
 
 ### Phase 6: Testing & Validation
-- [ ] Create unit tests for Telegram bot
-  - [ ] Mock Telegram API calls
-  - [ ] Mock STT/TTS/LLM service calls
-  - [ ] Test audio format conversions
-  - [ ] Test error handling paths
-- [ ] Create integration tests
-  - [ ] End-to-end voice message flow
-  - [ ] Test with real services (STT, TTS, Inference API)
-  - [ ] Test error scenarios
-  - [ ] Test concurrent requests
-- [ ] Add validation test suite
-  - [ ] Test voice message round-trip accuracy
-  - [ ] Test response quality and latency
-  - [ ] Test with various audio qualities and lengths
+- [x] Create unit tests for Telegram bot
+  - [x] Mock Telegram API calls
+  - [x] Mock STT/TTS/LLM service calls
+  - [x] Test audio format conversions
+  - [x] Test error handling paths
+- [x] Create integration tests
+  - [x] End-to-end voice message flow
+  - [x] Test with real services (STT, TTS, Inference API)
+  - [x] Test error scenarios
+  - [x] Test concurrent requests
+- [x] Add validation test suite
+  - [x] Test voice message round-trip accuracy
+  - [x] Test response quality and latency
+  - [x] Test with various audio qualities and lengths
 
 ### Phase 7: Deployment & Monitoring
-- [ ] Add monitoring and logging
-  - [ ] Prometheus metrics (requests, latencies, errors)
-  - [ ] Structured logging for debugging
-  - [ ] Health check endpoint
-  - [ ] Request tracing
-- [ ] Configure production settings
-  - [ ] Webhook setup for production (vs. polling for dev)
-  - [ ] Rate limiting per user
-  - [ ] Resource limits (memory, CPU)
-  - [ ] Graceful shutdown handling
-- [ ] Documentation
-  - [ ] Update README.md with Telegram bot setup
-  - [ ] Document environment variables
-  - [ ] Add usage examples
-  - [ ] Troubleshooting guide
+- [x] Add monitoring and logging
+  - [x] Prometheus metrics (requests, latencies, errors)
+  - [x] Structured logging for debugging
+  - [x] Health check endpoint
+  - [x] Request tracing (OpenTelemetry)
+- [x] Configure production settings
+  - [x] Webhook setup for production (vs. polling for dev)
+  - [x] Rate limiting per user
+  - [x] Resource limits (memory, CPU)
+  - [x] Graceful shutdown handling
+- [x] Documentation
+  - [x] Update README.md with Telegram bot setup
+  - [x] Document environment variables
+  - [x] Add usage examples
+  - [x] Troubleshooting guide
 
 ## 🔧 Technical Details
 
