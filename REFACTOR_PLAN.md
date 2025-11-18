@@ -123,6 +123,10 @@ Pare down the june project to bare essentials for the **voice message → STT �
   - ✅ Enhanced docstrings for BenchmarkTask and TaskResult dataclasses with comprehensive attribute documentation
 - ✅ Benchmark evaluation command implemented (`essence/commands/run_benchmarks.py`) - CLI interface for running benchmark evaluations
   - ✅ Enhanced docstrings for all class methods with comprehensive documentation
+- ✅ Model download command implemented (`essence/commands/download_models.py`) - CLI interface for downloading authorized models
+  - ✅ Enhanced docstrings for all class methods with comprehensive documentation
+- ✅ Dataset generation command implemented (`essence/commands/generate_alice_dataset.py`) - CLI interface for generating Alice dataset
+  - ✅ Enhanced docstrings for all class methods with comprehensive documentation
 - ✅ Sandbox isolation implemented (`essence/agents/sandbox.py`)
   - ✅ Enhanced docstrings for SandboxMetrics and CommandLog dataclasses with comprehensive attribute documentation
 - ✅ Verification tools implemented (`essence/commands/verify_qwen3.py`, `benchmark_qwen3.py`)
