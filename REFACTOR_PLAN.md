@@ -388,6 +388,7 @@ The june project has been successfully refactored from a complex microservices a
 
 **Remaining Work (Optional/Future):**
 - ⏳ TODO (Optional): Fix dependencies for `tests/services/` tests for active services (telegram, discord, stt, tts, inference-api) - these may be integration tests that need running services
+  - **Note:** These tests currently fail with `ModuleNotFoundError: No module named 'opentelemetry'` because system Python doesn't have dependencies installed and PEP 668 prevents installation. These tests are excluded from pytest collection and are optional. They may need to be run in a containerized environment or with proper virtualenv setup.
 
 **Note:** These TODO items are also listed in the "Refactoring Status Summary" section above. All remaining work is optional and does not block core functionality.
 
