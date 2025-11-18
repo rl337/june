@@ -824,8 +824,10 @@ def stream_chat_response_agent(
                         else:
                             # For assistant messages, yield immediately if conditions are met
                             # Track accumulated message history for yielding when threshold is met
+                            # Always add the current accumulated message to history (it may have been updated)
                             if accumulated_message and accumulated_message not in [msg for msg, _ in previous_accumulated_messages]:
                                 previous_accumulated_messages.append((accumulated_message, current_time))
+                                logger.debug(f"Added accumulated message to history: length={len(accumulated_message)}, history_size={len(previous_accumulated_messages)}")
                             
                             # Clear pending and add the new accumulated message
                             pending_messages = [(accumulated_message, current_time)]
@@ -926,7 +928,7 @@ def stream_chat_response_agent(
                     previous_accumulated_messages = []
                 # Process any remaining pending messages quickly
                 for message, _ in pending_messages:
-                    if message not in seen_messages or not first_message_sent:
+                    if message and message.strip() and (message not in seen_messages or not first_message_sent):
                         logger.info(f"Yielding remaining pending message: length={len(message)}")
                         if span:
                             span.add_event("yielding_pending_message", attributes={
@@ -963,7 +965,7 @@ def stream_chat_response_agent(
                             "length": len(result_message)
                         })
                     yield (result_message, True, "result")
-                elif first_message_sent:
+                elif first_message_sent and (accumulated_message or json_line_count > 0):
                     # We've already sent messages, just mark as final
                     logger.info(f"Yielding final signal. Total messages sent: {len(seen_messages)}")
                     if span:
