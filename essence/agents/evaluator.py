@@ -204,6 +204,18 @@ class BenchmarkEvaluator:
                 sandbox.start()
                 span.set_attribute("sandbox_created", True)
                 
+                # Record initial files after sandbox starts but before task execution
+                # (for tracking modifications during task execution)
+                initial_files = {}  # Dict mapping file path to initial mtime
+                if workspace_dir.exists():
+                    for f in workspace_dir.rglob("*"):
+                        if f.is_file():
+                            try:
+                                initial_files[f] = f.stat().st_mtime
+                            except (OSError, FileNotFoundError):
+                                # File may be deleted or inaccessible
+                                pass
+                
                 # Initialize coding agent
                 agent = CodingAgent(
                     inference_api_url=self.inference_api_url,
@@ -265,7 +277,29 @@ class BenchmarkEvaluator:
                 # Collect metrics
                 sandbox_metrics = sandbox.metrics
                 sandbox_metrics.end_time = time.time()
-                files_created = len(list(workspace_dir.glob("*.py"))) if workspace_dir.exists() else 0
+                
+                # Count files created and modified
+                files_created = 0
+                files_modified = 0
+                if workspace_dir.exists():
+                    final_files = {}
+                    for f in workspace_dir.rglob("*"):
+                        if f.is_file():
+                            try:
+                                final_files[f] = f.stat().st_mtime
+                            except (OSError, FileNotFoundError):
+                                # File may be deleted or inaccessible
+                                pass
+                    
+                    # Files created: exist in final but not in initial
+                    files_created = len(set(final_files.keys()) - set(initial_files.keys()))
+                    
+                    # Files modified: exist in both but have different modification times
+                    for file_path, final_mtime in final_files.items():
+                        if file_path in initial_files:
+                            initial_mtime = initial_files[file_path]
+                            if final_mtime > initial_mtime:
+                                files_modified += 1
                 
                 # Save sandbox snapshot if requested
                 if save_sandbox_snapshot:
@@ -295,7 +329,7 @@ class BenchmarkEvaluator:
                     agent_iterations=agent_iterations,
                     tokens_generated=tokens_generated,
                     files_created=files_created,
-                    files_modified=0,  # TODO: Track file modifications
+                    files_modified=files_modified,
                     commands_executed=sandbox_metrics.commands_executed if sandbox_metrics else 0,
                 )
                 

@@ -96,6 +96,7 @@ Pare down the june project to bare essentials for the **voice message → STT �
 - ✅ Benchmark evaluator implemented (`essence/agents/evaluator.py`)
 - ✅ Sandbox isolation implemented (`essence/agents/sandbox.py`)
 - ✅ Verification tools implemented (`essence/commands/verify_qwen3.py`, `benchmark_qwen3.py`)
+- ✅ File modification tracking implemented in benchmark evaluator - tracks files created and modified during task execution
 - ⏳ **Operational tasks:** Model download, service startup, and testing can be done when ready to use (requires running system with GPU)
 
 **Operational Guide (When Ready to Use):**
