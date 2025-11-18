@@ -33,10 +33,24 @@ logger = logging.getLogger(__name__)
 
 
 class MonitorGpuCommand(Command):
-    """Command for monitoring GPU metrics and exporting to Prometheus."""
+    """
+    Command for monitoring GPU metrics and exporting to Prometheus.
+    
+    Continuously monitors GPU utilization, memory usage, temperature, power
+    consumption, and other metrics using NVIDIA Management Library (NVML).
+    Exports metrics to Prometheus format for integration with monitoring systems.
+    
+    Provides real-time GPU health monitoring essential for large model inference
+    workloads. Metrics are exposed via HTTP endpoint for Prometheus scraping.
+    """
     
     def __init__(self, args: argparse.Namespace):
-        """Initialize command with parsed arguments."""
+        """
+        Initialize command with parsed arguments.
+        
+        Args:
+            args: Parsed command-line arguments containing monitoring configuration
+        """
         super().__init__(args)
         self._metrics_port = None
         self._update_interval = None
@@ -46,14 +60,34 @@ class MonitorGpuCommand(Command):
     
     @classmethod
     def get_name(cls) -> str:
+        """
+        Get the command name.
+        
+        Returns:
+            Command name: "monitor-gpu"
+        """
         return "monitor-gpu"
     
     @classmethod
     def get_description(cls) -> str:
+        """
+        Get the command description.
+        
+        Returns:
+            Description of what this command does
+        """
         return "Monitor GPU metrics and export to Prometheus"
     
     @classmethod
     def add_args(cls, parser: argparse.ArgumentParser) -> None:
+        """
+        Add command-line arguments to the argument parser.
+        
+        Configures Prometheus metrics server port and update interval for GPU monitoring.
+        
+        Args:
+            parser: Argument parser to add arguments to
+        """
         parser.add_argument(
             "--port",
             type=int,
@@ -68,7 +102,16 @@ class MonitorGpuCommand(Command):
         )
     
     def init(self) -> None:
-        """Initialize GPU monitoring."""
+        """
+        Initialize GPU monitoring.
+        
+        Validates NVML availability, sets up signal handlers, creates Prometheus
+        metrics registry, defines all GPU metrics (utilization, memory, temperature,
+        power), and initializes NVML library. Must be called before run().
+        
+        Raises:
+            RuntimeError: If pynvml is not available or NVML initialization fails
+        """
         if not NVML_AVAILABLE:
             logger.warning("pynvml not available. GPU monitoring will be limited.")
             raise RuntimeError("pynvml not available. Install with: pip install pynvml")
@@ -183,7 +226,16 @@ class MonitorGpuCommand(Command):
             return None
     
     def run(self) -> None:
-        """Run the GPU monitoring loop."""
+        """
+        Run the GPU monitoring loop.
+        
+        Starts the Prometheus HTTP metrics server and begins continuous GPU
+        monitoring. Updates metrics at the configured interval until stopped
+        (via signal handler). This method blocks until monitoring is stopped.
+        
+        Monitors all detected GPUs and exports metrics including utilization,
+        memory usage, temperature, and power consumption.
+        """
         # Start Prometheus metrics server
         try:
             start_http_server(self._metrics_port, registry=self._registry)
@@ -244,7 +296,13 @@ class MonitorGpuCommand(Command):
             self._monitoring_active = False
     
     def cleanup(self) -> None:
-        """Clean up GPU monitoring resources."""
+        """
+        Clean up GPU monitoring resources.
+        
+        Stops the monitoring loop and shuts down NVML library. Releases all
+        GPU monitoring resources including Prometheus metrics registry and
+        HTTP server connections. Should be called when the command is finished.
+        """
         self._monitoring_active = False
         if NVML_AVAILABLE:
             try:

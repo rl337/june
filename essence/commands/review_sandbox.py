@@ -215,18 +215,47 @@ def find_sandbox_snapshot(output_dir: Path, task_id: str) -> Optional[Path]:
 
 
 class ReviewSandboxCommand(Command):
-    """Command for reviewing sandbox snapshots from benchmark evaluations."""
+    """
+    Command for reviewing sandbox snapshots from benchmark evaluations.
+    
+    Provides a tool for inspecting sandbox snapshots created during benchmark
+    task execution. Displays metadata, command logs, filesystem structure,
+    and efficiency metrics for debugging and analysis of coding agent behavior.
+    
+    Supports both direct path specification and task ID lookup within output
+    directories. Can output results in human-readable or JSON format.
+    """
     
     @classmethod
     def get_name(cls) -> str:
+        """
+        Get the command name.
+        
+        Returns:
+            Command name: "review-sandbox"
+        """
         return "review-sandbox"
     
     @classmethod
     def get_description(cls) -> str:
+        """
+        Get the command description.
+        
+        Returns:
+            Description of what this command does
+        """
         return "Review sandbox snapshot from benchmark evaluation"
     
     @classmethod
     def add_args(cls, parser: argparse.ArgumentParser) -> None:
+        """
+        Add command-line arguments to the argument parser.
+        
+        Configures sandbox snapshot path, optional task ID lookup, and output format.
+        
+        Args:
+            parser: Argument parser to add arguments to
+        """
         parser.add_argument(
             "path",
             help="Path to sandbox snapshot directory or output directory",
@@ -243,12 +272,26 @@ class ReviewSandboxCommand(Command):
         )
     
     def init(self) -> None:
-        """Initialize review sandbox command."""
+        """
+        Initialize review sandbox command.
+        
+        No initialization is needed for this read-only tool. The command
+        operates directly on filesystem paths without requiring service setup.
+        """
         # No initialization needed for this tool
         pass
     
     def run(self) -> None:
-        """Run the review sandbox tool."""
+        """
+        Run the review sandbox tool.
+        
+        Loads sandbox snapshot metadata and displays comprehensive information
+        including task details, command execution logs, filesystem structure,
+        and efficiency metrics. Supports both human-readable and JSON output formats.
+        
+        Exits:
+            sys.exit(1): If sandbox snapshot or metadata file is not found
+        """
         snapshot_dir = Path(self.args.path)
         
         # If task_id is provided, treat path as output directory
@@ -302,6 +345,11 @@ class ReviewSandboxCommand(Command):
             print(f"{'='*60}\n")
     
     def cleanup(self) -> None:
-        """Clean up review sandbox command."""
+        """
+        Clean up review sandbox command.
+        
+        No cleanup is needed for this read-only tool. The command only reads
+        filesystem data and does not maintain any persistent resources.
+        """
         # No cleanup needed for this tool
         pass
