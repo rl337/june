@@ -793,10 +793,11 @@ async def handle_voice_message(
                 try:
                     async with grpc_pool.get_stt_channel() as channel:
                         stt_client = asr_shim.SpeechToTextClient(channel)
-                        # Use preferred_language for STT
-                        # TODO: Support language=None for auto-detection when STT service supports it
+                        # Use preferred_language for STT, or None for auto-detection
+                        # STT service supports None/empty string for auto-detection
+                        stt_language = preferred_language if preferred_language else None
                         cfg = asr_shim.RecognitionConfig(
-                            language=preferred_language,  # TODO: Support None for auto-detection
+                            language=stt_language,  # None enables auto-detection
                             interim_results=True  # Enable interim results for streaming feedback
                         )
                         
@@ -1670,8 +1671,11 @@ async def handle_voice_message_from_queue(
             grpc_pool = get_grpc_pool()
             async with grpc_pool.get_stt_channel() as channel:
                 stt_client = asr_shim.SpeechToTextClient(channel)
+                # Use preferred_language for STT, or None for auto-detection
+                # STT service supports None/empty string for auto-detection
+                stt_language = preferred_language if preferred_language else None
                 cfg = asr_shim.RecognitionConfig(
-                    language=preferred_language,
+                    language=stt_language,  # None enables auto-detection
                     interim_results=True
                 )
                 
