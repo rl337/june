@@ -113,7 +113,7 @@ Pare down the june project to bare essentials for the **voice message → STT �
 
 5. **Update documentation:**
    - ✅ Document scripts/ directory purpose and guidelines (COMPLETED - updated scripts/README.md)
-   - ⏳ Document command pattern and how to add new commands
+   - ✅ Document command pattern and how to add new commands (COMPLETED - enhanced docs/guides/COMMANDS.md with comprehensive documentation including discovery mechanism, best practices, examples, error handling, testing, and migration guide)
    - ✅ Update any references to moved scripts (COMPLETED - updated README.md, docs/guides/AGENTS.md, run_checks.sh, services/cli-tools/README.md, run_tests_with_artifacts.sh)
 
 ### Phase 12: Test Infrastructure and Integration Test Service ⏳ TODO
