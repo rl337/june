@@ -101,6 +101,8 @@ Pare down the june project to bare essentials for the **voice message → STT �
 ### Phase 9.1: Service Refactoring ✅
 - All services refactored to use Command pattern
 - All services work without external dependencies
+- ✅ Core service commands enhanced with comprehensive docstrings (`essence/commands/telegram_service.py`, `discord_service.py`, `stt_service.py`, `tts_service.py`, `inference_api_service.py`)
+  - ✅ Enhanced docstrings for all class methods with comprehensive documentation
 - **Best Practice:** All services must follow Command pattern and work independently
 
 ### Phase 10: Qwen3 Setup and Coding Agent ✅
