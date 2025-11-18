@@ -178,53 +178,70 @@ def mock_streaming_popen_generator(lines):
 @pytest.mark.parametrize("name,input_lines,expected_outputs,expected_final_state", TEST_CASES)
 def test_json_accumulation_logic(name, input_lines, expected_outputs, expected_final_state):
     """Test JSON accumulation logic with various input scenarios."""
-    # Mock the streaming_popen_generator
-    with patch('essence.chat.agent.response.streaming_popen_generator') as mock_gen:
-        mock_gen.return_value = mock_streaming_popen_generator(input_lines)
+    # Mock file system checks for agent script
+    with patch('essence.chat.agent.response.os.path.exists') as mock_exists, \
+         patch('essence.chat.agent.response.os.access') as mock_access, \
+         patch('essence.chat.agent.response.time.time') as mock_time:
+        # Mock that the agent script exists and is executable
+        def exists_side_effect(path):
+            if path == "/tmp/scripts/test.sh":
+                return True
+            return False
+        mock_exists.side_effect = exists_side_effect
+        mock_access.return_value = True
         
-        # Mock the command execution
-        with patch('subprocess.Popen') as mock_popen:
-            # Collect all yielded outputs
-            outputs = []
-            final_state = {}
+        # Mock time to simulate waiting for first message
+        # Provide enough time values for multiple iterations
+        time_values = [0.0, 0.1, 0.2, 2.1, 2.2] + [2.3 + i * 0.1 for i in range(100)]  # Start at 0, then jump past max_wait_for_first_message
+        mock_time.side_effect = time_values
+        
+        # Mock the streaming_popen_generator
+        with patch('essence.chat.agent.response.streaming_popen_generator') as mock_gen:
+            mock_gen.return_value = mock_streaming_popen_generator(input_lines)
             
-            try:
-                # Call the generator function
-                gen = stream_chat_response_agent(
-                    user_message="test",
-                    agenticness_dir="/tmp",
-                    user_id="123",
-                    chat_id="123",
-                    line_timeout=1.0,
-                    max_total_time=10.0,
-                    agent_script_name="test.sh",
-                    agent_script_simple_name="test_simple.sh",
-                    platform="test"
-                )
+            # Mock the command execution
+            with patch('subprocess.Popen') as mock_popen:
+                # Collect all yielded outputs
+                outputs = []
+                final_state = {}
                 
-                # Collect all outputs
-                for output in gen:
-                    outputs.append(output)
+                try:
+                    # Call the generator function
+                    gen = stream_chat_response_agent(
+                        user_message="test",
+                        agenticness_dir="/tmp",
+                        user_id="123",
+                        chat_id="123",
+                        line_timeout=1.0,
+                        max_total_time=10.0,
+                        agent_script_name="test.sh",
+                        agent_script_simple_name="test_simple.sh",
+                        platform="test"
+                    )
                     
-            except Exception as e:
-                # Capture exception for debugging
-                pytest.fail(f"Test '{name}' raised exception: {e}")
-            
-            # Verify outputs
-            assert len(outputs) == len(expected_outputs), \
-                f"Test '{name}': Expected {len(expected_outputs)} outputs, got {len(outputs)}. " \
-                f"Outputs: {outputs}"
-            
-            for i, (actual, expected) in enumerate(zip(outputs, expected_outputs)):
-                actual_msg, actual_final, actual_type = actual
-                expected_msg, expected_final, expected_type = expected
+                    # Collect all outputs
+                    for output in gen:
+                        outputs.append(output)
+                        
+                except Exception as e:
+                    # Capture exception for debugging
+                    pytest.fail(f"Test '{name}' raised exception: {e}")
                 
-                assert actual_msg == expected_msg, \
-                    f"Test '{name}' output {i}: Expected message '{expected_msg}', got '{actual_msg}'"
-                assert actual_final == expected_final, \
-                    f"Test '{name}' output {i}: Expected is_final={expected_final}, got {actual_final}"
-                assert actual_type == expected_type, \
-                    f"Test '{name}' output {i}: Expected type={expected_type}, got {actual_type}"
+                # Verify outputs
+                assert len(outputs) == len(expected_outputs), \
+                    f"Test '{name}': Expected {len(expected_outputs)} outputs, got {len(outputs)}. " \
+                    f"Outputs: {outputs}"
+                
+                for i, (actual, expected) in enumerate(zip(outputs, expected_outputs)):
+                    actual_msg, actual_final, actual_type = actual
+                    expected_msg, expected_final, expected_type = expected
+                    
+                    assert actual_msg == expected_msg, \
+                        f"Test '{name}' output {i}: Expected message '{expected_msg}', got '{actual_msg}'"
+                    assert actual_final == expected_final, \
+                        f"Test '{name}' output {i}: Expected is_final={expected_final}, got {actual_final}"
+                    assert actual_type == expected_type, \
+                        f"Test '{name}' output {i}: Expected type={expected_type}, got {actual_type}"
 
 
 def test_simple_complete_json():
