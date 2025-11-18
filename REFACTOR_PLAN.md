@@ -525,35 +525,48 @@ This phase focuses on refactoring individual services, building them, testing th
 #### 9.3: Test Individual Services ⏳ TODO
 
 1. **Unit tests for each service:**
-   - ⏳ **telegram service tests:**
-     - Test voice message handling
-     - Test conversation storage (in-memory)
-     - Test rate limiting (in-memory)
-     - Test error handling
-     - Test tracing spans
-     - Test metrics collection
-   - ⏳ **discord service tests:**
-     - Test voice message handling
-     - Test conversation storage (in-memory)
-     - Test rate limiting (in-memory)
-     - Test error handling
-     - Test tracing spans
-     - Test metrics collection
-   - ⏳ **stt service tests:**
-     - Test speech-to-text conversion
-     - Test error handling
-     - Test tracing spans
-     - Test metrics collection
-   - ⏳ **tts service tests:**
-     - Test text-to-speech synthesis
-     - Test error handling
-     - Test tracing spans
-     - Test metrics collection
-   - ⏳ **inference-api service tests:**
-     - Test LLM generation
-     - Test error handling
-     - Test tracing spans
-     - Test metrics collection
+   - ✅ **COMPLETED: Document existing test coverage:**
+     - ✅ **telegram service tests:** Extensive test suite exists in `tests/services/telegram/`
+       - ✅ `test_main.py` - Main service tests (voice message handling, command handlers, error handling)
+       - ✅ `test_conversation_storage.py` - Conversation storage tests (in-memory)
+       - ✅ `test_audio_utils.py` - Audio processing and validation tests
+       - ✅ `test_voice_queue.py` - Voice queue (NATS) tests
+       - ✅ `test_telegram_utils.py` - Telegram utility tests
+       - ✅ `test_admin_commands.py` - Admin command tests
+       - ✅ `test_cost_tracking.py` - Cost tracking tests
+       - ✅ `test_streaming_popen.py` - Streaming subprocess tests
+       - ✅ `test_stream_timing.py` - Stream timing tests
+       - ✅ `test_voice_quality.py` - Voice quality tests
+       - **Coverage:** Voice message handling ✅, conversation storage ✅, error handling ✅
+       - **Missing:** Rate limiting tests, tracing span tests, metrics collection tests
+     - ⏳ **discord service tests:**
+       - ⏳ **No test files exist** - `tests/services/discord/` is empty
+       - ⏳ Need to create test suite for discord service
+       - ⏳ Test voice message handling
+       - ⏳ Test conversation storage (in-memory)
+       - ⏳ Test rate limiting (in-memory)
+       - ⏳ Test error handling
+       - ⏳ Test tracing spans
+       - ⏳ Test metrics collection
+     - ✅ **COMPLETED: stt service tests:** Test suite exists in `tests/services/stt/`
+       - ✅ `test_stt.py` - Comprehensive STT service tests (speech-to-text conversion, error handling)
+       - ✅ `test_stt_metrics.py` - STT metrics tests
+       - **Coverage:** Speech-to-text conversion ✅, error handling ✅, metrics collection ✅
+       - **Missing:** Tracing span tests
+     - ✅ **COMPLETED: tts service tests:** Test suite exists in `tests/services/tts/`
+       - ✅ `test_tts.py` - TTS service tests (text-to-speech synthesis, error handling)
+       - **Coverage:** Text-to-speech synthesis ✅, error handling ✅
+       - **Missing:** Tracing span tests, metrics collection tests
+     - ✅ **COMPLETED: inference-api service tests:** Test suite exists in `tests/services/inference-api/`
+       - ✅ `test_inference_api.py` - Comprehensive inference API tests (LLM generation, error handling, integration tests)
+       - **Coverage:** LLM generation ✅, error handling ✅
+       - **Missing:** Tracing span tests, metrics collection tests
+   
+   - ⏳ **Remaining unit test tasks:**
+     - ⏳ Add tracing span tests for all services (verify spans are created with correct attributes)
+     - ⏳ Add metrics collection tests for telegram, tts services (stt and inference-api have some metrics tests)
+     - ⏳ Create complete test suite for discord service (currently no tests exist)
+     - ⏳ Add rate limiting tests for telegram service
 
 2. **Integration tests for each service:**
    - ⏳ Test service can start and connect to dependencies
