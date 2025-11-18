@@ -282,6 +282,46 @@ class Qwen3LlmStrategy(LlmStrategy):
             # Set model to evaluation mode
             self._model.eval()
 
+            # Log quantization status after loading
+            if self.use_quantization and self.quantization_bits:
+                # Verify quantization was actually applied
+                quantization_applied = False
+                if hasattr(self._model, 'hf_quantizer'):
+                    quantization_applied = True
+                elif hasattr(self._model, 'quantization_config'):
+                    quant_config = self._model.quantization_config
+                    if hasattr(quant_config, 'load_in_4bit') and quant_config.load_in_4bit:
+                        quantization_applied = True
+                    elif hasattr(quant_config, 'load_in_8bit') and quant_config.load_in_8bit:
+                        quantization_applied = True
+                elif hasattr(self._model, 'base_model') and hasattr(self._model.base_model, 'hf_quantizer'):
+                    quantization_applied = True
+                
+                if quantization_applied:
+                    logger.info(
+                        "✅ Quantization successfully applied: %d-bit quantization active",
+                        self.quantization_bits
+                    )
+                else:
+                    logger.warning(
+                        "⚠️  Quantization was configured (%d-bit) but may not be active. "
+                        "Check model loading logs above for details.",
+                        self.quantization_bits
+                    )
+            
+            # Log memory usage if CUDA is available
+            if torch.cuda.is_available() and gpu_compatible:
+                try:
+                    memory_allocated = torch.cuda.memory_allocated(0) / (1024**3)
+                    memory_reserved = torch.cuda.memory_reserved(0) / (1024**3)
+                    memory_total = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                    logger.info(
+                        "GPU Memory Usage: %.2f GB allocated / %.2f GB reserved / %.2f GB total",
+                        memory_allocated, memory_reserved, memory_total
+                    )
+                except Exception as e:
+                    logger.debug(f"Could not get GPU memory stats: {e}")
+
             logger.info("Qwen3 model loaded and initialized successfully")
 
         except ImportError as e:

@@ -679,9 +679,14 @@ This phase focuses on refactoring individual services, building them, testing th
      - ✅ Updated inference-api main.py to pass quantization parameters to Qwen3LlmStrategy
      - ✅ Quantization is now configurable via environment variables (defaults to 8-bit for compatibility)
      - ✅ Users can now easily switch between 4-bit and 8-bit quantization by setting `QUANTIZATION_BITS=4` or `QUANTIZATION_BITS=8`
+   - ✅ **COMPLETED: Quantization verification and monitoring tools:**
+     - ✅ Created `scripts/verify_qwen3_quantization.py` script to verify quantization settings and monitor GPU memory
+     - ✅ Enhanced Qwen3 strategy logging to report quantization status and GPU memory usage after model loading
+     - ✅ Script checks environment variables, PyTorch/CUDA availability, BitsAndBytes availability, and model quantization status
+     - ✅ Script provides detailed report with verification summary
    - ⏳ **Remaining memory optimization tasks:**
-     - ⏳ Verify 4-bit quantization is working (check logs when using QUANTIZATION_BITS=4)
-     - ⏳ Monitor GPU memory usage during inference
+     - ⏳ Verify 4-bit quantization is working (check logs when using QUANTIZATION_BITS=4) - can now use verify_qwen3_quantization.py script
+     - ⏳ Monitor GPU memory usage during inference - can now use verify_qwen3_quantization.py script or check logs
      - ⏳ Adjust `MAX_CONTEXT_LENGTH` if needed based on available GPU memory
      - ⏳ Test with different batch sizes if applicable
 
