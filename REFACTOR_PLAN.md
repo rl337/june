@@ -800,16 +800,32 @@ This phase focuses on refactoring individual services, building them, testing th
    - ⏳ Results and sandbox snapshots stored in volume mount
    - ⏳ Fully automated - no manual steps required
 
-6. **Sandbox review tools:**
-   - ⏳ Create `scripts/review_sandbox.sh` to inspect sandbox after task
-   - ⏳ Tools should show:
-     - File system tree (what files were created/modified)
-     - Command execution timeline
-     - Process tree
-     - Resource usage graphs
-     - Code changes (diffs)
-     - Efficiency metrics
-   - ⏳ Enable post-hoc analysis of agent's problem-solving approach
+6. **✅ COMPLETED: Sandbox review tools:**
+   - ✅ **COMPLETED:** Created `scripts/review_sandbox.py` Python tool for detailed sandbox analysis
+     - ✅ Parses sandbox_metadata.json from snapshot directories
+     - ✅ Shows metadata (task ID, container name, workspace directory)
+     - ✅ Shows metrics (commands, files, duration, memory, CPU, success status)
+     - ✅ Shows command execution timeline with timestamps, return codes, stdout/stderr
+     - ✅ Shows filesystem tree from filesystem.tar snapshot
+     - ✅ Shows efficiency metrics (commands per second, files per second, time per command/iteration)
+     - ✅ Supports both snapshot directory path and output_dir + task_id lookup
+     - ✅ JSON output mode for programmatic access
+   - ✅ **COMPLETED:** Updated `scripts/review_sandbox.sh` shell script
+     - ✅ Works with actual snapshot structure from evaluator
+     - ✅ Falls back to Python tool when available (preferred)
+     - ✅ Shows metadata, command logs, filesystem tree, and metrics summary
+     - ✅ Supports both snapshot directory path and output_dir + task_id lookup
+   - ✅ **Features implemented:**
+     - ✅ File system tree (from filesystem.tar or directory listing)
+     - ✅ Command execution timeline (from command_logs in metadata)
+     - ✅ Resource usage (from metrics: CPU time, memory, disk I/O)
+     - ✅ Efficiency metrics (commands per second, files per second, etc.)
+     - ✅ Post-hoc analysis of agent's problem-solving approach
+   - ⏳ **Remaining features (optional enhancements):**
+     - ⏳ Process tree (can be added via container stats collection)
+     - ⏳ Resource usage graphs (can be added with matplotlib/plotting)
+     - ⏳ Code changes (diffs) - can be computed by comparing filesystem snapshots
+     - ⏳ Network activity log (if network access was enabled)
 
 #### 10.6: Documentation and Deployment ⏳ TODO
 
