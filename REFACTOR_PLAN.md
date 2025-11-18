@@ -121,7 +121,8 @@ Pare down the june project to bare essentials for the **voice message → STT �
 - ✅ File modification tracking implemented in benchmark evaluator - tracks files created and modified during task execution
 - ✅ Language auto-detection support implemented in Telegram voice handler - STT service now receives None for auto-detection when language preference is not set
 - ⚠️ **Known limitation:** pass@k calculation (for k > 1) currently uses pass@1 as placeholder - proper implementation would require running each task multiple times (future enhancement)
-  - TODO comments in `essence/agents/evaluator.py` (lines 530-532) document this limitation
+  - TODO comments in `essence/agents/evaluator.py` (lines 541-543) document this limitation
+  - Comprehensive documentation added explaining what pass@k measures, why multiple attempts are needed, and what would be required for proper implementation
   - This is intentional and documented - not a bug or incomplete feature
 - ⏳ **Operational tasks:** Model download, service startup, and testing can be done when ready to use (requires running system with GPU)
 
