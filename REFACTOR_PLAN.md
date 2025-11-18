@@ -175,7 +175,7 @@ These are not needed for the core voice round trip:
    - ✅ All services should run via `python -m essence <service-name>-service`
    - ✅ Services get their code from the `essence` package, not from `services/` directories
 
-### Phase 4: Implement OpenTelemetry Tracing ⏳ IN PROGRESS
+### Phase 4: Implement OpenTelemetry Tracing ✅ COMPLETED (Implementation)
 
 1. **Ensure all services initialize tracing:**
    - ✅ **COMPLETED:** All services now call `setup_tracing()` from `essence/chat/utils/tracing.py` on startup
@@ -242,13 +242,14 @@ These are not needed for the core voice round trip:
      - ✅ gRPC instrumentation automatically propagates trace context in gRPC metadata
      - ✅ Works for both client (outgoing) and server (incoming) gRPC calls
      - ✅ Graceful fallback if instrumentation package is not available
-   - ⏳ Verify traces show full request flow: Telegram → STT → LLM → TTS → Telegram (requires testing with actual requests)
-
-4. **Verify tracing works:**
-   - ⏳ Send a test voice message through the system
-   - ⏳ Check Jaeger UI (http://localhost:16686) for traces
-   - ⏳ Verify traces show complete request flow with all spans
-   - ⏳ Verify trace spans have proper tags and attributes
+   - ⏳ **Verification tasks (requires running system):**
+     - ⏳ Verify traces show full request flow: Telegram → STT → LLM → TTS → Telegram (requires testing with actual requests)
+     - ⏳ Send a test voice message through the system
+     - ⏳ Check Jaeger UI (http://localhost:16686) for traces
+     - ⏳ Verify traces show complete request flow with all spans
+     - ⏳ Verify trace spans have proper tags and attributes
+   
+   **✅ PHASE 4 IMPLEMENTATION COMPLETED:** All tracing implementation tasks are complete. All services have tracing initialized, all gRPC handlers have tracing spans, HTTP requests are traced, and trace propagation is enabled. Remaining tasks are verification tasks that require running the system and checking Jaeger UI.
 
 ### Phase 5: Set Up Grafana Metrics ✅ COMPLETED (Metrics Implementation)
 
