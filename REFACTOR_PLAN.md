@@ -612,7 +612,15 @@ This phase focuses on refactoring individual services, building them, testing th
        - ✅ Tests for exception recording and error status
        - ✅ Tests for user_id and chat_id correlation attributes
        - ✅ Tests for multiple span creation
-       - ⏳ **Remaining:** Add tracing span tests for other services (discord, stt, tts, inference-api) - can be added in future
+       - ✅ **COMPLETED:** Add tracing span tests for discord service (test_tracing.py with 9 tests, all passing)
+        - ✅ Tests for agent.stream_message span creation with attributes (platform, user_id, chat_id, message_length, agent_script_name, agent_available)
+        - ✅ Tests for agent.process_message span creation with attributes
+        - ✅ Tests for HTTP request span creation with attributes (http.method, http.url, http.path, http.status_code)
+        - ✅ Tests for exception recording and error status
+        - ✅ Tests for user_id and chat_id correlation attributes
+        - ✅ Tests for multiple span creation
+        - ✅ Tests for span status setting (success and error)
+      - ⏳ **Remaining:** Add tracing span tests for other services (stt, tts, inference-api) - can be added in future
      - ✅ **COMPLETED:** Add metrics collection tests for telegram service (test_metrics.py with 14 tests, all passing)
        - ✅ Tests for HTTP request metrics (total, duration)
        - ✅ Tests for gRPC request metrics (total, duration)
