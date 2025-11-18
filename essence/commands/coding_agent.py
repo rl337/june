@@ -29,23 +29,51 @@ except ImportError as e:
 
 
 class CodingAgentCommand(Command):
-    """Command for interacting with the coding agent."""
+    """
+    Command for interacting with the coding agent.
+    
+    Provides both single-task execution and interactive modes for sending
+    coding tasks to the Qwen3 model via the inference API.
+    """
     
     def __init__(self, args: argparse.Namespace):
-        """Initialize command with parsed arguments."""
+        """
+        Initialize command with parsed arguments.
+        
+        Args:
+            args: Parsed command-line arguments
+        """
         super().__init__(args)
         self._agent = None
     
     @classmethod
     def get_name(cls) -> str:
+        """
+        Get the command name.
+        
+        Returns:
+            Command name: "coding-agent"
+        """
         return "coding-agent"
     
     @classmethod
     def get_description(cls) -> str:
+        """
+        Get the command description.
+        
+        Returns:
+            Description of what this command does
+        """
         return "Interactive interface for coding tasks with Qwen3 model"
     
     @classmethod
     def add_args(cls, parser: argparse.ArgumentParser) -> None:
+        """
+        Add command-line arguments to the argument parser.
+        
+        Args:
+            parser: Argument parser to add arguments to
+        """
         parser.add_argument(
             "--task",
             type=str,
@@ -94,7 +122,15 @@ class CodingAgentCommand(Command):
         )
     
     def init(self) -> None:
-        """Initialize coding agent."""
+        """
+        Initialize coding agent.
+        
+        Sets up the coding agent with the configured parameters and creates
+        the workspace directory if it doesn't exist.
+        
+        Raises:
+            RuntimeError: If required dependencies are not available
+        """
         if not DEPENDENCIES_AVAILABLE:
             raise RuntimeError(
                 f"Required dependencies not available: {IMPORT_ERROR}\n"
@@ -123,7 +159,15 @@ class CodingAgentCommand(Command):
         logger.info(f"  Workspace: {self.args.workspace_dir}")
     
     def run(self) -> None:
-        """Run the coding agent."""
+        """
+        Run the coding agent.
+        
+        Executes either a single task (if --task is provided) or starts
+        interactive mode (if --interactive is provided).
+        
+        Exits:
+            sys.exit(1): If neither --task nor --interactive is provided
+        """
         if self.args.task:
             # Execute single task
             self._execute_task(self.args.task)
@@ -173,7 +217,13 @@ class CodingAgentCommand(Command):
             sys.exit(1)
     
     def _run_interactive(self) -> None:
-        """Run in interactive mode."""
+        """
+        Run in interactive mode.
+        
+        Provides an interactive REPL-like interface for executing multiple
+        coding tasks in sequence with conversation history maintained.
+        Supports special commands: help, reset, quit/exit/q.
+        """
         print("\n🤖 Coding Agent - Interactive Mode")
         print("=" * 50)
         print("Enter coding tasks or commands:")
@@ -251,7 +301,12 @@ class CodingAgentCommand(Command):
         print("\n" + "=" * 50)
     
     def cleanup(self) -> None:
-        """Clean up coding agent resources."""
+        """
+        Clean up coding agent resources.
+        
+        Closes gRPC connections and releases any resources held by the
+        coding agent. Should be called when the command is finished.
+        """
         if self._agent:
             # Close gRPC connection if needed
             if hasattr(self._agent, '_channel') and self._agent._channel:
