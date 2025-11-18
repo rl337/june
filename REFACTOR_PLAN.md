@@ -543,15 +543,15 @@ This phase focuses on refactoring individual services, building them, testing th
        - ✅ `test_voice_quality.py` - Voice quality tests
        - **Coverage:** Voice message handling ✅, conversation storage ✅, error handling ✅
        - **Missing:** Rate limiting tests, tracing span tests, metrics collection tests
-     - ⏳ **discord service tests:**
-       - ⏳ **No test files exist** - `tests/services/discord/` is empty
-       - ⏳ Need to create test suite for discord service
-       - ⏳ Test voice message handling
-       - ⏳ Test conversation storage (in-memory)
-       - ⏳ Test rate limiting (in-memory)
-       - ⏳ Test error handling
-       - ⏳ Test tracing spans
-       - ⏳ Test metrics collection
+     - ✅ **COMPLETED: discord service tests:** Test suite created in `tests/services/discord/`
+       - ✅ Created `test_main.py` with comprehensive test suite (14 tests, all passing)
+       - ✅ Test service initialization (success, missing token, custom port)
+       - ✅ Test message handling (success, error, no response, bot message ignored)
+       - ✅ Test command handlers (ping command)
+       - ✅ Test health check endpoints (healthy, unhealthy, metrics)
+       - ✅ Test error handling (stream error, send error)
+       - ✅ Test service run and shutdown
+       - ⏳ **Remaining:** Test tracing spans, test metrics collection (can be added in future)
      - ✅ **COMPLETED: stt service tests:** Test suite exists in `tests/services/stt/`
        - ✅ `test_stt.py` - Comprehensive STT service tests (speech-to-text conversion, error handling)
        - ✅ `test_stt_metrics.py` - STT metrics tests
