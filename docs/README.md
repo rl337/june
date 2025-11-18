@@ -21,7 +21,7 @@ This documentation is organized by audience and purpose to help you find what yo
 - **[Agentic Capabilities](architecture/AGENTIC_CAPABILITIES.md)** - Comprehensive documentation for June's agentic capabilities system, enabling autonomous AI agents to discover, plan, execute, and verify tasks
 
 ### For API Users
-- **[API Documentation](API/)** - Complete API docs for Gateway (REST/WebSocket), Inference API (gRPC), STT/TTS services (gRPC), Telegram Bot API, and TODO MCP Service with examples
+- **[API Documentation](API/)** - Complete API docs for Inference API (gRPC), STT/TTS services (gRPC), Telegram Bot API, and TODO MCP Service with examples
 
 ## 🗂️ Documentation Structure
 
@@ -29,7 +29,7 @@ This documentation is organized by audience and purpose to help you find what yo
 docs/
 ├── README.md                    # This file - documentation index
 ├── API/                         # API documentation
-│   ├── gateway.md              # Gateway REST/WebSocket API
+│   ├── gateway.md.obsolete      # Gateway REST/WebSocket API (archived - service removed)
 │   ├── inference.md            # Inference API gRPC
 │   ├── stt.md                  # STT Service gRPC
 │   ├── tts.md                  # TTS Service gRPC
@@ -86,7 +86,6 @@ docs/
 - [Monitoring](../README.md#-monitoring) - Metrics and observability
 
 ### APIs
-- [Gateway API](API/gateway.md) - REST and WebSocket endpoints
 - [Inference API](API/inference.md) - LLM gRPC service
 - [STT/TTS APIs](API/) - Speech services
 - [Telegram Bot API](API/telegram.md) - Bot integration
