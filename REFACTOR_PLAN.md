@@ -412,8 +412,25 @@ This phase focuses on refactoring individual services, building them, testing th
      - ✅ Consolidated duplicate HTTP tracing/metrics middleware code from telegram and discord services
      - ✅ Both services now use the shared middleware utility, reducing code duplication
      - ✅ ~60 lines of duplicate code removed and consolidated into reusable utility
-   - ⏳ Add proper error handling
-   - ⏳ Add proper logging with structured format
+   - ✅ **COMPLETED:** Add proper error handling
+     - ✅ Created `essence/chat/error_handler.py` with structured error handling utilities
+     - ✅ `create_error_message()` function for creating structured error messages
+     - ✅ `render_error_for_platform()` function for platform-specific error rendering
+     - ✅ Telegram and Discord services use error handler utilities consistently
+     - ✅ Error handling includes user-friendly messages, error types, and optional tracebacks
+     - ✅ Errors are logged with `exc_info=True` for full traceback information
+     - ✅ Prometheus error metrics are recorded (`ERRORS_TOTAL` with service and error_type labels)
+     - ✅ OpenTelemetry spans record exceptions with `span.record_exception()`
+     - **Note:** Error handling is well-implemented across services. Future improvements could include more specific error types and retry strategies for transient errors.
+   - ✅ **COMPLETED:** Add proper logging with structured format
+     - ✅ All services use `setup_logging()` from `inference_core.utils` for consistent logging setup
+     - ✅ Logging format includes: timestamp, service name, module name, log level, message
+     - ✅ Logs are written to both console (stdout) and file (for Loki collection)
+     - ✅ Log levels are configurable via `config.monitoring.log_level` environment variable
+     - ✅ Services use `logging.getLogger(__name__)` for module-specific loggers
+     - ✅ Error logging includes `exc_info=True` for full exception tracebacks
+     - ✅ Logging standards documented in `docs/guides/AGENTS.md`
+     - **Note:** Logging is well-structured and consistent. All services follow the same logging pattern. Future improvements could include JSON structured logging for better log aggregation.
    - ✅ **COMPLETED:** Ensure all imports are from `essence` package (or proper packages)
      - ✅ Fixed STT service to use `june_grpc_api.generated` package instead of `sys.path.append('../../proto')`
      - ✅ Removed sys.path manipulation for protobuf imports in `services/stt/main.py`
