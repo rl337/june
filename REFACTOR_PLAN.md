@@ -123,7 +123,7 @@ These are not needed for the core voice round trip:
    - **Note:** Kept `services/telegram/` and `services/discord/` - they contain Dockerfiles and config, code is in `essence/`
    - **Note:** Test files in `tests/` that reference these removed services (e.g., `tests/services/gateway/`, `tests/integration/test_system_integration.py`) may need updating or removal in a future task
 
-### Phase 2: Remove Code Dependencies on Removed Services ⏳ IN PROGRESS
+### Phase 2: Remove Code Dependencies on Removed Services ✅ COMPLETED
 
 1. **Remove environment variable references:**
    - ✅ Remove `POSTGRES_URL` from inference-api config (made optional, defaults to empty string)
@@ -149,6 +149,8 @@ These are not needed for the core voice round trip:
      - ✅ Old code in `services/` directories is not being used (active code is in `essence/`)
      - ✅ NATS is optional and fail-safe (voice_queue.py, inference-api already handle NATS unavailability)
      - **Note:** Test files and scripts still reference removed services, but these are not part of active service code and can be updated in a future task
+   
+   **✅ PHASE 2 COMPLETED:** All code dependencies on removed services have been eliminated or made optional with graceful fallbacks. All active service code works without PostgreSQL, MinIO, Redis, NATS, or Gateway services. Remaining references are only in optional/legacy code paths (voice_worker.py, voice_queue.py) that are documented as optional and fail gracefully when services are unavailable.
 
 ### Phase 3: Clean Up Service Directories ✅ COMPLETED
 
