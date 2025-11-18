@@ -119,6 +119,7 @@ Pare down the june project to bare essentials for the **voice message → STT �
 - ✅ Benchmark evaluator implemented (`essence/agents/evaluator.py`)
   - ✅ Enhanced error handling and validation in `_run_tests` method with input validation and better exception handling
 - ✅ Sandbox isolation implemented (`essence/agents/sandbox.py`)
+  - ✅ Enhanced docstrings for SandboxMetrics and CommandLog dataclasses with comprehensive attribute documentation
 - ✅ Verification tools implemented (`essence/commands/verify_qwen3.py`, `benchmark_qwen3.py`)
 - ✅ File modification tracking implemented in benchmark evaluator - tracks files created and modified during task execution
 - ✅ Language auto-detection support implemented in Telegram voice handler - STT service now receives None for auto-detection when language preference is not set

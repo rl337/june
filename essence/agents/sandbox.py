@@ -23,7 +23,27 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class SandboxMetrics:
-    """Metrics collected from sandbox execution."""
+    """
+    Metrics collected from sandbox execution.
+    
+    Tracks resource usage, activity, and outcome of benchmark task execution
+    in an isolated Docker container sandbox.
+    
+    Attributes:
+        task_id: Unique identifier for the task being executed
+        start_time: Unix timestamp when sandbox execution started
+        end_time: Unix timestamp when sandbox execution ended (None if still running)
+        commands_executed: Total number of commands executed in the sandbox
+        files_created: Total number of files created in the workspace
+        files_modified: Total number of files modified in the workspace
+        total_cpu_time: Total CPU time consumed (in seconds)
+        peak_memory_mb: Peak memory usage in megabytes
+        disk_io_bytes: Total disk I/O in bytes
+        network_requests: Number of network requests made (if network enabled)
+        iterations: Number of agent iterations performed
+        success: Whether the task completed successfully
+        error_message: Error message if task failed (None if successful)
+    """
     task_id: str
     start_time: float
     end_time: Optional[float] = None
@@ -44,7 +64,12 @@ class SandboxMetrics:
     
     @property
     def duration_seconds(self) -> float:
-        """Get execution duration in seconds."""
+        """
+        Get execution duration in seconds.
+        
+        Returns:
+            Duration in seconds, or 0.0 if execution hasn't ended yet.
+        """
         if self.end_time is None:
             return 0.0
         return self.end_time - self.start_time
@@ -52,7 +77,18 @@ class SandboxMetrics:
 
 @dataclass
 class CommandLog:
-    """Log entry for a command execution."""
+    """
+    Log entry for a command execution in the sandbox.
+    
+    Attributes:
+        timestamp: Unix timestamp when the command was executed
+        command: The command that was executed
+        working_directory: Working directory where the command was run
+        returncode: Exit code of the command (0 for success, non-zero for failure)
+        stdout: Standard output from the command
+        stderr: Standard error output from the command
+        duration_seconds: Time taken to execute the command in seconds
+    """
     timestamp: float
     command: str
     working_directory: str
