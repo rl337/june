@@ -156,7 +156,18 @@ def main():
             logger.info(f"Average iterations: {report.average_iterations:.2f}")
             logger.info(f"Average commands: {report.average_commands:.2f}")
             logger.info(f"Efficiency score: {report.efficiency_score:.4f}")
-            logger.info(f"Results saved to: {dataset_output_dir}")
+            
+            # Print baseline comparisons
+            if report.baseline_comparisons:
+                logger.info(f"\n--- Baseline Comparisons ---")
+                for comp in report.baseline_comparisons:
+                    delta_sign = "+" if comp.pass_at_1_delta >= 0 else ""
+                    logger.info(f"{comp.baseline_name}:")
+                    logger.info(f"  Baseline Pass@1: {comp.baseline_pass_at_1:.2%}")
+                    logger.info(f"  Our Pass@1: {comp.our_pass_at_1:.2%}")
+                    logger.info(f"  Delta: {delta_sign}{comp.pass_at_1_delta:.2%}")
+            
+            logger.info(f"\nResults saved to: {dataset_output_dir}")
             logger.info(f"{'='*60}\n")
             
         except Exception as e:

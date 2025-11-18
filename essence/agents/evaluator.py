@@ -66,6 +66,22 @@ class TaskResult:
 
 
 @dataclass
+class BaselineComparison:
+    """Comparison with published baseline results."""
+    baseline_name: str  # e.g., "GPT-4", "Claude-3", "Qwen2.5-32B"
+    baseline_pass_at_1: float
+    baseline_pass_at_k: Dict[int, float]
+    our_pass_at_1: float
+    our_pass_at_k: Dict[int, float]
+    pass_at_1_delta: float  # our - baseline
+    pass_at_k_delta: Dict[int, float]  # our - baseline
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return asdict(self)
+
+
+@dataclass
 class EvaluationReport:
     """Complete evaluation report for a benchmark dataset."""
     dataset: str
@@ -82,11 +98,14 @@ class EvaluationReport:
     average_tokens: float
     efficiency_score: float  # Composite efficiency metric
     task_results: List[TaskResult]
+    baseline_comparisons: Optional[List[BaselineComparison]] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
         result = asdict(self)
         result['task_results'] = [tr.to_dict() for tr in self.task_results]
+        if self.baseline_comparisons:
+            result['baseline_comparisons'] = [bc.to_dict() for bc in self.baseline_comparisons]
         return result
     
     def save(self, output_path: Path) -> None:
@@ -499,6 +518,9 @@ if __name__ == "__main__":
             (1.0 / (1.0 + avg_commands / 20.0) * 0.15)  # Command efficiency
         )
         
+        # Compare with published baselines
+        baseline_comparisons = self._compare_with_baselines(dataset, pass_at_1, pass_at_k)
+        
         return EvaluationReport(
             dataset=dataset,
             model_name=self.model_name,
@@ -514,4 +536,99 @@ if __name__ == "__main__":
             average_tokens=avg_tokens,
             efficiency_score=efficiency_score,
             task_results=results,
+            baseline_comparisons=baseline_comparisons,
         )
+    
+    def _compare_with_baselines(
+        self,
+        dataset: str,
+        our_pass_at_1: float,
+        our_pass_at_k: Dict[int, float],
+    ) -> Optional[List[BaselineComparison]]:
+        """
+        Compare results with published baseline results.
+        
+        Args:
+            dataset: Dataset name (humaneval, mbpp, etc.)
+            our_pass_at_1: Our pass@1 score
+            our_pass_at_k: Our pass@k scores
+            
+        Returns:
+            List of BaselineComparison objects, or None if no baselines available
+        """
+        # Published baseline results (from papers and leaderboards)
+        # These are approximate values - actual baselines may vary
+        baselines = {
+            "humaneval": [
+                {
+                    "name": "GPT-4",
+                    "pass_at_1": 0.674,  # From OpenAI paper
+                    "pass_at_k": {1: 0.674, 5: 0.90, 10: 0.95, 100: 0.99},
+                },
+                {
+                    "name": "Claude-3-Opus",
+                    "pass_at_1": 0.84,  # From Anthropic paper
+                    "pass_at_k": {1: 0.84, 5: 0.92, 10: 0.95, 100: 0.98},
+                },
+                {
+                    "name": "Qwen2.5-32B",
+                    "pass_at_1": 0.75,  # Approximate from Qwen paper
+                    "pass_at_k": {1: 0.75, 5: 0.88, 10: 0.92, 100: 0.97},
+                },
+                {
+                    "name": "GPT-3.5-Turbo",
+                    "pass_at_1": 0.48,  # From OpenAI paper
+                    "pass_at_k": {1: 0.48, 5: 0.70, 10: 0.78, 100: 0.90},
+                },
+            ],
+            "mbpp": [
+                {
+                    "name": "GPT-4",
+                    "pass_at_1": 0.83,  # Approximate
+                    "pass_at_k": {1: 0.83, 5: 0.92, 10: 0.95, 100: 0.98},
+                },
+                {
+                    "name": "Claude-3-Opus",
+                    "pass_at_1": 0.87,  # Approximate
+                    "pass_at_k": {1: 0.87, 5: 0.94, 10: 0.96, 100: 0.99},
+                },
+                {
+                    "name": "Qwen2.5-32B",
+                    "pass_at_1": 0.80,  # Approximate
+                    "pass_at_k": {1: 0.80, 5: 0.90, 10: 0.93, 100: 0.97},
+                },
+            ],
+        }
+        
+        dataset_baselines = baselines.get(dataset)
+        if not dataset_baselines:
+            logger.info(f"No baseline data available for dataset: {dataset}")
+            return None
+        
+        comparisons = []
+        for baseline in dataset_baselines:
+            baseline_pass_at_k = baseline["pass_at_k"]
+            our_pass_at_k_values = {
+                k: our_pass_at_k.get(k, our_pass_at_1) for k in [1, 5, 10, 100]
+            }
+            
+            # Calculate deltas
+            pass_at_1_delta = our_pass_at_1 - baseline["pass_at_1"]
+            pass_at_k_delta = {
+                k: our_pass_at_k_values[k] - baseline_pass_at_k.get(k, baseline["pass_at_1"])
+                for k in [1, 5, 10, 100]
+            }
+            
+            comparison = BaselineComparison(
+                baseline_name=baseline["name"],
+                baseline_pass_at_1=baseline["pass_at_1"],
+                baseline_pass_at_k=baseline_pass_at_k,
+                our_pass_at_1=our_pass_at_1,
+                our_pass_at_k=our_pass_at_k_values,
+                pass_at_1_delta=pass_at_1_delta,
+                pass_at_k_delta=pass_at_k_delta,
+            )
+            comparisons.append(comparison)
+        
+        logger.info(f"Compared with {len(comparisons)} baselines for {dataset}")
+        return comparisons
