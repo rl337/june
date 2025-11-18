@@ -673,8 +673,14 @@ This phase focuses on refactoring individual services, building them, testing th
      - ✅ TTS espeak strategy: No model loading (just checks espeak availability) - no check needed
      - ✅ All strategies now prevent duplicate model loads which consume massive amounts of memory
      - ✅ Critical for large models like Qwen3-30B which can use 15-20GB+ of memory
+   - ✅ **COMPLETED: Quantization configuration:**
+     - ✅ Added `use_quantization` and `quantization_bits` to ModelConfig
+     - ✅ Added `USE_QUANTIZATION` and `QUANTIZATION_BITS` environment variables to docker-compose.yml
+     - ✅ Updated inference-api main.py to pass quantization parameters to Qwen3LlmStrategy
+     - ✅ Quantization is now configurable via environment variables (defaults to 8-bit for compatibility)
+     - ✅ Users can now easily switch between 4-bit and 8-bit quantization by setting `QUANTIZATION_BITS=4` or `QUANTIZATION_BITS=8`
    - ⏳ **Remaining memory optimization tasks:**
-     - ⏳ Verify 4-bit quantization is working (check logs) - Currently using 8-bit quantization
+     - ⏳ Verify 4-bit quantization is working (check logs when using QUANTIZATION_BITS=4)
      - ⏳ Monitor GPU memory usage during inference
      - ⏳ Adjust `MAX_CONTEXT_LENGTH` if needed based on available GPU memory
      - ⏳ Test with different batch sizes if applicable

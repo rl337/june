@@ -46,6 +46,9 @@ class ModelConfig:
     model_cache_dir: str = "/home/rlee/models"
     huggingface_cache_dir: str = "/home/rlee/models/huggingface"
     transformers_cache_dir: str = "/home/rlee/models/transformers"
+    # Quantization parameters
+    use_quantization: bool = True  # Enable quantization by default for memory efficiency
+    quantization_bits: int = 8  # 4 or 8 bits (8-bit is more compatible, 4-bit is more memory efficient)
     # Generation parameters (defaults, can be overridden per request)
     temperature: float = 0.7
     max_tokens: int = 2048
@@ -134,6 +137,8 @@ class Config:
             model_cache_dir=os.getenv("MODEL_CACHE_DIR", "/home/rlee/models"),
             huggingface_cache_dir=os.getenv("HUGGINGFACE_CACHE_DIR", "/home/rlee/models/huggingface"),
             transformers_cache_dir=os.getenv("TRANSFORMERS_CACHE_DIR", "/home/rlee/models/transformers"),
+            use_quantization=os.getenv("USE_QUANTIZATION", "true").lower() == "true",
+            quantization_bits=int(os.getenv("QUANTIZATION_BITS", "8")),
             temperature=float(os.getenv("MODEL_TEMPERATURE", "0.7")),
             max_tokens=int(os.getenv("MODEL_MAX_TOKENS", "2048")),
             top_p=float(os.getenv("MODEL_TOP_P", "0.9")),

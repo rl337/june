@@ -144,6 +144,10 @@ temp/
 *.tmp
 *.temp
 
+# Refactor agent tracking files
+.refactor_agent_error_count
+.refactor_agent_session_id
+
 # Build artifacts
 build/
 dist/

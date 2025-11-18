@@ -600,6 +600,8 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                     huggingface_token=config.model.huggingface_token if hasattr(config.model, 'huggingface_token') else None,
                     model_cache_dir=config.model.model_cache_dir if hasattr(config.model, 'model_cache_dir') else None,
                     local_files_only=config.model.local_files_only if hasattr(config.model, 'local_files_only') else None,
+                    use_quantization=config.model.use_quantization if hasattr(config.model, 'use_quantization') else None,
+                    quantization_bits=config.model.quantization_bits if hasattr(config.model, 'quantization_bits') else None,
                 )
                 
                 # Warmup the strategy (loads model and tokenizer)
