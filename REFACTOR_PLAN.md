@@ -265,6 +265,8 @@ Pare down the june project to bare essentials for the **voice message â†’ STT â†
 
 **Recent Attempts:**
 - Added logic to track old accumulated message in history before updating (line 779-781)
-- Added logic to ensure current accumulated message is in history at final line (line 902-904)
+- Added logic to ensure current accumulated message is in history at final line (line 916-918)
 - Added first message to history immediately when set (line 807-809)
+- Added new accumulated message to history immediately after updating (line 785-787)
 - Still need to debug why history only contains first message instead of all intermediate states
+- Issue: When chunks arrive quickly (before 2-second threshold), history should accumulate all intermediate states ("Hello", "Hello world", "Hello world!"), but only "Hello" is being yielded. Need to trace why "Hello world" and "Hello world!" are not in history when final line arrives.

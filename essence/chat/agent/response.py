@@ -781,6 +781,10 @@ def stream_chat_response_agent(
                                         logger.debug(f"Added old accumulated to history before update: length={len(old_accumulated)}")
                                     accumulated_message = accumulated_message + message
                                     message_updated = True
+                                    # Add new accumulated message to history immediately after updating
+                                    if accumulated_message and accumulated_message not in [msg for msg, _ in previous_accumulated_messages]:
+                                        previous_accumulated_messages.append((accumulated_message, current_time))
+                                        logger.debug(f"Added new accumulated to history after update: length={len(accumulated_message)}")
                                     logger.info(
                                         f"Appending assistant delta chunk. "
                                         f"Old: {old_accumulated[:50]}... ({len(old_accumulated)} chars), "
