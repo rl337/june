@@ -87,8 +87,8 @@ Pare down the june project to bare essentials for the **voice message → STT �
 
 **Tasks:**
 1. **Audit scripts directory:**
-   - ⏳ Categorize each script: keep as script, convert to command, move to tests, or remove
-   - ⏳ Document categorization decisions
+   - ✅ Categorize each script: keep as script, convert to command, move to tests, or remove (COMPLETED - reviewed all 16 remaining scripts)
+   - ✅ Document categorization decisions (COMPLETED - updated scripts/SCRIPTS_AUDIT.md with comprehensive audit including current state, categorization, priorities, and notes)
 
 2. **Convert reusable tools to commands:**
    - ✅ `review_sandbox.py` → `essence/commands/review_sandbox.py` (COMPLETED - runnable via `poetry run -m essence review-sandbox`)
