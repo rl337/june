@@ -685,13 +685,11 @@ def stream_chat_response_agent(
                     if is_result:
                         # Result message contains the full accumulated text - this is authoritative
                         # Store it separately and use it for final output
-                        # First, yield any pending assistant message if we haven't sent it yet
                         old_accumulated = accumulated_message
                         result_message = message
                         
-                        # If we have a pending assistant message that hasn't been sent, yield it first
+                        # If we have an assistant message that hasn't been sent yet, yield it first
                         if old_accumulated and old_accumulated != message and not first_message_sent:
-                            # Yield the assistant message first
                             logger.info(f"Yielding assistant message before result: {len(old_accumulated)} chars")
                             if span:
                                 span.add_event("yielding_assistant_before_result", attributes={
@@ -705,6 +703,8 @@ def stream_chat_response_agent(
                         # Store result message for final yield (don't yield it now - yield at final line)
                         accumulated_message = message
                         message_updated = False  # Don't yield result message now - yield it at final line with is_final=True
+                        # Clear pending messages since we'll yield the result at final line
+                        pending_messages = []
                         logger.info(f"Received authoritative result message: {len(message)} chars, previous accumulated: {len(old_accumulated)} chars")
                         
                         # Validate that our chunk appending worked correctly (for debugging)
@@ -804,43 +804,45 @@ def stream_chat_response_agent(
                         seen_messages.discard(accumulated_message)  # Remove old if exists
                         seen_messages.add(accumulated_message)
                         
-                        # Clear pending and add the new accumulated message
-                        pending_messages = [(accumulated_message, current_time)]
-                        
                         # Determine message type for the handler
                         message_type = "result" if is_result else "assistant"
                         
-                        # If this is the first message and we've waited long enough, send it immediately
-                        if not first_message_sent and elapsed >= max_wait_for_first_message:
-                            first_message_sent = True
-                            logger.info(f"Yielding first message after {elapsed:.2f}s: length={len(accumulated_message)}, type={message_type}")
-                            if span:
-                                span.add_event("yielding_first_message", attributes={
-                                    "length": len(accumulated_message),
-                                    "type": message_type,
-                                    "elapsed_seconds": elapsed
-                                })
-                            yield (accumulated_message, False, message_type)
-                            last_message_yield_time = current_time
-                            # Remove from pending since we just sent it
-                            pending_messages = []
-                        elif first_message_sent:
-                            # We've already sent a message, yield the updated one immediately
-                            # This allows Telegram to update the message in place
-                            # If this is a result message, it's authoritative and should overwrite regardless of length
-                            if is_result:
-                                logger.info(f"Yielding result message (authoritative): length={len(accumulated_message)} chars")
-                            else:
+                        # For result messages, don't yield immediately - yield at final line
+                        if is_result:
+                            # Store in pending for final yield, but don't yield now
+                            pending_messages = [(accumulated_message, current_time)]
+                        else:
+                            # For assistant messages, yield immediately if conditions are met
+                            # Clear pending and add the new accumulated message
+                            pending_messages = [(accumulated_message, current_time)]
+                            
+                            # If this is the first message and we've waited long enough, send it immediately
+                            if not first_message_sent and elapsed >= max_wait_for_first_message:
+                                first_message_sent = True
+                                logger.info(f"Yielding first message after {elapsed:.2f}s: length={len(accumulated_message)}, type={message_type}")
+                                if span:
+                                    span.add_event("yielding_first_message", attributes={
+                                        "length": len(accumulated_message),
+                                        "type": message_type,
+                                        "elapsed_seconds": elapsed
+                                    })
+                                yield (accumulated_message, False, message_type)
+                                last_message_yield_time = current_time
+                                # Remove from pending since we just sent it
+                                pending_messages = []
+                            elif first_message_sent:
+                                # We've already sent a message, yield the updated one immediately
+                                # This allows Telegram to update the message in place
                                 logger.info(f"Yielding updated accumulated message: length={len(accumulated_message)}, type={message_type}")
-                            if span:
-                                span.add_event("yielding_updated_message", attributes={
-                                    "length": len(accumulated_message),
-                                    "type": message_type,
-                                    "is_result": is_result
-                                })
-                            yield (accumulated_message, False, message_type)
-                            last_message_yield_time = current_time
-                            pending_messages = []
+                                if span:
+                                    span.add_event("yielding_updated_message", attributes={
+                                        "length": len(accumulated_message),
+                                        "type": message_type,
+                                        "is_result": is_result
+                                    })
+                                yield (accumulated_message, False, message_type)
+                                last_message_yield_time = current_time
+                                pending_messages = []
             
             # Yield pending messages if enough time has passed (pacing)
             if pending_messages:

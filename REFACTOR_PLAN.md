@@ -3,7 +3,7 @@
 ## Goal
 Pare down the june project to bare essentials for the **voice message → STT → LLM → TTS → voice response** round trip, supporting both **Telegram** and **Discord** platforms.
 
-**Extended Goal:** Get Qwen3-30B-A3B-Thinking-2507 running on GPU in containers and develop a capable locally-run coding agent for evaluation on public benchmark datasets. **All operations must be containerized** - no host system pollution.
+**Extended Goal:** Get Qwen3-30B-A3B-Thinking-2507 running on **GPU** in containers (CPU loading is FORBIDDEN - see Critical Requirements) and develop a capable locally-run coding agent for evaluation on public benchmark datasets. **All operations must be containerized** - no host system pollution.
 
 ## Core Principles (Established from Completed Work)
 
@@ -86,6 +86,39 @@ Pare down the june project to bare essentials for the **voice message → STT �
 - Created Grafana dashboard for test monitoring
 - Comprehensive workflow documentation
 - **Best Practice:** Monitor test runs via Prometheus/Grafana; set up alerts for failures
+
+## Critical Requirements
+
+### GPU-Only Model Loading (MANDATORY)
+
+**CRITICAL:** Large models (30B+ parameters) must **NEVER** be loaded on CPU. Loading a 30B model on CPU consumes 100GB+ of system memory and will cause system instability.
+
+**Requirements:**
+1. **All large models must use GPU** - Models like Qwen3-30B-A3B-Thinking-2507 must load on GPU with quantization (4-bit or 8-bit)
+2. **CPU fallback is FORBIDDEN for large models** - If GPU is not available or compatible, the service must:
+   - Fail to start with a clear error message
+   - NOT attempt to load the model on CPU
+   - Log the GPU compatibility issue and exit
+3. **GPU compatibility must be verified before model loading** - Check GPU compute capability and PyTorch compatibility before attempting to load models
+4. **Consult external sources for GPU setup** - If GPU is not working:
+   - Check PyTorch CUDA compatibility with your GPU architecture
+   - Review NVIDIA documentation for compute capability support
+   - Check PyTorch installation and CUDA toolkit versions
+   - Consider upgrading PyTorch or using a different CUDA version
+   - Review model quantization options (BitsAndBytesConfig) for GPU memory efficiency
+   - Check Docker container GPU access (nvidia-docker, GPU passthrough)
+   - Consult HuggingFace documentation for model loading best practices
+
+**Current Issue:**
+- Qwen3-30B model is falling back to CPU due to GPU compute capability mismatch (sm_121 not supported by PyTorch 2.5.1)
+- This causes 100GB+ memory usage and system instability
+- **Action Required:** Fix GPU compatibility or prevent CPU fallback (fail fast instead)
+
+**Implementation Guidelines:**
+- In `qwen3_strategy.py`, if GPU is not compatible, raise an exception instead of falling back to CPU
+- Add explicit checks: `if not gpu_compatible: raise RuntimeError("GPU required for large models")`
+- Document GPU requirements in service README
+- Add health check that verifies GPU availability before accepting requests
 
 ## Current Priorities
 
