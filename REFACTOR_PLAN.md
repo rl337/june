@@ -105,10 +105,10 @@ Pare down the june project to bare essentials for the **voice message → STT �
 
 **Tasks:**
 1. **Create integration test service:**
-   - ⏳ Design REST API for test management
-   - ⏳ Implement test runner that executes tests in background
-   - ⏳ Implement result storage and retrieval
-   - ⏳ Add health check endpoint
+   - ✅ Design REST API for test management (COMPLETED - REST API with endpoints for starting tests, checking status, retrieving results, viewing logs, listing runs, cancelling runs)
+   - ✅ Implement test runner that executes tests in background (COMPLETED - uses subprocess to run pytest in background, captures output line-by-line)
+   - ✅ Implement result storage and retrieval (COMPLETED - in-memory storage with TestRun dataclass, stores status, output, logs, exit codes)
+   - ✅ Add health check endpoint (COMPLETED - /health endpoint with Prometheus metrics)
 
 2. **Migrate existing integration tests:**
    - ⏳ Identify current integration tests

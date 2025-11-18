@@ -23,6 +23,7 @@ from . import download_models  # noqa: F401
 from . import benchmark_qwen3  # noqa: F401
 from . import run_benchmarks  # noqa: F401
 from . import generate_alice_dataset  # noqa: F401
+from . import integration_test_service  # noqa: F401
 
-__all__ = ["telegram_service", "discord_service", "tts_service", "stt_service", "inference_api_service", "review_sandbox", "monitor_gpu", "verify_qwen3", "download_models", "benchmark_qwen3", "run_benchmarks", "generate_alice_dataset"]
+__all__ = ["telegram_service", "discord_service", "tts_service", "stt_service", "inference_api_service", "review_sandbox", "monitor_gpu", "verify_qwen3", "download_models", "benchmark_qwen3", "run_benchmarks", "generate_alice_dataset", "integration_test_service"]
 
