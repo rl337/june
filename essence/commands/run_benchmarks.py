@@ -32,24 +32,59 @@ except ImportError as e:
 
 
 class RunBenchmarksCommand(Command):
-    """Command for running benchmark evaluations with sandboxed execution."""
+    """
+    Command for running benchmark evaluations with sandboxed execution.
+    
+    Orchestrates evaluation of coding agents on benchmark datasets (HumanEval, MBPP)
+    using isolated Docker container sandboxes. All task execution happens in containers
+    to ensure security, reproducibility, and full activity logging.
+    
+    Supports multiple datasets, configurable sandbox resources, and generates detailed
+    evaluation reports with metrics including pass@k, execution time, and efficiency scores.
+    """
     
     def __init__(self, args: argparse.Namespace):
-        """Initialize command with parsed arguments."""
+        """
+        Initialize command with parsed arguments.
+        
+        Args:
+            args: Parsed command-line arguments containing benchmark configuration
+        """
         super().__init__(args)
         self._evaluator = None
         self._output_dir = None
     
     @classmethod
     def get_name(cls) -> str:
+        """
+        Get the command name.
+        
+        Returns:
+            Command name: "run-benchmarks"
+        """
         return "run-benchmarks"
     
     @classmethod
     def get_description(cls) -> str:
+        """
+        Get the command description.
+        
+        Returns:
+            Description of what this command does
+        """
         return "Run benchmark evaluations with sandboxed execution"
     
     @classmethod
     def add_args(cls, parser: argparse.ArgumentParser) -> None:
+        """
+        Add command-line arguments to the argument parser.
+        
+        Configures all benchmark evaluation parameters including dataset selection,
+        sandbox configuration, resource limits, and output options.
+        
+        Args:
+            parser: Argument parser to add arguments to
+        """
         parser.add_argument(
             "--dataset",
             choices=["humaneval", "mbpp", "all"],
@@ -113,7 +148,15 @@ class RunBenchmarksCommand(Command):
         )
     
     def init(self) -> None:
-        """Initialize benchmark evaluation."""
+        """
+        Initialize benchmark evaluation.
+        
+        Sets up OpenTelemetry tracing, creates output directories, and initializes
+        the BenchmarkEvaluator with configured sandbox and inference API settings.
+        
+        Raises:
+            RuntimeError: If required dependencies (evaluator, dataset_loader) are not available
+        """
         if not DEPENDENCIES_AVAILABLE:
             raise RuntimeError(
                 f"Required dependencies not available: {IMPORT_ERROR}\n"
@@ -143,7 +186,23 @@ class RunBenchmarksCommand(Command):
         logger.info("Benchmark evaluator initialized")
     
     def run(self) -> None:
-        """Run benchmark evaluations."""
+        """
+        Run benchmark evaluations.
+        
+        Loads datasets (HumanEval, MBPP, or both), evaluates each task in isolated
+        sandboxes, collects metrics, and generates detailed reports. Supports
+        evaluating subsets of tasks via --max-tasks and generates both per-dataset
+        and combined reports.
+        
+        For each dataset:
+        - Loads tasks from the dataset loader
+        - Evaluates tasks using the BenchmarkEvaluator
+        - Prints summary statistics (pass@1, execution time, efficiency)
+        - Saves detailed reports and sandbox snapshots to output directory
+        
+        If multiple datasets are evaluated, generates a combined report with
+        aggregated results across all datasets.
+        """
         # Determine datasets to evaluate
         datasets_to_evaluate = []
         if self.args.dataset == "all":
@@ -222,7 +281,13 @@ class RunBenchmarksCommand(Command):
         logger.info("Benchmark evaluation completed!")
     
     def cleanup(self) -> None:
-        """Clean up benchmark evaluation resources."""
+        """
+        Clean up benchmark evaluation resources.
+        
+        Releases any resources held by the benchmark evaluator, including
+        sandbox containers and connections. Should be called when the command
+        is finished to ensure proper resource cleanup.
+        """
         if self._evaluator:
             # Evaluator cleanup if needed
             pass
