@@ -26,10 +26,6 @@ def clean_temp_dir():
     shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-# Pytest markers
-pytest_plugins = []
-
-
 def pytest_configure(config):
     """Configure pytest markers."""
     config.addinivalue_line(

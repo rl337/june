@@ -567,6 +567,13 @@ This phase focuses on refactoring individual services, building them, testing th
        - **Missing:** Tracing span tests, metrics collection tests
    
    - ⏳ **Remaining unit test tasks:**
+     - ✅ **COMPLETED:** Fixed pytest_plugins error in tests/agentic/conftest.py (removed pytest_plugins = [] from non-top-level conftest)
+     - ⏳ **CRITICAL:** Fix test import errors - Many test files have import errors because they reference old `services/` directory structure
+       - ⏳ Test files in `tests/services/telegram/` import from `main`, `audio_utils`, `handlers.commands`, `handlers.voice` (old paths)
+       - ⏳ Test files in `tests/services/stt/`, `tests/services/tts/`, `tests/services/inference-api/` have similar import issues
+       - ⏳ Tests need to be updated to import from `essence/services/<service>/` instead of old `services/<service>/` paths
+       - ⏳ This is blocking test collection - 24 test files have ImportError during collection
+       - ⏳ Example: `from main import TelegramBotService` should be `from essence.services.telegram.main import TelegramBotService` (or similar)
      - ⏳ Add tracing span tests for all services (verify spans are created with correct attributes)
      - ⏳ Add metrics collection tests for telegram, tts services (stt and inference-api have some metrics tests)
      - ⏳ Create complete test suite for discord service (currently no tests exist)
