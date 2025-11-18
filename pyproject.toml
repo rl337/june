@@ -73,6 +73,7 @@ dependencies = [
     "pillow>=10.1.0",
     "numpy>=1.24.0",  # Standard version, TTS will be installed separately in TTS service
     "scipy>=1.11.0",
+    "docker>=6.1.0",  # Docker SDK for sandbox management
 ]
 
 [build-system]
