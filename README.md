@@ -205,7 +205,7 @@ June uses Qwen3-30B-A3B-Thinking-2507 for LLM inference. The model runs in Docke
    ```bash
    # Download model in container (no host pollution)
    docker compose run --rm cli-tools \
-     poetry run python scripts/download_qwen3.py
+     poetry run -m essence download-models --model Qwen/Qwen3-30B-A3B-Thinking-2507
    ```
 
 2. **Start inference-api service:**

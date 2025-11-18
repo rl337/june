@@ -31,8 +31,8 @@ from essence.command import Command
 
 logger = logging.getLogger(__name__)
 
-# Model cache directory
-MODEL_CACHE_DIR = Path("/home/rlee/models")
+# Model cache directory (supports both host and container paths)
+MODEL_CACHE_DIR = Path(os.getenv("MODEL_CACHE_DIR", "/home/rlee/models"))
 HUGGINGFACE_CACHE_DIR = MODEL_CACHE_DIR / "huggingface"
 TRANSFORMERS_CACHE_DIR = MODEL_CACHE_DIR / "transformers"
 WHISPER_CACHE_DIR = MODEL_CACHE_DIR / "whisper"
@@ -120,20 +120,47 @@ class ModelDownloader:
             os.environ["HF_HOME"] = str(self.hf_cache_dir)
             os.environ["TRANSFORMERS_CACHE"] = str(self.transformers_cache_dir)
             
+            # Get HuggingFace token from environment (for gated models)
+            token = os.getenv("HUGGINGFACE_TOKEN")
+            if not token:
+                logger.warning("HUGGINGFACE_TOKEN not set - model may be gated and require authentication")
+                logger.warning("Set HUGGINGFACE_TOKEN environment variable if download fails")
+            
+            # Check if model is already downloaded (for LLM models)
+            if category == "llm":
+                model_path = self.hf_cache_dir / "hub" / f"models--{model_name.replace('/', '--')}"
+                if model_path.exists():
+                    # Check for key model files
+                    safetensors_files = list(model_path.rglob("*.safetensors"))
+                    if safetensors_files:
+                        logger.info(f"Model appears to be already downloaded ({len(safetensors_files)} safetensors files found)")
+                        logger.info(f"Model cached at: {model_path}")
+                        logger.info("To force re-download, delete the model directory first or use --force flag")
+                        return True
+            
             # Download the model
+            download_kwargs = {
+                "cache_dir": self.hf_cache_dir,
+                "local_files_only": False,
+                "resume_download": True,
+            }
+            if token:
+                download_kwargs["token"] = token
+            
             if category == "llm":
                 # For large language models, download the entire repository
-                snapshot_download(
+                logger.info("Downloading model files (this may take a while)...")
+                logger.info("Note: Model will be quantized when loaded by inference-api service")
+                model_path = snapshot_download(
                     repo_id=model_name,
-                    cache_dir=self.hf_cache_dir,
-                    local_files_only=False
+                    **download_kwargs
                 )
+                logger.info(f"Model files downloaded successfully to {model_path}")
             else:
                 # For other models, download specific files
                 hf_hub_download(
                     repo_id=model_name,
-                    cache_dir=self.hf_cache_dir,
-                    local_files_only=False
+                    **download_kwargs
                 )
             
             logger.info(f"Successfully downloaded {model_name}")
@@ -141,6 +168,8 @@ class ModelDownloader:
             
         except Exception as e:
             logger.error(f"Failed to download {model_name}: {e}")
+            if "gated" in str(e).lower() or "authentication" in str(e).lower():
+                logger.error("This model may be gated. Set HUGGINGFACE_TOKEN environment variable.")
             return False
     
     def download_whisper_model(self, model_name: str) -> bool:

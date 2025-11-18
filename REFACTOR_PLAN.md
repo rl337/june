@@ -97,7 +97,8 @@ Pare down the june project to bare essentials for the **voice message → STT �
    - ✅ `download_models.py` → `essence/commands/download_models.py` (COMPLETED - runnable via `poetry run -m essence download-models`)
    - ✅ `benchmark_qwen3_performance.py` → `essence/commands/benchmark_qwen3.py` (COMPLETED - runnable via `poetry run -m essence benchmark-qwen3`)
    - ✅ `run_benchmarks.py` → `essence/commands/run_benchmarks.py` (COMPLETED - runnable via `poetry run -m essence run-benchmarks`)
-   - ⏳ Any other reusable Python tools (download_qwen3.py, generate_alice_dataset.py)
+   - ✅ `download_qwen3.py` → Merged into `essence/commands/download_models.py` (COMPLETED - enhanced download-models command to support MODEL_CACHE_DIR and HUGGINGFACE_TOKEN, removed redundant script)
+   - ⏳ Any other reusable Python tools (generate_alice_dataset.py)
 
 3. **Move test utilities to tests/:**
    - ✅ `test_*.py` files → `tests/scripts/` (COMPLETED - moved 8 test Python files)

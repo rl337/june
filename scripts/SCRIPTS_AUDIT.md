@@ -54,12 +54,13 @@ These are shell scripts for infrastructure setup, automation, or complex contain
 
 These are reusable Python tools that should be converted to commands:
 
-1. **`download_qwen3.py`** 🔄 CONVERT TO COMMAND
+1. **`download_qwen3.py`** ✅ MERGED INTO COMMAND
    - **Purpose:** Download Qwen3-30B-A3B-Thinking-2507 model in container
-   - **Action:** Merge into `essence/commands/download_models.py` or create `essence/commands/download_qwen3.py`
+   - **Action:** ✅ Merged into `essence/commands/download_models.py` (enhanced to support MODEL_CACHE_DIR and HUGGINGFACE_TOKEN)
    - **Reason:** Reusable tool for model management
-   - **Priority:** Medium (functionality may already exist in download-models command)
-   - **Status:** ⏳ TODO
+   - **Priority:** Medium (functionality already exists in download-models command)
+   - **Status:** ✅ COMPLETED
+   - **Note:** ✅ Enhanced download-models command to support container paths via MODEL_CACHE_DIR env var, added HUGGINGFACE_TOKEN support, added model existence check
 
 2. **`generate_alice_dataset.py`** 🔄 CONVERT TO COMMAND
    - **Purpose:** Generate Alice's Adventures in Wonderland dataset for audio testing

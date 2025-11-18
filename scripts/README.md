@@ -56,7 +56,6 @@ Reusable tools have been migrated to commands. Use these instead of scripts:
 
 ### Dataset/Data Scripts
 - `generate_alice_dataset.py` - Dataset generation (may stay as script or become command)
-- `download_qwen3.py` - Model download (may be merged into download-models command)
 
 ## Guidelines
 
