@@ -399,7 +399,14 @@ This phase focuses on refactoring individual services, building them, testing th
      - Add proper tracing to all operations
 
 2. **Code quality improvements:**
-   - ⏳ Ensure all services follow `essence.command.Command` pattern
+   - ✅ **COMPLETED:** Ensure all services follow `essence.command.Command` pattern
+     - ✅ telegram service: Already uses `TelegramServiceCommand` (essence/commands/telegram_service.py)
+     - ✅ discord service: Already uses `DiscordServiceCommand` (essence/commands/discord_service.py)
+     - ✅ tts service: Already uses `TTSServiceCommand` (essence/commands/tts_service.py)
+     - ✅ stt service: Created `STTServiceCommand` (essence/commands/stt_service.py) - wraps async serve() function
+     - ✅ inference-api service: Created `InferenceAPIServiceCommand` (essence/commands/inference_api_service.py) - wraps async serve() function
+     - ✅ All commands registered in essence/commands/__init__.py for discovery
+     - ✅ All services can now be run via `poetry run python -m essence <service-name>`
    - ⏳ Remove duplicate code (consolidate into `essence/`)
    - ⏳ Add proper error handling
    - ⏳ Add proper logging with structured format
