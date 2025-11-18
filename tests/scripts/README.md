@@ -19,7 +19,7 @@ These tests require:
 - `test_generate_stream.py` - LLM stream generation test
 - `test_validate_tts_stt.py` - TTS/STT validation test
 - `test_round_trip_alice*.py` - Round-trip voice message tests
-- `test_pipeline_modes.py` - Pipeline mode tests (may reference gateway)
+- `test_pipeline_modes.py` - ⚠️ **OBSOLETE** - Pipeline mode tests (depends on removed gateway service, imports non-existent `test_round_trip_gateway`, kept for reference only)
 - `test_single_word_fix.py` - Single word fix test
 - `penetration_test.py` - Penetration testing script (may reference gateway)
 
@@ -30,6 +30,7 @@ These tests should be run manually when services are running, or via the integra
 ## TODO
 
 - ✅ **COMPLETED:** Marked `test_e2e_text_passthrough.py` as obsolete (depends on removed gateway service)
-- ⏳ Update other tests that reference removed services (gateway) - see `test_pipeline_modes.py`, `penetration_test.py`, and shell scripts
+- ✅ **COMPLETED:** Marked `test_pipeline_modes.py` as obsolete (depends on removed gateway service, imports non-existent module)
+- ⏳ Update other tests that reference removed services (gateway) - see `penetration_test.py` and shell scripts (`diagnose_test_failures.sh`, `run_tests_with_artifacts.sh`)
 - ⏳ Ensure all dependencies are available when running via integration test service
 - ⏳ Consider moving these to `tests/integration/` if they're meant to be integration tests

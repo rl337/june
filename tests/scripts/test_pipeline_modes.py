@@ -1,9 +1,21 @@
 #!/usr/bin/env python3
 """
 Pipeline Mode Testing Script
+
+⚠️ **OBSOLETE:** This test is obsolete because it depends on the gateway service,
+which has been removed as part of the refactoring. The gateway service was
+removed to achieve a minimal architecture with direct gRPC communication between
+services.
+
+**Original Purpose:**
 Tests the pipeline in different modes:
 1. Full Mock Mode - all services pass-through
 2. STT/TTS Round-Trip Mode - real TTS/STT for audio validation
+
+**Status:** This test file is kept for reference but is not functional.
+The test imports `test_round_trip_gateway` which no longer exists, and all
+test modes reference the removed gateway service. To test the pipeline without
+gateway, use direct gRPC calls to STT, LLM, and TTS services.
 """
 import os
 import sys
