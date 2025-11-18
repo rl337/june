@@ -4,7 +4,9 @@
 
 **Last Updated:** 2025-11-18
 
-**🎉 REFACTORING COMPLETE:** All major refactoring phases have been completed. The project has been successfully pared down to bare essentials for the voice message → STT → LLM → TTS → voice response round trip. 
+**🎉 REFACTORING COMPLETE:** All major refactoring phases have been completed. The project has been successfully pared down to bare essentials for the voice message → STT → LLM → TTS → voice response round trip.
+
+**✅ Phase 10 Coding Agent Command:** The coding-agent CLI command has been implemented (`essence/commands/coding_agent.py`), providing both single-task and interactive modes for using the coding agent. This completes the Phase 10 implementation infrastructure. 
 
 **✅ All code-related work is complete:**
 - All service dependencies removed
