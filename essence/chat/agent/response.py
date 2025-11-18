@@ -775,6 +775,10 @@ def stream_chat_response_agent(
                                     # Delta chunk - append directly (no separators, chunks should fit together)
                                     # If message starts with space, it's a continuation (e.g., " world" after "Hello")
                                     old_accumulated = accumulated_message
+                                    # Add old accumulated message to history before updating (if not already there)
+                                    if old_accumulated and old_accumulated not in [msg for msg, _ in previous_accumulated_messages]:
+                                        previous_accumulated_messages.append((old_accumulated, current_time))
+                                        logger.debug(f"Added old accumulated to history before update: length={len(old_accumulated)}")
                                     accumulated_message = accumulated_message + message
                                     message_updated = True
                                     logger.info(
@@ -799,6 +803,10 @@ def stream_chat_response_agent(
                                 accumulated_message = message
                                 message_updated = True
                                 logger.info(f"First assistant chunk: {len(accumulated_message)} chars")
+                                # Add first message to history immediately
+                                if accumulated_message and accumulated_message not in [msg for msg, _ in previous_accumulated_messages]:
+                                    previous_accumulated_messages.append((accumulated_message, current_time))
+                                    logger.debug(f"Added first message to history: length={len(accumulated_message)}")
                     
                     # Always yield the accumulated message when it updates, so Telegram can update in place
                     if message_updated:
@@ -884,7 +892,7 @@ def stream_chat_response_agent(
             
             # If this is the final line from the generator, process remaining messages
             if is_final_line:
-                logger.info(f"Received final line from generator. pending_messages={len(pending_messages)}, seen_messages={len(seen_messages)}")
+                logger.info(f"Received final line from generator. pending_messages={len(pending_messages)}, seen_messages={len(seen_messages)}, history_size={len(previous_accumulated_messages)}")
                 if span:
                     span.add_event("final_line_received", attributes={
                         "pending_messages": len(pending_messages),
@@ -892,11 +900,17 @@ def stream_chat_response_agent(
                         "json_lines_processed": json_line_count,
                         "accumulated_length": len(accumulated_message),
                         "has_result_message": result_message is not None,
-                        "first_message_sent": first_message_sent
+                        "first_message_sent": first_message_sent,
+                        "history_size": len(previous_accumulated_messages)
                     })
                 # If we haven't sent the first message yet and threshold is met, yield from history
-                if not first_message_sent and elapsed >= max_wait_for_first_message and previous_accumulated_messages:
+                if not first_message_sent and elapsed >= max_wait_for_first_message:
                     first_message_sent = True
+                    # Ensure current accumulated message is in history if it's not already there
+                    if accumulated_message and accumulated_message not in [msg for msg, _ in previous_accumulated_messages]:
+                        previous_accumulated_messages.append((accumulated_message, current_time))
+                        logger.info(f"Added current accumulated message to history (final line): length={len(accumulated_message)}")
+                    
                     # Yield all previous accumulated messages in sequence
                     last_yielded_msg = None
                     for msg, msg_time in previous_accumulated_messages:
@@ -910,11 +924,6 @@ def stream_chat_response_agent(
                         last_yielded_msg = msg
                     # Clear history after yielding
                     previous_accumulated_messages = []
-                    # Also yield current message if it's different from the last one yielded
-                    if last_yielded_msg and accumulated_message and accumulated_message != last_yielded_msg:
-                        logger.info(f"Yielding current message after history (final line): length={len(accumulated_message)}")
-                        yield (accumulated_message, False, "assistant")
-                        last_message_yield_time = current_time
                 # Process any remaining pending messages quickly
                 for message, _ in pending_messages:
                     if message not in seen_messages or not first_message_sent:

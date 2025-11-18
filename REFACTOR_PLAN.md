@@ -261,3 +261,9 @@ Pare down the june project to bare essentials for the **voice message â†’ STT â†
 **Impact:** This failure affects the response accumulation logic for multiple assistant chunks but doesn't block the core refactoring goals. Most test cases (11/12) are now passing.
 
 **Action Required:** Refine history tracking logic in `stream_chat_response_agent` to properly yield all intermediate accumulated states when the threshold is met at the final line.
+
+**Recent Attempts:**
+- Added logic to track old accumulated message in history before updating (line 779-781)
+- Added logic to ensure current accumulated message is in history at final line (line 902-904)
+- Added first message to history immediately when set (line 807-809)
+- Still need to debug why history only contains first message instead of all intermediate states
