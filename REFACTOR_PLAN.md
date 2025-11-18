@@ -107,7 +107,11 @@ Pare down the june project to bare essentials for the **voice message → STT �
    - ✅ `test_artifact_collection.sh` → `tests/scripts/` (COMPLETED)
    - ✅ `test_audio_services.sh` → `tests/scripts/` (COMPLETED)
    - ✅ `validate_stt.sh` → `tests/scripts/` (COMPLETED)
-   - ✅ Updated references in `scripts/deploy_audio_services.sh`, `tests/scripts/run_audio_tests.sh`, and `docs/guides/AGENTS.md` (COMPLETED)
+   - ✅ `diagnose_test_failures.sh` → `tests/scripts/` (COMPLETED)
+   - ✅ `run_tests_with_artifacts.sh` → `tests/scripts/` (COMPLETED)
+   - ✅ `set_test_mode.sh` → `tests/scripts/` (COMPLETED - removed GATEWAY_MODE references)
+   - ✅ `penetration_test.py` → `tests/scripts/` (COMPLETED)
+   - ✅ Updated references in `scripts/deploy_audio_services.sh`, `tests/scripts/run_audio_tests.sh`, `docs/guides/AGENTS.md`, `tests/scripts/diagnose_test_failures.sh`, and `tests/scripts/set_test_mode.sh` (COMPLETED)
 
 4. **Remove obsolete scripts:**
    - ✅ Scripts referencing removed services (COMPLETED - removed validate_gateway.sh, test_round_trip_gateway.py, optimize_database_queries.py, encrypt_existing_data.py)

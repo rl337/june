@@ -536,7 +536,7 @@ Test runs create isolated test artifacts in timestamped directories:
 
 ### Test Orchestration
 
-The `scripts/run_tests_with_artifacts.sh` script provides full test orchestration:
+The `tests/scripts/run_tests_with_artifacts.sh` script provides full test orchestration:
 
 1. **Starts Fresh Containers** - Spins up a clean docker-compose environment
 2. **Runs Tests** - Executes Gateway round-trip tests
@@ -546,10 +546,10 @@ The `scripts/run_tests_with_artifacts.sh` script provides full test orchestratio
 **Usage:**
 ```bash
 # Full test run with artifact collection
-./scripts/run_tests_with_artifacts.sh
+./tests/scripts/run_tests_with_artifacts.sh
 
 # With custom test limit
-TEST_LIMIT=5 ./scripts/run_tests_with_artifacts.sh
+TEST_LIMIT=5 ./tests/scripts/run_tests_with_artifacts.sh
 ```
 
 **Important Notes:**

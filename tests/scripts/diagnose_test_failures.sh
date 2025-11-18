@@ -140,9 +140,9 @@ echo ""
 
 # Check 8: Environment variables in orchestration script
 echo "8. Checking orchestration script environment variable handling..."
-if [ -f "scripts/run_tests_with_artifacts.sh" ]; then
+if [ -f "tests/scripts/run_tests_with_artifacts.sh" ]; then
     echo "   Script exists"
-    if grep -q "JUNE_TEST_DATA_DIR" scripts/run_tests_with_artifacts.sh; then
+    if grep -q "JUNE_TEST_DATA_DIR" tests/scripts/run_tests_with_artifacts.sh; then
         echo "   ✅ JUNE_TEST_DATA_DIR is set in script"
     else
         echo "   ❌ JUNE_TEST_DATA_DIR not found in script"

@@ -82,31 +82,31 @@ These are reusable Python tools that should be converted to commands:
 
 These are test utilities that should be moved to `tests/scripts/`:
 
-1. **`diagnose_test_failures.sh`** 📦 MOVE TO TESTS
+1. **`diagnose_test_failures.sh`** ✅ MOVED TO TESTS
    - **Purpose:** Comprehensive diagnostic script for test artifact failures
-   - **Action:** Move to `tests/scripts/diagnose_test_failures.sh`
+   - **Action:** ✅ Moved to `tests/scripts/diagnose_test_failures.sh`
    - **Reason:** Test utility for debugging test failures
-   - **Status:** ⏳ TODO
+   - **Status:** ✅ COMPLETED
 
-2. **`run_tests_with_artifacts.sh`** 📦 MOVE TO TESTS
+2. **`run_tests_with_artifacts.sh`** ✅ MOVED TO TESTS
    - **Purpose:** Run tests with artifact collection
-   - **Action:** Move to `tests/scripts/run_tests_with_artifacts.sh` or convert to pytest
+   - **Action:** ✅ Moved to `tests/scripts/run_tests_with_artifacts.sh`
    - **Reason:** Test utility
-   - **Status:** ⏳ TODO
+   - **Status:** ✅ COMPLETED
 
-3. **`set_test_mode.sh`** 📦 MOVE TO TESTS
+3. **`set_test_mode.sh`** ✅ MOVED TO TESTS
    - **Purpose:** Set test mode configuration (mock, stt_tts_roundtrip, etc.)
-   - **Action:** Move to `tests/scripts/set_test_mode.sh` or convert to pytest fixture
+   - **Action:** ✅ Moved to `tests/scripts/set_test_mode.sh`
    - **Reason:** Test utility for configuring test environment
-   - **Status:** ⏳ TODO
-   - **Note:** References removed services (GATEWAY_MODE) - needs update
+   - **Status:** ✅ COMPLETED
+   - **Note:** ✅ Removed references to removed services (GATEWAY_MODE)
 
-4. **`penetration_test.py`** 📦 MOVE TO TESTS
+4. **`penetration_test.py`** ✅ MOVED TO TESTS
    - **Purpose:** Automated penetration testing for June Agent system
-   - **Action:** Move to `tests/scripts/penetration_test.py` or `tests/security/penetration_test.py`
+   - **Action:** ✅ Moved to `tests/scripts/penetration_test.py`
    - **Reason:** Security testing utility
-   - **Status:** ⏳ TODO
-   - **Note:** References removed services (gateway) - needs update
+   - **Status:** ✅ COMPLETED
+   - **Note:** May need updates to remove references to removed services (gateway)
 
 ### ❌ Remove (Obsolete)
 
@@ -151,13 +151,13 @@ These scripts are obsolete and should be removed:
 **Current State:**
 - **Keep as Scripts:** 7 scripts (all infrastructure/automation)
 - **Convert to Commands:** ✅ All Python tools converted (3 completed: run_benchmarks, download_qwen3 merged, generate_alice_dataset)
-- **Move to Tests:** 4 scripts (test utilities)
-- **Remove:** 2 scripts (obsolete build scripts)
+- **Move to Tests:** ✅ All test utilities moved (4 completed: diagnose_test_failures.sh, run_tests_with_artifacts.sh, set_test_mode.sh, penetration_test.py)
+- **Remove:** ✅ All obsolete scripts removed (2 completed: build_inference_core_wheel.sh, build_june_grpc_api_wheel.sh)
 
 **Total Remaining Tasks:**
 - ✅ All conversions to commands completed
-- 4 moves to tests
-- 2 removals
+- ✅ All test utilities moved to tests/
+- ✅ All obsolete scripts removed
 
 ## Conversion Priority
 
