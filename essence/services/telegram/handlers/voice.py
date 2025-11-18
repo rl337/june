@@ -822,140 +822,146 @@ async def handle_voice_message(
                                 encoding="wav",
                                 config=cfg
                             ):
-                            # Track the last result for confidence
-                            last_result = result
-                            
-                            # Update transcript with latest result
-                            if result.transcript:
-                                transcript = result.transcript
-                            
-                            # If this is a final result, save it
-                            if result.is_final:
-                                final_transcript = result.transcript
-                                transcript = result.transcript
-                                final_confidence = result.confidence
+                                # Track the last result for confidence
+                                last_result = result
                                 
-                                # Update detected language from final result
-                                stt_detected_language = getattr(result, "detected_language", None)
-                                if stt_detected_language:
-                                    detected_language = stt_detected_language
-                                    # Update language preference if detected language differs from preference
-                                    if detected_language != preferred_language:
-                                        logger.info(f"STT detected language {detected_language} differs from preference {preferred_language}, updating preference")
-                                        ConversationStorage.set_language_preference(user_id, chat_id, detected_language)
-                            
-                            # Update Telegram message with interim results (throttle to avoid too many updates)
-                            now = datetime.now()
-                            if (now - last_update_time).total_seconds() >= 1.0:  # Update at most once per second
+                                # Update transcript with latest result
+                                if result.transcript:
+                                    transcript = result.transcript
+                                
+                                # If this is a final result, save it
                                 if result.is_final:
-                                    await status_msg.edit_text(f"✅ **Transcription complete:**\n\n{transcript}")
-                                else:
-                                    # Show interim result with indicator
-                                    await status_msg.edit_text(f"🎤 **Transcribing...**\n\n{transcript}\n\n_Listening..._")
-                                last_update_time = now
-                        
-                        # Use final transcript if available, otherwise use last transcript
-                        transcript = final_transcript if final_transcript else transcript
-                        
-                        # Use confidence from last result if available
-                        if last_result and not final_transcript:
-                            final_confidence = last_result.confidence
-                        
-                        # Set span attributes with results
-                        span.set_attribute("stt.transcript_length", len(transcript))
-                        span.set_attribute("stt.confidence", final_confidence)
-                        if detected_language:
-                            span.set_attribute("stt.detected_language", detected_language)
-                    except Exception as e:
-                        stt_status = "error"
-                        span.record_exception(e)
-                        span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
-                        raise
-                    finally:
-                        # Record STT metrics
-                        stt_duration = time.time() - stt_start_time
-                        record_grpc_call("stt", "recognize_stream", stt_duration, stt_status)
-                        STT_TRANSCRIPTION_DURATION_SECONDS.labels(platform=PLATFORM, status=stt_status).observe(stt_duration)
+                                    final_transcript = result.transcript
+                                    transcript = result.transcript
+                                    final_confidence = result.confidence
+                                    
+                                    # Update detected language from final result
+                                    stt_detected_language = getattr(result, "detected_language", None)
+                                    if stt_detected_language:
+                                        detected_language = stt_detected_language
+                                        # Update language preference if detected language differs from preference
+                                        if detected_language != preferred_language:
+                                            logger.info(f"STT detected language {detected_language} differs from preference {preferred_language}, updating preference")
+                                            ConversationStorage.set_language_preference(user_id, chat_id, detected_language)
+                                
+                                # Update Telegram message with interim results (throttle to avoid too many updates)
+                                now = datetime.now()
+                                if (now - last_update_time).total_seconds() >= 1.0:  # Update at most once per second
+                                    if result.is_final:
+                                        await status_msg.edit_text(f"✅ **Transcription complete:**\n\n{transcript}")
+                                    else:
+                                        # Show interim result with indicator
+                                        await status_msg.edit_text(f"🎤 **Transcribing...**\n\n{transcript}\n\n_Listening..._")
+                                    last_update_time = now
+                            
+                            # Use final transcript if available, otherwise use last transcript
+                            transcript = final_transcript if final_transcript else transcript
+                            
+                            # Use confidence from last result if available
+                            if last_result and not final_transcript:
+                                final_confidence = last_result.confidence
+                            
+                            # Set span attributes with results
+                            span.set_attribute("stt.transcript_length", len(transcript))
+                            span.set_attribute("stt.confidence", final_confidence)
+                            if detected_language:
+                                span.set_attribute("stt.detected_language", detected_language)
+                        except Exception as e:
+                            stt_status = "error"
+                            span.record_exception(e)
+                            span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                            raise
+                        finally:
+                            # Record STT metrics
+                            stt_duration = time.time() - stt_start_time
+                            record_grpc_call("stt", "recognize_stream", stt_duration, stt_status)
+                            STT_TRANSCRIPTION_DURATION_SECONDS.labels(platform=PLATFORM, status=stt_status).observe(stt_duration)
+                    
+                    # Handle empty or invalid transcriptions
+                    if not transcript or not transcript.strip():
+                        logger.warning("STT service returned empty or whitespace-only transcript")
+                        await status_msg.edit_text(
+                            "❌ **Transcription failed:**\n\n"
+                            "The audio could not be transcribed. This might be due to:\n"
+                            "• Background noise or unclear audio\n"
+                            "• Audio too short or silent\n"
+                            "• Unsupported language\n\n"
+                            "Please try again with a clearer voice message."
+                        )
+                        return
+                except Exception as e:
+                    # Handle errors from the STT channel/streaming
+                    stt_status = "error"
+                    span.record_exception(e)
+                    span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                    raise
                 
-                # Handle empty or invalid transcriptions
-                if not transcript or not transcript.strip():
-                    logger.warning("STT service returned empty or whitespace-only transcript")
-                    await status_msg.edit_text(
-                        "❌ **Transcription failed:**\n\n"
-                        "The audio could not be transcribed. This might be due to:\n"
-                        "• Background noise or unclear audio\n"
-                        "• Audio too short or silent\n"
-                        "• Unsupported language\n\n"
-                        "Please try again with a clearer voice message."
-                    )
+                # Check for voice language change command
+                is_language_command, language_command_response = handle_voice_language_command(
+                    transcript, user_id, chat_id
+                )
+                
+                if is_language_command:
+                    # This was a language change command, respond and return early
+                    await status_msg.edit_text(language_command_response)
                     return
-            
-            # Check for voice language change command
-            is_language_command, language_command_response = handle_voice_language_command(
-                transcript, user_id, chat_id
-            )
-            
-            if is_language_command:
-                # This was a language change command, respond and return early
-                await status_msg.edit_text(language_command_response)
-                return
-            
-            # Calculate processing time and audio duration
-            processing_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
-            
-            # Calculate audio duration from the prepared audio
-            try:
-                audio_array, sr = librosa.load(io.BytesIO(stt_audio), sr=16000)
-                audio_duration = len(audio_array) / sr
-            except Exception:
-                # Fallback: estimate from size (rough approximation)
-                audio_duration = len(stt_audio) / (16000 * 2)  # 16kHz, 16-bit = 2 bytes/sample
-            
-            # Record metrics (use final transcript confidence if available)
-            try:
-                metrics = get_metrics_storage()
-                metrics.record_transcription(
-                    audio_format=original_audio_format,
-                    audio_duration_seconds=audio_duration,
-                    audio_size_bytes=original_audio_size,
-                    sample_rate=16000,
-                    transcript_length=len(transcript),
-                    confidence=final_confidence,
-                    processing_time_ms=processing_time_ms,
-                    source="telegram",
-                    metadata={
-                        "telegram_file_id": voice_metadata['file_id'],
-                        "telegram_file_unique_id": voice_metadata['file_unique_id'],
-                        "telegram_duration": voice_metadata['duration'],
-                        "telegram_file_size": voice_metadata['file_size'],
-                        "telegram_mime_type": voice_metadata['mime_type'],
-                        "prepared_audio_size": len(stt_audio),
-                        "streaming": True
-                    }
-                )
-            except Exception as e:
-                logger.warning(f"Failed to record transcription metrics: {e}")
-            
-            # Record STT cost (non-blocking)
-            try:
-                conversation_id = get_conversation_id_from_user_chat(user_id, chat_id)
-                stt_cost = calculate_stt_cost(audio_duration)
-                record_cost(
-                    service="stt",
-                    user_id=user_id,
-                    conversation_id=conversation_id,
-                    cost=stt_cost,
-                    metadata={
-                        "audio_duration_seconds": audio_duration,
-                        "transcript_length": len(transcript),
-                        "confidence": final_confidence,
-                        "source": "telegram"
-                    }
-                )
-            except Exception as e:
-                logger.warning(f"Failed to record STT cost: {e}")
-            
-            logger.info(f"Transcription: {transcript}")
+                
+                # Calculate processing time and audio duration
+                processing_time_ms = int((datetime.now() - start_time).total_seconds() * 1000)
+                
+                # Calculate audio duration from the prepared audio
+                try:
+                    audio_array, sr = librosa.load(io.BytesIO(stt_audio), sr=16000)
+                    audio_duration = len(audio_array) / sr
+                except Exception:
+                    # Fallback: estimate from size (rough approximation)
+                    audio_duration = len(stt_audio) / (16000 * 2)  # 16kHz, 16-bit = 2 bytes/sample
+                
+                # Record metrics (use final transcript confidence if available)
+                try:
+                    metrics = get_metrics_storage()
+                    metrics.record_transcription(
+                        audio_format=original_audio_format,
+                        audio_duration_seconds=audio_duration,
+                        audio_size_bytes=original_audio_size,
+                        sample_rate=16000,
+                        transcript_length=len(transcript),
+                        confidence=final_confidence,
+                        processing_time_ms=processing_time_ms,
+                        source="telegram",
+                        metadata={
+                            "telegram_file_id": voice_metadata['file_id'],
+                            "telegram_file_unique_id": voice_metadata['file_unique_id'],
+                            "telegram_duration": voice_metadata['duration'],
+                            "telegram_file_size": voice_metadata['file_size'],
+                            "telegram_mime_type": voice_metadata['mime_type'],
+                            "prepared_audio_size": len(stt_audio),
+                            "streaming": True
+                        }
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to record transcription metrics: {e}")
+                
+                # Record STT cost (non-blocking)
+                try:
+                    conversation_id = get_conversation_id_from_user_chat(user_id, chat_id)
+                    stt_cost = calculate_stt_cost(audio_duration)
+                    record_cost(
+                        service="stt",
+                        user_id=user_id,
+                        conversation_id=conversation_id,
+                        cost=stt_cost,
+                        metadata={
+                            "audio_duration_seconds": audio_duration,
+                            "transcript_length": len(transcript),
+                            "confidence": final_confidence,
+                            "source": "telegram"
+                        }
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to record STT cost: {e}")
+                
+                logger.info(f"Transcription: {transcript}")
         except STTTimeoutError as e:
             # Handle timeout errors with specific user feedback
             logger.error(f"STT timeout error: {e}", exc_info=True)
@@ -1611,20 +1617,23 @@ async def handle_voice_message_from_queue(
             except AudioValidationError as e:
                 span.record_exception(e)
                 span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
-            await status_msg.edit_text(
-                f"? Audio validation failed: {str(e)}\n\n"
-                "Please ensure your voice message is:\n"
-                f"? Under {MAX_AUDIO_DURATION_SECONDS} seconds\n"
-                f"? Under {MAX_AUDIO_SIZE_BYTES / (1024 * 1024):.0f} MB"
-            )
-            return
-        except Exception as e:
-            logger.error(f"Error preparing audio: {e}", exc_info=True)
-            await status_msg.edit_text(
-                f"? Error processing audio: {str(e)}\n\n"
-                "Please try again."
-            )
-            return
+                await status_msg.edit_text(
+                    f"? Audio validation failed: {str(e)}\n\n"
+                    "Please ensure your voice message is:\n"
+                    f"? Under {MAX_AUDIO_DURATION_SECONDS} seconds\n"
+                    f"? Under {MAX_AUDIO_SIZE_BYTES / (1024 * 1024):.0f} MB"
+                )
+                return
+            except Exception as e:
+                # Handle other exceptions from audio enhancement
+                span.record_exception(e)
+                span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                logger.error(f"Error preparing audio: {e}", exc_info=True)
+                await status_msg.edit_text(
+                    f"? Error processing audio: {str(e)}\n\n"
+                    "Please try again."
+                )
+                return
         
         # Step 2: Get language preference and send to STT with streaming
         await status_msg.edit_text("?? Transcribing your voice message...")
