@@ -568,12 +568,17 @@ This phase focuses on refactoring individual services, building them, testing th
    
    - ⏳ **Remaining unit test tasks:**
      - ✅ **COMPLETED:** Fixed pytest_plugins error in tests/agentic/conftest.py (removed pytest_plugins = [] from non-top-level conftest)
-     - ⏳ **CRITICAL:** Fix test import errors - Many test files have import errors because they reference old `services/` directory structure
-       - ⏳ Test files in `tests/services/telegram/` import from `main`, `audio_utils`, `handlers.commands`, `handlers.voice` (old paths)
-       - ⏳ Test files in `tests/services/stt/`, `tests/services/tts/`, `tests/services/inference-api/` have similar import issues
-       - ⏳ Tests need to be updated to import from `essence/services/<service>/` instead of old `services/<service>/` paths
-       - ⏳ This is blocking test collection - 24 test files have ImportError during collection
-       - ⏳ Example: `from main import TelegramBotService` should be `from essence.services.telegram.main import TelegramBotService` (or similar)
+     - ✅ **COMPLETED:** Fixed test import errors for telegram service tests
+       - ✅ Updated `test_conversation_storage.py` to import from `essence.services.telegram.conversation_storage`
+       - ✅ Updated `test_audio_utils.py` to import from `essence.services.telegram.audio_utils`
+       - ✅ Updated `test_voice_queue.py` to import from `essence.services.telegram.voice_queue`
+       - ✅ Updated `test_cost_tracking.py` to import from `essence.services.telegram.cost_tracking` and fixed patch decorators
+       - ✅ Updated `test_admin_commands.py` to import from `essence.services.telegram.admin_auth` and `essence.services.telegram.admin_db`, added telegram import fix
+       - ✅ Updated `test_streaming_popen.py` to import from `essence.chat.utils.streaming_popen`
+       - ✅ Updated `test_telegram_utils.py` to import from `essence.services.telegram.telegram_utils` and fixed telegram import
+       - ✅ Updated `test_voice_quality.py` to import from `essence.services.telegram.voice_quality`
+       - ⏳ **Remaining:** Some test files still have import errors (likely dependency-related, e.g., missing opentelemetry module)
+       - ⏳ Test files in `tests/services/stt/`, `tests/services/tts/`, `tests/services/inference-api/` may have similar import issues (these services still use `services/<service>/main.py` structure, so imports may be correct)
      - ⏳ Add tracing span tests for all services (verify spans are created with correct attributes)
      - ⏳ Add metrics collection tests for telegram, tts services (stt and inference-api have some metrics tests)
      - ⏳ Create complete test suite for discord service (currently no tests exist)
