@@ -293,18 +293,48 @@ class ModelDownloader:
 
 
 class DownloadModelsCommand(Command):
-    """Command for downloading models for June Agent."""
+    """
+    Command for downloading models for June Agent.
+    
+    Manages downloading of authorized models (LLM, STT, TTS) from HuggingFace Hub
+    with proper caching and validation. Supports downloading specific models,
+    all required models, listing available models, and checking cache status.
+    
+    All downloads are containerized - models are cached in Docker volumes to avoid
+    host system pollution. Only authorized models can be downloaded for security.
+    """
     
     @classmethod
     def get_name(cls) -> str:
+        """
+        Get the command name.
+        
+        Returns:
+            Command name: "download-models"
+        """
         return "download-models"
     
     @classmethod
     def get_description(cls) -> str:
+        """
+        Get the command description.
+        
+        Returns:
+            Description of what this command does
+        """
         return "Download models for June Agent (authorized models only)"
     
     @classmethod
     def add_args(cls, parser: argparse.ArgumentParser) -> None:
+        """
+        Add command-line arguments to the argument parser.
+        
+        Configures model download options including specific model selection,
+        batch download, listing, and cache status checking.
+        
+        Args:
+            parser: Argument parser to add arguments to
+        """
         parser.add_argument(
             "--model", "-m",
             help="Download specific model"
@@ -331,14 +361,33 @@ class DownloadModelsCommand(Command):
         )
     
     def init(self) -> None:
-        """Initialize download models command."""
+        """
+        Initialize download models command.
+        
+        Validates that required dependencies (huggingface_hub, openai-whisper, TTS)
+        are available before proceeding with model downloads.
+        
+        Raises:
+            RuntimeError: If required dependencies are not available
+        """
         if not DEPENDENCIES_AVAILABLE:
             error_msg = f"Required dependencies not available: {IMPORT_ERROR}"
             logger.error(error_msg)
             raise RuntimeError(f"{error_msg}\nInstall with: pip install huggingface_hub openai-whisper TTS")
     
     def run(self) -> None:
-        """Run the model download command."""
+        """
+        Run the model download command.
+        
+        Executes the requested action:
+        - --list: Lists all authorized models with cache status
+        - --status: Checks cache status for all authorized models
+        - --all: Downloads all required models
+        - --model MODEL: Downloads a specific model
+        
+        Exits:
+            sys.exit(1): If download fails or no action is specified
+        """
         downloader = ModelDownloader()
         
         if self.args.list:
@@ -369,6 +418,11 @@ class DownloadModelsCommand(Command):
             sys.exit(1)
     
     def cleanup(self) -> None:
-        """Clean up download models command."""
+        """
+        Clean up download models command.
+        
+        Releases any resources held by the model downloader. Currently no cleanup
+        is needed as the ModelDownloader handles its own resources.
+        """
         # No cleanup needed for this tool
         pass

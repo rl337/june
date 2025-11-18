@@ -168,23 +168,59 @@ def save_dataset(passages: List[Dict], dataset_dir: Path) -> Path:
 
 
 class GenerateAliceDatasetCommand(Command):
-    """Command for generating Alice's Adventures in Wonderland dataset."""
+    """
+    Command for generating Alice's Adventures in Wonderland dataset.
+    
+    Downloads the full text of Alice's Adventures in Wonderland from Project Gutenberg,
+    processes it into passages of configurable length, and saves it as a JSON dataset
+    for use in audio testing (STT/TTS evaluation).
+    
+    The dataset consists of random passages extracted from the book, with configurable
+    sentence counts per passage. Useful for testing speech-to-text and text-to-speech
+    systems with natural language content.
+    """
     
     def __init__(self, args: argparse.Namespace):
-        """Initialize command with parsed arguments."""
+        """
+        Initialize command with parsed arguments.
+        
+        Args:
+            args: Parsed command-line arguments containing dataset generation configuration
+        """
         super().__init__(args)
         self._dataset_dir = None
     
     @classmethod
     def get_name(cls) -> str:
+        """
+        Get the command name.
+        
+        Returns:
+            Command name: "generate-alice-dataset"
+        """
         return "generate-alice-dataset"
     
     @classmethod
     def get_description(cls) -> str:
+        """
+        Get the command description.
+        
+        Returns:
+            Description of what this command does
+        """
         return "Generate Alice's Adventures in Wonderland dataset for audio testing"
     
     @classmethod
     def add_args(cls, parser: argparse.ArgumentParser) -> None:
+        """
+        Add command-line arguments to the argument parser.
+        
+        Configures dataset generation parameters including output directory,
+        number of passages, sentence counts per passage, and download options.
+        
+        Args:
+            parser: Argument parser to add arguments to
+        """
         parser.add_argument(
             "--output-dir",
             type=Path,
@@ -216,14 +252,31 @@ class GenerateAliceDatasetCommand(Command):
         )
     
     def init(self) -> None:
-        """Initialize dataset generation."""
+        """
+        Initialize dataset generation.
+        
+        Creates the output directory if it doesn't exist and sets up the dataset
+        directory path for file operations.
+        """
         # Create output directory
         self._dataset_dir = self.args.output_dir
         self._dataset_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Dataset directory: {self._dataset_dir}")
     
     def run(self) -> None:
-        """Generate the dataset."""
+        """
+        Generate the dataset.
+        
+        Performs the complete dataset generation workflow:
+        1. Downloads Alice's Adventures in Wonderland from Project Gutenberg (if needed)
+        2. Loads and cleans the book text
+        3. Splits text into sentences
+        4. Extracts random passages with configured sentence counts
+        5. Saves the dataset as JSON to the output directory
+        
+        Raises:
+            RuntimeError: If book download or loading fails
+        """
         # Book file path
         book_file = self._dataset_dir / 'alice_adventures_in_wonderland.txt'
         book_url = 'https://www.gutenberg.org/cache/epub/11/pg11.txt'
