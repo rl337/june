@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from typing import Dict, Any, Optional
 
 from ..strategies import LlmStrategy, InferenceRequest, InferenceResponse
@@ -416,6 +417,9 @@ class Qwen3LlmStrategy(LlmStrategy):
                     # Full past_key_values reuse would require tracking conversation state
                     pass
 
+            # Measure inference performance
+            inference_start_time = time.time()
+            
             # Generate
             with torch.no_grad():
                 outputs = self._model.generate(
@@ -427,10 +431,15 @@ class Qwen3LlmStrategy(LlmStrategy):
                 # Note: This requires the model to return past_key_values in outputs
                 # For now, we enable use_cache which improves performance within a single generation
 
+            inference_end_time = time.time()
+            inference_duration = inference_end_time - inference_start_time
+
             # Decode output
+            decode_start_time = time.time()
             generated_text = self._tokenizer.decode(
                 outputs[0], skip_special_tokens=True
             )
+            decode_duration = time.time() - decode_start_time
 
             # Remove the original prompt from the generated text if it's included
             if generated_text.startswith(prompt):
@@ -439,6 +448,20 @@ class Qwen3LlmStrategy(LlmStrategy):
             # Count tokens (approximate)
             input_tokens = len(inputs.input_ids[0])
             output_tokens = len(outputs[0]) - input_tokens
+
+            # Calculate performance metrics
+            total_duration = inference_duration + decode_duration
+            tokens_per_second = output_tokens / total_duration if total_duration > 0 else 0.0
+            
+            # Log performance metrics
+            logger.info(
+                "Qwen3 inference performance: %.2f tokens/s (%.2fs total, %d input tokens, %d output tokens, KV cache: %s)",
+                tokens_per_second,
+                total_duration,
+                input_tokens,
+                output_tokens,
+                "enabled" if self.use_kv_cache and generation_kwargs.get("use_cache") else "disabled"
+            )
 
             # Cache result if deterministic (temperature=0)
             if cache_key is not None and temperature == 0.0:
@@ -454,7 +477,15 @@ class Qwen3LlmStrategy(LlmStrategy):
 
             return InferenceResponse(
                 payload={"text": generated_text, "tokens": output_tokens},
-                metadata={"input_tokens": input_tokens, "output_tokens": output_tokens, "cached": False},
+                metadata={
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "cached": False,
+                    "inference_duration_seconds": inference_duration,
+                    "total_duration_seconds": total_duration,
+                    "tokens_per_second": tokens_per_second,
+                    "kv_cache_enabled": self.use_kv_cache and generation_kwargs.get("use_cache", False),
+                },
             )
 
         except Exception as e:

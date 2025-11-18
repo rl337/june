@@ -189,7 +189,7 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                 context_data = await self._prepare_context(request.context)
                 
                 # Generate text
-                response_text, usage_stats = await self._generate_text(
+                response_text, usage_stats, tokens_per_second = await self._generate_text(
                     request.prompt,
                     request.params,
                     context_data
@@ -198,7 +198,7 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                 return GenerationResponse(
                     text=response_text,
                     tokens_generated=usage_stats.completion_tokens,
-                    tokens_per_second=usage_stats.completion_tokens / max(usage_stats.total_tokens, 1),
+                    tokens_per_second=tokens_per_second,
                     finish_reason=FinishReason.STOP,
                     usage=usage_stats
                 )
@@ -295,7 +295,7 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                 formatted_prompt = await self._format_conversation(request.messages, context_data)
                 
                 # Generate response
-                response_text, usage_stats = await self._generate_text(
+                response_text, usage_stats, tokens_per_second = await self._generate_text(
                     formatted_prompt,
                     request.params,
                     context_data
@@ -310,7 +310,7 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                 return ChatResponse(
                     message=assistant_message,
                     tokens_generated=usage_stats.completion_tokens,
-                    tokens_per_second=usage_stats.completion_tokens / max(usage_stats.total_tokens, 1),
+                    tokens_per_second=tokens_per_second,
                     usage=usage_stats
                 )
                 
@@ -507,8 +507,12 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
             )
             yield error_chunk
     
-    async def _generate_text(self, prompt: str, params: GenerationParameters, context_data: Dict[str, Any]) -> tuple[str, UsageStats]:
-        """Generate text without streaming."""
+    async def _generate_text(self, prompt: str, params: GenerationParameters, context_data: Dict[str, Any]) -> tuple[str, UsageStats, float]:
+        """Generate text without streaming.
+        
+        Returns:
+            tuple: (response_text, usage_stats, tokens_per_second)
+        """
         try:
             # Use strategy to generate text
             request = InferenceRequest(
@@ -541,6 +545,26 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                 # Fallback: estimate input tokens (rough approximation)
                 input_tokens = len(prompt.split())
             
+            # Extract performance metrics from response metadata
+            tokens_per_second = response.metadata.get("tokens_per_second", 0.0)
+            total_duration = response.metadata.get("total_duration_seconds", 0.0)
+            kv_cache_enabled = response.metadata.get("kv_cache_enabled", False)
+            
+            # Record Prometheus metrics
+            TOKEN_COUNT.labels(model=config.model.name).inc(completion_tokens)
+            if tokens_per_second > 0:
+                TOKEN_GENERATION_RATE.observe(tokens_per_second)
+            if total_duration > 0:
+                REQUEST_DURATION.observe(total_duration)
+            
+            # Log performance metrics
+            logger.info(
+                "Inference API generation: %.2f tokens/s, %.2fs duration, KV cache: %s",
+                tokens_per_second,
+                total_duration,
+                "enabled" if kv_cache_enabled else "disabled"
+            )
+            
             usage_stats = UsageStats(
                 prompt_tokens=input_tokens,
                 completion_tokens=completion_tokens,
@@ -548,9 +572,7 @@ class InferenceAPIService(llm_pb2_grpc.LLMInferenceServicer):
                 prompt_cache_hits=0
             )
             
-            TOKEN_COUNT.labels(model=config.model.name).inc(completion_tokens)
-            
-            return response_text, usage_stats
+            return response_text, usage_stats, tokens_per_second
             
         except Exception as e:
             logger.error(f"Text generation error: {e}")

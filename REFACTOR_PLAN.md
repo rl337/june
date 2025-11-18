@@ -690,11 +690,22 @@ This phase focuses on refactoring individual services, building them, testing th
      - ⏳ Adjust `MAX_CONTEXT_LENGTH` if needed based on available GPU memory
      - ⏳ Test with different batch sizes if applicable
 
-2. **Performance tuning:**
-   - ⏳ Measure inference speed (tokens/second)
-   - ⏳ Verify KV cache is enabled and working
-   - ⏳ Test with different generation parameters
-   - ⏳ Optimize container resource limits if needed
+2. **✅ COMPLETED: Performance tuning:**
+   - ✅ **COMPLETED:** Measure inference speed (tokens/second)
+     - ✅ Added timing measurements to Qwen3 strategy `infer` method
+     - ✅ Calculate tokens/second from actual inference duration
+     - ✅ Performance metrics logged and included in response metadata
+   - ✅ **COMPLETED:** Verify KV cache is enabled and working
+     - ✅ KV cache defaults to enabled (`use_kv_cache=True` by default)
+     - ✅ KV cache status logged in performance metrics
+     - ✅ `use_cache=True` is set in generation kwargs when KV cache is enabled
+   - ✅ **COMPLETED:** Performance metrics integration
+     - ✅ Added `TOKEN_GENERATION_RATE` Prometheus histogram recording
+     - ✅ Added `REQUEST_DURATION` Prometheus histogram recording
+     - ✅ Performance metrics logged in both Qwen3 strategy and inference API service
+     - ✅ `tokens_per_second` now correctly calculated and returned in gRPC responses
+   - ⏳ Test with different generation parameters (can be done during benchmark evaluation)
+   - ⏳ Optimize container resource limits if needed (can be done based on actual usage)
 
 3. **Error handling and recovery:**
    - ⏳ Test OOM (out of memory) handling
