@@ -1,5 +1,11 @@
 # June Refactoring Plan
 
+## Status: ✅ **CORE REFACTORING COMPLETE**
+
+**Last Updated:** 2025-01-18
+
+All major refactoring phases have been completed. The project has been successfully pared down to bare essentials for the voice message → STT → LLM → TTS → voice response round trip. See "Refactoring Status Summary" section below for details.
+
 ## Goal
 Pare down the june project to bare essentials for the **voice message → STT → LLM → TTS → voice response** round trip, supporting both **Telegram** and **Discord** platforms.
 
