@@ -282,6 +282,12 @@ All major refactoring phases have been completed:
    - ✅ Updated README.md Infrastructure section to include TensorRT-LLM
    - ⏳ **Remaining:** Fully remove inference-api service from docker-compose.yml (waiting for TensorRT-LLM setup and verification in home_infra)
      - Use `poetry run -m essence verify-tensorrt-llm` to check migration readiness before removal
+   - ✅ **Code Improvement:** Renamed `inference_api_url` parameter to `llm_url` across all agent classes and commands for clarity
+     - Updated CodingAgent, LLMClient, and BenchmarkEvaluator to use `llm_url` parameter
+     - Updated command-line arguments from `--inference-api-url` to `--llm-url`
+     - Added backward compatibility: `LLM_URL` environment variable (new) with `INFERENCE_API_URL` fallback
+     - Improved documentation to mention TensorRT-LLM, NIM, and legacy inference-api options
+     - This makes the codebase more consistent since the parameter works with any LLM service, not just inference-api
 
 4. **Get Qwen3-30B-A3B-Thinking-2507 running:** ⏳ IN PROGRESS
    - **Model Downloads:** ✅ COMPLETED
