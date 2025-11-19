@@ -41,6 +41,7 @@ All major refactoring phases have been completed:
 - ✅ **Agentic Reasoning Enhancement:** Implemented dependency checking in executor for step dependencies. Steps with unsatisfied dependencies now fail with clear error messages. Added comprehensive tests for dependency checking (both satisfied and missing dependencies). This completes the TODO in executor.py for dependency validation.
 - ✅ **Plan Adjustments from Reflection:** Implemented plan adjustments generation from LLM reflection. When goal is not achieved and should_continue is True, the reflector now uses the LLM to generate an adjusted plan that addresses the issues found. Added _generate_plan_adjustments and _parse_plan_text methods. This completes the TODO in reflector.py for generating plan adjustments from LLM reflection.
 - ✅ **Structured Plan Format Parsing:** Enhanced planner's _parse_plan_text method to support multiple structured formats: JSON (with or without markdown code blocks), markdown lists (- or *), and improved numbered list parsing. JSON parsing extracts tool names, arguments, and expected outputs. Added comprehensive tests for all formats. This completes the TODO in planner.py for parsing structured plan formats.
+- ✅ **Agent Communication Integration:** Integrated agent communication interface with the agentic reasoning system. Added enable_agent_communication parameter to AgenticReasoner and helper methods (_send_agent_message, _ask_for_clarification, _request_help, _report_progress) that wrap the agent_communication module. This enables agents to communicate with users during reasoning when enabled. This completes the TODO in Phase 16 for implementing agent communication interface.
 - ✅ **Documentation Updates:** 
   - Updated essence/README.md to reflect current module structure (added essence.agents, essence.commands, essence.services, essence.command modules)
   - Updated tests/README.md to clarify inference-api deprecation status (added notes about legacy service, migration guide reference)
@@ -473,8 +474,8 @@ All major refactoring phases have been completed:
    - ⏳ Compare expected vs actual output
    - ⏳ Fix any formatting/markdown issues
    - ⏳ Verify message history works for both Telegram and Discord
-   - ⏳ Implement agent communication interface
-   - ⏳ Analyze Telegram/Discord message format requirements
+   - ✅ Implement agent communication interface (integrated with agentic reasoning system)
+   - ⏳ Analyze Telegram/Discord message format requirements (tools ready, requires actual message data)
 
 5. **Performance testing:** ⏳ TODO (framework ready, requires real services)
    - ⏳ Measure latency for each stage (STT, LLM, TTS)
