@@ -35,6 +35,7 @@ All major refactoring phases have been completed:
   - Cleaned up Prometheus configuration: Removed references to removed services (gateway, orchestrator, postgres, nats) from config/prometheus.yml and config/prometheus-alerts.yml, updated alerts to reflect current architecture
   - Added Discord service to Prometheus monitoring: Added Discord scrape job (discord:8081) and included Discord in ServiceDown and HighErrorRate alerts
   - Updated integration tests README: Clarified that Gateway tests are obsolete (gateway service was removed) and will always be skipped, removed Gateway from service requirements list
+  - Created Discord Bot API documentation: Added docs/API/discord.md with bot setup, commands, message processing, configuration, and monitoring information, updated docs/API/README.md to include Discord Bot API reference
 - ✅ **Service Refactoring (Phase 9.1):** All services refactored to minimal architecture
 - ✅ **Scripts Cleanup (Phase 11):** Converted reusable tools to commands, removed obsolete scripts
 - ✅ **Test Infrastructure (Phases 12-13):** Integration test service with REST API, Prometheus/Grafana monitoring

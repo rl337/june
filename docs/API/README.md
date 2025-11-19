@@ -8,6 +8,7 @@ This directory contains comprehensive API documentation for all June services.
 - **[STT Service](stt.md)** - Speech-to-text gRPC service with audio format requirements, streaming, language detection
 - **[TTS Service](tts.md)** - Text-to-speech gRPC service with voice options, prosody control, streaming
 - **[Telegram Bot API](telegram.md)** - Telegram bot integration with commands, message handling, webhook setup, admin commands
+- **[Discord Bot API](discord.md)** - Discord bot integration with commands, message handling, bot setup
 - **[TODO MCP Service](todo-mcp.md)** - Task management endpoints, MCP compatibility, relationships
 
 **Note:** Gateway API was removed for MVP. Services now communicate directly via gRPC. See [gateway.md.obsolete](gateway.md.obsolete) for historical reference.
