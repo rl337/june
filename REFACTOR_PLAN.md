@@ -202,8 +202,9 @@ All major refactoring phases have been completed:
          - ✅ For Discord: Same consideration applies if agent communication uses Discord
      - ⏳ Fix rendering issues discovered through message history analysis
        - ⏳ Use `get_message_history()` to inspect what was actually sent
-       - ⏳ Compare expected vs actual output
-       - ⏳ Fix any formatting/markdown issues
+       - ✅ Improved `compare_expected_vs_actual()` similarity calculation using difflib.SequenceMatcher for more robust text matching
+       - ⏳ Compare expected vs actual output (tools ready, requires actual message history data)
+       - ⏳ Fix any formatting/markdown issues (requires analysis of actual message history)
        - ✅ Document Telegram message format requirements and limitations
        - ✅ Document Discord message format requirements and limitations
        - ✅ Created comprehensive documentation: `docs/guides/MESSAGE_FORMAT_REQUIREMENTS.md`
@@ -751,4 +752,26 @@ All code changes, cleanup, and refactoring tasks have been completed:
 
 
 
+
+
+## Agent Monitor Alert - 2025-11-19 13:13:32
+
+**Status:** Agent appears to be stuck: 13:32] AGENT STUCK DETECTED: Agent appears to be in a loop (low pattern diversity)
+Unknown reason
+
+**Current Task:** 
+
+**Recommendations:**
+- If stuck on a specific task, consider breaking it into smaller subtasks
+- If encountering errors, check logs and fix the underlying issue
+- If no progress is being made, consider moving to a different task
+- If blocked by external dependencies, document the blocker and move on
+
+**Action:** Agent should review this alert and either:
+1. Continue with current task if progress is being made
+2. Break down the task into smaller steps
+3. Move to a different task if blocked
+4. Ask for help if truly stuck
+
+---
 

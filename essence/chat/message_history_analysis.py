@@ -201,7 +201,9 @@ def compare_expected_vs_actual(
 
         # Calculate similarity using SequenceMatcher (more robust than simple char comparison)
         if msg.raw_text:
-            similarity = difflib.SequenceMatcher(None, expected_text, msg.raw_text).ratio()
+            similarity = difflib.SequenceMatcher(
+                None, expected_text, msg.raw_text
+            ).ratio()
             if similarity > best_similarity:
                 best_similarity = similarity
                 best_match = msg
