@@ -22,7 +22,7 @@ This documentation is organized by audience and purpose to help you find what yo
 - **[Agentic Capabilities](architecture/AGENTIC_CAPABILITIES.md)** - Comprehensive documentation for June's agentic capabilities system, enabling autonomous AI agents to discover, plan, execute, and verify tasks
 
 ### For API Users
-- **[API Documentation](API/)** - Complete API docs for Inference API (gRPC), STT/TTS services (gRPC), Telegram Bot API, and TODO MCP Service with examples
+- **[API Documentation](API/)** - Complete API docs for LLM Inference (TensorRT-LLM gRPC, default), STT/TTS services (gRPC), Telegram Bot API, and TODO MCP Service with examples
 
 ## 🗂️ Documentation Structure
 
