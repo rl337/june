@@ -2,7 +2,7 @@
 
 ## Status: ✅ **CORE REFACTORING COMPLETE** → 🚀 **FORWARD DEVELOPMENT IN PROGRESS**
 
-**Last Updated:** 2025-11-19 (Fixed GitHub Actions CI - Excluded integration tests from CI workflow)
+**Last Updated:** 2025-11-19 (Fixed GitHub Actions CI - Use pytest marker to exclude integration tests)
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
@@ -250,8 +250,8 @@ All major refactoring phases have been completed:
    - ✅ Made MagicMock import safer (run #280) - Added try/except around MagicMock import and additional exception handling in grpc availability check
    - ✅ Simplified CI skip logic (run #282) - Skip integration tests in CI environment (CI=true) to avoid collection issues, check grpc availability locally
    - ✅ Combined skipif conditions (run #285) - Use single `_should_skip_integration_test()` function that checks CI first, then grpc availability, avoiding multiple decorator evaluation issues
-   - ✅ Excluded integration tests from CI (run #288) - Use `--ignore` flag in CI workflow to exclude `test_pipeline_integration.py` entirely, as these tests require real services and are meant for local testing only
-   - ✅ Total: 162 tests passing (153 existing + 9 pipeline tests, 2 integration tests excluded from CI)
+   - ✅ Excluded integration tests from CI (run #291) - Use pytest marker `@pytest.mark.integration` and exclude with `-m "not integration"` in CI workflow, wrapped all module-level code in try/except for maximum safety
+   - ✅ Total: 162 tests passing (153 existing + 9 pipeline tests, 2 integration tests excluded from CI via marker)
 
 2. **Test STT → LLM → TTS flow:** ⏳ TODO (framework ready, requires real services)
    - ⏳ Send voice message via Telegram
