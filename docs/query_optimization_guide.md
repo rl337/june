@@ -1,5 +1,7 @@
 # Database Query Optimization Guide
 
+**⚠️ OBSOLETE:** This document references PostgreSQL query optimization, but PostgreSQL was removed for MVP. The project now uses in-memory storage. This document is kept for reference only.
+
 This document describes the optimizations applied to PostgreSQL queries and provides guidance for writing efficient queries.
 
 ## Overview

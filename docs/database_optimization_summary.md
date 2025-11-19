@@ -1,5 +1,7 @@
 # Database Query Optimization Summary
 
+**⚠️ OBSOLETE:** This document references PostgreSQL database optimization, but PostgreSQL was removed for MVP. The project now uses in-memory storage. This document is kept for reference only.
+
 ## Task: Analyze and optimize database queries for performance
 
 **Task ID**: 468  
