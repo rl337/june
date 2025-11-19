@@ -166,6 +166,7 @@ All major refactoring phases have been completed:
    - ✅ Configured environment variables (NGC_API_KEY, MAX_CONTEXT_LENGTH, tracing)
    - ✅ Added Jaeger tracing integration
    - ✅ Created `verify-nim` command for NIM service verification (checks HTTP health, gRPC connectivity, optional protocol compatibility)
+   - ✅ Added comprehensive unit tests for verify-nim command (30 tests covering all verification functions and command class)
    - ✅ Updated june services to support NIM endpoint (updated config.py, docker-compose.yml, documentation)
    - ✅ Added NIM as LLM option in configuration (can be set via LLM_URL=grpc://nim-qwen3:8001)
    - ⏳ **Note:** NIM image name may need verification (currently using `nvcr.io/nvstaging/nim_qwen3_30b_instruct:latest`)
