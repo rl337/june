@@ -122,7 +122,13 @@ create_prompt() {
     cat << 'PROMPT_EOF'
 You are working on refactoring the june project. Your task is to:
 
-1. **Read REFACTOR_PLAN.md** - Read the entire refactoring plan to understand the current state and what needs to be done.
+1. **Check MCP todorama for available tasks FIRST** - Before reading REFACTOR_PLAN.md:
+   - Use MCP todorama service to query available tasks: `cursor-agent mcp call todorama list_available_tasks --agent_type refactor --project_id 1 --limit 10`
+   - If tasks are available, reserve one and work on it (see MCP workflow below)
+   - If no tasks available, proceed to step 2
+   - **CRITICAL:** Always reserve tasks before working on them, and always complete or unlock them when done
+
+2. **Read REFACTOR_PLAN.md** - If no MCP tasks available, read the refactoring plan to understand the current state and identify TODO items.
 
 **Working on Related Projects:**
 - You CAN and SHOULD work on the `home_infra` project at `/home/rlee/dev/home_infra` when tasks require it
@@ -130,7 +136,7 @@ You are working on refactoring the june project. Your task is to:
 - If a task requires changes to `home_infra/docker-compose.yml` or related files, you should make those changes
 - This is NOT external work - it's part of the june project infrastructure
 
-2. **Check for GitHub Actions failures FIRST** - Before picking a new task:
+3. **Check for GitHub Actions failures** - Before picking a new task:
    - Check the GitHub Actions page: https://github.com/rl337/june/actions
    - Look for any failed workflow runs (status: failed, red X icon)
    - If failures are found:
@@ -141,14 +147,20 @@ You are working on refactoring the june project. Your task is to:
      - Verify the fix by checking if a new workflow run passes
    - **Priority:** Fixing GitHub Actions failures takes precedence over new tasks
    - Only proceed to pick a new task if there are no active failures
+   - **If you fix a CI issue, create a task in todorama to track it:** Use MCP to create a task documenting what was fixed
 
-3. **Pick an unfinished task** - If no GitHub Actions failures, look for tasks marked with ⏳ TODO in the REFACTOR_PLAN.md. Choose one that:
+4. **Pick an unfinished task** - If no GitHub Actions failures and no MCP tasks:
+   - Look for tasks marked with ⏳ TODO in the REFACTOR_PLAN.md
+   - **For operational tasks that are blocked**, create MCP tasks in todorama to track them:
+     - Example: "Phase 15 Task 4: Compile Qwen3 model" → Create task in todorama with details
+     - Example: "Phase 16: End-to-end testing" → Create task in todorama with subtasks
+   - Choose a task that:
    - Is clearly defined and actionable
    - You have enough context to complete
    - Will make meaningful progress toward the refactoring goals
    - Is appropriate for a single iteration (not too large)
 
-4. **Perform the task** - Complete the selected task. This may involve:
+5. **Perform the task** - Complete the selected task. This may involve:
    - Removing code dependencies on removed services
    - Implementing tracing or metrics
    - Cleaning up code
@@ -159,14 +171,24 @@ You are working on refactoring the june project. Your task is to:
    - **Setting up benchmark evaluation with sandboxes (Phase 10.5) - NEW PRIORITY**
    - Any other task from the plan
 
-5. **Update REFACTOR_PLAN.md** - After completing the task:
+6. **Update task status in MCP todorama** - After completing the task:
+   - If you worked on an MCP task, mark it complete: `cursor-agent mcp call todorama complete_task --task_id <id> --agent_id refactor --notes "Completed: <summary>"`
+   - Add task updates during work: `cursor-agent mcp call todorama add_task_update --task_id <id> --agent_id refactor --content "<progress>" --update_type progress`
+   - If you encountered errors, unlock the task: `cursor-agent mcp call todorama unlock_task --task_id <id> --agent_id refactor`
+
+7. **Store learnings in MCP bucketofacts** - After completing significant work:
+   - Store important decisions: `cursor-agent mcp call bucketofacts create_fact --subject "june" --predicate "uses" --object "TensorRT-LLM for LLM inference"`
+   - Store code patterns: `cursor-agent mcp call bucketofacts create_fact --subject "june" --predicate "pattern" --object "All services use gRPC for inter-service communication"`
+   - Query before making decisions: `cursor-agent mcp call bucketofacts query_facts --subject "june"` to see what's been learned
+
+8. **Update REFACTOR_PLAN.md** - After completing the task:
    - Mark the completed task(s) as ✅ COMPLETED
    - Add a brief summary of what was done
    - If you discovered new tasks or issues, add them to the appropriate section with ⏳ TODO
    - If you found that a task needs to be broken down further, update the plan accordingly
    - Document any important discoveries or decisions made
 
-6. **Document discoveries** - If during your work you discover:
+9. **Document discoveries** - If during your work you discover:
    - New tasks that need to be done
    - Issues or blockers
    - Better approaches or alternatives
@@ -210,45 +232,36 @@ You are working on refactoring the june project. Your task is to:
   - This is especially critical for large models like Qwen3-30B which can use 15-20GB+ of memory
   - When modifying model loading code, always add checks to prevent reloading if already loaded
 
-**MCP Services for Self-Directed Tasks and Data:**
-- **Use MCP services for task management and data storage** - The project has MCP (Model Context Protocol) services available that you should use for:
-  - **Task Management (todorama service):** Use MCP tools to manage your own tasks and track progress:
-    - `list_available_tasks(agent_type, project_id, limit)` - Find tasks you can work on
-    - `reserve_task(task_id, agent_id)` - Lock a task before working on it (MANDATORY)
-    - `complete_task(task_id, agent_id, notes, ...)` - Mark tasks complete when done (MANDATORY)
-    - `unlock_task(task_id, agent_id)` - Unlock tasks on errors (MANDATORY - always use try/except/finally)
-    - `add_task_update(task_id, agent_id, content, update_type)` - Add progress updates during work
-    - `get_task_context(task_id)` - Get full context for a task
-    - `create_task(...)` - Create new tasks for future work
-    - `query_tasks(...)` - Query tasks by various criteria
-    - The "june" project (project_id=1) is available in the todorama database
-    - **CRITICAL:** Always reserve tasks before working, and always complete or unlock them - never leave tasks in_progress
-  - **Knowledge Storage (bucketofacts service):** Use MCP tools to store and retrieve facts and knowledge:
-    - `create_fact(subject, predicate, object, ...)` - Store facts about the codebase, decisions, or learnings
-    - `query_facts(...)` - Query stored facts
-    - `semantic_search(query, limit, threshold)` - Search facts semantically
-    - `get_fact(fact_id, ...)` - Retrieve specific facts
-    - Use this to remember important decisions, code patterns, architecture choices, etc.
-  - **Documentation (docomatic service):** Use MCP tools to manage documentation:
-    - `create_document(title, ...)` - Create documentation documents
-    - `create_section(document_id, heading, body, ...)` - Add sections to documents
-    - `update_document(document_id, ...)` - Update documentation
-    - `search_sections(query, ...)` - Search documentation
-    - Use this to maintain project documentation, architecture docs, API docs, etc.
-- **How to use MCP services:**
-  - MCP services are accessible via `cursor-agent mcp` commands
-  - You can call MCP tools directly in your agent interactions
-  - Services are available at: http://localhost:8000/mcp/{service-name}/sse
-  - The todorama service has 49 tools, bucketofacts has 17 tools, docomatic has 23 tools
-  - **Best practice:** Use todorama to track your own work, bucketofacts to store learnings, and docomatic for documentation
-- **Self-directed task management:**
-  - Instead of only working from REFACTOR_PLAN.md, you can:
-    - Query available tasks from the todorama service
-    - Create tasks for work you identify needs to be done
-    - Track your progress using task updates
-    - Store learnings in bucketofacts for future reference
-    - Document your work in docomatic
-  - This enables more autonomous operation and better tracking of work across iterations
+**MCP Services Workflow (REQUIRED):**
+
+**Step 1: Check for available tasks in todorama FIRST**
+- Query available tasks: `cursor-agent mcp call todorama list_available_tasks --agent_type refactor --project_id 1 --limit 10`
+- If tasks found, reserve one: `cursor-agent mcp call todorama reserve_task --task_id <id> --agent_id refactor`
+- Work on the reserved task
+- Add progress updates: `cursor-agent mcp call todorama add_task_update --task_id <id> --agent_id refactor --content "<update>" --update_type progress`
+- When done: `cursor-agent mcp call todorama complete_task --task_id <id> --agent_id refactor --notes "<summary>"`
+- On error: `cursor-agent mcp call todorama unlock_task --task_id <id> --agent_id refactor` (always unlock on errors)
+
+**Step 2: Create tasks for operational work**
+- When you encounter operational tasks (e.g., "compile model", "run end-to-end test"), create tasks in todorama:
+  - `cursor-agent mcp call todorama create_task --project_id 1 --title "<task>" --description "<details>" --agent_type refactor`
+- This allows tracking operational work that's blocked on external factors
+
+**Step 3: Store learnings in bucketofacts**
+- After significant work, store decisions: `cursor-agent mcp call bucketofacts create_fact --subject "june" --predicate "<relation>" --object "<value>"`
+- Query before decisions: `cursor-agent mcp call bucketofacts query_facts --subject "june"` to see what's been learned
+- Use semantic search: `cursor-agent mcp call bucketofacts semantic_search --query "<question>" --limit 5`
+
+**Step 4: Document in docomatic (optional)**
+- For major architectural decisions: `cursor-agent mcp call docomatic create_document --title "<title>" --content "<content>"`
+- Search existing docs: `cursor-agent mcp call docomatic search_sections --query "<topic>"`
+
+**MCP Service Details:**
+- **todorama:** 49 tools for task management (project_id=1 for june project)
+- **bucketofacts:** 17 tools for knowledge storage
+- **docomatic:** 23 tools for documentation
+- **Access:** `cursor-agent mcp call <service> <tool> --<arg> <value>`
+- **CRITICAL:** Always reserve tasks before working, always complete or unlock them - never leave tasks in_progress
 
 **Current Context:**
 - Project root: /home/rlee/dev/june
