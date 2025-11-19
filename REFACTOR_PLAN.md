@@ -168,6 +168,9 @@ Pare down the june project to bare essentials for the **voice message → STT �
   - ✅ Added return type annotation (-> None) to `get_cache_status` in `download_models.py`
   - ✅ Added return type annotation (-> None) to `reset_peak_stats` in `benchmark_qwen3.py`
   - ✅ Enhanced docstrings with detailed descriptions for better documentation
+- ✅ Code quality improvements: Added return type annotation to gRPC metrics utility
+  - ✅ Added return type annotation (-> None) to `record_grpc_call` in `grpc_metrics.py`
+  - ✅ Improves type safety and code clarity for gRPC instrumentation utilities
 - ✅ File modification tracking implemented in benchmark evaluator - tracks files created and modified during task execution
 - ✅ Language auto-detection support implemented in Telegram voice handler - STT service now receives None for auto-detection when language preference is not set
 - ⚠️ **Known limitation:** pass@k calculation (for k > 1) currently uses pass@1 as placeholder - proper implementation would require running each task multiple times (future enhancement)
