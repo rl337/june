@@ -14,17 +14,17 @@ This directory contains integration tests for the June project. These tests veri
 
 2. **`test_voice_message_integration.py`**
    - Tests complete voice message flow: Audio → STT → LLM → TTS → Audio
-   - **Dependencies:** STT, TTS, TensorRT-LLM (gRPC on port 8000, default) or Inference API (gRPC on port 50051, legacy), Gateway (optional - tests will skip if unavailable)
-   - **Status:** ✅ Active - Gateway tests will skip if gateway not available
+   - **Dependencies:** STT, TTS, TensorRT-LLM (gRPC on port 8000, default) or Inference API (gRPC on port 50051, legacy)
+   - **Status:** ✅ Active - Gateway tests are obsolete (gateway service was removed) and will be skipped
    - **Can run in background:** Yes (pytest-based)
-   - **Note:** Some tests use gateway endpoints, but these will be skipped if gateway is not available
+   - **Note:** Some tests reference gateway endpoints, but these are obsolete and will always be skipped since gateway service was removed
 
 3. **`test_telegram_bot_qwen3_integration.py`**
    - Tests Telegram bot with Qwen3-30B-A3B: Voice → STT → LLM (Qwen3) → TTS → Voice
-   - **Dependencies:** STT, TTS, TensorRT-LLM (gRPC on port 8000, default) or Inference API (gRPC on port 50051, legacy), Gateway (optional - tests will skip if unavailable)
-   - **Status:** ✅ Active - Gateway tests will skip if gateway not available
+   - **Dependencies:** STT, TTS, TensorRT-LLM (gRPC on port 8000, default) or Inference API (gRPC on port 50051, legacy)
+   - **Status:** ✅ Active - Gateway tests are obsolete (gateway service was removed) and will be skipped
    - **Can run in background:** Yes (pytest-based)
-   - **Note:** Some tests use gateway endpoints, but these will be skipped if gateway is not available
+   - **Note:** Some tests reference gateway endpoints, but these are obsolete and will always be skipped since gateway service was removed
 
 ### Obsolete Tests
 
@@ -79,13 +79,13 @@ Integration tests require running services:
 - **TTS service** - gRPC on port 50053 (default)
 - **TensorRT-LLM** - gRPC on port 8000 (default, in home_infra/shared-network)
 - **Inference API** - gRPC on port 50051 (legacy, available via `--profile legacy`)
-- **Gateway service** - HTTP on port 8000 (optional, tests will skip if unavailable)
+
+**Note:** Gateway service was removed for MVP. Tests that reference gateway endpoints will be skipped.
 
 Service addresses can be overridden via environment variables:
 - `STT_SERVICE_ADDRESS` - STT service address
 - `TTS_SERVICE_ADDRESS` - TTS service address
 - `INFERENCE_API_URL` or `LLM_URL` - LLM service address (default: tensorrt-llm:8000 for TensorRT-LLM, can use inference-api:50051 for legacy)
-- `GATEWAY_URL` - Gateway service URL (optional)
 
 ## Test Structure
 
@@ -130,5 +130,5 @@ All integration tests are designed to run in the background:
 
 2. **Optional: Remove gateway dependencies:**
    - `test_voice_message_integration.py` and `test_telegram_bot_qwen3_integration.py` have gateway tests
-   - These tests already skip if gateway is unavailable, so they're safe to keep
-   - Could be updated to test services directly via gRPC instead of gateway
+   - These tests already skip gateway tests (gateway service was removed), so they're safe to keep
+   - Could be updated to remove gateway test code entirely and test services directly via gRPC
