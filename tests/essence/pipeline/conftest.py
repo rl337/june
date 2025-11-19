@@ -50,20 +50,6 @@ def pipeline_framework_real():
     return PipelineTestFramework(use_real_services=True)
 
 
-def pytest_collection_modifyitems(config, items):
-    """Modify test collection to skip integration tests in CI."""
-    # Skip entire pipeline directory if in CI and integration tests are excluded
-    try:
-        if os.getenv('CI') == 'true':
-            # In CI, skip any tests that use pipeline_framework_real fixture
-            # This is a safety measure in case the file rename didn't work
-            for item in items[:]:
-                if hasattr(item, 'fixturenames') and 'pipeline_framework_real' in item.fixturenames:
-                    # Check if integration marker is present or if marker exclusion is active
-                    if 'integration' in [mark.name for mark in item.iter_markers()]:
-                        items.remove(item)
-    except Exception:
-        pass  # If anything fails, continue with normal collection
 
 
 def pytest_addoption(parser):
