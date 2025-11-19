@@ -16,8 +16,9 @@ jobs:
       with:
         python-version: '3.12'
     - name: Install Poetry
-      run: |
-        pip install --break-system-packages poetry
+      uses: abatilo/actions-poetry@v3
+      with:
+        poetry-version: '1.8.4'
     - name: Configure Poetry and install dependencies
       env:
         POETRY_VIRTUALENVS_CREATE: "true"
