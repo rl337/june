@@ -7,6 +7,14 @@ They will skip if services are not running or if grpc is mocked.
 The `pipeline_framework_real` fixture is defined in conftest.py with skip logic.
 """
 import pytest
+import os
+
+# Skip entire file in CI - this prevents pytest from even collecting these tests
+# This is more reliable than relying on marker exclusion alone
+pytestmark = pytest.mark.skipif(
+    os.getenv('CI') == 'true',
+    reason="Integration tests skipped in CI environment"
+)
 
 
 @pytest.mark.integration
