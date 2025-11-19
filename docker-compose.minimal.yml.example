@@ -1,5 +1,7 @@
 # Minimal docker-compose.yml for Telegram/Discord voice round trip
-# This is the bare essentials - 5 services needed (4 core + 1 platform service)
+# This is the bare essentials - 4 core services (STT, TTS, Telegram, Discord)
+# LLM inference is provided by TensorRT-LLM container in home_infra (shared-network)
+# Legacy inference-api service available via --profile legacy if needed
 
 services:
   # STT Service - Speech-to-Text
@@ -29,6 +31,7 @@ services:
       - /var/log/june/stt:/logs
     networks:
       - june_network
+      - shared-network  # For TensorRT-LLM, Jaeger, Prometheus (from home_infra)
     healthcheck:
       test: ["CMD", "python", "-c", "import grpc; grpc.insecure_channel('localhost:50052').check_connectivity_state(True)"]
       interval: 30s
@@ -63,6 +66,7 @@ services:
       - /var/log/june/tts:/logs
     networks:
       - june_network
+      - shared-network  # For TensorRT-LLM, Jaeger, Prometheus (from home_infra)
     healthcheck:
       test: ["CMD", "python", "-c", "import grpc; grpc.insecure_channel('localhost:50053').check_connectivity_state(True)"]
       interval: 30s
@@ -70,37 +74,10 @@ services:
       retries: 3
       start_period: 60s
 
-  # Inference API - LLM
-  inference-api:
-    build:
-      context: .
-      dockerfile: ./services/inference-api/Dockerfile
-    restart: unless-stopped
-    ports:
-      - 50051:50051
-    environment:
-      - MODEL_NAME=${MODEL_NAME:-Qwen/Qwen3-30B-A3B-Thinking-2507}
-      - MODEL_DEVICE=${MODEL_DEVICE:-cuda:0}
-      - MAX_CONTEXT_LENGTH=${MAX_CONTEXT_LENGTH:-131072}
-      - USE_YARN=${USE_YARN:-true}
-      - MODEL_TEMPERATURE=${MODEL_TEMPERATURE:-0.7}
-      - MODEL_MAX_TOKENS=${MODEL_MAX_TOKENS:-2048}
-      - MODEL_TOP_P=${MODEL_TOP_P:-0.9}
-      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
-      - CUDA_VISIBLE_DEVICES=0
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              device_ids: ['0']
-              capabilities: [gpu]
-    volumes:
-      - ${MODEL_CACHE_DIR:-/home/rlee/models}:/models
-      - ${JUNE_DATA_DIR:-/home/rlee/june_data}/model_artifacts/inference-api:/app/model_artifacts
-      - /var/log/june/inference-api:/logs
-    networks:
-      - june_network
+  # NOTE: LLM Inference is provided by TensorRT-LLM container in home_infra
+  # TensorRT-LLM is accessible via shared-network as tensorrt-llm:8000
+  # See REFACTOR_PLAN.md Phase 15 for TensorRT-LLM setup instructions
+  # Legacy inference-api service available via: docker compose --profile legacy up -d inference-api
 
   # Telegram Bot Service - Orchestrates the pipeline
   telegram:
@@ -116,17 +93,17 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - STT_URL=grpc://stt:50052
       - TTS_URL=grpc://tts:50053
-      - LLM_URL=grpc://inference-api:50051
-      # Conversation API is optional - telegram service has fallback
-      # - CONVERSATION_API_URL=http://gateway:8080
+      - LLM_URL=grpc://tensorrt-llm:8000  # TensorRT-LLM in home_infra/shared-network
+      # Legacy: Use inference-api with --profile legacy: LLM_URL=grpc://inference-api:50051
     depends_on:
       - stt
       - tts
-      - inference-api
+      # TensorRT-LLM is in home_infra/shared-network, not in this compose file
     volumes:
       - /var/log/june/telegram:/logs
     networks:
       - june_network
+      - shared-network  # For TensorRT-LLM, Jaeger, Prometheus (from home_infra)
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
       interval: 30s
@@ -148,17 +125,17 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - STT_URL=grpc://stt:50052
       - TTS_URL=grpc://tts:50053
-      - LLM_URL=grpc://inference-api:50051
-      # Conversation API is optional - discord service has fallback
-      # - CONVERSATION_API_URL=http://gateway:8080
+      - LLM_URL=grpc://tensorrt-llm:8000  # TensorRT-LLM in home_infra/shared-network
+      # Legacy: Use inference-api with --profile legacy: LLM_URL=grpc://inference-api:50051
     depends_on:
       - stt
       - tts
-      - inference-api
+      # TensorRT-LLM is in home_infra/shared-network, not in this compose file
     volumes:
       - /var/log/june/discord:/logs
     networks:
       - june_network
+      - shared-network  # For TensorRT-LLM, Jaeger, Prometheus (from home_infra)
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8081/health"]
       interval: 30s
@@ -169,8 +146,13 @@ services:
 networks:
   june_network:
     driver: bridge
+  shared-network:
+    external: true
+    name: shared_network  # Connects to home_infra for TensorRT-LLM, Jaeger, Prometheus, etc.
 
-# That's it! Only 5 services needed for the core functionality (4 core + 1 platform service).
+# That's it! Only 4 core services needed (STT, TTS, Telegram, Discord).
+# LLM inference provided by TensorRT-LLM container in home_infra (shared-network).
 # Telegram and Discord share code via essence/chat/ module.
 # No PostgreSQL, Redis, MinIO, NATS, Gateway, Webapp, etc.
+# Legacy inference-api service available via --profile legacy if needed.
 
