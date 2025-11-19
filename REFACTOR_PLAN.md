@@ -98,6 +98,7 @@ Pare down the june project to bare essentials for the **voice message → STT �
 - Simplified README.md to reflect minimal architecture
 - Removed references to removed services
 - ✅ Fixed documentation inconsistencies: Updated `docs/guides/AGENTS.md` to reference `REFACTOR_PLAN.md` instead of outdated `TODO.md` as the source of truth
+- ✅ **COMPLETED:** Updated `AGENTS.md` to reflect TensorRT-LLM container architecture - removed inference-api service references and updated to show TensorRT-LLM container from home_infra shared-network for LLM inference
 - ✅ Improved benchmark evaluation documentation: Updated `README.md` to show both script wrapper and direct command options for running benchmarks, providing users with clear choices
 - ✅ Improved coding agent documentation: Updated `README.md` to show both CLI command and Python API options for using the coding agent, matching the pattern used for benchmark evaluation
 - ✅ Updated `docs/README.md` last updated date to 2025-11-18
