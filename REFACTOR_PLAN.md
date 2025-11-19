@@ -106,6 +106,7 @@ All major refactoring phases have been completed:
    - ✅ **Proper pass@k calculation:** Implemented support for multiple attempts per task with accurate pass@k calculation (pass@1, pass@5, pass@10, pass@100). Added `num_attempts_per_task` parameter to BenchmarkEvaluator and `--num-attempts` flag to run-benchmarks command.
    - ✅ **Comprehensive tests:** Added test suite for pass@k calculation (9 tests covering single attempts, multiple attempts, edge cases). Fixed bug where `pass_at_1` was not defined for multiple attempts. Fixed deprecation warning (datetime.utcnow() → datetime.now(timezone.utc)).
    - ✅ **Documentation:** Updated QWEN3_BENCHMARK_EVALUATION.md to document `--num-attempts` parameter and pass@k calculation. Added new "Pass@k Calculation" section with examples and explanation of when pass@k is accurate.
+   - ✅ **Script wrapper:** Updated `scripts/run_benchmarks.sh` to support `--num-attempts` parameter. Added NUM_ATTEMPTS environment variable, command-line argument parsing, and help message. Shell script wrapper now fully supports pass@k calculation feature.
 
 4. ✅ **Verification Tools:**
    - ✅ `essence/commands/verify_qwen3.py` - Model verification command
