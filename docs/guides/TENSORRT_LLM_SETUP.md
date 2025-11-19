@@ -203,6 +203,80 @@ It also generates compilation command templates with proper options.
    poetry run -m essence setup-triton-repository --action validate --model qwen3-30b
    ```
 
+## Complete Workflow Example
+
+Here's a complete end-to-end workflow for setting up and using TensorRT-LLM with Qwen3-30B:
+
+### Step-by-Step Workflow
+
+```bash
+# 1. Download the model (if not already downloaded)
+docker compose run --rm cli-tools \
+  poetry run -m essence download-models --model Qwen/Qwen3-30B-A3B-Thinking-2507
+
+# 2. Create model repository structure
+poetry run -m essence setup-triton-repository --action create --model qwen3-30b
+
+# 3. Check prerequisites and get compilation guidance
+poetry run -m essence compile-model --model qwen3-30b \
+  --check-prerequisites \
+  --generate-template \
+  --generate-config \
+  --generate-tokenizer-commands
+
+# 4. Compile the model using TensorRT-LLM build tools
+# (Use the template commands from step 3 - requires TensorRT-LLM Docker container)
+docker run --rm --gpus all \
+  -v /home/rlee/models:/models \
+  nvcr.io/nvidia/tensorrt-llm:latest \
+  trtllm-build \
+    --checkpoint_dir /models/Qwen/Qwen3-30B-A3B-Thinking-2507 \
+    --output_dir /models/triton-repository/qwen3-30b/1/ \
+    --quantization int8 \
+    --max_batch_size 1 \
+    --max_input_len 131072 \
+    --max_output_len 2048
+
+# 5. Copy tokenizer files (use commands from step 3)
+# Example:
+cp /home/rlee/models/huggingface/hub/models--Qwen--Qwen3-30B-A3B-Thinking-2507/tokenizer*.json \
+   /home/rlee/models/triton-repository/qwen3-30b/1/
+
+# 6. Verify model is ready for loading
+poetry run -m essence compile-model --model qwen3-30b --check-readiness
+
+# 7. Load the model into TensorRT-LLM
+poetry run -m essence manage-tensorrt-llm --action load --model qwen3-30b
+
+# 8. Verify model status
+poetry run -m essence manage-tensorrt-llm --action status --model qwen3-30b
+
+# 9. Verify TensorRT-LLM setup
+poetry run -m essence verify-tensorrt-llm
+```
+
+### Quick Reference: Common Commands
+
+```bash
+# Check if model is ready
+poetry run -m essence compile-model --model qwen3-30b --check-readiness
+
+# Load model
+poetry run -m essence manage-tensorrt-llm --action load --model qwen3-30b
+
+# Check model status
+poetry run -m essence manage-tensorrt-llm --action status --model qwen3-30b
+
+# List all models
+poetry run -m essence manage-tensorrt-llm --action list
+
+# Unload model
+poetry run -m essence manage-tensorrt-llm --action unload --model qwen3-30b
+
+# Verify TensorRT-LLM setup
+poetry run -m essence verify-tensorrt-llm
+```
+
 ## Model Management
 
 ### Loading Models
