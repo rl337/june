@@ -2,7 +2,7 @@
 
 ## Status: ✅ **CORE REFACTORING COMPLETE** → 🚀 **FORWARD DEVELOPMENT IN PROGRESS**
 
-**Last Updated:** 2025-11-19 (Fixed GitHub Actions CI - Wrapped PipelineTestFramework import in try/except in conftest.py)
+**Last Updated:** 2025-11-19 (Fixed GitHub Actions CI - Added pytestmark to skip entire file in CI)
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
@@ -262,6 +262,7 @@ All major refactoring phases have been completed:
    - ✅ Simplified module-level code, check CI first in fixture (run #309) - Removed all complex module-level constant evaluation and grpc checking code. Module now only imports `PipelineTestFramework` wrapped in try/except. Fixture checks CI first, then PipelineTestFramework availability, then grpc availability. This ensures module can always be imported safely even when grpc is mocked by other conftest.py files.
    - ✅ Moved fixture skip logic to conftest.py, removed duplicate fixture (run #311) - Found duplicate `pipeline_framework_real` fixture definition in both `test_pipeline_integration.py` and `conftest.py`. Moved all skip logic to the fixture in `conftest.py` and removed the duplicate from the test file. This fixes pytest collection errors caused by duplicate fixture definitions.
    - ✅ Wrapped PipelineTestFramework import in try/except in conftest.py (run #313) - Wrapped the `from tests.essence.pipeline.test_pipeline_framework import PipelineTestFramework` import in conftest.py with try/except to ensure conftest.py can always be imported safely, even if PipelineTestFramework import fails. This prevents pytest collection failures when grpc is mocked by other conftest.py files.
+   - ✅ Added pytestmark to skip entire file in CI (run #316) - Added `pytestmark = pytest.mark.skipif(os.getenv('CI') == 'true', ...)` at module level in `test_pipeline_integration.py` to skip the entire file in CI. This prevents pytest from even collecting these tests in CI, which is more reliable than relying on marker exclusion alone.
    - ✅ Total: 161 tests passing (153 existing + 8 pipeline tests, 3 integration tests excluded from CI via marker)
 
 2. **Test STT → LLM → TTS flow:** ⏳ TODO (framework ready, requires real services)
