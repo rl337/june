@@ -2,7 +2,7 @@
 
 ## Status: ✅ **CORE REFACTORING COMPLETE**
 
-**Last Updated:** 2025-11-18 (Verified: 2025-11-18 - All code refactoring complete, PostgreSQL optimization docs marked obsolete, commit count updated to 309)
+**Last Updated:** 2025-11-18 (Verified: 2025-11-18 - All code refactoring complete, PostgreSQL optimization docs marked obsolete, commit count updated to 310, documentation inconsistency fixed)
 
 **🎉 REFACTORING COMPLETE:** All major refactoring phases have been completed. The project has been successfully pared down to bare essentials for the voice message → STT → LLM → TTS → voice response round trip.
 
@@ -11,7 +11,7 @@
 - Verified no linting errors in essence package
 - Verified git status is clean (only session tracking file modified, which is in .gitignore)
 - Confirmed all code-related refactoring is complete
-- Note: 309 commits ahead of origin/main (push failed due to access rights - remote repository issue, not a code issue)
+- Note: 310 commits ahead of origin/main (push failed due to access rights - remote repository issue, not a code issue)
 
 **✅ Final Status Verification (2025-11-18):**
 - All 100 unit tests passing (verified with `pytest tests/essence/`)
@@ -50,8 +50,9 @@ Pare down the june project to bare essentials for the **voice message → STT �
 ## Core Principles (Established from Completed Work)
 
 ### Minimal Architecture
-- **Essential services only:** telegram, discord, stt, tts
-- **LLM inference:** TensorRT-LLM container (from home_infra shared-network) - no custom inference service
+- **Essential services only:** telegram, discord, stt, tts, inference-api
+- **LLM inference:** inference-api service (current implementation) - provides gRPC interface for LLM inference
+- **Optional future migration:** TensorRT-LLM container (from home_infra shared-network) - can replace inference-api for optimized GPU inference (see Phase 10 operational guide)
 - **No external dependencies:** All services communicate via gRPC directly
 - **In-memory alternatives:** Conversation storage and rate limiting use in-memory implementations
 - **Container-first:** All operations run in Docker containers - no host system pollution
@@ -108,6 +109,7 @@ Pare down the june project to bare essentials for the **voice message → STT �
 - ✅ Fixed CPU fallback documentation inconsistency in README.md - Corrected misleading statement that CPU fallback is allowed for large models (30B+). Updated to reflect Critical Requirements that CPU fallback is FORBIDDEN for large models and service will fail to start if GPU is not available
 - ✅ Added pre-flight environment check step to README.md Quick Setup section - Added step 0 recommending users run `poetry run -m essence check-environment` before attempting model downloads. This helps catch configuration issues early and aligns README.md with the operational guide in REFACTOR_PLAN.md
 - ✅ Updated commit count accuracy: Fixed commit count discrepancy in REFACTOR_PLAN.md (updated from 243 to 244, then to 245 to match git status after commits)
+- ✅ **COMPLETED:** Fixed documentation inconsistency regarding LLM inference - Clarified that inference-api is the current implementation (included in june project) and TensorRT-LLM is an optional future migration path. Updated REFACTOR_PLAN.md and AGENTS.md to accurately reflect current architecture vs. future migration options.
 - **Best Practice:** Keep documentation minimal and aligned with actual architecture. Maintain commit count accuracy in REFACTOR_PLAN.md to reflect current git status. Note: Each commit that updates the count increments it further, which is expected maintenance behavior.
 
 ### Phase 9.1: Service Refactoring ✅
@@ -185,7 +187,26 @@ When ready to use the Qwen3 model and coding agent, follow these steps:
    ```
    **Note:** This checks Docker, GPU, NVIDIA Container Toolkit, HUGGINGFACE_TOKEN, and other prerequisites. Fix any issues before proceeding.
 
-1. **Set up TensorRT-LLM container in home_infra:**
+1. **Start inference-api service (current implementation):**
+   ```bash
+   # Start the inference-api service with Qwen3 model
+   docker compose up -d inference-api
+   
+   # Check logs for model loading
+   docker compose logs -f inference-api
+   ```
+   **Note:** This requires a GPU with 20GB+ VRAM. The inference-api service will load Qwen3-30B-A3B-Thinking-2507 model with quantization automatically.
+
+2. **Verify inference-api service is running:**
+   ```bash
+   # Check container status
+   docker compose ps inference-api
+   
+   # Check health endpoint
+   curl http://localhost:8001/health
+   ```
+
+3. **Optional: Migrate to TensorRT-LLM container (future optimization):**
    ```bash
    # Add TensorRT-LLM container to home_infra docker-compose.yml
    # Configure it to load Qwen3-30B-A3B-Thinking-2507 model
@@ -193,26 +214,11 @@ When ready to use the Qwen3 model and coding agent, follow these steps:
    cd /home/rlee/dev/home_infra
    # Add tensorrt-llm service configuration
    docker compose up -d tensorrt-llm
-   ```
-   **Note:** This requires a GPU with 20GB+ VRAM. TensorRT-LLM will handle model loading and quantization automatically.
-
-2. **Verify TensorRT-LLM container is running:**
-   ```bash
-   # Check container status
-   docker compose ps tensorrt-llm
    
-   # Check logs for model loading
-   docker compose logs -f tensorrt-llm
-   
-   # Verify it's on shared-network
-   docker network inspect shared_network | grep tensorrt-llm
-   ```
-
-3. **Update june services to connect to TensorRT-LLM:**
-   ```bash
-   # Services should connect to tensorrt-llm service via shared-network
+   # Update june services to connect to TensorRT-LLM instead of inference-api
    # Update service configuration to use tensorrt-llm:8000 (or appropriate port)
    ```
+   **Note:** TensorRT-LLM provides optimized GPU inference but requires additional setup. inference-api is the current working implementation.
 
 4. **Test the coding agent:**
    ```bash
@@ -270,16 +276,16 @@ When ready to use the Qwen3 model and coding agent, follow these steps:
 
 **Requirements:**
 1. **All large models must use GPU** - Models like Qwen3-30B-A3B-Thinking-2507 must load on GPU with quantization (4-bit or 8-bit)
-2. **Use TensorRT-LLM container** - TensorRT-LLM handles GPU loading and quantization automatically - no custom inference service needed
-3. **CPU fallback is FORBIDDEN for large models** - TensorRT-LLM container must be configured to fail if GPU is not available, not attempt CPU loading
-4. **GPU compatibility must be verified before model loading** - TensorRT-LLM container should verify GPU availability before starting
-5. **Consult external sources for GPU setup** - If GPU is not working:
-   - Check TensorRT-LLM documentation for GPU requirements and setup
+2. **Current implementation: inference-api service** - The inference-api service handles GPU loading and quantization automatically - CPU fallback is prevented for large models (30B+)
+3. **Optional future: TensorRT-LLM container** - TensorRT-LLM can replace inference-api for optimized GPU inference (see Phase 10 operational guide)
+4. **CPU fallback is FORBIDDEN for large models** - Both inference-api and TensorRT-LLM must be configured to fail if GPU is not available, not attempt CPU loading
+5. **GPU compatibility must be verified before model loading** - Both inference-api and TensorRT-LLM should verify GPU availability before starting
+6. **Consult external sources for GPU setup** - If GPU is not working:
+   - Check inference-api service logs for GPU compatibility issues
    - Review NVIDIA documentation for compute capability support
-   - Check TensorRT-LLM container GPU access (nvidia-docker, GPU passthrough)
-   - Review TensorRT-LLM model quantization and optimization options
-   - Consult TensorRT-LLM documentation for model loading best practices
-   - Check TensorRT-LLM container logs for GPU compatibility issues
+   - Check container GPU access (nvidia-docker, GPU passthrough)
+   - Review model quantization and optimization options
+   - For TensorRT-LLM: Check TensorRT-LLM documentation for GPU requirements and setup
 
 **Current Issue:**
 - ~~Qwen3-30B model is falling back to CPU due to GPU compute capability mismatch (sm_121 not supported by PyTorch 2.5.1)~~
@@ -287,11 +293,12 @@ When ready to use the Qwen3 model and coding agent, follow these steps:
 - ✅ **FIXED:** CPU fallback is now prevented for large models (30B+) - service fails fast with clear error message
 
 **Implementation:**
-- ✅ **Use TensorRT-LLM container** - No custom inference service needed; TensorRT-LLM handles GPU loading and quantization
-- ✅ TensorRT-LLM container must be configured to fail if GPU is not available (not attempt CPU loading)
-- ✅ TensorRT-LLM container should verify GPU availability before starting
-- ✅ Services connect to TensorRT-LLM container via shared-network (home_infra)
-- ✅ Clear error messages if TensorRT-LLM container is not available or GPU is not compatible
+- ✅ **Current: inference-api service** - Handles GPU loading and quantization; CPU fallback prevented for large models (30B+)
+- ✅ inference-api service is configured to fail if GPU is not available (not attempt CPU loading)
+- ✅ inference-api service verifies GPU availability before starting
+- ✅ Services connect to inference-api service via gRPC (inference-api:50051)
+- ✅ Clear error messages if inference-api service is not available or GPU is not compatible
+- ⏳ **Optional future: TensorRT-LLM container** - Can replace inference-api for optimized GPU inference (requires setup in home_infra)
 
 ## Current Priorities
 
@@ -348,12 +355,13 @@ When ready to use the Qwen3 model and coding agent, follow these steps:
 2. **discord** - Receives voice messages from Discord, orchestrates the pipeline (shares code with telegram)
 3. **stt** - Speech-to-text conversion (Whisper)
 4. **tts** - Text-to-speech conversion (FastSpeech2/espeak)
+5. **inference-api** - LLM inference service (provides gRPC interface for Qwen3 and other models)
 
 ### Infrastructure
+- **Current LLM inference:** inference-api service (included in june project)
+- **Optional future migration:** TensorRT-LLM container (from home_infra shared-network) - can replace inference-api for optimized GPU inference (see Phase 10 operational guide)
 - **From home_infra (shared-network):** 
-  - **TensorRT-LLM** - LLM inference service (loads Qwen3 and other models)
   - nginx, jaeger, prometheus, grafana (available but not required)
-- **No custom inference service** - Use TensorRT-LLM container instead
 - All services communicate via gRPC directly
 
 ## Architecture
