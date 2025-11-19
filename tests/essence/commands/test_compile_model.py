@@ -224,7 +224,7 @@ class TestGenerateCompilationTemplate:
         template = generate_compilation_template("qwen3-30b", "Qwen/Qwen3-30B-A3B-Thinking-2507")
         
         assert "qwen3-30b" in template
-        assert "Qwen/Qwen3-30B-A3B-Thinking-2507" in template
+        assert "models--Qwen--Qwen3-30B-A3B-Thinking-2507" in template
         assert "trtllm-build" in template or "tensorrt-llm" in template
         assert "int8" in template  # quantization
     

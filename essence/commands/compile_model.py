@@ -312,26 +312,35 @@ def generate_compilation_template(model_name: str, model_hf_name: str = None) ->
         else:
             model_hf_name = f"<HUGGINGFACE_MODEL_NAME>"
     
+    # Find the actual HuggingFace cache location
+    model_cache_dir = "/home/rlee/models"
+    hf_cache_pattern = f"models--{model_hf_name.replace('/', '--')}"
+    hf_model_path = f"/models/{hf_cache_pattern}"
+    
     template = f"""# Model Compilation Template for {model_name}
 
 ## Prerequisites
 - NVIDIA GPU with 20GB+ VRAM
 - TensorRT-LLM build tools (in Docker container or installed)
-- Model downloaded to /home/rlee/models/{model_hf_name}
-- Model repository structure created at /home/rlee/models/triton-repository/{model_name}/1/
+- Model downloaded to {hf_model_path} (HuggingFace cache format)
+- Model repository structure created at /models/triton-repository/{model_name}/1/
+- HuggingFace cache environment variables set (HF_HOME=/models, TRANSFORMERS_CACHE=/models)
 
 ## Compilation Steps
 
 ### Option 1: Using TensorRT-LLM Docker Container (Recommended)
 
 ```bash
-# Run TensorRT-LLM build container
+# Run TensorRT-LLM build container with HuggingFace cache mounted
 docker run --rm --gpus all \\
   -v /home/rlee/models:/models \\
   -v /home/rlee/dev/june:/workspace \\
+  -e HF_HOME=/models \\
+  -e TRANSFORMERS_CACHE=/models \\
+  -e HF_HUB_CACHE=/models \\
   nvcr.io/nvidia/tensorrt-llm:latest \\
   trtllm-build \\
-    --checkpoint_dir /models/{model_hf_name} \\
+    --checkpoint_dir /models/{hf_cache_pattern} \\
     --output_dir /models/triton-repository/{model_name}/1/ \\
     --gemm_plugin float16 \\
     --gpt_attention_plugin float16 \\
@@ -346,8 +355,13 @@ docker run --rm --gpus all \\
 
 ```bash
 # In a container with TensorRT-LLM installed
+# Set HuggingFace cache environment variables
+export HF_HOME=/models
+export TRANSFORMERS_CACHE=/models
+export HF_HUB_CACHE=/models
+
 python3 -m tensorrt_llm.build \\
-  --checkpoint_dir /models/{model_hf_name} \\
+  --checkpoint_dir /models/{hf_cache_pattern} \\
   --output_dir /models/triton-repository/{model_name}/1/ \\
   --quantization int8 \\
   --max_batch_size 1 \\
@@ -358,8 +372,13 @@ python3 -m tensorrt_llm.build \\
 ### Option 3: Using trtllm-build Command
 
 ```bash
+# Set HuggingFace cache environment variables
+export HF_HOME=/models
+export TRANSFORMERS_CACHE=/models
+export HF_HUB_CACHE=/models
+
 trtllm-build \\
-  --checkpoint_dir /models/{model_hf_name} \\
+  --checkpoint_dir /models/{hf_cache_pattern} \\
   --output_dir /models/triton-repository/{model_name}/1/ \\
   --quantization int8 \\
   --max_batch_size 1 \\
