@@ -121,6 +121,7 @@ async def test_pipeline_performance_with_real_services(pipeline_framework_real):
     print(f"  Total duration: {metrics.total_duration:.2f}s")
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_service_availability_check(pipeline_framework_real):
     """Test service availability checking."""
