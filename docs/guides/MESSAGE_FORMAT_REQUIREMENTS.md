@@ -326,6 +326,235 @@ limitations = validator.get_limitations()
    - Use platform validators to catch platform-specific issues
    - Verify rendering metadata is correct for each platform
 
+## Using the Debugging Tools
+
+The message history debugging tools provide programmatic access to inspect what messages were actually sent and identify rendering issues. This section provides practical examples for using these tools.
+
+### Command-Line Usage
+
+The `get-message-history` command provides a CLI interface for debugging:
+
+#### Basic Message Retrieval
+
+```bash
+# Get recent messages (last 24 hours, default limit: 50)
+poetry run python -m essence get-message-history
+
+# Get messages for a specific user
+poetry run python -m essence get-message-history --user-id "123456789"
+
+# Get messages for a specific chat/channel
+poetry run python -m essence get-message-history --chat-id "-1001234567890"
+
+# Filter by platform
+poetry run python -m essence get-message-history --platform telegram
+
+# Filter by message type
+poetry run python -m essence get-message-history --message-type text
+
+# Limit number of results
+poetry run python -m essence get-message-history --limit 10
+
+# Output as JSON for programmatic processing
+poetry run python -m essence get-message-history --format json
+```
+
+#### Analyzing Rendering Issues
+
+```bash
+# Analyze all messages for rendering issues (last 24 hours)
+poetry run python -m essence get-message-history --analyze
+
+# Analyze messages for a specific platform
+poetry run python -m essence get-message-history --analyze --platform telegram
+
+# Analyze messages for a specific user
+poetry run python -m essence get-message-history --analyze --user-id "123456789"
+
+# Analyze messages from last hour
+poetry run python -m essence get-message-history --analyze --hours 1
+
+# Output analysis as JSON
+poetry run python -m essence get-message-history --analyze --format json
+```
+
+#### Comparing Expected vs Actual
+
+```bash
+# Compare expected text with what was actually sent
+poetry run python -m essence get-message-history --compare "Expected message text here"
+
+# Compare with platform filter
+poetry run python -m essence get-message-history --compare "Expected text" --platform telegram
+
+# Compare for specific user/chat
+poetry run python -m essence get-message-history --compare "Expected text" --user-id "123456789" --chat-id "-1001234567890"
+
+# Look back further in time (default: 1 hour)
+poetry run python -m essence get-message-history --compare "Expected text" --hours 24
+```
+
+#### Validating Messages
+
+```bash
+# Validate a message for Telegram
+poetry run python -m essence get-message-history --validate "Message text" --platform telegram
+
+# Validate a message for Discord
+poetry run python -m essence get-message-history --validate "Message text" --platform discord
+
+# Output validation as JSON
+poetry run python -m essence get-message-history --validate "Message text" --platform telegram --format json
+```
+
+#### Getting Statistics
+
+```bash
+# Get message history statistics
+poetry run python -m essence get-message-history --stats
+
+# Get statistics as JSON
+poetry run python -m essence get-message-history --stats --format json
+```
+
+### Programmatic Usage
+
+For programmatic access, use the `essence.chat.message_history_analysis` module:
+
+```python
+from essence.chat.message_history_analysis import (
+    get_recent_messages,
+    analyze_rendering_issues,
+    compare_expected_vs_actual,
+    get_message_statistics,
+    validate_message_for_platform,
+)
+
+# Get recent messages
+messages = get_recent_messages(
+    user_id="123456789",
+    platform="telegram",
+    hours=1,
+    limit=10
+)
+
+# Analyze rendering issues
+issues = analyze_rendering_issues(
+    user_id="123456789",
+    platform="telegram",
+    hours=24
+)
+print(f"Found {issues['total_messages']} messages")
+print(f"Split messages: {issues['split_messages']}")
+print(f"Truncated messages: {issues['truncated_messages']}")
+
+# Compare expected vs actual
+comparison = compare_expected_vs_actual(
+    expected_text="Expected message text",
+    user_id="123456789",
+    platform="telegram",
+    hours=1
+)
+if comparison:
+    print(f"Similarity: {comparison['similarity']:.2%}")
+    print(f"Differences: {len(comparison['differences'])}")
+
+# Validate a message
+validation = validate_message_for_platform(
+    "Message text to validate",
+    platform="telegram",
+    parse_mode="Markdown"
+)
+if not validation['valid']:
+    print(f"Errors: {validation['errors']}")
+    print(f"Warnings: {validation['warnings']}")
+
+# Get statistics
+stats = get_message_statistics()
+print(f"Total messages: {stats['total_messages']}")
+print(f"By platform: {stats['by_platform']}")
+```
+
+### Common Debugging Workflows
+
+#### Workflow 1: Debug a Specific Message
+
+1. **Get the message from history:**
+   ```bash
+   poetry run python -m essence get-message-history --user-id "123456789" --limit 5
+   ```
+
+2. **Compare expected vs actual:**
+   ```bash
+   poetry run python -m essence get-message-history --compare "Expected message text" --user-id "123456789"
+   ```
+
+3. **Check rendering metadata:**
+   - Look for `rendering_metadata` in the output
+   - Check for `was_truncated`, `is_split`, `total_parts`
+
+#### Workflow 2: Find All Rendering Issues
+
+1. **Analyze all messages:**
+   ```bash
+   poetry run python -m essence get-message-history --analyze --hours 24
+   ```
+
+2. **Review issues:**
+   - Check `split_messages` count
+   - Check `truncated_messages` count
+   - Review individual issues in the output
+
+3. **Investigate specific issues:**
+   ```bash
+   poetry run python -m essence get-message-history --user-id "123456789" --analyze
+   ```
+
+#### Workflow 3: Validate Before Sending
+
+1. **Test message validation:**
+   ```bash
+   poetry run python -m essence get-message-history --validate "Your message text" --platform telegram
+   ```
+
+2. **Fix any errors or warnings:**
+   - Address length issues
+   - Fix markdown syntax errors
+   - Remove unsupported features
+
+3. **Re-validate:**
+   ```bash
+   poetry run python -m essence get-message-history --validate "Fixed message text" --platform telegram
+   ```
+
+### Interpreting Results
+
+#### Analysis Results
+
+- **`total_messages`**: Total number of messages in the time window
+- **`split_messages`**: Messages that were split into multiple parts
+- **`truncated_messages`**: Messages that were truncated
+- **`format_mismatches`**: Messages with formatting issues
+- **`exceeded_limit`**: Messages that exceeded platform limits
+- **`issues`**: List of specific issues found
+
+#### Comparison Results
+
+- **`similarity`**: Similarity score (0.0 to 1.0) between expected and actual
+- **`expected_length`**: Length of expected text
+- **`actual_length`**: Length of actual sent message
+- **`raw_length`**: Length of raw text (before formatting)
+- **`differences`**: List of differences found (truncation, splits, etc.)
+
+#### Validation Results
+
+- **`valid`**: Whether the message is valid for the platform
+- **`length`**: Current message length
+- **`max_length`**: Maximum allowed length for platform
+- **`within_length_limit`**: Whether message is within length limit
+- **`errors`**: List of validation errors
+- **`warnings`**: List of validation warnings
+
 ## Reference
 
 ### Constants

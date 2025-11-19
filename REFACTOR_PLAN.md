@@ -231,6 +231,12 @@ All major refactoring phases have been completed:
          - ✅ Added comprehensive unit tests for TelegramHTMLValidator (20 test cases covering valid HTML, unclosed tags, invalid tags, nested tags)
          - ✅ Updated existing tests to work with improved validation (71 total tests passing in test_platform_validators.py)
          - ✅ All chat module tests passing (170 tests total)
+       - ✅ Added comprehensive usage guide for message history debugging tools
+         - ✅ Added "Using the Debugging Tools" section to MESSAGE_FORMAT_REQUIREMENTS.md
+         - ✅ Documented command-line usage examples (basic retrieval, analysis, comparison, validation, statistics)
+         - ✅ Documented programmatic usage examples with code samples
+         - ✅ Added common debugging workflows (debug specific message, find all issues, validate before sending)
+         - ✅ Added result interpretation guide (analysis results, comparison results, validation results)
      - ✅ Verify message history works for both Telegram and Discord
        - ✅ Test message history retrieval for both platforms
        - ✅ Test agent communication interface for both platforms
