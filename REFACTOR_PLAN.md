@@ -176,6 +176,9 @@ All major refactoring phases have been completed:
 5. **Implement message history debugging and agent communication:** ⏳ NEW PRIORITY
    - **Goal:** Fix Telegram and Discord rendering issues and enable agents to communicate directly with the user
    - **Tasks:**
+     - ✅ Enhanced message history helpers with comprehensive rendering metadata (message length, split info, truncation, parse mode, etc.)
+     - ✅ Added raw_text parameter to capture original LLM response before formatting
+     - ✅ Updated text handlers to pass raw_llm_response for better debugging
      - ⏳ Enhance `get_message_history()` command to support agent communication
        - ⏳ Add ability for agents to query message history programmatically (not just CLI)
        - ⏳ Add agent-to-user communication interface (agents can send messages to user)
