@@ -268,7 +268,8 @@ You are working on refactoring the june project. Your task is to:
 - Refactor plan: REFACTOR_PLAN.md
 - **Primary Goal:** Pare down june to bare essentials for Telegram/Discord voice round trip
 - **Extended Goal:** Get Qwen3-30B-A3B-Thinking-2507 running on GPU in containers and develop coding agent for benchmark evaluation
-- Services to keep: telegram, discord, stt, tts, inference-api
+- Services to keep: telegram, discord, stt, tts
+- LLM Inference: TensorRT-LLM (in home_infra/shared-network, default) or NVIDIA NIM (nim-qwen3:8001). Legacy inference-api service available via --profile legacy for backward compatibility only.
 - Services removed: gateway, postgres, minio, redis, nats, orchestrator, webapp
 - **NEW PRIORITY:** Phase 10 (Qwen3 setup and coding agent) - see REFACTOR_PLAN.md Phase 10
 - **Container-first requirement:** All model operations, downloads, and inference must happen in Docker containers - no host system pollution
