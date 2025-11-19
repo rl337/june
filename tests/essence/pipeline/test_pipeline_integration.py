@@ -22,36 +22,34 @@ from tests.essence.pipeline.test_pipeline_framework import PipelineTestFramework
 # These tests require real services and are meant for local integration testing
 _IS_CI = os.getenv('CI') == 'true'
 
-
-def _should_skip_integration_test():
-    """Determine if integration tests should be skipped.
-    
-    Returns True if tests should be skipped (in CI or grpc unavailable/mocked).
-    This function is safe to call during pytest collection.
-    """
-    # Always skip in CI
-    if _IS_CI:
-        return True
-    
-    # Not in CI, check if grpc is available
+# Check grpc availability (only evaluated when not in CI, to avoid CI collection issues)
+# In CI, we always skip, so we don't need to check grpc
+if not _IS_CI:
+    # Not in CI, check if grpc is available and not mocked
+    _GRPC_AVAILABLE = False
     try:
-        if MagicMock is None:
-            return True
-        if 'grpc' in sys.modules:
-            grpc_module = sys.modules['grpc']
-            if isinstance(grpc_module, MagicMock):
-                return True
-        try:
-            import grpc
-            if isinstance(grpc, MagicMock):
-                return True
-            if not hasattr(grpc, 'insecure_channel'):
-                return True
-            return False  # grpc is available, don't skip
-        except (ImportError, AttributeError, TypeError):
-            return True  # grpc not available, skip
+        if MagicMock is not None:
+            if 'grpc' in sys.modules:
+                grpc_module = sys.modules['grpc']
+                if not isinstance(grpc_module, MagicMock):
+                    try:
+                        import grpc
+                        if not isinstance(grpc, MagicMock) and hasattr(grpc, 'insecure_channel'):
+                            _GRPC_AVAILABLE = True
+                    except (ImportError, AttributeError, TypeError):
+                        pass
+            else:
+                try:
+                    import grpc
+                    if not isinstance(grpc, MagicMock) and hasattr(grpc, 'insecure_channel'):
+                        _GRPC_AVAILABLE = True
+                except (ImportError, AttributeError, TypeError):
+                    pass
     except Exception:
-        return True  # Any error, skip
+        pass
+else:
+    # In CI, always skip (grpc check not needed)
+    _GRPC_AVAILABLE = False
 
 
 @pytest.fixture
@@ -61,7 +59,7 @@ def pipeline_framework_real():
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(_should_skip_integration_test(), reason="Skipping integration test (CI environment or grpc unavailable/mocked)")
+@pytest.mark.skipif(_IS_CI or not _GRPC_AVAILABLE, reason="Skipping integration test (CI environment or grpc unavailable/mocked)")
 async def test_pipeline_with_real_services(pipeline_framework_real):
     """Test complete pipeline with real services (if available)."""
     # Generate test audio
@@ -84,7 +82,7 @@ async def test_pipeline_with_real_services(pipeline_framework_real):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(_should_skip_integration_test(), reason="Skipping integration test (CI environment or grpc unavailable/mocked)")
+@pytest.mark.skipif(_IS_CI or not _GRPC_AVAILABLE, reason="Skipping integration test (CI environment or grpc unavailable/mocked)")
 async def test_pipeline_performance_with_real_services(pipeline_framework_real):
     """Test pipeline performance with real services."""
     # Generate test audio
