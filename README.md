@@ -201,6 +201,13 @@ June uses Qwen3-30B-A3B-Thinking-2507 for LLM inference. The model runs in Docke
 
 ### Quick Setup
 
+0. **Pre-flight environment check (recommended):**
+   ```bash
+   # Validate environment readiness before proceeding
+   poetry run -m essence check-environment
+   ```
+   **Note:** This checks Docker, GPU, NVIDIA Container Toolkit, HUGGINGFACE_TOKEN, and other prerequisites. Fix any issues before proceeding.
+
 1. **Download the model (containerized):**
    ```bash
    # Download model in container (no host pollution)
