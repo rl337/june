@@ -310,16 +310,19 @@ def validate_message_for_platform(
 
     # Platform-specific validations
     if platform == "telegram":
-        # Telegram-specific validations
-        if parse_mode == "HTML":
-            # Basic HTML validation (check for unclosed tags)
-            open_tags = text.count("<")
-            close_tags = text.count(">")
-            if open_tags != close_tags:
-                result["warnings"].append("Potential unclosed HTML tags detected")
+        # Use appropriate validator based on parse_mode
+        from essence.chat.platform_validators import get_validator
 
-        # Check for entities that might cause issues
-        if (
+        validator = get_validator(platform, parse_mode)
+        is_valid_format, format_errors = validator.validate(text, lenient=False)
+        if not is_valid_format:
+            result["valid"] = False
+            result["errors"].extend(format_errors)
+        elif format_errors:
+            result["warnings"].extend(format_errors)
+
+        # Check for entities that might cause issues (HTML mode specific)
+        if parse_mode == "HTML" and (
             "&" in text
             and "&amp;" not in text
             and "&lt;" not in text
@@ -330,14 +333,16 @@ def validate_message_for_platform(
             )
 
     elif platform == "discord":
-        # Discord-specific validations
-        # Check for markdown issues
-        if text.count("**") % 2 != 0:
-            result["warnings"].append("Unmatched bold markdown (**)")
-        if text.count("*") % 2 != 0 and "**" not in text:
-            result["warnings"].append("Unmatched italic markdown (*)")
-        if text.count("`") % 2 != 0:
-            result["warnings"].append("Unmatched code markdown (`)")
+        # Use Discord validator
+        from essence.chat.platform_validators import get_validator
+
+        validator = get_validator(platform)
+        is_valid_format, format_errors = validator.validate(text, lenient=False)
+        if not is_valid_format:
+            result["valid"] = False
+            result["errors"].extend(format_errors)
+        elif format_errors:
+            result["warnings"].extend(format_errors)
 
     return result
 

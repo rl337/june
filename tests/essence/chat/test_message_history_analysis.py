@@ -392,9 +392,10 @@ class TestValidateMessageForPlatform:
         result = validate_message_for_platform("**bold** text", "discord")
         assert result["valid"] is True
 
-        # Unmatched bold markers
+        # Unmatched bold markers - should produce errors (not warnings)
         result = validate_message_for_platform("**bold text", "discord")
-        assert len(result["warnings"]) > 0
+        assert result["valid"] is False
+        assert len(result["errors"]) > 0
 
 
 class TestGetMessageStatistics:

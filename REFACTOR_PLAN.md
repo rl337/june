@@ -212,6 +212,14 @@ All major refactoring phases have been completed:
          - ✅ Documented validation rules and common issues
          - ✅ Added debugging tools and best practices
          - ✅ Included reference to platform validators and message history analysis tools
+       - ✅ Enhanced message validation infrastructure
+         - ✅ Added TelegramHTMLValidator class for HTML mode validation (checks tag balance, invalid tags, proper nesting)
+         - ✅ Updated `get_validator()` function to support parse_mode parameter for Telegram (HTML vs Markdown)
+         - ✅ Updated `validate_message_for_platform()` to use appropriate validator based on parse_mode
+         - ✅ Improved Discord validation to use DiscordValidator instead of basic checks
+         - ✅ Added comprehensive unit tests for TelegramHTMLValidator (20 test cases covering valid HTML, unclosed tags, invalid tags, nested tags)
+         - ✅ Updated existing tests to work with improved validation (71 total tests passing in test_platform_validators.py)
+         - ✅ All chat module tests passing (170 tests total)
      - ✅ Verify message history works for both Telegram and Discord
        - ✅ Test message history retrieval for both platforms
        - ✅ Test agent communication interface for both platforms
