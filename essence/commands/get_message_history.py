@@ -3,6 +3,8 @@ CLI command to retrieve message history for debugging.
 
 Provides access to message history stored by Telegram and Discord handlers,
 allowing inspection of what messages were actually sent to users.
+
+Also provides programmatic access for agents via essence.chat.message_history_analysis module.
 """
 import json
 import logging
@@ -12,6 +14,12 @@ import argparse
 
 from essence.command import Command
 from essence.chat.message_history import get_message_history
+from essence.chat.message_history_analysis import (
+    analyze_rendering_issues,
+    compare_expected_vs_actual,
+    validate_message_for_platform,
+    get_message_statistics
+)
 
 logger = logging.getLogger(__name__)
 
@@ -23,34 +31,12 @@ class GetMessageHistoryCommand(Command):
     def get_name(cls) -> str:
         return "get-message-history"
     
-    def init(self) -> None:
-        """Initialize the command."""
-        pass
+    @classmethod
+    def get_description(cls) -> str:
+        return "Retrieve and analyze message history for debugging Telegram and Discord rendering issues"
     
-    def run(self) -> None:
-        """Run the command."""
-        parser = argparse.ArgumentParser(
-            description="Retrieve message history for debugging Telegram and Discord rendering issues",
-            formatter_class=argparse.RawDescriptionHelpFormatter,
-            epilog="""
-Examples:
-  # Get last 10 messages for a user
-  poetry run -m essence get-message-history --user-id 12345 --limit 10
-
-  # Get all messages for a chat/channel
-  poetry run -m essence get-message-history --chat-id 67890
-
-  # Get only error messages
-  poetry run -m essence get-message-history --message-type error
-
-  # Get messages in JSON format
-  poetry run -m essence get-message-history --user-id 12345 --format json
-
-  # Get statistics
-  poetry run -m essence get-message-history --stats
-            """
-        )
-        
+    @classmethod
+    def add_args(cls, parser: argparse.ArgumentParser) -> None:
         parser.add_argument(
             "--user-id",
             type=str,
@@ -87,14 +73,123 @@ Examples:
             action="store_true",
             help="Show statistics instead of messages"
         )
-        
-        args = parser.parse_args()
-        
+        parser.add_argument(
+            "--analyze",
+            action="store_true",
+            help="Analyze messages for rendering issues"
+        )
+        parser.add_argument(
+            "--compare",
+            type=str,
+            metavar="TEXT",
+            help="Compare expected text with actual sent message"
+        )
+        parser.add_argument(
+            "--validate",
+            type=str,
+            metavar="TEXT",
+            help="Validate message text for platform (requires --platform)"
+        )
+        parser.add_argument(
+            "--hours",
+            type=int,
+            default=24,
+            help="Number of hours to look back for analysis (default: 24)"
+        )
+    
+    def init(self) -> None:
+        """Initialize the command."""
+        pass
+    
+    def run(self) -> None:
+        """Run the command."""
         history = get_message_history()
         
-        if args.stats:
+        # Handle validation request
+        if self.args.validate:
+            if not self.args.platform:
+                print("Error: --validate requires --platform to be specified")
+                return
+            
+            result = validate_message_for_platform(
+                self.args.validate,
+                self.args.platform,
+                getattr(self.args, 'parse_mode', None)
+            )
+            
+            if self.args.format == "json":
+                print(json.dumps(result, indent=2, default=str))
+            else:
+                print(f"Validation for {self.args.platform}:")
+                print(f"  Valid: {result['valid']}")
+                print(f"  Length: {result['length']}/{result['max_length']}")
+                print(f"  Within limit: {result['within_length_limit']}")
+                if result['warnings']:
+                    print(f"  Warnings: {len(result['warnings'])}")
+                    for warning in result['warnings']:
+                        print(f"    - {warning}")
+                if result['errors']:
+                    print(f"  Errors: {len(result['errors'])}")
+                    for error in result['errors']:
+                        print(f"    - {error}")
+            return
+        
+        # Handle comparison request
+        if self.args.compare:
+            result = compare_expected_vs_actual(
+                self.args.compare,
+                user_id=self.args.user_id,
+                chat_id=self.args.chat_id,
+                platform=self.args.platform,
+                hours=self.args.hours
+            )
+            
+            if not result:
+                print("No matching message found in recent history.")
+                return
+            
+            if self.args.format == "json":
+                print(json.dumps(result, indent=2, default=str))
+            else:
+                print("Expected vs Actual Comparison:")
+                print(f"  Expected: {result['expected_length']} chars")
+                print(f"  Actual: {result['actual_length']} chars")
+                print(f"  Raw: {result['raw_length']} chars")
+                print(f"  Similarity: {result['similarity']:.2%}")
+                if result['differences']:
+                    print(f"  Differences: {len(result['differences'])}")
+                    for diff in result['differences']:
+                        print(f"    - {diff['type']}: {diff['description']}")
+            return
+        
+        # Handle analysis request
+        if self.args.analyze:
+            result = analyze_rendering_issues(
+                user_id=self.args.user_id,
+                chat_id=self.args.chat_id,
+                platform=self.args.platform,
+                hours=self.args.hours
+            )
+            
+            if self.args.format == "json":
+                print(json.dumps(result, indent=2, default=str))
+            else:
+                print("Rendering Issues Analysis:")
+                print(f"  Total messages: {result['total_messages']}")
+                print(f"  Split messages: {result['split_messages']}")
+                print(f"  Truncated messages: {result['truncated_messages']}")
+                print(f"  Format mismatches: {result['format_mismatches']}")
+                print(f"  Exceeded limit: {result['exceeded_limit']}")
+                if result['issues']:
+                    print(f"\n  Issues found: {len(result['issues'])}")
+                    for issue in result['issues'][:10]:  # Show first 10
+                        print(f"    - {issue['type']}: {issue.get('description', '')}")
+            return
+        
+        # Handle stats request
+        if self.args.stats:
             stats = history.get_stats()
-            if args.format == "json":
+            if self.args.format == "json":
                 print(json.dumps(stats, indent=2, default=str))
             else:
                 print("Message History Statistics:")
@@ -110,20 +205,20 @@ Examples:
                     print(f"  {msg_type}: {count}")
             return
         
-        # Get messages
+        # Default: Get messages
         messages = history.get_messages(
-            user_id=args.user_id,
-            chat_id=args.chat_id,
-            platform=args.platform,
-            message_type=args.message_type,
-            limit=args.limit or 50
+            user_id=self.args.user_id,
+            chat_id=self.args.chat_id,
+            platform=self.args.platform,
+            message_type=self.args.message_type,
+            limit=self.args.limit or 50
         )
         
         if not messages:
             print("No messages found matching criteria.")
             return
         
-        if args.format == "json":
+        if self.args.format == "json":
             # Output as JSON
             output = []
             for msg in messages:
