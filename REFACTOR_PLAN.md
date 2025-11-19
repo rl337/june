@@ -35,6 +35,8 @@ All major refactoring phases have been completed:
 - ✅ **Last Updated Line:** Updated "Last Updated" line in REFACTOR_PLAN.md to reflect current test counts (341 passed) and recent documentation work
 - ✅ **Script Consistency:** Updated `scripts/run_benchmarks.sh` to use `--llm-url` and `LLM_URL` as primary (matching Python command), with `--inference-api-url` and `INFERENCE_API_URL` deprecated for backward compatibility. This makes the script consistent with the rest of the codebase migration to `llm_url` naming.
 - ✅ **Script Documentation:** Updated `scripts/refactor_agent_loop.sh` to reflect TensorRT-LLM as default LLM service (inference-api is legacy, available via --profile legacy only). Updated "Services to keep" section to remove inference-api and clarify LLM inference options.
+- ✅ **Operational Task Documentation:** Enhanced REFACTOR_PLAN.md with detailed operational task steps for NIM gRPC connectivity testing (Phase 15) and Phase 18 benchmark evaluation. Added clear requirements, steps, and verification criteria for operational work.
+- ✅ **Cleanup:** Removed temporary backup file (REFACTOR_PLAN.md.backup.20251119_150335) from repository.
 - ✅ **Documentation Updates:** 
   - Updated essence/README.md to reflect current module structure (added essence.agents, essence.commands, essence.services, essence.command modules)
   - Updated tests/README.md to clarify inference-api deprecation status (added notes about legacy service, migration guide reference)
