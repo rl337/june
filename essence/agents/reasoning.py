@@ -355,11 +355,32 @@ class AgenticReasoner:
                 
                 # If LLM client is available, use it for thinking
                 if self.llm_client:
-                    # TODO: Implement LLM-based thinking
-                    # For now, return a simple analysis
-                    analysis = f"Analyzing request: {user_message[:100]}..."
-                    think_span.set_attribute("analysis_length", len(analysis))
-                    return analysis
+                    try:
+                        # Convert message history to format expected by LLM client
+                        conversation_history = None
+                        if context.message_history:
+                            conversation_history = [
+                                {"role": msg.get("role", "user"), "content": msg.get("content", "")}
+                                for msg in context.message_history[-10:]  # Last 10 messages
+                            ]
+                        
+                        # Generate analysis using LLM
+                        analysis = self.llm_client.think(
+                            user_message=user_message,
+                            conversation_history=conversation_history,
+                        )
+                        
+                        think_span.set_attribute("llm_think_used", True)
+                        think_span.set_attribute("analysis_length", len(analysis))
+                        return analysis
+                    
+                    except Exception as e:
+                        logger.error(f"Error in LLM think phase: {e}", exc_info=True)
+                        think_span.record_exception(e)
+                        # Fallback to simple analysis
+                        analysis = f"Analyzing request: {user_message[:100]}..."
+                        think_span.set_attribute("analysis_length", len(analysis))
+                        return analysis
                 else:
                     # Fallback: simple analysis
                     return f"Request analysis: {len(user_message)} characters"

@@ -76,11 +76,98 @@ class Planner:
         context: ConversationContext,
         span: trace.Span,
     ) -> Plan:
-        """Create plan using LLM (to be implemented)."""
-        # TODO: Implement LLM-based planning
-        # For now, fall back to simple planning
-        logger.info("LLM-based planning not yet implemented, using simple planning")
-        return self._create_simple_plan(user_request, available_tools, context, span)
+        """Create plan using LLM."""
+        try:
+            # Get analysis from conversation history if available
+            analysis = ""
+            if context.reasoning_history:
+                last_reasoning = context.reasoning_history[-1]
+                if hasattr(last_reasoning, 'plan') and last_reasoning.plan:
+                    # Use previous plan as context
+                    analysis = f"Previous plan: {str(last_reasoning.plan)}"
+            
+            # Get tool names
+            tool_names = [
+                tool.name if hasattr(tool, 'name') else str(tool)
+                for tool in available_tools
+            ]
+            
+            # Generate plan using LLM
+            plan_text = self.llm_client.plan(
+                user_request=user_request,
+                analysis=analysis or f"Request: {user_request}",
+                available_tools=tool_names,
+            )
+            
+            # Parse plan text into Plan object
+            # For now, create a simple plan from the LLM output
+            # TODO: Parse structured plan format from LLM response
+            steps = self._parse_plan_text(plan_text, tool_names)
+            
+            complexity = self._estimate_complexity(user_request)
+            success_criteria = self._define_success_criteria(user_request)
+            
+            span.set_attribute("llm_plan_used", True)
+            span.set_attribute("plan_text_length", len(plan_text))
+            
+            return Plan(
+                steps=steps,
+                estimated_complexity=complexity,
+                success_criteria=success_criteria,
+                required_tools=tool_names,
+            )
+        
+        except Exception as e:
+            logger.error(f"Error creating plan with LLM: {e}", exc_info=True)
+            span.record_exception(e)
+            # Fall back to simple planning
+            logger.info("LLM planning failed, falling back to simple planning")
+            return self._create_simple_plan(user_request, available_tools, context, span)
+    
+    def _parse_plan_text(self, plan_text: str, available_tools: List[str]) -> List[Step]:
+        """Parse LLM-generated plan text into Step objects."""
+        import re
+        
+        steps = []
+        step_id = 1
+        
+        # Try to extract numbered steps from plan text
+        # Pattern: "1. Step description" or "Step 1: description"
+        step_patterns = [
+            r'^\s*(\d+)\.\s+(.+?)(?=\n\s*\d+\.|\n\n|$)',
+            r'Step\s+(\d+):\s+(.+?)(?=\n\s*Step\s+\d+:|$)',
+        ]
+        
+        for pattern in step_patterns:
+            matches = re.finditer(pattern, plan_text, re.MULTILINE | re.DOTALL)
+            for match in matches:
+                step_num = int(match.group(1))
+                description = match.group(2).strip()
+                
+                # Try to identify tool from description
+                tool_name = None
+                tool_args = None
+                for tool in available_tools:
+                    if tool.lower() in description.lower():
+                        tool_name = tool
+                        break
+                
+                steps.append(Step(
+                    step_id=step_id,
+                    description=description,
+                    tool_name=tool_name,
+                    tool_args=tool_args,
+                ))
+                step_id += 1
+        
+        # If no steps found, create a single step from the plan text
+        if not steps:
+            steps.append(Step(
+                step_id=1,
+                description=plan_text[:200] + "..." if len(plan_text) > 200 else plan_text,
+            ))
+        
+        return steps
     
     def _create_simple_plan(
         self,

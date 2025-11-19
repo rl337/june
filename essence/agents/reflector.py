@@ -76,11 +76,131 @@ class Reflector:
         original_request: str,
         span: trace.Span,
     ) -> ReflectionResult:
-        """Reflect using LLM (to be implemented)."""
-        # TODO: Implement LLM-based reflection
-        # For now, fall back to simple reflection
-        logger.info("LLM-based reflection not yet implemented, using simple reflection")
-        return self._reflect_simple(plan, execution_results, original_request, span)
+        """Reflect using LLM."""
+        try:
+            # Convert plan to string
+            plan_text = str(plan) if plan else "No plan available"
+            
+            # Convert execution results to dict format
+            results_dict = [
+                {
+                    "success": r.success,
+                    "output": str(r.output) if r.output else "No output",
+                    "error": r.error,
+                    "step_id": r.step_id,
+                }
+                for r in execution_results
+            ]
+            
+            # Generate reflection using LLM
+            reflection_text = self.llm_client.reflect(
+                original_request=original_request,
+                plan=plan_text,
+                execution_results=results_dict,
+            )
+            
+            # Parse reflection text to extract key information
+            goal_achieved = self._parse_goal_achievement(reflection_text)
+            issues_found = self._parse_issues(reflection_text)
+            should_continue = self._parse_should_continue(reflection_text)
+            confidence = self._parse_confidence(reflection_text)
+            
+            # Generate plan adjustments if needed
+            plan_adjustments = None
+            if not goal_achieved and should_continue:
+                # TODO: Generate plan adjustments from LLM reflection
+                pass
+            
+            span.set_attribute("llm_reflection_used", True)
+            span.set_attribute("reflection_text_length", len(reflection_text))
+            
+            return ReflectionResult(
+                goal_achieved=goal_achieved,
+                issues_found=issues_found,
+                plan_adjustments=plan_adjustments,
+                should_continue=should_continue,
+                final_response=reflection_text,
+                confidence=confidence,
+            )
+        
+        except Exception as e:
+            logger.error(f"Error reflecting with LLM: {e}", exc_info=True)
+            span.record_exception(e)
+            # Fall back to simple reflection
+            logger.info("LLM reflection failed, falling back to simple reflection")
+            return self._reflect_simple(plan, execution_results, original_request, span)
+    
+    def _parse_goal_achievement(self, reflection_text: str) -> bool:
+        """Parse goal achievement status from reflection text."""
+        text_lower = reflection_text.lower()
+        positive_indicators = ["goal achieved", "successfully completed", "task completed", "done", "finished"]
+        negative_indicators = ["goal not achieved", "failed", "error", "issue", "problem"]
+        
+        positive_count = sum(1 for indicator in positive_indicators if indicator in text_lower)
+        negative_count = sum(1 for indicator in negative_indicators if indicator in text_lower)
+        
+        return positive_count > negative_count
+    
+    def _parse_issues(self, reflection_text: str) -> List[str]:
+        """Parse issues from reflection text."""
+        import re
+        
+        issues = []
+        
+        # Look for issue patterns
+        issue_patterns = [
+            r'issue[s]?:\s*(.+?)(?=\n|$)',
+            r'error[s]?:\s*(.+?)(?=\n|$)',
+            r'problem[s]?:\s*(.+?)(?=\n|$)',
+        ]
+        
+        for pattern in issue_patterns:
+            matches = re.finditer(pattern, reflection_text, re.IGNORECASE | re.MULTILINE)
+            for match in matches:
+                issue = match.group(1).strip()
+                if issue and issue not in issues:
+                    issues.append(issue)
+        
+        return issues
+    
+    def _parse_should_continue(self, reflection_text: str) -> bool:
+        """Parse whether to continue from reflection text."""
+        text_lower = reflection_text.lower()
+        continue_indicators = ["should continue", "retry", "adjust", "fix", "try again"]
+        stop_indicators = ["complete", "finished", "done", "successful"]
+        
+        continue_count = sum(1 for indicator in continue_indicators if indicator in text_lower)
+        stop_count = sum(1 for indicator in stop_indicators if indicator in text_lower)
+        
+        return continue_count > stop_count
+    
+    def _parse_confidence(self, reflection_text: str) -> float:
+        """Parse confidence level from reflection text."""
+        import re
+        
+        # Look for confidence indicators
+        confidence_patterns = [
+            r'confidence[:\s]+(\d+(?:\.\d+)?)',
+            r'(\d+(?:\.\d+)?)\s*%',
+        ]
+        
+        for pattern in confidence_patterns:
+            match = re.search(pattern, reflection_text, re.IGNORECASE)
+            if match:
+                value = float(match.group(1))
+                # Normalize to 0.0-1.0 range
+                if value > 1.0:
+                    value = value / 100.0
+                return min(max(value, 0.0), 1.0)
+        
+        # Default confidence based on keywords
+        text_lower = reflection_text.lower()
+        if any(word in text_lower for word in ["high confidence", "very confident", "certain"]):
+            return 0.9
+        elif any(word in text_lower for word in ["low confidence", "uncertain", "unsure"]):
+            return 0.3
+        else:
+            return 0.7
     
     def _reflect_simple(
         self,

@@ -15,6 +15,7 @@ from .reasoning import (
 from .planner import Planner
 from .executor import Executor
 from .reflector import Reflector
+from .llm_client import LLMClient
 
 __all__ = [
     'CodingAgent',
@@ -33,4 +34,5 @@ __all__ = [
     'Planner',
     'Executor',
     'Reflector',
+    'LLMClient',
 ]
