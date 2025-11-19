@@ -1,5 +1,17 @@
 """
-Inference API service command implementation.
+Legacy Inference API service command implementation.
+
+⚠️ **DEPRECATED:** This command is deprecated. The project has migrated to TensorRT-LLM
+for optimized GPU inference. This service is kept for backward compatibility only.
+
+**Current Implementation:** TensorRT-LLM (via Triton Inference Server in home_infra/shared-network)
+**Legacy Implementation:** inference-api service (available via `--profile legacy`)
+
+To use legacy inference-api:
+- Set `LLM_URL=grpc://inference-api:50051` environment variable
+- Start service with `docker compose --profile legacy up -d inference-api`
+
+See: `docs/guides/TENSORRT_LLM_SETUP.md` for TensorRT-LLM setup and migration guide.
 """
 import argparse
 import asyncio
@@ -15,15 +27,17 @@ logger = logging.getLogger(__name__)
 
 class InferenceAPIServiceCommand(Command):
     """
-    Command for running the Inference API service.
+    Command for running the legacy Inference API service (DEPRECATED).
     
-    Provides gRPC service for LLM inference using Qwen3 models. Receives text
-    prompts via gRPC, processes them through the language model, and returns
-    generated text responses.
+    ⚠️ **DEPRECATED:** This service is deprecated. Use TensorRT-LLM instead.
+    
+    Legacy gRPC service for LLM inference using Qwen3 models. This service is
+    kept for backward compatibility only. All new deployments should use TensorRT-LLM
+    (accessible via tensorrt-llm:8000 in home_infra/shared-network).
     
     The service manages model loading, GPU allocation, quantization, and inference
-    orchestration. It is used by Telegram and Discord services to generate AI
-    responses to user messages.
+    orchestration. It was previously used by Telegram and Discord services, but these
+    now default to TensorRT-LLM.
     """
     
     @classmethod
@@ -44,7 +58,7 @@ class InferenceAPIServiceCommand(Command):
         Returns:
             Description of what this command does
         """
-        return "Run the Inference API service (LLM orchestration)"
+        return "Run the legacy Inference API service (DEPRECATED - use TensorRT-LLM instead)"
     
     @classmethod
     def add_args(cls, parser: argparse.ArgumentParser) -> None:
