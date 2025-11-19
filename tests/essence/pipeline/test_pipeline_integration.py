@@ -18,52 +18,31 @@ except ImportError:
 from tests.essence.pipeline.test_pipeline_framework import PipelineTestFramework
 
 
-# Evaluate grpc availability at import time (safer for pytest collection)
-# This constant is evaluated once when the module is imported, before pytest
-# starts collecting tests, which avoids issues with decorator evaluation
-# 
-# Strategy: In CI (GitHub Actions), always skip integration tests.
-# Locally, check if grpc is available and not mocked.
-_GRPC_AVAILABLE = False
-try:
-    # Check if we're in CI environment (GitHub Actions sets CI=true)
-    if os.getenv('CI') == 'true':
-        # In CI, always skip integration tests (they require real services)
-        _GRPC_AVAILABLE = False
-    else:
-        # Not in CI, check if grpc is available
-        # First, check if MagicMock is available (should always be, but be safe)
+# Skip integration tests in CI environment (GitHub Actions sets CI=true)
+# These tests require real services and are meant for local integration testing
+_IS_CI = os.getenv('CI') == 'true'
+
+
+def _check_grpc_available():
+    """Check if grpc is available and not mocked (only called when not in CI)."""
+    try:
         if MagicMock is None:
-            _GRPC_AVAILABLE = False
-        else:
-            # Check if grpc is already mocked in sys.modules (from other test modules)
-            if 'grpc' in sys.modules:
-                try:
-                    grpc_module = sys.modules['grpc']
-                    if isinstance(grpc_module, MagicMock):
-                        _GRPC_AVAILABLE = False
-                    else:
-                        # Not mocked, try to verify it's real
-                        try:
-                            import grpc
-                            if not isinstance(grpc, MagicMock) and hasattr(grpc, 'insecure_channel'):
-                                _GRPC_AVAILABLE = True
-                        except (ImportError, AttributeError, TypeError, Exception):
-                            _GRPC_AVAILABLE = False
-                except (AttributeError, KeyError, Exception):
-                    _GRPC_AVAILABLE = False
-            else:
-                # grpc not in sys.modules, try to import it
-                try:
-                    import grpc
-                    if not isinstance(grpc, MagicMock) and hasattr(grpc, 'insecure_channel'):
-                        _GRPC_AVAILABLE = True
-                except (ImportError, AttributeError, TypeError, Exception):
-                    _GRPC_AVAILABLE = False
-except Exception:
-    # Catch absolutely everything - assume unavailable if anything goes wrong
-    # This ensures the module can always be imported, even if grpc checking fails
-    _GRPC_AVAILABLE = False
+            return False
+        if 'grpc' in sys.modules:
+            grpc_module = sys.modules['grpc']
+            if isinstance(grpc_module, MagicMock):
+                return False
+        try:
+            import grpc
+            if isinstance(grpc, MagicMock):
+                return False
+            if not hasattr(grpc, 'insecure_channel'):
+                return False
+            return True
+        except (ImportError, AttributeError, TypeError):
+            return False
+    except Exception:
+        return False
 
 
 @pytest.fixture
@@ -73,7 +52,8 @@ def pipeline_framework_real():
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(not _GRPC_AVAILABLE, reason="grpc module not available or mocked - skipping integration test")
+@pytest.mark.skipif(_IS_CI, reason="Skipping integration test in CI environment")
+@pytest.mark.skipif(not _IS_CI and not _check_grpc_available(), reason="grpc module not available or mocked - skipping integration test")
 async def test_pipeline_with_real_services(pipeline_framework_real):
     """Test complete pipeline with real services (if available)."""
     # Generate test audio
@@ -96,7 +76,8 @@ async def test_pipeline_with_real_services(pipeline_framework_real):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(not _GRPC_AVAILABLE, reason="grpc module not available or mocked - skipping integration test")
+@pytest.mark.skipif(_IS_CI, reason="Skipping integration test in CI environment")
+@pytest.mark.skipif(not _IS_CI and not _check_grpc_available(), reason="grpc module not available or mocked - skipping integration test")
 async def test_pipeline_performance_with_real_services(pipeline_framework_real):
     """Test pipeline performance with real services."""
     # Generate test audio
