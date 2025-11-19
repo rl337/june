@@ -696,7 +696,7 @@ All code changes, cleanup, and refactoring tasks have been completed:
 - ✅ All gateway references cleaned up
 - ✅ All obsolete test files and scripts marked appropriately
 - ✅ All code references updated to reflect current architecture
-- ✅ All unit tests passing (161/161 in tests/essence/ - 112 existing + 41 agentic reasoning + 8 pipeline tests, 1 skipped)
+- ✅ All unit tests passing (196/196 in tests/essence/ - 112 existing + 41 agentic reasoning + 8 pipeline + 35 message history/agent communication tests, 1 skipped)
 - ✅ Minimal architecture achieved with only essential services
 
 **Current Development Focus:**
@@ -707,7 +707,7 @@ All code changes, cleanup, and refactoring tasks have been completed:
 
 **Current State:**
 - ✅ All essential services refactored and working
-- ✅ All unit tests passing (161/161 in tests/essence/ - 112 existing + 41 agentic reasoning + 8 pipeline tests, 1 skipped)
+- ✅ All unit tests passing (196/196 in tests/essence/ - 112 existing + 41 agentic reasoning + 8 pipeline + 35 message history/agent communication tests, 1 skipped)
 - ✅ Minimal architecture achieved
 - ✅ Message history debugging implemented
 - ✅ TensorRT-LLM migration (code/documentation) complete - all services default to TensorRT-LLM, all documentation updated
