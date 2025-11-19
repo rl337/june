@@ -104,6 +104,7 @@ All major refactoring phases have been completed:
    - ✅ Sandbox isolation with full activity logging
    - ✅ Efficiency metrics capture (commands executed, time to solution, resource usage)
    - ✅ **Proper pass@k calculation:** Implemented support for multiple attempts per task with accurate pass@k calculation (pass@1, pass@5, pass@10, pass@100). Added `num_attempts_per_task` parameter to BenchmarkEvaluator and `--num-attempts` flag to run-benchmarks command.
+   - ✅ **Comprehensive tests:** Added test suite for pass@k calculation (9 tests covering single attempts, multiple attempts, edge cases). Fixed bug where `pass_at_1` was not defined for multiple attempts. Fixed deprecation warning (datetime.utcnow() → datetime.now(timezone.utc)).
 
 4. ✅ **Verification Tools:**
    - ✅ `essence/commands/verify_qwen3.py` - Model verification command

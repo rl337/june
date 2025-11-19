@@ -12,7 +12,7 @@ import statistics
 import time
 from collections import defaultdict
 from dataclasses import asdict, dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
@@ -673,8 +673,14 @@ if __name__ == "__main__":
             for task_id, task_results in results_by_task.items():
                 num_attempts = len(task_results)
 
-                # For each k value, check if at least one of the first k attempts passed
-                for k in [1, 5, 10, 100]:
+                # For each k value in [1, 5, 10, 100], check if at least one of the first k attempts passed
+                # Also check for k values up to num_attempts_per_task to handle cases where k > num_attempts
+                k_values_to_check = set([1, 5, 10, 100])
+                # Add k values up to num_attempts_per_task if needed
+                for k in range(1, min(num_attempts, self.num_attempts_per_task) + 1):
+                    k_values_to_check.add(k)
+
+                for k in k_values_to_check:
                     # Get first k attempts (or all if k > num_attempts)
                     attempts_to_check = task_results[: min(k, num_attempts)]
                     # Check if at least one of these attempts passed
@@ -693,13 +699,23 @@ if __name__ == "__main__":
                     )
                 else:
                     # For k > num_attempts_per_task, use the best available estimate
-                    # (all tasks with at least one passing attempt in all attempts)
-                    max_available_k = min(k, self.num_attempts_per_task)
+                    # Find the largest k' <= num_attempts_per_task that we calculated
+                    max_available_k = max(
+                        (
+                            k_val
+                            for k_val in tasks_with_passing_attempt.keys()
+                            if k_val <= self.num_attempts_per_task
+                        ),
+                        default=0,
+                    )
                     pass_at_k[k] = (
                         tasks_with_passing_attempt.get(max_available_k, 0) / total_tasks
                         if total_tasks > 0
                         else 0.0
                     )
+
+            # Extract pass_at_1 for use in efficiency score calculation
+            pass_at_1 = pass_at_k[1]
 
             # Calculate other metrics (use first attempt or aggregate)
             successful_tasks = sum(
@@ -761,7 +777,7 @@ if __name__ == "__main__":
         return EvaluationReport(
             dataset=dataset,
             model_name=self.model_name,
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             total_tasks=total_tasks,
             successful_tasks=successful_tasks,
             passed_tests=passed_tests,
