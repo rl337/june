@@ -124,6 +124,12 @@ You are working on refactoring the june project. Your task is to:
 
 1. **Read REFACTOR_PLAN.md** - Read the entire refactoring plan to understand the current state and what needs to be done.
 
+**Working on Related Projects:**
+- You CAN and SHOULD work on the `home_infra` project at `/home/rlee/dev/home_infra` when tasks require it
+- The `home_infra` project provides shared infrastructure (TensorRT-LLM, nginx, prometheus, etc.) that june services use
+- If a task requires changes to `home_infra/docker-compose.yml` or related files, you should make those changes
+- This is NOT external work - it's part of the june project infrastructure
+
 2. **Check for GitHub Actions failures FIRST** - Before picking a new task:
    - Check the GitHub Actions page: https://github.com/rl337/june/actions
    - Look for any failed workflow runs (status: failed, red X icon)

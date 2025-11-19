@@ -107,28 +107,18 @@ All major refactoring phases have been completed:
 
 **Goal:** Replace `inference-api` service with TensorRT-LLM container for optimized GPU inference.
 
-**Current Status:** Code migration complete (Task 3 ✅). Remaining tasks (1, 2, 4) require external setup in `home_infra` project and are blocked until TensorRT-LLM container is configured and running.
+**Current Status:** Code migration complete (Task 3 ✅). Remaining tasks (1, 2, 4) require setup in `home_infra` project.
 
-**Blocking Situation:** All remaining Phase 15 tasks require work in the external `home_infra` project:
-- Task 1: Requires adding TensorRT-LLM service to `home_infra/docker-compose.yml` and configuring shared-network connectivity
-- Task 2: Requires TensorRT-LLM container to be running first
-- Task 4: Requires TensorRT-LLM container to be running and model loading API implemented
-
-**Next Steps (External):**
-1. Set up TensorRT-LLM container in `home_infra` project
-2. Configure shared-network connectivity
-3. Implement model loading/unloading API
-4. Verify TensorRT-LLM is accessible from june services
-5. Once verified, proceed with Phase 15.3 remaining work (remove inference-api from docker-compose.yml)
+**IMPORTANT:** The agent CAN and SHOULD work on the `home_infra` project at `/home/rlee/dev/home_infra` to complete these tasks. This is NOT external work - it's part of the june project infrastructure. The agent has full access to modify `home_infra/docker-compose.yml` and related configuration files.
 
 **Tasks:**
-1. **Set up TensorRT-LLM container in home_infra:** ⏳ BLOCKED (requires work in home_infra project)
+1. **Set up TensorRT-LLM container in home_infra:** ⏳ TODO
    - Add TensorRT-LLM service to `home_infra/docker-compose.yml`
    - Configure it to connect to shared-network
    - Set up GPU access and resource limits
    - Configure model storage and cache directories
 
-2. **Implement model loading/unloading:** ⏳ BLOCKED (requires TensorRT-LLM container setup first)
+2. **Implement model loading/unloading:** ⏳ TODO (can be done after TensorRT-LLM container is set up in task 1)
    - Create API/interface for loading models into TensorRT-LLM
    - Create API/interface for unloading models
    - Support multiple models (load one at a time, unload before loading another)
