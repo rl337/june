@@ -2,7 +2,7 @@
 
 ## Status: ✅ **CORE REFACTORING COMPLETE**
 
-**Last Updated:** 2025-11-18 (Verified: 2025-11-18 - All code refactoring complete, PostgreSQL optimization docs marked obsolete, commit count updated to 298)
+**Last Updated:** 2025-11-18 (Verified: 2025-11-18 - All code refactoring complete, PostgreSQL optimization docs marked obsolete, commit count updated to 300)
 
 **🎉 REFACTORING COMPLETE:** All major refactoring phases have been completed. The project has been successfully pared down to bare essentials for the voice message → STT → LLM → TTS → voice response round trip.
 
@@ -11,7 +11,7 @@
 - Verified no linting errors in essence package
 - Verified git status is clean (only session tracking file modified, which is in .gitignore)
 - Confirmed all code-related refactoring is complete
-- Note: 297 commits ahead of origin/main (push failed due to access rights - remote repository issue, not a code issue)
+- Note: 300 commits ahead of origin/main (push failed due to access rights - remote repository issue, not a code issue)
 
 **✅ Final Status Verification (2025-11-18):**
 - All 100 unit tests passing (verified with `pytest tests/essence/`)
@@ -349,11 +349,13 @@ When ready to use the Qwen3 model and coding agent, follow these steps:
 2. **discord** - Receives voice messages from Discord, orchestrates the pipeline (shares code with telegram)
 3. **stt** - Speech-to-text conversion (Whisper)
 4. **tts** - Text-to-speech conversion (FastSpeech2/espeak)
-5. **inference-api** - LLM processing (Qwen3)
 
 ### Infrastructure
-- **None required** - All services communicate via gRPC directly
-- **From home_infra (shared-network):** nginx, jaeger, prometheus, grafana (available but not required)
+- **From home_infra (shared-network):** 
+  - **TensorRT-LLM** - LLM inference service (loads Qwen3 and other models)
+  - nginx, jaeger, prometheus, grafana (available but not required)
+- **No custom inference service** - Use TensorRT-LLM container instead
+- All services communicate via gRPC directly
 
 ## Architecture
 
