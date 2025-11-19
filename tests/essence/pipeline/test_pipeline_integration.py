@@ -70,6 +70,11 @@ def _should_skip_integration_test():
         return True
 
 
+# Create a lambda that safely evaluates the skip condition
+# This ensures the condition is evaluated at runtime, not at decoration time
+_skip_integration_condition = lambda: _should_skip_integration_test()
+
+
 @pytest.fixture
 def pipeline_framework_real():
     """Fixture providing a pipeline test framework with real services."""
@@ -80,7 +85,7 @@ def pipeline_framework_real():
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-@pytest.mark.skipif(_should_skip_integration_test(), reason="Skipping integration test (CI environment or grpc unavailable/mocked)")
+@pytest.mark.skipif(_skip_integration_condition, reason="Skipping integration test (CI environment or grpc unavailable/mocked)")
 async def test_pipeline_with_real_services(pipeline_framework_real):
     """Test complete pipeline with real services (if available)."""
     # Generate test audio
@@ -104,7 +109,7 @@ async def test_pipeline_with_real_services(pipeline_framework_real):
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-@pytest.mark.skipif(_should_skip_integration_test(), reason="Skipping integration test (CI environment or grpc unavailable/mocked)")
+@pytest.mark.skipif(_skip_integration_condition, reason="Skipping integration test (CI environment or grpc unavailable/mocked)")
 async def test_pipeline_performance_with_real_services(pipeline_framework_real):
     """Test pipeline performance with real services."""
     # Generate test audio
@@ -132,7 +137,7 @@ async def test_pipeline_performance_with_real_services(pipeline_framework_real):
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-@pytest.mark.skipif(_should_skip_integration_test(), reason="Skipping integration test (CI environment or grpc unavailable/mocked)")
+@pytest.mark.skipif(_skip_integration_condition, reason="Skipping integration test (CI environment or grpc unavailable/mocked)")
 async def test_service_availability_check(pipeline_framework_real):
     """Test service availability checking."""
     import os
