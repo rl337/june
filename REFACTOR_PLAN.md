@@ -290,6 +290,7 @@ All major refactoring phases have been completed:
      - Updated command-line arguments from `--inference-api-url` to `--llm-url`
      - Added backward compatibility: `LLM_URL` environment variable (new) with `INFERENCE_API_URL` fallback
      - Improved documentation to mention TensorRT-LLM, NIM, and legacy inference-api options
+     - ✅ Updated README.md to use `llm_url` parameter in examples (matches code changes)
      - This makes the codebase more consistent since the parameter works with any LLM service, not just inference-api
 
 4. **Get Qwen3-30B-A3B-Thinking-2507 running:** ⏳ IN PROGRESS
