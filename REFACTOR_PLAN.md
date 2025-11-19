@@ -33,6 +33,7 @@ All major refactoring phases have been completed:
 - ✅ **Documentation Consistency:** Fixed Phase 18 documentation inconsistency in "Next Steps" section (framework is already complete from Phase 10, not a TODO item)
 - ✅ **Test Count Updates:** Updated test counts in REFACTOR_PLAN.md to reflect current test suite (341 passed, 1 skipped, 17 deselected) - corrected outdated counts from 244 and 196
 - ✅ **Last Updated Line:** Updated "Last Updated" line in REFACTOR_PLAN.md to reflect current test counts (341 passed) and recent documentation work
+- ✅ **Script Consistency:** Updated `scripts/run_benchmarks.sh` to use `--llm-url` and `LLM_URL` as primary (matching Python command), with `--inference-api-url` and `INFERENCE_API_URL` deprecated for backward compatibility. This makes the script consistent with the rest of the codebase migration to `llm_url` naming.
 - ✅ **Documentation Updates:** 
   - Updated essence/README.md to reflect current module structure (added essence.agents, essence.commands, essence.services, essence.command modules)
   - Updated tests/README.md to clarify inference-api deprecation status (added notes about legacy service, migration guide reference)
