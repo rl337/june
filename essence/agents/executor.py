@@ -42,6 +42,7 @@ class Executor:
         self,
         step: Step,
         context: ConversationContext,
+        completed_step_ids: Optional[List[int]] = None,
     ) -> ExecutionResult:
         """
         Execute a single step from the plan.
@@ -49,6 +50,7 @@ class Executor:
         Args:
             step: The step to execute
             context: Execution context (conversation state, tool state, etc.)
+            completed_step_ids: List of step IDs that have been successfully completed
 
         Returns:
             ExecutionResult with success status, output, and error information
@@ -63,8 +65,25 @@ class Executor:
 
                 # Check if step has dependencies that need to be satisfied first
                 if step.dependencies:
-                    # TODO: Check if dependencies are satisfied
-                    pass
+                    completed = set(completed_step_ids or [])
+                    missing_dependencies = [
+                        dep_id for dep_id in step.dependencies if dep_id not in completed
+                    ]
+                    if missing_dependencies:
+                        error_msg = (
+                            f"Step {step.step_id} cannot execute: "
+                            f"missing dependencies {missing_dependencies}"
+                        )
+                        logger.warning(error_msg)
+                        span.set_attribute("error", error_msg)
+                        span.set_attribute("missing_dependencies", str(missing_dependencies))
+                        return ExecutionResult(
+                            step_id=step.step_id,
+                            success=False,
+                            error=error_msg,
+                            execution_time=0.0,
+                        )
+                    span.set_attribute("dependencies_satisfied", True)
 
                 # Execute the step
                 if step.tool_name and step.tool_name in self.available_tools:
@@ -186,7 +205,7 @@ class Executor:
         context: ConversationContext,
     ) -> List[ExecutionResult]:
         """
-        Execute multiple steps in sequence.
+        Execute multiple steps in sequence, respecting dependencies.
 
         Args:
             steps: List of steps to execute
@@ -196,10 +215,15 @@ class Executor:
             List of ExecutionResult objects
         """
         results = []
+        completed_step_ids: List[int] = []
 
         for step in steps:
-            result = self.execute_step(step, context)
+            result = self.execute_step(step, context, completed_step_ids)
             results.append(result)
+
+            # Track successfully completed steps for dependency checking
+            if result.success:
+                completed_step_ids.append(step.step_id)
 
             # Stop execution if a critical step fails
             if not result.success and step.step_id == 1:  # First step failure

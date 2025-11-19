@@ -500,6 +500,66 @@ class TestComponentIntegration:
         # If all steps succeeded, goal should typically be achieved
         # But LLM parsing may have quirks, so we verify structure only
 
+    def test_executor_dependency_checking(
+        self, executor, conversation_context, mock_tools
+    ):
+        """Test that executor properly checks step dependencies."""
+        # Create a plan with dependencies
+        plan = Plan(
+            steps=[
+                Step(step_id=1, description="Step 1", tool_name="read_file"),
+                Step(
+                    step_id=2,
+                    description="Step 2",
+                    tool_name="write_file",
+                    dependencies=[1],  # Depends on step 1
+                ),
+                Step(
+                    step_id=3,
+                    description="Step 3",
+                    tool_name="read_file",
+                    dependencies=[2],  # Depends on step 2
+                ),
+            ],
+        )
+
+        # Execute the plan - should succeed as dependencies are satisfied
+        execution_results = executor.execute_plan(plan.steps, conversation_context)
+
+        assert len(execution_results) == 3
+        assert execution_results[0].success is True
+        assert execution_results[1].success is True
+        assert execution_results[2].success is True
+
+    def test_executor_missing_dependency(
+        self, executor, conversation_context, mock_tools
+    ):
+        """Test that executor fails when dependencies are not satisfied."""
+        # Create a plan where step 2 depends on step 1, but step 1 fails
+        # Use step_id=2 for failing step to avoid early termination (executor stops if step 1 fails)
+        plan = Plan(
+            steps=[
+                Step(step_id=1, description="Step 1", tool_name="read_file"),
+                Step(step_id=2, description="Step 2", tool_name="failing_tool"),
+                Step(
+                    step_id=3,
+                    description="Step 3",
+                    tool_name="write_file",
+                    dependencies=[2],  # Depends on step 2, which will fail
+                ),
+            ],
+        )
+
+        # Execute the plan
+        execution_results = executor.execute_plan(plan.steps, conversation_context)
+
+        assert len(execution_results) == 3
+        assert execution_results[0].success is True  # Step 1 succeeds
+        assert execution_results[1].success is False  # Step 2 fails
+        # Step 3 should fail because dependency (step 2) was not successfully completed
+        assert execution_results[2].success is False
+        assert "missing dependencies" in execution_results[2].error.lower()
+
 
 class TestReasoningResult:
     """Test ReasoningResult structure and behavior."""
