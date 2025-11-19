@@ -13,6 +13,7 @@ from essence.services.telegram.admin_db import (
     clear_conversation, clear_user_conversations,
     log_audit_action, is_user_blocked
 )
+from essence.chat.message_history import get_message_history
 
 logger = logging.getLogger(__name__)
 
@@ -356,6 +357,157 @@ async def system_status_command(update: Update, context: ContextTypes.DEFAULT_TY
     await update.message.reply_text("\n".join(status_lines))
 
 
+async def admin_message_history_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle /admin_message_history command - View message history for debugging."""
+    user_id = str(update.effective_user.id)
+    
+    try:
+        # Check admin permission
+        require_admin(user_id)
+    except PermissionError:
+        await update.message.reply_text(
+            "❌ **Access Denied**\n\n"
+            "You are not authorized to use admin commands."
+        )
+        return
+    
+    # Parse command arguments
+    args = context.args if context.args else []
+    
+    # Parse filters
+    filters_dict = {}
+    limit = 10  # Default limit
+    
+    i = 0
+    while i < len(args):
+        arg = args[i]
+        if arg == "--user-id" and i + 1 < len(args):
+            filters_dict["user_id"] = args[i + 1]
+            i += 2
+        elif arg == "--chat-id" and i + 1 < len(args):
+            filters_dict["chat_id"] = args[i + 1]
+            i += 2
+        elif arg == "--platform" and i + 1 < len(args):
+            platform = args[i + 1].lower()
+            if platform in ["telegram", "discord"]:
+                filters_dict["platform"] = platform
+            i += 2
+        elif arg == "--type" and i + 1 < len(args):
+            msg_type = args[i + 1].lower()
+            if msg_type in ["text", "voice", "error", "status"]:
+                filters_dict["message_type"] = msg_type
+            i += 2
+        elif arg == "--limit" and i + 1 < len(args):
+            try:
+                limit = int(args[i + 1])
+                limit = max(1, min(limit, 50))  # Clamp between 1 and 50
+            except ValueError:
+                pass
+            i += 2
+        elif arg == "--stats":
+            # Show statistics instead of messages
+            history = get_message_history()
+            stats = history.get_stats()
+            
+            stats_text = (
+                "📊 **Message History Statistics**\n\n"
+                f"**Total Messages:** {stats['total_messages']}\n"
+                f"**Max Entries:** {stats['max_entries']}\n"
+                f"**Unique Users:** {stats['unique_users']}\n"
+                f"**Unique Chats:** {stats['unique_chats']}\n\n"
+                "**By Platform:**\n"
+            )
+            
+            for platform, count in stats['by_platform'].items():
+                stats_text += f"  • {platform.capitalize()}: {count}\n"
+            
+            stats_text += "\n**By Type:**\n"
+            for msg_type, count in stats['by_type'].items():
+                if count > 0:
+                    stats_text += f"  • {msg_type.capitalize()}: {count}\n"
+            
+            await update.message.reply_text(stats_text, parse_mode="HTML")
+            return
+        else:
+            i += 1
+    
+    # Get messages
+    history = get_message_history()
+    messages = history.get_messages(
+        user_id=filters_dict.get("user_id"),
+        chat_id=filters_dict.get("chat_id"),
+        platform=filters_dict.get("platform"),
+        message_type=filters_dict.get("message_type"),
+        limit=limit
+    )
+    
+    if not messages:
+        filter_desc = "matching criteria" if filters_dict else ""
+        await update.message.reply_text(
+            f"📭 **No Messages Found**\n\n"
+            f"No messages {filter_desc} in history.",
+            parse_mode="HTML"
+        )
+        return
+    
+    # Format messages for Telegram (HTML)
+    # Telegram has a 4096 character limit, so we'll send multiple messages if needed
+    message_parts = []
+    current_part = f"📜 **Message History** ({len(messages)} message{'s' if len(messages) != 1 else ''})\n\n"
+    
+    for i, msg in enumerate(messages, 1):
+        msg_entry = (
+            f"<b>Message {i}</b>\n"
+            f"Time: {msg.timestamp.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"Platform: {msg.platform}\n"
+            f"User: <code>{msg.user_id}</code>\n"
+            f"Chat: <code>{msg.chat_id}</code>\n"
+            f"Type: {msg.message_type}\n"
+        )
+        
+        if msg.message_id:
+            msg_entry += f"ID: <code>{msg.message_id}</code>\n"
+        
+        # Truncate content if too long (leave room for formatting)
+        content_preview = msg.message_content[:300] + ("..." if len(msg.message_content) > 300 else "")
+        msg_entry += f"\nContent:\n<pre>{content_preview}</pre>\n"
+        
+        if msg.rendering_metadata:
+            metadata_str = ", ".join(f"{k}={v}" for k, v in list(msg.rendering_metadata.items())[:3])
+            if len(msg.rendering_metadata) > 3:
+                metadata_str += "..."
+            msg_entry += f"\nMetadata: {metadata_str}\n"
+        
+        msg_entry += "\n"
+        
+        # Check if adding this entry would exceed Telegram's limit
+        if len(current_part) + len(msg_entry) > 4000:  # Leave some margin
+            message_parts.append(current_part)
+            current_part = msg_entry
+        else:
+            current_part += msg_entry
+    
+    if current_part:
+        message_parts.append(current_part)
+    
+    # Send messages
+    for part in message_parts:
+        await update.message.reply_text(part, parse_mode="HTML")
+    
+    # Log audit action
+    log_audit_action(
+        action="message_history_viewed",
+        actor_user_id=user_id,
+        target_user_id=filters_dict.get("user_id"),
+        details={
+            "filters": filters_dict,
+            "limit": limit,
+            "results_count": len(messages)
+        },
+        ip_address=get_user_ip(update)
+    )
+
+
 async def admin_help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /admin_help command - Show admin command help."""
     user_id = str(update.effective_user.id)
@@ -378,6 +530,20 @@ async def admin_help_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
 **Conversation Management:**
 `/admin_clear_conversation <conversation_id>` - Clear a conversation
 `/admin_clear_user <user_id>` - Clear all conversations for a user
+
+**Debugging:**
+`/admin_message_history [options]` - View message history
+  Options:
+    `--user-id <id>` - Filter by user ID
+    `--chat-id <id>` - Filter by chat/channel ID
+    `--platform <telegram|discord>` - Filter by platform
+    `--type <text|voice|error|status>` - Filter by message type
+    `--limit <n>` - Limit results (1-50, default: 10)
+    `--stats` - Show statistics instead of messages
+  Examples:
+    `/admin_message_history --user-id 12345 --limit 5`
+    `/admin_message_history --platform telegram --type error`
+    `/admin_message_history --stats`
 
 **System:**
 `/admin_status` - Check system status

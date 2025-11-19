@@ -54,7 +54,7 @@ from essence.services.telegram.handlers.text import handle_text_message
 from essence.services.telegram.handlers.admin_commands import (
     block_command, unblock_command, list_blocked_command,
     clear_conversation_command, clear_user_conversations_command,
-    system_status_command, admin_help_command
+    system_status_command, admin_message_history_command, admin_help_command
 )
 from essence.services.telegram.dependencies.config import (
     get_service_config,
@@ -454,6 +454,7 @@ class TelegramBotService:
         self.application.add_handler(CommandHandler("admin_clear_conversation", clear_conversation_command))
         self.application.add_handler(CommandHandler("admin_clear_user", clear_user_conversations_command))
         self.application.add_handler(CommandHandler("admin_status", system_status_command))
+        self.application.add_handler(CommandHandler("admin_message_history", admin_message_history_command))
         self.application.add_handler(CommandHandler("admin_help", admin_help_command))
         
         # Regular command handlers

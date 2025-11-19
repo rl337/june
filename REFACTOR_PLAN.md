@@ -384,7 +384,12 @@ When ready to use the Qwen3 model and coding agent, follow these steps:
      - Output format: text (formatted) or JSON
      - Statistics command (`--stats`) for overview
    - ✅ Provides direct function access: `get_message_history()` singleton
-   - ⏳ Admin endpoint (optional): Can be added in future if needed
+   - ✅ Admin endpoint implemented: Added `/admin_message_history` Telegram command for admins to query message history
+     - Supports filtering by user_id, chat_id, platform, message_type
+     - Supports limiting results (1-50, default: 10)
+     - Statistics mode (`--stats`) for overview
+     - Formats output for Telegram (HTML) with proper message splitting for long results
+     - All admin actions logged for audit purposes
 
 4. **Testing and documentation:** ✅ COMPLETED
    - ✅ Added comprehensive unit tests (`tests/essence/chat/test_message_history.py`) - 12 tests, all passing
@@ -401,6 +406,8 @@ When ready to use the Qwen3 model and coding agent, follow these steps:
 **Best Practice:** Use in-memory storage (consistent with other MVP storage), but design interface to allow future migration to persistent storage if needed.
 
 **Usage:**
+
+**CLI Command:**
 ```bash
 # Get last 10 messages for a user
 poetry run -m essence get-message-history --user-id 12345 --limit 10
@@ -416,6 +423,21 @@ poetry run -m essence get-message-history --user-id 12345 --format json
 
 # Get statistics
 poetry run -m essence get-message-history --stats
+```
+
+**Telegram Admin Command:**
+```
+# Get last 10 messages for a user
+/admin_message_history --user-id 12345 --limit 10
+
+# Get error messages from Telegram
+/admin_message_history --platform telegram --type error
+
+# Get statistics
+/admin_message_history --stats
+
+# See help
+/admin_help
 ```
 
 ## Essential Services
