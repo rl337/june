@@ -106,32 +106,34 @@ class GetMessageHistoryCommand(Command):
                 )
                 sys.exit(1)
 
-            result = validate_message_for_platform(
+            validation_result = validate_message_for_platform(
                 self.args.validate,
                 self.args.platform,
                 getattr(self.args, "parse_mode", None),
             )
 
             if self.args.format == "json":
-                print(json.dumps(result, indent=2, default=str))
+                print(json.dumps(validation_result, indent=2, default=str))
             else:
                 print(f"Validation for {self.args.platform}:")
-                print(f"  Valid: {result['valid']}")
-                print(f"  Length: {result['length']}/{result['max_length']}")
-                print(f"  Within limit: {result['within_length_limit']}")
-                if result["warnings"]:
-                    print(f"  Warnings: {len(result['warnings'])}")
-                    for warning in result["warnings"]:
+                print(f"  Valid: {validation_result['valid']}")
+                print(
+                    f"  Length: {validation_result['length']}/{validation_result['max_length']}"
+                )
+                print(f"  Within limit: {validation_result['within_length_limit']}")
+                if validation_result["warnings"]:
+                    print(f"  Warnings: {len(validation_result['warnings'])}")
+                    for warning in validation_result["warnings"]:
                         print(f"    - {warning}")
-                if result["errors"]:
-                    print(f"  Errors: {len(result['errors'])}")
-                    for error in result["errors"]:
+                if validation_result["errors"]:
+                    print(f"  Errors: {len(validation_result['errors'])}")
+                    for error in validation_result["errors"]:
                         print(f"    - {error}")
             return
 
         # Handle comparison request
         if self.args.compare:
-            result: Optional[Dict[str, Any]] = compare_expected_vs_actual(
+            comparison_result: Optional[Dict[str, Any]] = compare_expected_vs_actual(
                 self.args.compare,
                 user_id=self.args.user_id,
                 chat_id=self.args.chat_id,
@@ -139,27 +141,27 @@ class GetMessageHistoryCommand(Command):
                 hours=self.args.hours,
             )
 
-            if not result:
+            if not comparison_result:
                 print("No matching message found in recent history.")
                 return
 
             if self.args.format == "json":
-                print(json.dumps(result, indent=2, default=str))
+                print(json.dumps(comparison_result, indent=2, default=str))
             else:
                 print("Expected vs Actual Comparison:")
-                print(f"  Expected: {result['expected_length']} chars")
-                print(f"  Actual: {result['actual_length']} chars")
-                print(f"  Raw: {result['raw_length']} chars")
-                print(f"  Similarity: {result['similarity']:.2%}")
-                if result["differences"]:
-                    print(f"  Differences: {len(result['differences'])}")
-                    for diff in result["differences"]:
+                print(f"  Expected: {comparison_result['expected_length']} chars")
+                print(f"  Actual: {comparison_result['actual_length']} chars")
+                print(f"  Raw: {comparison_result['raw_length']} chars")
+                print(f"  Similarity: {comparison_result['similarity']:.2%}")
+                if comparison_result["differences"]:
+                    print(f"  Differences: {len(comparison_result['differences'])}")
+                    for diff in comparison_result["differences"]:
                         print(f"    - {diff['type']}: {diff['description']}")
             return
 
         # Handle analysis request
         if self.args.analyze:
-            result = analyze_rendering_issues(
+            analysis_result = analyze_rendering_issues(
                 user_id=self.args.user_id,
                 chat_id=self.args.chat_id,
                 platform=self.args.platform,
@@ -167,17 +169,17 @@ class GetMessageHistoryCommand(Command):
             )
 
             if self.args.format == "json":
-                print(json.dumps(result, indent=2, default=str))
+                print(json.dumps(analysis_result, indent=2, default=str))
             else:
                 print("Rendering Issues Analysis:")
-                print(f"  Total messages: {result['total_messages']}")
-                print(f"  Split messages: {result['split_messages']}")
-                print(f"  Truncated messages: {result['truncated_messages']}")
-                print(f"  Format mismatches: {result['format_mismatches']}")
-                print(f"  Exceeded limit: {result['exceeded_limit']}")
-                if result["issues"]:
-                    print(f"\n  Issues found: {len(result['issues'])}")
-                    for issue in result["issues"][:10]:  # Show first 10
+                print(f"  Total messages: {analysis_result['total_messages']}")
+                print(f"  Split messages: {analysis_result['split_messages']}")
+                print(f"  Truncated messages: {analysis_result['truncated_messages']}")
+                print(f"  Format mismatches: {analysis_result['format_mismatches']}")
+                print(f"  Exceeded limit: {analysis_result['exceeded_limit']}")
+                if analysis_result["issues"]:
+                    print(f"\n  Issues found: {len(analysis_result['issues'])}")
+                    for issue in analysis_result["issues"][:10]:  # Show first 10
                         print(f"    - {issue['type']}: {issue.get('description', '')}")
             return
 
