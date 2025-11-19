@@ -210,10 +210,19 @@ All major refactoring phases have been completed:
          - ✅ Documented validation rules and common issues
          - ✅ Added debugging tools and best practices
          - ✅ Included reference to platform validators and message history analysis tools
-     - ⏳ Verify message history works for both Telegram and Discord
-       - ⏳ Test message history retrieval for both platforms
-       - ⏳ Test agent communication interface for both platforms
-       - ⏳ Verify message validation works correctly
+     - ✅ Verify message history works for both Telegram and Discord
+       - ✅ Test message history retrieval for both platforms
+       - ✅ Test agent communication interface for both platforms
+       - ✅ Verify message validation works correctly
+       - ✅ Created comprehensive test suite: `tests/essence/chat/test_message_history_analysis.py` (20 tests)
+       - ✅ Created comprehensive test suite: `tests/essence/chat/test_agent_communication.py` (15 tests)
+       - ✅ All 35 tests passing, covering:
+         - Message history retrieval with time window filtering, platform filtering, limits
+         - Rendering issue analysis (truncation, splits, format mismatches, exceeded limits)
+         - Expected vs actual message comparison with similarity calculation
+         - Message validation for Telegram and Discord (length limits, HTML mode, markdown)
+         - Service status checking and agent communication (AUTO channel, fallback, error handling)
+         - Helper functions (ask_for_clarification, request_help, report_progress, ask_for_feedback)
    - **Use Cases:**
      - Agents can query: "What messages did I send to user X in the last hour?"
      - Agents can analyze: "What format did Telegram actually accept for message Y?"
@@ -713,6 +722,138 @@ All code changes, cleanup, and refactoring tasks have been completed:
 ## Agent Monitor Alert - 2025-11-19 11:13:29
 
 **Status:** Agent appears to be stuck: 13:29] AGENT STUCK DETECTED: Agent appears to be in a loop (low pattern diversity)
+Unknown reason
+
+**Current Task:** 
+
+**Recommendations:**
+- If stuck on a specific task, consider breaking it into smaller subtasks
+- If encountering errors, check logs and fix the underlying issue
+- If no progress is being made, consider moving to a different task
+- If blocked by external dependencies, document the blocker and move on
+
+**Action:** Agent should review this alert and either:
+1. Continue with current task if progress is being made
+2. Break down the task into smaller steps
+3. Move to a different task if blocked
+4. Ask for help if truly stuck
+
+---
+
+
+## Agent Monitor Alert - 2025-11-19 11:33:30
+
+**Status:** Agent appears to be stuck: 33:30] AGENT STUCK DETECTED: Agent appears to be in a loop (low pattern diversity)
+Unknown reason
+
+**Current Task:** 
+
+**Recommendations:**
+- If stuck on a specific task, consider breaking it into smaller subtasks
+- If encountering errors, check logs and fix the underlying issue
+- If no progress is being made, consider moving to a different task
+- If blocked by external dependencies, document the blocker and move on
+
+**Action:** Agent should review this alert and either:
+1. Continue with current task if progress is being made
+2. Break down the task into smaller steps
+3. Move to a different task if blocked
+4. Ask for help if truly stuck
+
+---
+
+
+## Agent Monitor Alert - 2025-11-19 11:43:30
+
+**Status:** Agent appears to be stuck: 43:30] AGENT STUCK DETECTED: Agent appears to be in a loop (low pattern diversity)
+Unknown reason
+
+**Current Task:** 
+
+**Recommendations:**
+- If stuck on a specific task, consider breaking it into smaller subtasks
+- If encountering errors, check logs and fix the underlying issue
+- If no progress is being made, consider moving to a different task
+- If blocked by external dependencies, document the blocker and move on
+
+**Action:** Agent should review this alert and either:
+1. Continue with current task if progress is being made
+2. Break down the task into smaller steps
+3. Move to a different task if blocked
+4. Ask for help if truly stuck
+
+---
+
+
+## Agent Monitor Alert - 2025-11-19 11:53:30
+
+**Status:** Agent appears to be stuck: 53:30] AGENT STUCK DETECTED: No commits in last 20 minutes, Agent appears to be in a loop (low pattern diversity)
+Unknown reason
+
+**Current Task:** 
+
+**Recommendations:**
+- If stuck on a specific task, consider breaking it into smaller subtasks
+- If encountering errors, check logs and fix the underlying issue
+- If no progress is being made, consider moving to a different task
+- If blocked by external dependencies, document the blocker and move on
+
+**Action:** Agent should review this alert and either:
+1. Continue with current task if progress is being made
+2. Break down the task into smaller steps
+3. Move to a different task if blocked
+4. Ask for help if truly stuck
+
+---
+
+
+## Agent Monitor Alert - 2025-11-19 12:03:30
+
+**Status:** Agent appears to be stuck: 03:30] AGENT STUCK DETECTED: No commits in last 20 minutes, Agent appears to be in a loop (low pattern diversity)
+Unknown reason
+
+**Current Task:** 
+
+**Recommendations:**
+- If stuck on a specific task, consider breaking it into smaller subtasks
+- If encountering errors, check logs and fix the underlying issue
+- If no progress is being made, consider moving to a different task
+- If blocked by external dependencies, document the blocker and move on
+
+**Action:** Agent should review this alert and either:
+1. Continue with current task if progress is being made
+2. Break down the task into smaller steps
+3. Move to a different task if blocked
+4. Ask for help if truly stuck
+
+---
+
+
+## Agent Monitor Alert - 2025-11-19 12:13:31
+
+**Status:** Agent appears to be stuck: 13:31] AGENT STUCK DETECTED: No commits in last 20 minutes, Agent appears to be in a loop (low pattern diversity)
+Unknown reason
+
+**Current Task:** 
+
+**Recommendations:**
+- If stuck on a specific task, consider breaking it into smaller subtasks
+- If encountering errors, check logs and fix the underlying issue
+- If no progress is being made, consider moving to a different task
+- If blocked by external dependencies, document the blocker and move on
+
+**Action:** Agent should review this alert and either:
+1. Continue with current task if progress is being made
+2. Break down the task into smaller steps
+3. Move to a different task if blocked
+4. Ask for help if truly stuck
+
+---
+
+
+## Agent Monitor Alert - 2025-11-19 12:23:31
+
+**Status:** Agent appears to be stuck: 23:31] AGENT STUCK DETECTED: No commits in last 20 minutes, Agent appears to be in a loop (low pattern diversity)
 Unknown reason
 
 **Current Task:** 

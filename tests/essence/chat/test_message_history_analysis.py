@@ -418,7 +418,9 @@ class TestGetMessageStatistics:
         history = get_message_history()
 
         history.add_message("telegram", "12345", "67890", "Short", "text")
-        history.add_message("telegram", "12345", "67890", "Medium length message", "text")
+        history.add_message(
+            "telegram", "12345", "67890", "Medium length message", "text"
+        )
         history.add_message("discord", "99999", "88888", "Error occurred", "error")
 
         stats = get_message_statistics(hours=24)
