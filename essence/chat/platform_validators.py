@@ -54,7 +54,7 @@ class TelegramValidator(PlatformValidator):
     - Blockquotes are not supported
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Patterns for Telegram markdown
         self.bold_pattern = re.compile(r"\*([^*]+)\*")
         self.italic_pattern = re.compile(r"_([^_]+)_")
@@ -176,7 +176,7 @@ class TelegramHTMLValidator(PlatformValidator):
     - Nested tags must be properly ordered (e.g., <b><i>text</i></b> not <b><i>text</b></i>)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Allowed HTML tags for Telegram
         self.allowed_tags = {
             "b",
@@ -228,12 +228,12 @@ class TelegramHTMLValidator(PlatformValidator):
 
     def _check_tag_balance(self, html: str) -> List[str]:
         """Check that all HTML tags are properly closed."""
-        errors = []
+        errors: List[str] = []
         # Find all tags
         tag_pattern = re.compile(r"<([^>]+)>")
         tags = tag_pattern.findall(html)
 
-        open_tags = []
+        open_tags: List[str] = []
         for tag_content in tags:
             # Skip self-closing tags and comments
             if tag_content.startswith("!") or tag_content.endswith("/"):
@@ -264,7 +264,7 @@ class TelegramHTMLValidator(PlatformValidator):
 
     def _check_unescaped_chars(self, html: str) -> List[str]:
         """Check for unescaped special characters that should be escaped."""
-        errors = []
+        errors: List[str] = []
 
         # Check for unescaped & characters (should be &amp; unless part of entity)
         # Simple check: & not followed by # or letters (entity pattern)
@@ -281,7 +281,7 @@ class TelegramHTMLValidator(PlatformValidator):
 
     def _check_invalid_tags(self, html: str) -> List[str]:
         """Check for tags that are not allowed in Telegram HTML."""
-        errors = []
+        errors: List[str] = []
         tag_pattern = re.compile(r"<([^/>]+)>")
         tags = tag_pattern.findall(html)
 
@@ -306,7 +306,7 @@ class TelegramHTMLValidator(PlatformValidator):
 
     def _check_tag_nesting(self, html: str) -> List[str]:
         """Check that tags are properly nested (e.g., <b><i>text</i></b> not <b><i>text</b></i>)."""
-        errors = []
+        errors: List[str] = []
         # This is already checked by _check_tag_balance, but we can add more specific checks
         # For now, tag balance checking is sufficient
         return errors
