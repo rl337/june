@@ -30,6 +30,7 @@ All major refactoring phases have been completed:
 - ✅ **Documentation Updates:** 
   - Updated essence/README.md to reflect current module structure (added essence.agents, essence.commands, essence.services, essence.command modules)
   - Updated tests/README.md to clarify inference-api deprecation status (added notes about legacy service, migration guide reference)
+  - Updated docs/API/telegram.md to remove Gateway Admin API references (replaced with environment variable configuration, updated monitoring section to use direct service endpoints)
 - ✅ **Service Refactoring (Phase 9.1):** All services refactored to minimal architecture
 - ✅ **Scripts Cleanup (Phase 11):** Converted reusable tools to commands, removed obsolete scripts
 - ✅ **Test Infrastructure (Phases 12-13):** Integration test service with REST API, Prometheus/Grafana monitoring

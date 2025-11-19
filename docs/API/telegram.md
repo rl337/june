@@ -379,26 +379,20 @@ curl -X POST "https://api.telegram.org/bot<BOT_TOKEN>/deleteWebhook"
 
 ### Bot Configuration
 
-Bot configuration can be managed via the Gateway Admin API:
+Bot configuration is managed via environment variables. Update the service's environment variables in `docker-compose.yml` or your deployment configuration:
 
-**Get Bot Config:**
-```bash
-curl -X GET "http://localhost:8000/admin/bot/config" \
-  -H "Authorization: Bearer <admin_token>"
+**Configuration via Environment Variables:**
+```yaml
+services:
+  telegram:
+    environment:
+      - TELEGRAM_BOT_TOKEN=your_bot_token
+      - MAX_FILE_SIZE=20971520  # 20MB in bytes
+      - SUPPORTED_LANGUAGES=en,es,fr
+      # ... other configuration variables
 ```
 
-**Update Bot Config:**
-```bash
-curl -X PUT "http://localhost:8000/admin/bot/config" \
-  -H "Authorization: Bearer <admin_token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "config": {
-      "max_file_size": 20971520,
-      "supported_languages": ["en", "es", "fr"]
-    }
-  }'
-```
+**Note:** Gateway service was removed for MVP. Bot configuration is now done via environment variables at service startup. To change configuration, update environment variables and restart the service.
 
 ## Limits
 
@@ -487,9 +481,10 @@ def webhook():
 
 Monitor bot health and performance:
 
-- **Service status**: Use `/admin_status` command
-- **Metrics**: Available via Gateway Admin API (`/admin/monitoring/metrics`)
-- **Logs**: Check service logs for errors and issues
+- **Service status**: Use `/admin_status` command (admin users only)
+- **Health endpoint**: `http://telegram:8080/health` (HTTP health check)
+- **Metrics**: Available at `http://telegram:8080/metrics` (Prometheus format)
+- **Logs**: Check service logs for errors and issues: `docker compose logs telegram`
 
 ## Support
 
