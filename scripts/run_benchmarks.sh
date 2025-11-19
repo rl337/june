@@ -20,7 +20,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DATASET="${DATASET:-humaneval}"
 MAX_TASKS="${MAX_TASKS:-}"
 OUTPUT_DIR="${OUTPUT_DIR:-/tmp/benchmarks/results}"
-INFERENCE_API_URL="${INFERENCE_API_URL:-inference-api:50051}"
+INFERENCE_API_URL="${INFERENCE_API_URL:-tensorrt-llm:8000}"  # TensorRT-LLM in home_infra/shared-network (default)
 MODEL_NAME="${MODEL_NAME:-Qwen/Qwen3-30B-A3B-Thinking-2507}"
 SANDBOX_IMAGE="${SANDBOX_IMAGE:-python:3.11-slim}"
 SANDBOX_MEMORY="${SANDBOX_MEMORY:-4g}"
@@ -83,7 +83,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --dataset DATASET          Dataset to evaluate (humaneval, mbpp, all) [default: humaneval]"
             echo "  --max-tasks N              Maximum number of tasks to evaluate [default: all]"
             echo "  --output-dir DIR           Output directory for results [default: /tmp/benchmarks/results]"
-            echo "  --inference-api-url URL    gRPC endpoint for inference API [default: inference-api:50051]"
+            echo "  --inference-api-url URL    gRPC endpoint for LLM inference [default: tensorrt-llm:8000 for TensorRT-LLM, can use inference-api:50051 for legacy service]"
             echo "  --model-name NAME          Model name to evaluate [default: Qwen/Qwen3-30B-A3B-Thinking-2507]"
             echo "  --sandbox-image IMAGE      Docker base image for sandboxes [default: python:3.11-slim]"
             echo "  --sandbox-memory MEM       Maximum memory for sandboxes [default: 4g]"
@@ -134,33 +134,41 @@ else
     echo "Running benchmarks via docker compose..."
     cd "$PROJECT_ROOT"
     
-    # Ensure inference-api is running
-    if ! docker compose ps inference-api | grep -q "Up"; then
-        echo "Starting inference-api service..."
-        docker compose up -d inference-api
-        echo "Waiting for inference-api to be ready..."
-        
-        # Wait for container to be healthy (with timeout)
-        MAX_WAIT=120
-        WAIT_INTERVAL=5
-        ELAPSED=0
-        while [ $ELAPSED -lt $MAX_WAIT ]; do
-            if docker compose ps inference-api | grep -q "Up"; then
-                # Container is up, check if it's responding (basic check)
-                if docker compose exec -T inference-api test -f /tmp/.inference_api_ready 2>/dev/null || \
-                   timeout 2 bash -c "echo > /dev/tcp/inference-api/50051" 2>/dev/null; then
-                    echo "Inference API is ready!"
-                    break
+    # Check if using legacy inference-api (for backward compatibility)
+    if [[ "$INFERENCE_API_URL" == *"inference-api:50051"* ]]; then
+        echo "Using legacy inference-api service..."
+        # Ensure inference-api is running (requires --profile legacy)
+        if ! docker compose ps inference-api | grep -q "Up"; then
+            echo "Starting inference-api service (legacy profile)..."
+            docker compose --profile legacy up -d inference-api
+            echo "Waiting for inference-api to be ready..."
+            
+            # Wait for container to be healthy (with timeout)
+            MAX_WAIT=120
+            WAIT_INTERVAL=5
+            ELAPSED=0
+            while [ $ELAPSED -lt $MAX_WAIT ]; do
+                if docker compose ps inference-api | grep -q "Up"; then
+                    # Container is up, check if it's responding (basic check)
+                    if docker compose exec -T inference-api test -f /tmp/.inference_api_ready 2>/dev/null || \
+                       timeout 2 bash -c "echo > /dev/tcp/inference-api/50051" 2>/dev/null; then
+                        echo "Inference API is ready!"
+                        break
+                    fi
                 fi
+                echo "  Waiting for inference-api... (${ELAPSED}s/${MAX_WAIT}s)"
+                sleep $WAIT_INTERVAL
+                ELAPSED=$((ELAPSED + WAIT_INTERVAL))
+            done
+            
+            if [ $ELAPSED -ge $MAX_WAIT ]; then
+                echo "Warning: Inference API may not be fully ready, but proceeding anyway..."
             fi
-            echo "  Waiting for inference-api... (${ELAPSED}s/${MAX_WAIT}s)"
-            sleep $WAIT_INTERVAL
-            ELAPSED=$((ELAPSED + WAIT_INTERVAL))
-        done
-        
-        if [ $ELAPSED -ge $MAX_WAIT ]; then
-            echo "Warning: Inference API may not be fully ready, but proceeding anyway..."
         fi
+    else
+        # Using TensorRT-LLM (default) - it's in home_infra/shared-network, not in this compose file
+        echo "Using TensorRT-LLM (in home_infra/shared-network)..."
+        echo "Note: TensorRT-LLM should be running in home_infra. This script does not start it."
     fi
     
     # Run benchmark command in cli-tools container
