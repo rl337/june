@@ -16,9 +16,13 @@ jobs:
       with:
         python-version: '3.12'
         cache: 'poetry'
-    - name: Install Poetry
+    - name: Install pipx
       run: |
-        pip install poetry
+        python -m pip install --user pipx
+        python -m pipx ensurepath
+    - name: Install Poetry via pipx
+      run: |
+        pipx install poetry
         poetry config virtualenvs.create true
         poetry config virtualenvs.in-project true
     - name: Install dependencies
