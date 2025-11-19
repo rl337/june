@@ -202,8 +202,14 @@ All major refactoring phases have been completed:
        - ⏳ Use `get_message_history()` to inspect what was actually sent
        - ⏳ Compare expected vs actual output
        - ⏳ Fix any formatting/markdown issues
-       - ⏳ Document Telegram message format requirements and limitations
-       - ⏳ Document Discord message format requirements and limitations
+       - ✅ Document Telegram message format requirements and limitations
+       - ✅ Document Discord message format requirements and limitations
+       - ✅ Created comprehensive documentation: `docs/guides/MESSAGE_FORMAT_REQUIREMENTS.md`
+         - ✅ Documented length limits (Telegram: 4096, Discord: 2000)
+         - ✅ Documented supported and unsupported markdown features
+         - ✅ Documented validation rules and common issues
+         - ✅ Added debugging tools and best practices
+         - ✅ Included reference to platform validators and message history analysis tools
      - ⏳ Verify message history works for both Telegram and Discord
        - ⏳ Test message history retrieval for both platforms
        - ⏳ Test agent communication interface for both platforms
