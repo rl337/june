@@ -138,8 +138,7 @@ class Planner:
             )
 
             # Parse plan text into Plan object
-            # For now, create a simple plan from the LLM output
-            # TODO: Parse structured plan format from LLM response
+            # Supports multiple formats: JSON, markdown lists, numbered lists
             steps = self._parse_plan_text(plan_text, tool_names)
 
             complexity = self._estimate_complexity(user_request)
@@ -167,14 +166,127 @@ class Planner:
     def _parse_plan_text(
         self, plan_text: str, available_tools: List[str]
     ) -> List[Step]:
-        """Parse LLM-generated plan text into Step objects."""
+        """
+        Parse LLM-generated plan text into Step objects.
+
+        Supports multiple formats:
+        - JSON format: {"steps": [{"description": "...", "tool": "...", "args": {...}}]}
+        - Markdown lists: - Step description or * Step description
+        - Numbered lists: 1. Step description or Step 1: description
+        """
+        import json
         import re
 
         steps = []
         step_id = 1
 
-        # Try to extract numbered steps from plan text
-        # Pattern: "1. Step description" or "Step 1: description"
+        # Try to parse as JSON first (most structured format)
+        try:
+            # Look for JSON in the text (might be wrapped in markdown code blocks)
+            json_match = re.search(
+                r"```(?:json)?\s*(\{.*?\})\s*```", plan_text, re.DOTALL
+            )
+            if json_match:
+                plan_text_json = json_match.group(1)
+            else:
+                # Try to find JSON object directly
+                json_match = re.search(r"\{.*\}", plan_text, re.DOTALL)
+                if json_match:
+                    plan_text_json = json_match.group(0)
+                else:
+                    raise ValueError("No JSON found")
+
+            plan_data = json.loads(plan_text_json)
+
+            # Handle different JSON structures
+            if isinstance(plan_data, dict):
+                if "steps" in plan_data:
+                    # Format: {"steps": [{"description": "...", ...}]}
+                    plan_steps = plan_data["steps"]
+                elif "plan" in plan_data:
+                    # Format: {"plan": {"steps": [...]}}
+                    plan_steps = plan_data["plan"].get("steps", [])
+                else:
+                    # Try to use the dict itself as a single step
+                    plan_steps = [plan_data]
+            elif isinstance(plan_data, list):
+                # Format: [{"description": "...", ...}, ...]
+                plan_steps = plan_data
+            else:
+                raise ValueError("Unexpected JSON structure")
+
+            for step_data in plan_steps:
+                if isinstance(step_data, dict):
+                    description = step_data.get(
+                        "description", step_data.get("step", "")
+                    )
+                    tool_name = step_data.get("tool", step_data.get("tool_name"))
+                    tool_args = step_data.get("args", step_data.get("tool_args", {}))
+                    expected_output = step_data.get("expected_output")
+
+                    # Validate tool name
+                    if tool_name and tool_name not in available_tools:
+                        # Try to find matching tool by name similarity
+                        for tool in available_tools:
+                            if tool.lower() == tool_name.lower():
+                                tool_name = tool
+                                break
+                        else:
+                            tool_name = None  # Tool not found, will be None
+
+                    steps.append(
+                        Step(
+                            step_id=step_id,
+                            description=description,
+                            tool_name=tool_name,
+                            tool_args=tool_args
+                            if isinstance(tool_args, dict)
+                            else None,
+                            expected_output=expected_output,
+                        )
+                    )
+                    step_id += 1
+
+            if steps:
+                logger.info(f"Parsed {len(steps)} steps from JSON format")
+                return steps
+        except (json.JSONDecodeError, ValueError, KeyError) as e:
+            logger.debug(f"Failed to parse as JSON: {e}, trying other formats")
+
+        # Try markdown list format: - Step or * Step
+        markdown_patterns = [
+            r"^[-*]\s+(.+?)(?=\n[-*]|\n\n|$)",
+            r"^\s*[-*]\s+(.+?)(?=\n\s*[-*]|\n\n|$)",
+        ]
+
+        for pattern in markdown_patterns:
+            matches = re.finditer(pattern, plan_text, re.MULTILINE)
+            for match in matches:
+                description = match.group(1).strip()
+
+                # Try to identify tool from description
+                tool_name = None
+                tool_args = None
+                for tool in available_tools:
+                    if tool.lower() in description.lower():
+                        tool_name = tool
+                        break
+
+                steps.append(
+                    Step(
+                        step_id=step_id,
+                        description=description,
+                        tool_name=tool_name,
+                        tool_args=tool_args,
+                    )
+                )
+                step_id += 1
+
+            if steps:
+                logger.info(f"Parsed {len(steps)} steps from markdown list format")
+                return steps
+
+        # Try numbered list format: "1. Step description" or "Step 1: description"
         step_patterns = [
             r"^\s*(\d+)\.\s+(.+?)(?=\n\s*\d+\.|\n\n|$)",
             r"Step\s+(\d+):\s+(.+?)(?=\n\s*Step\s+\d+:|$)",
@@ -204,8 +316,15 @@ class Planner:
                 )
                 step_id += 1
 
+            if steps:
+                logger.info(f"Parsed {len(steps)} steps from numbered list format")
+                return steps
+
         # If no steps found, create a single step from the plan text
         if not steps:
+            logger.warning(
+                "Could not parse plan text, creating single step from full text"
+            )
             steps.append(
                 Step(
                     step_id=1,

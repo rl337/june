@@ -560,6 +560,81 @@ class TestComponentIntegration:
         assert execution_results[2].success is False
         assert "missing dependencies" in execution_results[2].error.lower()
 
+    def test_planner_json_format_parsing(
+        self, planner, conversation_context, mock_tools
+    ):
+        """Test that planner can parse JSON format plans."""
+        from essence.agents.planner import Planner
+
+        # Create a planner instance to test _parse_plan_text directly
+        test_planner = Planner(llm_client=None, enable_cache=False)
+
+        # Test JSON format with steps array
+        json_plan = """{
+            "steps": [
+                {"description": "Read a file", "tool": "read_file", "args": {"path": "test.txt"}},
+                {"description": "Write to file", "tool": "write_file", "args": {"path": "output.txt", "content": "data"}}
+            ]
+        }"""
+
+        tool_names = ["read_file", "write_file"]
+        steps = test_planner._parse_plan_text(json_plan, tool_names)
+
+        assert len(steps) == 2
+        assert steps[0].description == "Read a file"
+        assert steps[0].tool_name == "read_file"
+        assert steps[0].tool_args == {"path": "test.txt"}
+        assert steps[1].description == "Write to file"
+        assert steps[1].tool_name == "write_file"
+        assert steps[1].tool_args == {"path": "output.txt", "content": "data"}
+
+    def test_planner_markdown_list_parsing(
+        self, planner, conversation_context, mock_tools
+    ):
+        """Test that planner can parse markdown list format plans."""
+        from essence.agents.planner import Planner
+
+        test_planner = Planner(llm_client=None, enable_cache=False)
+
+        markdown_plan = """- Read a file using read_file
+- Write to file using write_file
+- Process the data"""
+
+        tool_names = ["read_file", "write_file"]
+        steps = test_planner._parse_plan_text(markdown_plan, tool_names)
+
+        assert len(steps) == 3
+        assert "read_file" in steps[0].description.lower()
+        assert steps[0].tool_name == "read_file"
+        assert "write_file" in steps[1].description.lower()
+        assert steps[1].tool_name == "write_file"
+
+    def test_planner_json_in_code_block(
+        self, planner, conversation_context, mock_tools
+    ):
+        """Test that planner can parse JSON wrapped in markdown code blocks."""
+        from essence.agents.planner import Planner
+
+        test_planner = Planner(llm_client=None, enable_cache=False)
+
+        json_plan = """```json
+{
+    "steps": [
+        {"description": "Step 1", "tool": "read_file"},
+        {"description": "Step 2", "tool": "write_file"}
+    ]
+}
+```"""
+
+        tool_names = ["read_file", "write_file"]
+        steps = test_planner._parse_plan_text(json_plan, tool_names)
+
+        assert len(steps) == 2
+        assert steps[0].description == "Step 1"
+        assert steps[0].tool_name == "read_file"
+        assert steps[1].description == "Step 2"
+        assert steps[1].tool_name == "write_file"
+
 
 class TestReasoningResult:
     """Test ReasoningResult structure and behavior."""
