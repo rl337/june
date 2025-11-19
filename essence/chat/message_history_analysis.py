@@ -193,17 +193,37 @@ def compare_expected_vs_actual(
     best_similarity = 0.0
 
     for msg in messages:
-        # Check if raw_text or message_content matches
-        if msg.raw_text == expected_text or msg.message_content == expected_text:
+        # Check exact matches first (fast path)
+        if (
+            msg.raw_text == expected_text
+            or msg.message_content == expected_text
+            or (msg.formatted_text and msg.formatted_text == expected_text)
+        ):
             best_match = msg
             best_similarity = 1.0
             break
 
-        # Calculate similarity using SequenceMatcher (more robust than simple char comparison)
+        # Calculate similarity using SequenceMatcher for all available text fields
+        # Use the best similarity score across all fields
+        similarities = []
         if msg.raw_text:
-            similarity = difflib.SequenceMatcher(
-                None, expected_text, msg.raw_text
-            ).ratio()
+            similarities.append(
+                difflib.SequenceMatcher(None, expected_text, msg.raw_text).ratio()
+            )
+        if msg.message_content:
+            similarities.append(
+                difflib.SequenceMatcher(
+                    None, expected_text, msg.message_content
+                ).ratio()
+            )
+        if msg.formatted_text:
+            similarities.append(
+                difflib.SequenceMatcher(None, expected_text, msg.formatted_text).ratio()
+            )
+
+        # Use the best similarity score from all fields
+        if similarities:
+            similarity = max(similarities)
             if similarity > best_similarity:
                 best_similarity = similarity
                 best_match = msg
