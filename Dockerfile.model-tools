@@ -1,0 +1,55 @@
+# Dockerfile for Model Compilation and Download Tools
+# Includes Whisper, TTS, and HuggingFace tools for model downloading
+# Note: TensorRT-LLM compilation requires NVIDIA's TensorRT-LLM container
+# Use: docker run --rm --gpus all -v /home/rlee/models:/models nvcr.io/nvidia/tensorrt-llm:latest ...
+FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+ENV HF_HOME=/models
+ENV TRANSFORMERS_CACHE=/models
+ENV HF_HUB_CACHE=/models
+ENV CUDA_VISIBLE_DEVICES=0
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    python3.10 \
+    python3-pip \
+    python3.10-dev \
+    git \
+    wget \
+    curl \
+    build-essential \
+    cmake \
+    ffmpeg \
+    rustc \
+    cargo \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies for model tools
+# Note: TTS installation may fail on sudachipy (requires Rust), but we continue anyway
+RUN pip3 install --no-cache-dir --upgrade pip && \
+    pip3 install --no-cache-dir \
+    torch \
+    torchvision \
+    torchaudio \
+    transformers \
+    huggingface-hub \
+    openai-whisper \
+    safetensors \
+    accelerate \
+    sentencepiece \
+    protobuf \
+    && (pip3 install --no-cache-dir TTS || echo "TTS installation failed (may need Rust for Japanese support)") \
+    && rm -rf /root/.cache/pip
+
+# Create workspace directory
+WORKDIR /workspace
+
+# Create helper scripts directory
+RUN mkdir -p /app/scripts
+
+# Default command
+CMD ["/bin/bash"]
+

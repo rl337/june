@@ -46,6 +46,42 @@ services:
     - -c
     - 'echo ''CLI Tools container ready. Use: docker exec -it june-cli-tools bash''
       && tail -f /dev/null'
+  model-tools:
+    build:
+      context: .
+      dockerfile: ./Dockerfile.model-tools
+    container_name: june-model-tools
+    environment:
+    - MODEL_CACHE_DIR=/models
+    - HF_HOME=/models
+    - TRANSFORMERS_CACHE=/models
+    - HF_HUB_CACHE=/models
+    - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN}
+    - CUDA_VISIBLE_DEVICES=0
+    volumes:
+    - ${MODEL_CACHE_DIR:-/home/rlee/models}:/models
+    - ${JUNE_DATA_DIR:-/home/rlee/june_data}:/data
+    - ./:/workspace
+    - /var/log/june/model-tools:/logs
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            device_ids:
+            - '0'
+            capabilities:
+            - gpu
+    networks:
+    - june_network
+    profiles:
+    - tools
+    command:
+    - bash
+    - -c
+    - 'echo ''Model Tools container ready. Use: docker exec -it june-model-tools bash''
+      && echo ''Available tools: python3, whisper, huggingface-cli''
+      && tail -f /dev/null'
   # NOTE: inference-api service is being replaced by TensorRT-LLM (in home_infra/shared-network)
   # This service will be removed once TensorRT-LLM is set up and verified working.
   # For now, kept for backward compatibility during migration.
