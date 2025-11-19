@@ -237,7 +237,7 @@ QUANTIZATION_BITS: 8  # 8-bit quantization for memory efficiency
 
 - **Minimum**: 20GB VRAM (with 8-bit quantization)
 - **Recommended**: 24GB+ VRAM for optimal performance
-- **CPU Fallback**: Model can run on CPU if GPU is not compatible (slower)
+- **CPU Fallback**: **FORBIDDEN** for large models (30B+) - Service will fail to start if GPU is not available (see Critical Requirements in REFACTOR_PLAN.md)
 
 ### Container-First Approach
 
