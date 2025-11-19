@@ -12,9 +12,10 @@ June uses a minimal microservices architecture with the following essential serv
 - **Discord Service** - Receives voice messages from Discord, orchestrates the pipeline
 - **STT Service** - Speech-to-text conversion using Whisper
 - **TTS Service** - Text-to-speech conversion using FastSpeech2/espeak
-- **TensorRT-LLM** - LLM processing using Qwen3 (via Triton Inference Server in home_infra/shared-network)
+- **TensorRT-LLM** - LLM processing using Qwen3 (via Triton Inference Server in home_infra/shared-network) - default
+- **NVIDIA NIM** - Pre-built LLM inference containers (nim-qwen3:8001) - alternative, no compilation needed
 
-**Note:** Legacy `inference-api` service is deprecated and disabled by default. All services now use TensorRT-LLM for optimized GPU inference.
+**Note:** Legacy `inference-api` service is deprecated and disabled by default. All services now use TensorRT-LLM (default) or NVIDIA NIM for optimized GPU inference.
 
 ### Architecture Flow
 
@@ -40,7 +41,8 @@ Telegram/Discord Service → User (Voice Response)
 - Rate limiting: In-memory (in telegram/discord services)
 
 **Optional Infrastructure (from home_infra):**
-- **TensorRT-LLM** - LLM inference service (Triton Inference Server) - available in shared-network as `tensorrt-llm:8000`
+- **TensorRT-LLM** - LLM inference service (Triton Inference Server) - available in shared-network as `tensorrt-llm:8000` (default)
+- **NVIDIA NIM** - Pre-built LLM inference containers - available in shared-network as `nim-qwen3:8001` (alternative)
 - **Jaeger** - Distributed tracing (OpenTelemetry) - available in shared-network
 - **Prometheus + Grafana** - Metrics collection and visualization - available in shared-network
 - **nginx** - Reverse proxy (replaces removed gateway service) - available in shared-network

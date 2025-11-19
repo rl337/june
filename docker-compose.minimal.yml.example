@@ -94,7 +94,7 @@ services:
       - STT_URL=grpc://stt:50052
       - TTS_URL=grpc://tts:50053
       - LLM_URL=grpc://tensorrt-llm:8000  # TensorRT-LLM in home_infra/shared-network
-      # Legacy: Use inference-api with --profile legacy: LLM_URL=grpc://inference-api:50051
+      # Options: tensorrt-llm:8000 (default), nim-qwen3:8001 (NIM, requires NGC_API_KEY), inference-api:50051 (legacy, use --profile legacy)
     depends_on:
       - stt
       - tts
@@ -126,7 +126,7 @@ services:
       - STT_URL=grpc://stt:50052
       - TTS_URL=grpc://tts:50053
       - LLM_URL=grpc://tensorrt-llm:8000  # TensorRT-LLM in home_infra/shared-network
-      # Legacy: Use inference-api with --profile legacy: LLM_URL=grpc://inference-api:50051
+      # Options: tensorrt-llm:8000 (default), nim-qwen3:8001 (NIM, requires NGC_API_KEY), inference-api:50051 (legacy, use --profile legacy)
     depends_on:
       - stt
       - tts

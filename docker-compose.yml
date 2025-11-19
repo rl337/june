@@ -256,6 +256,7 @@ services:
     - STT_URL=grpc://stt:50052
     - TTS_URL=grpc://tts:50053
     - LLM_URL=grpc://tensorrt-llm:8000
+      # LLM options: tensorrt-llm:8000 (default), nim-qwen3:8001 (NIM, requires NGC_API_KEY in home_infra), inference-api:50051 (legacy)
     - ENABLE_TRACING=${ENABLE_TRACING:-true}
     - JAEGER_ENDPOINT=http://common-jaeger:14268/api/traces
     - JAEGER_AGENT_HOST=common-jaeger
@@ -321,6 +322,7 @@ services:
     - STT_URL=grpc://stt:50052
     - TTS_URL=grpc://tts:50053
     - LLM_URL=grpc://tensorrt-llm:8000
+      # LLM options: tensorrt-llm:8000 (default), nim-qwen3:8001 (NIM, requires NGC_API_KEY in home_infra), inference-api:50051 (legacy)
     - ENABLE_TRACING=${ENABLE_TRACING:-true}
     - JAEGER_ENDPOINT=http://common-jaeger:14268/api/traces
     - JAEGER_AGENT_HOST=common-jaeger

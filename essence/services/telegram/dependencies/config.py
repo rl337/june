@@ -47,7 +47,10 @@ def get_llm_address() -> str:
     Note:
         Defaults to TensorRT-LLM service (tensorrt-llm:8000) for optimized GPU inference.
         Can be overridden via LLM_URL environment variable.
-        Legacy inference-api service (inference-api:50051) can be used by setting LLM_URL.
+        Options:
+        - TensorRT-LLM: tensorrt-llm:8000 (default, requires model compilation)
+        - NVIDIA NIM: nim-qwen3:8001 (pre-built, no compilation needed, requires NGC_API_KEY)
+        - Legacy inference-api: inference-api:50051 (legacy service, use --profile legacy)
     """
     return os.getenv("LLM_URL", "tensorrt-llm:8000").replace("grpc://", "")
 

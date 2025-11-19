@@ -192,7 +192,7 @@ When refactoring, remove dependencies on:
 - **gRPC:** Services communicate via gRPC directly
   - STT: `grpc://stt:50052`
   - TTS: `grpc://tts:50053`
-  - LLM: TensorRT-LLM container (grpc://tensorrt-llm:8000) - current implementation; inference-api service available via legacy profile
+  - LLM: TensorRT-LLM container (grpc://tensorrt-llm:8000) - default implementation; NVIDIA NIM (grpc://nim-qwen3:8001) - pre-built alternative; inference-api service available via legacy profile
 - **HTTP:** Health checks and metrics endpoints
   - Telegram: `http://telegram:8080`
   - Discord: `http://discord:8081`
