@@ -2,7 +2,7 @@
 
 ## Status: ✅ **CORE REFACTORING COMPLETE** → 🚀 **FORWARD DEVELOPMENT IN PROGRESS**
 
-**Last Updated:** 2025-11-18 (Phase 15.2: Model loading/unloading API implemented - CLI command `manage-tensorrt-llm` created for interacting with Triton Inference Server model repository API)
+**Last Updated:** 2025-11-18 (Phase 15.1: Enhanced TensorRT-LLM container configuration with Triton model repository path and command-line arguments)
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
@@ -121,7 +121,9 @@ All major refactoring phases have been completed:
    - ✅ Added health check endpoint
    - ✅ Configured environment variables for model name, quantization, context length
    - ✅ Added Jaeger tracing integration
-   - ⏳ **Note:** This is a basic configuration using Triton Inference Server. TensorRT-LLM requires model compilation/preparation and model repository setup, which will be handled in Task 2 (model loading/unloading API)
+   - ✅ Configured Triton model repository path (`/models/triton-repository`)
+   - ✅ Added Triton command-line arguments (--model-repository, --allow-gpu-metrics, --allow-http)
+   - ⏳ **Note:** Model repository directory structure must be created and models must be compiled before use (see Task 4)
 
 2. **Implement model loading/unloading:** ✅ COMPLETED
    - ✅ Created `essence/commands/manage_tensorrt_llm.py` command for model management
@@ -154,10 +156,22 @@ All major refactoring phases have been completed:
    - ⏳ **Remaining:** Fully remove inference-api service from docker-compose.yml (waiting for TensorRT-LLM setup and verification in home_infra)
 
 4. **Get Qwen3-30B-A3B-Thinking-2507 running:** ⏳ TODO (requires TensorRT-LLM container setup from task 1, model loading API from task 2, and model compilation/preparation)
-   - Load Qwen3 model into TensorRT-LLM container
-   - Verify GPU usage (must use GPU, CPU fallback FORBIDDEN)
-   - Test model inference via gRPC interface
-   - Verify quantization and memory usage
+   - **Model Repository Setup:**
+     - Create model repository directory structure: `/home/rlee/models/triton-repository/<model_name>/<version>/`
+     - Each model needs: compiled TensorRT-LLM engine files, config.pbtxt, tokenizer files
+   - **Model Compilation:**
+     - Compile Qwen3-30B-A3B-Thinking-2507 using TensorRT-LLM build tools
+     - Configure quantization (8-bit as specified in environment variables)
+     - Set max context length (131072 tokens)
+     - Place compiled model in repository structure
+   - **Model Loading:**
+     - Use `manage-tensorrt-llm` command to load model: `poetry run -m essence manage-tensorrt-llm --action load --model <name>`
+     - Verify model appears in repository index
+   - **Verification:**
+     - Verify GPU usage (must use GPU, CPU fallback FORBIDDEN)
+     - Test model inference via gRPC interface (tensorrt-llm:8000)
+     - Verify quantization and memory usage
+     - Check model status: `poetry run -m essence manage-tensorrt-llm --action status --model <name>`
 
 **Critical Requirements:**
 - **GPU-only loading:** Large models (30B+) must NEVER load on CPU
