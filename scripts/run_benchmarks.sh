@@ -27,6 +27,7 @@ SANDBOX_MEMORY="${SANDBOX_MEMORY:-4g}"
 SANDBOX_CPU="${SANDBOX_CPU:-2.0}"
 TIMEOUT="${TIMEOUT:-300}"
 MAX_ITERATIONS="${MAX_ITERATIONS:-10}"
+NUM_ATTEMPTS="${NUM_ATTEMPTS:-1}"
 ENABLE_NETWORK="${ENABLE_NETWORK:-false}"
 
 # Parse command line arguments
@@ -72,6 +73,10 @@ while [[ $# -gt 0 ]]; do
             MAX_ITERATIONS="$2"
             shift 2
             ;;
+        --num-attempts)
+            NUM_ATTEMPTS="$2"
+            shift 2
+            ;;
         --enable-network)
             ENABLE_NETWORK="true"
             shift
@@ -90,6 +95,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --sandbox-cpu CPU          Maximum CPU for sandboxes [default: 2.0]"
             echo "  --timeout SECONDS          Maximum time per task [default: 300]"
             echo "  --max-iterations N         Maximum agent iterations per task [default: 10]"
+            echo "  --num-attempts N           Number of attempts per task for pass@k calculation [default: 1]"
             echo "  --enable-network           Enable network access in sandboxes [default: disabled]"
             echo "  --help, -h                 Show this help message"
             exit 0
@@ -113,6 +119,7 @@ ARGS=(
     --sandbox-cpu "$SANDBOX_CPU"
     --timeout "$TIMEOUT"
     --max-iterations "$MAX_ITERATIONS"
+    --num-attempts "$NUM_ATTEMPTS"
 )
 
 if [[ -n "$MAX_TASKS" ]]; then
@@ -185,6 +192,7 @@ else
         -e SANDBOX_CPU="$SANDBOX_CPU" \
         -e TIMEOUT="$TIMEOUT" \
         -e MAX_ITERATIONS="$MAX_ITERATIONS" \
+        -e BENCHMARK_NUM_ATTEMPTS="$NUM_ATTEMPTS" \
         -e ENABLE_NETWORK="$ENABLE_NETWORK" \
         cli-tools \
         bash -c "cd /workspace && poetry run -m essence run-benchmarks ${ARGS[*]}"
