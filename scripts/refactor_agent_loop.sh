@@ -259,14 +259,16 @@ You are working on refactoring the june project. Your task is to:
     - "Add: OpenTelemetry tracing spans to voice processing operations"
     - "Fix: Update docker-compose.yml to remove gateway service"
   - DO NOT commit unrelated changes together - create separate commits for each logical group
-  - After committing all outstanding changes, check if there are unpushed commits and push them upstream
+  - **After each commit, immediately push to upstream:** `git push origin main` (or `git push` if upstream is configured)
+  - If push fails (e.g., network issue), log the error but continue - the commit is still saved locally
 
 **STEP 2: After completing each task**
 - Commit your changes using git with a descriptive commit message
 - Use the same commit format as above
 - Group related changes into logical commits (one commit per task or logical unit)
-- After committing, check if there are unpushed commits and push them upstream
-- DO NOT leave uncommitted changes - always commit your work before moving to the next task
+- **After each commit, immediately push to upstream:** `git push origin main` (or `git push` if upstream is configured)
+- If push fails (e.g., network issue), log the error but continue - the commit is still saved locally
+- DO NOT leave uncommitted changes - always commit and push your work before moving to the next task
 
 **CRITICAL - DO NOT UPDATE COMMIT COUNTS:**
 - **DO NOT automatically update commit counts in REFACTOR_PLAN.md** - The commit count (e.g., "85 commits ahead of origin/main") is informational only and does not need to be kept in sync
