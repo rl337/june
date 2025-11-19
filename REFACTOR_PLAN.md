@@ -97,6 +97,7 @@ Pare down the june project to bare essentials for the **voice message → STT �
 - Simplified README.md to reflect minimal architecture
 - Removed references to removed services
 - ✅ Fixed documentation inconsistencies: Updated `docs/guides/AGENTS.md` to reference `REFACTOR_PLAN.md` instead of outdated `TODO.md` as the source of truth
+- ✅ Improved benchmark evaluation documentation: Updated `README.md` to show both script wrapper and direct command options for running benchmarks, providing users with clear choices
 - ✅ Updated `docs/README.md` last updated date to 2025-11-18
 - ✅ Marked PostgreSQL optimization docs as obsolete: Added obsolete warnings to `docs/database_optimization_summary.md` and `docs/query_optimization_guide.md` (PostgreSQL removed for MVP)
 - ✅ **COMPLETED:** Updated `docs/guides/AGENTS.md` Architecture Overview section to reflect current minimal architecture - removed references to Gateway, Webapp, PostgreSQL, MinIO, and NATS services; updated to show Telegram/Discord services, in-memory storage, and current infrastructure setup
