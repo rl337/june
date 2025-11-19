@@ -416,7 +416,8 @@ June is a minimal voice-to-voice AI agent system that processes voice messages t
 - **Discord Service** - Receives voice messages from Discord, orchestrates the pipeline
 - **STT Service** (Port 50052) - Speech-to-Text conversion using Whisper
 - **TTS Service** (Port 50053) - Text-to-Speech conversion using FastSpeech2/espeak
-- **Inference API** (Port 50051) - LLM processing using Qwen3
+- **TensorRT-LLM** (Port 8000) - LLM processing using Qwen3 via TensorRT-LLM (default)
+- **Inference API** (Port 50051) - Legacy LLM service (available via `--profile legacy`)
 
 ### Architecture Flow
 ```
@@ -526,7 +527,8 @@ All containers produce model artifacts (outputs, caches, generated content) that
 **Model Artifacts Directory:** `/home/rlee/june_data/model_artifacts/`
 - **STT:** `/home/rlee/june_data/model_artifacts/stt/`
 - **TTS:** `/home/rlee/june_data/model_artifacts/tts/`
-- **Inference API:** `/home/rlee/june_data/model_artifacts/inference-api/`
+- **TensorRT-LLM:** `/home/rlee/models/triton-repository/` (model repository for TensorRT-LLM)
+- **Inference API (Legacy):** `/home/rlee/june_data/model_artifacts/inference-api/`
 
 These directories are mounted into containers at `/app/model_artifacts/` and persist across container restarts.
 
@@ -634,7 +636,7 @@ dev/june/
 ├── services/                 # Service Dockerfiles and configuration
 │   ├── telegram/            # Telegram bot service
 │   ├── discord/             # Discord bot service
-│   ├── inference-api/       # LLM orchestration
+│   ├── inference-api/       # Legacy LLM orchestration (deprecated, use TensorRT-LLM)
 │   ├── stt/                 # Speech-to-Text
 │   └── tts/                 # Text-to-Speech
 ├── essence/                  # All service code and shared utilities
@@ -1075,7 +1077,8 @@ docker-compose logs -f
 # View specific service logs
 docker-compose logs -f telegram
 docker-compose logs -f discord
-docker-compose logs -f inference-api
+docker-compose logs -f inference-api  # Legacy service (use --profile legacy)
+# TensorRT-LLM logs are in home_infra (not in june docker-compose)
 ```
 
 ## 🎙️ STT Service Updates and Validation
@@ -1260,7 +1263,7 @@ June Agent implements comprehensive security measures. All agents working on the
 
 ### Scaling Considerations
 - **Horizontal:** Stateless services can be scaled (telegram, discord, stt, tts)
-- **Vertical:** GPU memory limits model size (inference-api)
+- **Vertical:** GPU memory limits model size (TensorRT-LLM/inference-api)
 - **Storage:** In-memory storage scales with service instances (no external database)
 - **Load Balancing:** Multiple telegram/discord instances can handle more users
 

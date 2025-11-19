@@ -79,7 +79,7 @@ Check service health status. Displays status of STT, TTS, and LLM services.
 ✅ Bot: Online
 ✅ STT: Online (stt:8080)
 ✅ TTS: Online (tts:8080)
-✅ LLM: Online (inference-api:8080)
+✅ LLM: Online (tensorrt-llm:8000)  # TensorRT-LLM (default) or inference-api:50051 (legacy)
 ```
 
 #### `/language`
@@ -373,7 +373,7 @@ curl -X POST "https://api.telegram.org/bot<BOT_TOKEN>/deleteWebhook"
 - `TELEGRAM_WEBHOOK_SECRET`: Secret token for webhook verification
 - `STT_SERVICE_URL`: STT service address (default: `stt:8080`)
 - `TTS_SERVICE_URL`: TTS service address (default: `tts:8080`)
-- `LLM_SERVICE_URL`: LLM service address (default: `inference-api:8080`)
+- `LLM_SERVICE_URL`: LLM service address (default: `tensorrt-llm:8000` for TensorRT-LLM, legacy: `inference-api:50051`)
 - `MAX_FILE_SIZE`: Maximum voice file size in bytes (default: 20MB)
 - `SUPPORTED_LANGUAGES`: Comma-separated list of supported language codes
 

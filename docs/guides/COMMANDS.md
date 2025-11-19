@@ -17,7 +17,7 @@ poetry run -m essence <command-name> [arguments]
 - `discord-service` - Run Discord bot service
 - `stt` - Run STT service
 - `tts` - Run TTS service
-- `inference-api` - Run inference API service
+- `inference-api` - Run legacy inference API service (deprecated, use TensorRT-LLM via home_infra)
 
 ### Utility Commands
 - `download-models` - Download models for June Agent

@@ -2,7 +2,7 @@
 
 ## Status: ✅ **CORE REFACTORING COMPLETE** → 🚀 **FORWARD DEVELOPMENT IN PROGRESS**
 
-**Last Updated:** 2025-11-18 (Phase 15.3: Updated API documentation to reflect TensorRT-LLM as default)
+**Last Updated:** 2025-11-18 (Phase 15.3: Updated remaining documentation files to reflect TensorRT-LLM as default)
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
@@ -158,6 +158,9 @@ All major refactoring phases have been completed:
    - ✅ Updated scripts/run_benchmarks.sh to default to TensorRT-LLM (tensorrt-llm:8000), removed automatic inference-api startup, added legacy support with --profile legacy
    - ✅ Updated docs/API/inference.md to reflect TensorRT-LLM as default implementation (tensorrt-llm:8000), updated all examples, added migration notes
    - ✅ Updated docs/API/README.md to reflect TensorRT-LLM as default gRPC service address
+   - ✅ Updated docs/API/telegram.md to reflect TensorRT-LLM as default LLM service (tensorrt-llm:8000)
+   - ✅ Updated docs/guides/AGENTS.md to reflect TensorRT-LLM as default LLM service, updated model artifacts paths, marked inference-api as legacy
+   - ✅ Updated docs/guides/COMMANDS.md to mark inference-api command as deprecated/legacy
    - ⏳ **Remaining:** Fully remove inference-api service from docker-compose.yml (waiting for TensorRT-LLM setup and verification in home_infra)
 
 4. **Get Qwen3-30B-A3B-Thinking-2507 running:** ⏳ TODO (requires TensorRT-LLM container setup from task 1, model loading API from task 2, and model compilation/preparation)
