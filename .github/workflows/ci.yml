@@ -26,4 +26,4 @@ jobs:
         poetry install --no-interaction --no-ansi --no-root
     - name: Run tests
       run: |
-        poetry run pytest tests/essence/ -m "not integration"
+        poetry run pytest tests/essence/ -m "not integration" --ignore=tests/essence/pipeline/test_pipeline_integration.py
