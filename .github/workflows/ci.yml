@@ -24,6 +24,18 @@ jobs:
         POETRY_VIRTUALENVS_IN_PROJECT: "true"
       run: |
         poetry install --no-interaction --no-ansi --no-root
+    - name: Diagnostic information
+      run: |
+        echo "=== Environment Diagnostics ==="
+        echo "Python version: $(python --version)"
+        echo "Poetry version: $(poetry --version)"
+        echo "Pytest version: $(poetry run pytest --version || echo 'pytest not available')"
+        echo "Working directory: $(pwd)"
+        echo "Python path: $(which python)"
+        echo "=== Test directory structure ==="
+        find tests/essence -name "*.py" -type f | head -20
+        echo "=== Pytest configuration ==="
+        poetry run pytest --co -q tests/essence/ 2>&1 | head -30 || echo "Collection failed"
     - name: Check test collection
       run: |
         echo "Checking pytest collection..."
