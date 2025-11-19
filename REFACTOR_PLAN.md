@@ -11,7 +11,8 @@
 Build a complete **voice message → STT → LLM → TTS → voice response** system with **agentic LLM reasoning** before responding, supporting both **Telegram** and **Discord** platforms.
 
 **Extended Goal:** 
-- Get Qwen3-30B-A3B-Thinking-2507 running on **GPU** via **TensorRT-LLM** (CPU loading is FORBIDDEN)
+- Get **NIM models** running on **GPU** for inference (faster iteration than compiling Qwen3)
+- Fix **Telegram and Discord rendering issues** via message history debugging
 - Develop agentic flow that performs reasoning/planning before responding to users
 - Evaluate model performance on benchmark datasets
 - All operations must be containerized - no host system pollution
@@ -104,15 +105,16 @@ All major refactoring phases have been completed:
 
 **See:** `QWEN3_SETUP_PLAN.md` for detailed setup instructions and operational guide.
 
-### Phase 15: TensorRT-LLM Integration ⏳ IN PROGRESS
+### Phase 15: NIM Integration and Message History Debugging ⏳ IN PROGRESS
 
-**Goal:** Replace `inference-api` service with TensorRT-LLM container for optimized GPU inference.
+**Goal:** Get NVIDIA NIM (NVIDIA Inference Microservice) models running for inference, and implement message history debugging to fix Telegram/Discord rendering issues.
 
 **Current Status:** 
-- ✅ **Task 1:** TensorRT-LLM container setup complete in home_infra
+- ✅ **Task 1:** TensorRT-LLM container setup complete in home_infra (can be used for NIMs)
 - ✅ **Task 2:** Model loading/unloading API implemented (`manage-tensorrt-llm` command)
 - ✅ **Task 3:** Code/documentation migration complete (all services, tests, docs updated to use TensorRT-LLM)
-- ⏳ **Task 4:** Model compilation and loading (BLOCKED - requires TensorRT-LLM build tools on x86_64 or NVIDIA NGC access)
+- ⏳ **Task 4:** NIM model deployment (NEW PRIORITY - use NIMs instead of compiling Qwen3)
+- ⏳ **Task 5:** Message history debugging implementation (NEW PRIORITY - fix rendering issues)
 
 **Migration Status:** All code and documentation changes are complete. The june project is fully migrated to use TensorRT-LLM as the default LLM service. The legacy `inference-api` service remains in docker-compose.yml with a `legacy` profile for backward compatibility, but can be removed once TensorRT-LLM is verified operational (use `verify-tensorrt-llm` command).
 
@@ -321,22 +323,24 @@ All major refactoring phases have been completed:
    - ✅ Added diagnostic information step to CI workflow (run #367) - Added a "Diagnostic information" step that outputs Python version, Poetry version, pytest version, working directory, Python path, test directory structure, and pytest collection output. This provides comprehensive environment diagnostics to help identify CI-environment-specific issues that may be causing failures.
    - ✅ Total: 161 tests passing (153 existing + 8 pipeline tests, 3 integration tests excluded from CI by renaming file)
 
-2. **Test STT → LLM → TTS flow:** ⏳ TODO (framework ready, requires real services)
+2. **Test STT → LLM → TTS flow:** ⏳ DEFERRED (waiting for NIMs and message history fixes)
    - ⏳ Send voice message via Telegram
    - ⏳ Verify STT converts to text correctly
-   - ⏳ Verify LLM (Qwen3 via TensorRT-LLM) processes text
+   - ⏳ Verify LLM (NIM model) processes text
    - ⏳ Verify TTS converts response to audio
    - ⏳ Verify audio is sent back to user
 
-3. **Test Discord integration:** ⏳ TODO (framework ready, requires real services)
+3. **Test Discord integration:** ⏳ DEFERRED (waiting for NIMs and message history fixes)
    - ⏳ Repeat above flow for Discord
    - ⏳ Verify platform-specific handling works correctly
 
-4. **Debug rendering issues:** ⏳ TODO (framework ready, requires real services)
+4. **Debug rendering issues:** ⏳ MOVED TO Phase 15 Task 5 (NEW PRIORITY)
    - ⏳ Use `get_message_history()` to inspect what was actually sent
    - ⏳ Compare expected vs actual output
    - ⏳ Fix any formatting/markdown issues
    - ⏳ Verify message history works for both Telegram and Discord
+   - ⏳ Implement agent communication interface
+   - ⏳ Analyze Telegram/Discord message format requirements
 
 5. **Performance testing:** ⏳ TODO (framework ready, requires real services)
    - ⏳ Measure latency for each stage (STT, LLM, TTS)
