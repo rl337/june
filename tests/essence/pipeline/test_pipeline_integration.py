@@ -2,11 +2,32 @@
 Integration tests for pipeline framework with real services.
 
 These tests use the PipelineTestFramework with real services when available.
-They will skip if services are not running.
+They will skip if services are not running or if grpc is mocked.
 """
 import pytest
 import os
+import sys
+from unittest.mock import MagicMock
 from tests.essence.pipeline.test_pipeline_framework import PipelineTestFramework
+
+
+def _is_grpc_available():
+    """Check if grpc is available and not mocked."""
+    try:
+        # Check if grpc is in sys.modules and if it's mocked
+        if 'grpc' in sys.modules:
+            grpc = sys.modules['grpc']
+            # Check if grpc is mocked (from conftest.py in other test modules)
+            if isinstance(grpc, MagicMock):
+                return False
+        # Try to import grpc to see if it's available
+        import grpc
+        # Double-check it's not mocked after import
+        if isinstance(grpc, MagicMock):
+            return False
+        return True
+    except (ImportError, AttributeError):
+        return False
 
 
 @pytest.fixture
@@ -16,20 +37,17 @@ def pipeline_framework_real():
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(not _is_grpc_available(), reason="grpc module not available or mocked - skipping integration test")
 async def test_pipeline_with_real_services(pipeline_framework_real):
     """Test complete pipeline with real services (if available)."""
     # Generate test audio
     audio_data = pipeline_framework_real.generate_test_audio("Hello world", duration_seconds=1.0)
     
-    # Run pipeline (will check service availability)
+    # Run pipeline (fixture already checked service availability)
     metrics = await pipeline_framework_real.run_pipeline(
         audio_data,
-        check_services=True
+        check_services=False  # Already checked in fixture
     )
-    
-    # If services are not available, skip the test
-    if metrics.errors and "not available" in str(metrics.errors):
-        pytest.skip("Real services not available - skipping integration test")
     
     # Assert success
     pipeline_framework_real.assert_pipeline_success(metrics)
@@ -42,17 +60,17 @@ async def test_pipeline_with_real_services(pipeline_framework_real):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(not _is_grpc_available(), reason="grpc module not available or mocked - skipping integration test")
 async def test_pipeline_performance_with_real_services(pipeline_framework_real):
     """Test pipeline performance with real services."""
     # Generate test audio
     audio_data = pipeline_framework_real.generate_test_audio("Test performance", duration_seconds=1.0)
     
-    # Run pipeline
-    metrics = await pipeline_framework_real.run_pipeline(audio_data)
-    
-    # If services are not available, skip the test
-    if metrics.errors and "not available" in str(metrics.errors):
-        pytest.skip("Real services not available - skipping integration test")
+    # Run pipeline (fixture already checked service availability)
+    metrics = await pipeline_framework_real.run_pipeline(
+        audio_data,
+        check_services=False  # Already checked in fixture
+    )
     
     # Assert success
     pipeline_framework_real.assert_pipeline_success(metrics)

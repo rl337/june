@@ -2,6 +2,7 @@
 Pytest configuration for pipeline tests.
 """
 import pytest
+import os
 from tests.essence.pipeline.test_pipeline_framework import PipelineTestFramework
 
 
@@ -14,9 +15,7 @@ def pipeline_framework():
 @pytest.fixture
 def pipeline_framework_real():
     """Fixture providing a pipeline test framework with real services (if available)."""
-    # Check if real services are available
-    use_real = pytest.config.getoption("--use-real-services", default=False)
-    return PipelineTestFramework(use_real_services=use_real)
+    return PipelineTestFramework(use_real_services=True)
 
 
 def pytest_addoption(parser):

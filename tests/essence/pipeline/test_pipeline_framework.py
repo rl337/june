@@ -274,19 +274,25 @@ class PipelineTestFramework:
         """Check if a gRPC service is available."""
         try:
             import grpc
+            # Check if grpc is mocked (from conftest.py in other test modules)
+            if isinstance(grpc, MagicMock):
+                logger.warning(f"grpc module is mocked - cannot check {service_type} service")
+                return False
         except ImportError:
             logger.warning(f"grpc module not available - cannot check {service_type} service")
             return False
         
         try:
             async with grpc.aio.insecure_channel(address) as channel:
-                # Try to connect
-                await asyncio.wait_for(
-                    grpc.channel_ready_future(channel),
-                    timeout=2.0
-                )
-                logger.info(f"✓ {service_type} service reachable at {address}")
-                return True
+                # Try to connect (using same pattern as integration tests)
+                # channel_ready_future returns a Future that we need to wait for
+                try:
+                    grpc.channel_ready_future(channel).result(timeout=2.0)
+                    logger.info(f"✓ {service_type} service reachable at {address}")
+                    return True
+                except Exception as e:
+                    logger.warning(f"✗ {service_type} service not reachable at {address}: {e}")
+                    return False
         except Exception as e:
             logger.warning(f"✗ {service_type} service not reachable at {address}: {e}")
             return False
@@ -296,7 +302,13 @@ class PipelineTestFramework:
         import os
         try:
             import grpc
+            # Check if grpc is mocked (from conftest.py in other test modules)
+            if isinstance(grpc, MagicMock):
+                raise ImportError("grpc module is mocked - cannot use real STT service")
             from june_grpc_api import asr as asr_shim
+            # Check if june_grpc_api is mocked
+            if isinstance(asr_shim, MagicMock):
+                raise ImportError("june_grpc_api module is mocked - cannot use real STT service")
         except ImportError as e:
             raise ImportError(f"Required modules not available for real STT service: {e}")
         
@@ -330,7 +342,13 @@ class PipelineTestFramework:
         import os
         try:
             import grpc
+            # Check if grpc is mocked (from conftest.py in other test modules)
+            if isinstance(grpc, MagicMock):
+                raise ImportError("grpc module is mocked - cannot use real LLM service")
             from june_grpc_api import llm as llm_shim
+            # Check if june_grpc_api is mocked
+            if isinstance(llm_shim, MagicMock):
+                raise ImportError("june_grpc_api module is mocked - cannot use real LLM service")
         except ImportError as e:
             raise ImportError(f"Required modules not available for real LLM service: {e}")
         
@@ -353,7 +371,13 @@ class PipelineTestFramework:
         import os
         try:
             import grpc
+            # Check if grpc is mocked (from conftest.py in other test modules)
+            if isinstance(grpc, MagicMock):
+                raise ImportError("grpc module is mocked - cannot use real TTS service")
             from june_grpc_api import tts as tts_shim
+            # Check if june_grpc_api is mocked
+            if isinstance(tts_shim, MagicMock):
+                raise ImportError("june_grpc_api module is mocked - cannot use real TTS service")
         except ImportError as e:
             raise ImportError(f"Required modules not available for real TTS service: {e}")
         
