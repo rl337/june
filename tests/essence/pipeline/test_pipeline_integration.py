@@ -69,6 +69,7 @@ def pipeline_framework_real():
     return PipelineTestFramework(use_real_services=True)
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 @pytest.mark.skipif(_IS_CI or not _GRPC_AVAILABLE, reason="Skipping integration test (CI environment or grpc unavailable/mocked)")
 async def test_pipeline_with_real_services(pipeline_framework_real):
@@ -92,6 +93,7 @@ async def test_pipeline_with_real_services(pipeline_framework_real):
     assert metrics.total_duration > 0
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 @pytest.mark.skipif(_IS_CI or not _GRPC_AVAILABLE, reason="Skipping integration test (CI environment or grpc unavailable/mocked)")
 async def test_pipeline_performance_with_real_services(pipeline_framework_real):
