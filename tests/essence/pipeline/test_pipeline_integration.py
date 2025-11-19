@@ -12,25 +12,44 @@ from tests.essence.pipeline.test_pipeline_framework import PipelineTestFramework
 
 
 def _is_grpc_available():
-    """Check if grpc is available and not mocked."""
+    """Check if grpc is available and not mocked.
+    
+    This function is used in pytest.mark.skipif decorators, so it must be
+    extremely defensive and never raise exceptions during test collection.
+    """
     try:
         # Check if grpc is in sys.modules and if it's mocked
         if 'grpc' in sys.modules:
-            grpc_module = sys.modules['grpc']
-            # Check if grpc is mocked (from conftest.py in other test modules)
-            if isinstance(grpc_module, MagicMock):
+            try:
+                grpc_module = sys.modules['grpc']
+                # Check if grpc is mocked (from conftest.py in other test modules)
+                if isinstance(grpc_module, MagicMock):
+                    return False
+            except Exception:
+                # If anything goes wrong checking sys.modules, assume unavailable
                 return False
+        
         # Try to import grpc to see if it's available
-        import grpc
+        try:
+            import grpc
+        except ImportError:
+            # grpc is not installed
+            return False
+        
         # Double-check it's not mocked after import
-        if isinstance(grpc, MagicMock):
+        try:
+            if isinstance(grpc, MagicMock):
+                return False
+            # Verify grpc has essential attributes (not just a mock)
+            if not hasattr(grpc, 'insecure_channel'):
+                return False
+        except Exception:
+            # If anything goes wrong checking attributes, assume unavailable
             return False
-        # Verify grpc has essential attributes (not just a mock)
-        if not hasattr(grpc, 'insecure_channel'):
-            return False
+        
         return True
-    except (ImportError, AttributeError, TypeError, KeyError):
-        # Catch all possible exceptions during import/check
+    except Exception:
+        # Catch absolutely everything - this function must never raise
         return False
 
 
