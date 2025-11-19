@@ -206,8 +206,10 @@ All major refactoring phases have been completed:
      - ✅ Validates prerequisites (GPU availability, repository structure, build tools)
      - ✅ Checks if model is already compiled
      - ✅ Generates compilation command templates with proper options
+     - ✅ Generates config.pbtxt template files with TensorRT-LLM configuration
+     - ✅ Automatically saves config.pbtxt to model directory if repository exists
      - ✅ Provides step-by-step guidance for compilation process
-     - ✅ Usage: `poetry run -m essence compile-model --model <name> --check-prerequisites --generate-template`
+     - ✅ Usage: `poetry run -m essence compile-model --model <name> --check-prerequisites --generate-template --generate-config`
    - **Model Compilation (Operational):**
      - ⏳ Compile Qwen3-30B-A3B-Thinking-2507 using TensorRT-LLM build tools (use `compile-model` command for guidance)
      - ⏳ Configure quantization (8-bit as specified in environment variables)
