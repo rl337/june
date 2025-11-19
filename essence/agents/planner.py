@@ -6,6 +6,7 @@ Creates execution plans from user requests by breaking them down into steps.
 import logging
 from typing import Optional, List, Dict, Any
 from essence.agents.reasoning import Plan, Step, ConversationContext
+from essence.agents.reasoning_cache import get_reasoning_cache, ReasoningCache
 from essence.chat.utils.tracing import get_tracer
 from opentelemetry import trace
 
@@ -24,6 +25,8 @@ class Planner:
         self,
         llm_client: Optional[Any] = None,
         max_steps: int = 10,
+        cache: Optional[ReasoningCache] = None,
+        enable_cache: bool = True,
     ):
         """
         Initialize the planner.
@@ -31,9 +34,13 @@ class Planner:
         Args:
             llm_client: LLM client for generating plans (optional)
             max_steps: Maximum number of steps in a plan
+            cache: Reasoning cache instance (optional, uses global cache if None)
+            enable_cache: Whether to enable caching
         """
         self.llm_client = llm_client
         self.max_steps = max_steps
+        self.cache = cache or (get_reasoning_cache() if enable_cache else None)
+        self.enable_cache = enable_cache
     
     def create_plan(
         self,
@@ -57,11 +64,34 @@ class Planner:
                 span.set_attribute("request_length", len(user_request))
                 span.set_attribute("available_tools_count", len(available_tools))
                 
-                # If LLM client is available, use it for planning
+                # Check cache first
+                if self.cache:
+                    cache_key_data = {
+                        "request": user_request,
+                        "tools": [str(tool) for tool in available_tools],
+                    }
+                    cached_plan = self.cache.get("plan", cache_key_data)
+                    if cached_plan:
+                        span.set_attribute("cache_hit", True)
+                        logger.debug("Using cached plan")
+                        return cached_plan
+                    span.set_attribute("cache_hit", False)
+                
+                # Generate plan
                 if self.llm_client:
-                    return self._create_plan_with_llm(user_request, available_tools, context, span)
+                    plan = self._create_plan_with_llm(user_request, available_tools, context, span)
                 else:
-                    return self._create_simple_plan(user_request, available_tools, context, span)
+                    plan = self._create_simple_plan(user_request, available_tools, context, span)
+                
+                # Cache the plan
+                if self.cache and plan:
+                    cache_key_data = {
+                        "request": user_request,
+                        "tools": [str(tool) for tool in available_tools],
+                    }
+                    self.cache.put("plan", cache_key_data, plan)
+                
+                return plan
             
             except Exception as e:
                 logger.error(f"Error creating plan: {e}", exc_info=True)

@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from essence.chat.utils.tracing import get_tracer
+from essence.agents.reasoning_cache import get_reasoning_cache, ReasoningCache
 from opentelemetry import trace
 
 logger = logging.getLogger(__name__)
@@ -140,6 +141,9 @@ class AgenticReasoner:
         execute_timeout: float = 60.0,
         reflect_timeout: float = 10.0,
         total_timeout: float = 300.0,
+        cache: Optional[ReasoningCache] = None,
+        enable_cache: bool = True,
+        enable_early_termination: bool = True,
     ):
         """
         Initialize the agentic reasoner.
@@ -155,6 +159,9 @@ class AgenticReasoner:
             execute_timeout: Timeout for execute phase (seconds)
             reflect_timeout: Timeout for reflect phase (seconds)
             total_timeout: Total timeout for entire reasoning loop (seconds)
+            cache: Reasoning cache instance (optional, uses global cache if None)
+            enable_cache: Whether to enable caching
+            enable_early_termination: Whether to enable early termination for simple requests
         """
         self.planner = planner
         self.executor = executor
@@ -166,6 +173,9 @@ class AgenticReasoner:
         self.execute_timeout = execute_timeout
         self.reflect_timeout = reflect_timeout
         self.total_timeout = total_timeout
+        self.cache = cache or (get_reasoning_cache() if enable_cache else None)
+        self.enable_cache = enable_cache
+        self.enable_early_termination = enable_early_termination
     
     def reason(
         self,
@@ -190,6 +200,12 @@ class AgenticReasoner:
                 span.set_attribute("max_iterations", self.max_iterations)
                 span.set_attribute("user_id", context.user_id or "unknown")
                 span.set_attribute("chat_id", context.chat_id or "unknown")
+                
+                # Early termination for simple requests
+                if self.enable_early_termination and self._is_simple_request(user_message, context):
+                    span.set_attribute("early_termination", True)
+                    logger.debug("Early termination: simple request detected")
+                    return self._handle_simple_request(user_message, context, span)
                 
                 state = ReasoningState()
                 available_tools = available_tools or []
@@ -353,6 +369,19 @@ class AgenticReasoner:
             try:
                 think_span.set_attribute("user_message_length", len(user_message))
                 
+                # Check cache first
+                if self.cache:
+                    cache_key_data = {
+                        "message": user_message,
+                        "context_length": len(context.message_history) if context.message_history else 0,
+                    }
+                    cached_analysis = self.cache.get("think", cache_key_data)
+                    if cached_analysis:
+                        think_span.set_attribute("cache_hit", True)
+                        logger.debug("Using cached think analysis")
+                        return cached_analysis
+                    think_span.set_attribute("cache_hit", False)
+                
                 # If LLM client is available, use it for thinking
                 if self.llm_client:
                     try:
@@ -369,6 +398,14 @@ class AgenticReasoner:
                             user_message=user_message,
                             conversation_history=conversation_history,
                         )
+                        
+                        # Cache the analysis
+                        if self.cache and analysis:
+                            cache_key_data = {
+                                "message": user_message,
+                                "context_length": len(context.message_history) if context.message_history else 0,
+                            }
+                            self.cache.put("think", cache_key_data, analysis)
                         
                         think_span.set_attribute("llm_think_used", True)
                         think_span.set_attribute("analysis_length", len(analysis))
@@ -511,3 +548,118 @@ class AgenticReasoner:
             return "\n".join(response_parts)
         
         return "I've processed your request, but couldn't generate a detailed response."
+    
+    def _is_simple_request(
+        self,
+        user_message: str,
+        context: ConversationContext,
+    ) -> bool:
+        """
+        Determine if a request is simple enough to skip full reasoning loop.
+        
+        Args:
+            user_message: The user's message
+            context: Conversation context
+            
+        Returns:
+            True if request is simple, False otherwise
+        """
+        # Simple requests are:
+        # - Short messages (< 50 characters)
+        # - No tool keywords
+        # - No complex reasoning keywords
+        # - No multi-turn conversation context
+        
+        if len(user_message) < 50:
+            # Check for simple question patterns
+            simple_patterns = [
+                "hello", "hi", "hey", "thanks", "thank you",
+                "yes", "no", "ok", "okay", "sure",
+            ]
+            if any(pattern in user_message.lower() for pattern in simple_patterns):
+                return True
+        
+        # Check for tool keywords (indicates complexity)
+        tool_keywords = ["file", "code", "write", "create", "modify", "execute", "run"]
+        if any(keyword in user_message.lower() for keyword in tool_keywords):
+            return False
+        
+        # Check for reasoning keywords (indicates need for planning)
+        reasoning_keywords = ["plan", "step", "reason", "think", "break down", "how to"]
+        if any(keyword in user_message.lower() for keyword in reasoning_keywords):
+            return False
+        
+        # Check conversation history (multi-turn = more complex)
+        if context.message_history and len(context.message_history) > 2:
+            return False
+        
+        # Very short messages without complexity indicators are simple
+        return len(user_message) < 100
+    
+    def _handle_simple_request(
+        self,
+        user_message: str,
+        context: ConversationContext,
+        span: trace.Span,
+    ) -> ReasoningResult:
+        """
+        Handle simple requests without full reasoning loop.
+        
+        Args:
+            user_message: The user's message
+            context: Conversation context
+            span: Tracing span
+            
+        Returns:
+            ReasoningResult with direct response
+        """
+        # For simple requests, create a minimal plan and execute directly
+        if self.planner:
+            # Create a simple single-step plan
+            simple_plan = Plan(
+                steps=[Step(step_id=1, description=user_message)],
+                estimated_complexity="simple",
+                success_criteria=["Respond to user"],
+            )
+            
+            # Execute the plan
+            execution_results = []
+            if self.executor:
+                execution_results = self.executor.execute_plan(simple_plan.steps, context)
+            else:
+                # Fallback: create mock result
+                execution_results = [
+                    ExecutionResult(
+                        step_id=1,
+                        success=True,
+                        output=f"Response to: {user_message}",
+                    )
+                ]
+            
+            # Simple reflection
+            reflection = ReflectionResult(
+                goal_achieved=True,
+                confidence=0.9,
+                final_response=execution_results[0].output if execution_results else user_message,
+            )
+            
+            span.set_attribute("simple_request", True)
+            span.set_attribute("iterations", 1)
+            
+            return ReasoningResult(
+                success=True,
+                final_response=reflection.final_response or user_message,
+                iterations=1,
+                total_time=0.1,  # Minimal time for simple requests
+                plan=simple_plan,
+                execution_results=execution_results,
+                reflection=reflection,
+            )
+        else:
+            # No planner available, return direct response
+            return ReasoningResult(
+                success=True,
+                final_response=user_message,
+                iterations=0,
+                total_time=0.0,
+            )

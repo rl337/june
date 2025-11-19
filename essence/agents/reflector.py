@@ -6,6 +6,7 @@ Evaluates execution results and determines if goals were achieved.
 import logging
 from typing import Optional, List
 from essence.agents.reasoning import Plan, ExecutionResult, ReflectionResult, ConversationContext
+from essence.agents.reasoning_cache import get_reasoning_cache, ReasoningCache
 from essence.chat.utils.tracing import get_tracer
 from opentelemetry import trace
 
@@ -24,6 +25,8 @@ class Reflector:
         self,
         llm_client: Optional[Any] = None,
         min_confidence: float = 0.7,
+        cache: Optional[ReasoningCache] = None,
+        enable_cache: bool = True,
     ):
         """
         Initialize the reflector.
@@ -31,9 +34,13 @@ class Reflector:
         Args:
             llm_client: LLM client for reflection (optional)
             min_confidence: Minimum confidence threshold for goal achievement
+            cache: Reasoning cache instance (optional, uses global cache if None)
+            enable_cache: Whether to enable caching
         """
         self.llm_client = llm_client
         self.min_confidence = min_confidence
+        self.cache = cache or (get_reasoning_cache() if enable_cache else None)
+        self.enable_cache = enable_cache
     
     def reflect(
         self,
@@ -57,11 +64,40 @@ class Reflector:
                 span.set_attribute("plan_steps", len(plan.steps) if plan else 0)
                 span.set_attribute("execution_results_count", len(execution_results))
                 
-                # If LLM client is available, use it for reflection
+                # Check cache first (for similar execution patterns)
+                if self.cache:
+                    cache_key_data = {
+                        "request": original_request,
+                        "results_summary": [
+                            {"success": r.success, "step_id": r.step_id}
+                            for r in execution_results
+                        ],
+                    }
+                    cached_reflection = self.cache.get("reflect", cache_key_data)
+                    if cached_reflection:
+                        span.set_attribute("cache_hit", True)
+                        logger.debug("Using cached reflection")
+                        return cached_reflection
+                    span.set_attribute("cache_hit", False)
+                
+                # Generate reflection
                 if self.llm_client:
-                    return self._reflect_with_llm(plan, execution_results, original_request, span)
+                    reflection = self._reflect_with_llm(plan, execution_results, original_request, span)
                 else:
-                    return self._reflect_simple(plan, execution_results, original_request, span)
+                    reflection = self._reflect_simple(plan, execution_results, original_request, span)
+                
+                # Cache the reflection
+                if self.cache and reflection:
+                    cache_key_data = {
+                        "request": original_request,
+                        "results_summary": [
+                            {"success": r.success, "step_id": r.step_id}
+                            for r in execution_results
+                        ],
+                    }
+                    self.cache.put("reflect", cache_key_data, reflection)
+                
+                return reflection
             
             except Exception as e:
                 logger.error(f"Error in reflection: {e}", exc_info=True)

@@ -16,6 +16,8 @@ from .planner import Planner
 from .executor import Executor
 from .reflector import Reflector
 from .llm_client import LLMClient
+from .reasoning_cache import ReasoningCache, get_reasoning_cache
+from .decision import should_use_agentic_flow, estimate_request_complexity
 
 __all__ = [
     'CodingAgent',
@@ -35,4 +37,8 @@ __all__ = [
     'Executor',
     'Reflector',
     'LLMClient',
+    'ReasoningCache',
+    'get_reasoning_cache',
+    'should_use_agentic_flow',
+    'estimate_request_complexity',
 ]
