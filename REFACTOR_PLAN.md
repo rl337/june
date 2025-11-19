@@ -183,26 +183,33 @@ When ready to use the Qwen3 model and coding agent, follow these steps:
    ```
    **Note:** This checks Docker, GPU, NVIDIA Container Toolkit, HUGGINGFACE_TOKEN, and other prerequisites. Fix any issues before proceeding.
 
-1. **Download the model (containerized):**
+1. **Set up TensorRT-LLM container in home_infra:**
    ```bash
-   # Download model in container (no host pollution)
-   docker compose run --rm cli-tools \
-     poetry run -m essence download-models --model Qwen/Qwen3-30B-A3B-Thinking-2507
+   # Add TensorRT-LLM container to home_infra docker-compose.yml
+   # Configure it to load Qwen3-30B-A3B-Thinking-2507 model
+   # Connect it to shared-network so june services can access it
+   cd /home/rlee/dev/home_infra
+   # Add tensorrt-llm service configuration
+   docker compose up -d tensorrt-llm
    ```
-   **Note:** This requires a GPU with 20GB+ VRAM and may take significant time depending on network speed.
+   **Note:** This requires a GPU with 20GB+ VRAM. TensorRT-LLM will handle model loading and quantization automatically.
 
-2. **Start inference-api service:**
+2. **Verify TensorRT-LLM container is running:**
    ```bash
-   docker compose up -d inference-api
-   ```
-
-3. **Verify model is loaded:**
-   ```bash
-   # Check logs for "Model loaded successfully"
-   docker compose logs -f inference-api
+   # Check container status
+   docker compose ps tensorrt-llm
    
-   # Or check health endpoint
-   curl http://localhost:8001/health
+   # Check logs for model loading
+   docker compose logs -f tensorrt-llm
+   
+   # Verify it's on shared-network
+   docker network inspect shared_network | grep tensorrt-llm
+   ```
+
+3. **Update june services to connect to TensorRT-LLM:**
+   ```bash
+   # Services should connect to tensorrt-llm service via shared-network
+   # Update service configuration to use tensorrt-llm:8000 (or appropriate port)
    ```
 
 4. **Test the coding agent:**
