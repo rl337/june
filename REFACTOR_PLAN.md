@@ -2,7 +2,7 @@
 
 ## Status: ✅ **CORE REFACTORING COMPLETE** → 🚀 **FORWARD DEVELOPMENT IN PROGRESS**
 
-**Last Updated:** 2025-11-19 (Phase 17.6: Completed integration of agentic reasoning flow with chat agent handler)
+**Last Updated:** 2025-11-19 (Phase 16.1: Created pipeline test framework for end-to-end testing)
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
@@ -219,32 +219,45 @@ All major refactoring phases have been completed:
 - **GPU verification:** Verify GPU availability before model loading
 - **Model switching:** Support loading/unloading models dynamically
 
-### Phase 16: End-to-End Pipeline Testing ⏳ TODO
+### Phase 16: End-to-End Pipeline Testing ⏳ IN PROGRESS
 
 **Goal:** Verify complete voice message → STT → LLM → TTS → voice response flow works end-to-end.
 
+**Status:** Test framework created. Basic pipeline tests passing with mocked services. Ready for integration testing with real services.
+
 **Tasks:**
-1. **Test STT → LLM → TTS flow:**
-   - Send voice message via Telegram
-   - Verify STT converts to text correctly
-   - Verify LLM (Qwen3 via TensorRT-LLM) processes text
-   - Verify TTS converts response to audio
-   - Verify audio is sent back to user
+1. **Test framework:** ✅ COMPLETED
+   - ✅ Created `tests/essence/pipeline/test_pipeline_framework.py` - Comprehensive pipeline test framework
+   - ✅ Created `tests/essence/pipeline/test_pipeline_basic.py` - Basic pipeline flow tests
+   - ✅ Created `tests/essence/pipeline/conftest.py` - Pytest fixtures for pipeline tests
+   - ✅ Framework supports both mocked services (for CI/CD) and real services (for integration testing)
+   - ✅ `PipelineTestFramework` class provides utilities for testing STT → LLM → TTS flow
+   - ✅ Mock services: `MockSTTService`, `MockLLMService`, `MockTTSResponse` for isolated testing
+   - ✅ `PipelineMetrics` dataclass for collecting performance metrics
+   - ✅ All 8 basic pipeline tests passing (complete flow, custom responses, performance, error handling, languages, concurrent requests)
+   - ✅ Total: 161 tests passing (153 existing + 8 pipeline tests)
 
-2. **Test Discord integration:**
-   - Repeat above flow for Discord
-   - Verify platform-specific handling works correctly
+2. **Test STT → LLM → TTS flow:** ⏳ TODO (framework ready, requires real services)
+   - ⏳ Send voice message via Telegram
+   - ⏳ Verify STT converts to text correctly
+   - ⏳ Verify LLM (Qwen3 via TensorRT-LLM) processes text
+   - ⏳ Verify TTS converts response to audio
+   - ⏳ Verify audio is sent back to user
 
-3. **Debug rendering issues:**
-   - Use `get_message_history()` to inspect what was actually sent
-   - Compare expected vs actual output
-   - Fix any formatting/markdown issues
-   - Verify message history works for both Telegram and Discord
+3. **Test Discord integration:** ⏳ TODO (framework ready, requires real services)
+   - ⏳ Repeat above flow for Discord
+   - ⏳ Verify platform-specific handling works correctly
 
-4. **Performance testing:**
-   - Measure latency for each stage (STT, LLM, TTS)
-   - Identify bottlenecks
-   - Optimize where possible
+4. **Debug rendering issues:** ⏳ TODO (framework ready, requires real services)
+   - ⏳ Use `get_message_history()` to inspect what was actually sent
+   - ⏳ Compare expected vs actual output
+   - ⏳ Fix any formatting/markdown issues
+   - ⏳ Verify message history works for both Telegram and Discord
+
+5. **Performance testing:** ⏳ TODO (framework ready, requires real services)
+   - ⏳ Measure latency for each stage (STT, LLM, TTS)
+   - ⏳ Identify bottlenecks
+   - ⏳ Optimize where possible
 
 ### Phase 17: Agentic Flow Implementation ⏳ IN PROGRESS
 
@@ -475,7 +488,7 @@ All major refactoring phases have been completed:
    - Migrate june services to use TensorRT-LLM
    - Get Qwen3 model running
 
-2. **Phase 16: End-to-End Pipeline Testing** ⏳ TODO
+2. **Phase 16: End-to-End Pipeline Testing** ⏳ IN PROGRESS (Test framework complete, integration testing pending)
    - Test complete voice → STT → LLM → TTS → voice flow
    - Debug rendering issues with message history
    - Performance testing and optimization
@@ -513,18 +526,18 @@ All code changes, cleanup, and refactoring tasks have been completed:
 - ✅ All gateway references cleaned up
 - ✅ All obsolete test files and scripts marked appropriately
 - ✅ All code references updated to reflect current architecture
-- ✅ All unit tests passing (153/153 in tests/essence/ - 112 existing + 41 agentic reasoning tests)
+- ✅ All unit tests passing (161/161 in tests/essence/ - 112 existing + 41 agentic reasoning + 8 pipeline tests)
 - ✅ Minimal architecture achieved with only essential services
 
 **Current Development Focus:**
 - 🚀 **Phase 15:** TensorRT-LLM Integration (IN PROGRESS)
-- ⏳ **Phase 16:** End-to-End Pipeline Testing (TODO)
+- ⏳ **Phase 16:** End-to-End Pipeline Testing (IN PROGRESS - Test framework complete, integration testing pending)
 - ✅ **Phase 17:** Agentic Flow Implementation (COMPLETED - code complete, operational testing pending)
 - ⏳ **Phase 18:** Model Evaluation and Benchmarking (TODO)
 
 **Current State:**
 - ✅ All essential services refactored and working
-- ✅ All unit tests passing (153/153 in tests/essence/ - 112 existing + 41 agentic reasoning tests)
+- ✅ All unit tests passing (161/161 in tests/essence/ - 112 existing + 41 agentic reasoning + 8 pipeline tests)
 - ✅ Minimal architecture achieved
 - ✅ Message history debugging implemented
 - ✅ TensorRT-LLM migration (code/documentation) complete - all services default to TensorRT-LLM, all documentation updated
