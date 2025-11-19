@@ -2,7 +2,7 @@
 
 ## Status: ✅ **CORE REFACTORING COMPLETE** → 🚀 **FORWARD DEVELOPMENT IN PROGRESS**
 
-**Last Updated:** 2025-11-19 (Fixed GitHub Actions CI - Use pytest marker to exclude integration tests)
+**Last Updated:** 2025-11-19 (Fixed GitHub Actions CI - Added missing integration marker to test_service_availability_check)
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
@@ -251,7 +251,8 @@ All major refactoring phases have been completed:
    - ✅ Simplified CI skip logic (run #282) - Skip integration tests in CI environment (CI=true) to avoid collection issues, check grpc availability locally
    - ✅ Combined skipif conditions (run #285) - Use single `_should_skip_integration_test()` function that checks CI first, then grpc availability, avoiding multiple decorator evaluation issues
    - ✅ Excluded integration tests from CI (run #291) - Use pytest marker `@pytest.mark.integration` and exclude with `-m "not integration"` in CI workflow, wrapped all module-level code in try/except for maximum safety
-   - ✅ Total: 162 tests passing (153 existing + 9 pipeline tests, 2 integration tests excluded from CI via marker)
+   - ✅ Fixed missing integration marker (run #292) - Added `@pytest.mark.integration` to `test_service_availability_check` test to ensure it's excluded from CI runs
+   - ✅ Total: 161 tests passing (153 existing + 8 pipeline tests, 3 integration tests excluded from CI via marker)
 
 2. **Test STT → LLM → TTS flow:** ⏳ TODO (framework ready, requires real services)
    - ⏳ Send voice message via Telegram
