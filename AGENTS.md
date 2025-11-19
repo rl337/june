@@ -35,11 +35,10 @@ This document provides essential context and guidelines for AI agents working on
 2. **discord** - Receives voice messages from Discord, orchestrates pipeline
 3. **stt** - Speech-to-text conversion (Whisper)
 4. **tts** - Text-to-speech conversion (FastSpeech2/espeak)
-5. **inference-api** - LLM inference service (provides gRPC interface for Qwen3 and other models)
 
 **LLM Inference:** 
-- **Current implementation:** inference-api service (included in june project)
-- **Optional future migration:** TensorRT-LLM container (from home_infra shared-network) - can replace inference-api for optimized GPU inference
+- **Current implementation:** TensorRT-LLM container (from home_infra shared-network) - optimized GPU inference
+- **Legacy:** inference-api service (disabled by default, available via legacy profile for backward compatibility)
 
 ### Removed Services (Do Not Use)
 
@@ -193,7 +192,7 @@ When refactoring, remove dependencies on:
 - **gRPC:** Services communicate via gRPC directly
   - STT: `grpc://stt:50052`
   - TTS: `grpc://tts:50053`
-  - LLM: inference-api service (grpc://inference-api:50051) - current implementation; TensorRT-LLM container is optional future migration
+  - LLM: TensorRT-LLM container (grpc://tensorrt-llm:8000) - current implementation; inference-api service available via legacy profile
 - **HTTP:** Health checks and metrics endpoints
   - Telegram: `http://telegram:8080`
   - Discord: `http://discord:8081`

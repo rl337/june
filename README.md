@@ -215,18 +215,18 @@ June uses Qwen3-30B-A3B-Thinking-2507 for LLM inference. The model runs in Docke
      poetry run -m essence download-models --model Qwen/Qwen3-30B-A3B-Thinking-2507
    ```
 
-2. **Start inference-api service:**
+2. **Start TensorRT-LLM service (in home_infra):**
    ```bash
-   docker compose up -d inference-api
+   # TensorRT-LLM is set up in home_infra and connected via shared-network
+   # June services will automatically connect to tensorrt-llm:8000
+   # See REFACTOR_PLAN.md Phase 15 for TensorRT-LLM setup instructions
    ```
 
-3. **Verify model is loaded:**
+3. **Verify TensorRT-LLM is accessible:**
    ```bash
-   # Check logs for "Model loaded successfully"
-   docker compose logs -f inference-api
-   
-   # Or check health endpoint
-   curl http://localhost:8001/health
+   # Check that TensorRT-LLM is running in home_infra
+   # June services connect via shared-network to tensorrt-llm:8000
+   # Legacy inference-api service available via: docker compose --profile legacy up -d inference-api
    ```
 
 ### Model Configuration
@@ -285,9 +285,9 @@ poetry run -m essence coding-agent --task "Your task here" --workspace-dir /path
 ```python
 from essence.agents.coding_agent import CodingAgent
 
-# Initialize agent
+# Initialize agent (defaults to TensorRT-LLM)
 agent = CodingAgent(
-    inference_api_url="inference-api:50051",
+    inference_api_url="tensorrt-llm:8000",  # Default: TensorRT-LLM in home_infra/shared-network
     model_name="Qwen/Qwen3-30B-A3B-Thinking-2507",
 )
 
@@ -397,7 +397,7 @@ june/
 │   ├── discord/               # Discord Dockerfile
 │   ├── stt/                   # STT Dockerfile
 │   ├── tts/                   # TTS Dockerfile
-│   └── inference-api/         # Inference API Dockerfile
+│   └── inference-api/         # Legacy Inference API Dockerfile (disabled by default)
 ├── packages/                   # Shared packages
 │   ├── inference-core/        # Core inference logic
 │   └── june-grpc-api/         # gRPC API definitions
@@ -469,7 +469,7 @@ curl http://localhost:8080/health  # Telegram
 curl http://localhost:8081/health  # Discord
 
 # Check service dependencies
-docker compose ps stt tts inference-api
+docker compose ps stt tts  # TensorRT-LLM is in home_infra/shared-network
 ```
 
 ### Metrics Not Appearing
