@@ -11,46 +11,35 @@ from unittest.mock import MagicMock
 from tests.essence.pipeline.test_pipeline_framework import PipelineTestFramework
 
 
-def _is_grpc_available():
-    """Check if grpc is available and not mocked.
-    
-    This function is used in pytest.mark.skipif decorators, so it must be
-    extremely defensive and never raise exceptions during test collection.
-    """
-    try:
-        # Check if grpc is in sys.modules and if it's mocked
-        if 'grpc' in sys.modules:
+# Evaluate grpc availability at import time (safer for pytest collection)
+# This constant is evaluated once when the module is imported, before pytest
+# starts collecting tests, which avoids issues with decorator evaluation
+_GRPC_AVAILABLE = False
+try:
+    # Check if grpc is already mocked in sys.modules (from other test modules)
+    if 'grpc' in sys.modules:
+        grpc_module = sys.modules['grpc']
+        if isinstance(grpc_module, MagicMock):
+            _GRPC_AVAILABLE = False
+        else:
+            # Not mocked, try to verify it's real
             try:
-                grpc_module = sys.modules['grpc']
-                # Check if grpc is mocked (from conftest.py in other test modules)
-                if isinstance(grpc_module, MagicMock):
-                    return False
-            except Exception:
-                # If anything goes wrong checking sys.modules, assume unavailable
-                return False
-        
-        # Try to import grpc to see if it's available
+                import grpc
+                if not isinstance(grpc, MagicMock) and hasattr(grpc, 'insecure_channel'):
+                    _GRPC_AVAILABLE = True
+            except (ImportError, AttributeError, TypeError):
+                _GRPC_AVAILABLE = False
+    else:
+        # grpc not in sys.modules, try to import it
         try:
             import grpc
-        except ImportError:
-            # grpc is not installed
-            return False
-        
-        # Double-check it's not mocked after import
-        try:
-            if isinstance(grpc, MagicMock):
-                return False
-            # Verify grpc has essential attributes (not just a mock)
-            if not hasattr(grpc, 'insecure_channel'):
-                return False
-        except Exception:
-            # If anything goes wrong checking attributes, assume unavailable
-            return False
-        
-        return True
-    except Exception:
-        # Catch absolutely everything - this function must never raise
-        return False
+            if not isinstance(grpc, MagicMock) and hasattr(grpc, 'insecure_channel'):
+                _GRPC_AVAILABLE = True
+        except (ImportError, AttributeError, TypeError):
+            _GRPC_AVAILABLE = False
+except Exception:
+    # Catch absolutely everything - assume unavailable if anything goes wrong
+    _GRPC_AVAILABLE = False
 
 
 @pytest.fixture
@@ -60,7 +49,7 @@ def pipeline_framework_real():
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(not _is_grpc_available(), reason="grpc module not available or mocked - skipping integration test")
+@pytest.mark.skipif(not _GRPC_AVAILABLE, reason="grpc module not available or mocked - skipping integration test")
 async def test_pipeline_with_real_services(pipeline_framework_real):
     """Test complete pipeline with real services (if available)."""
     # Generate test audio
@@ -83,7 +72,7 @@ async def test_pipeline_with_real_services(pipeline_framework_real):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(not _is_grpc_available(), reason="grpc module not available or mocked - skipping integration test")
+@pytest.mark.skipif(not _GRPC_AVAILABLE, reason="grpc module not available or mocked - skipping integration test")
 async def test_pipeline_performance_with_real_services(pipeline_framework_real):
     """Test pipeline performance with real services."""
     # Generate test audio
