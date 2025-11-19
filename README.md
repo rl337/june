@@ -318,7 +318,7 @@ from essence.agents.coding_agent import CodingAgent
 
 # Initialize agent (defaults to TensorRT-LLM)
 agent = CodingAgent(
-    inference_api_url="tensorrt-llm:8000",  # Default: TensorRT-LLM in home_infra/shared-network
+    llm_url="tensorrt-llm:8000",  # Default: TensorRT-LLM in home_infra/shared-network
     model_name="Qwen/Qwen3-30B-A3B-Thinking-2507",
 )
 
@@ -363,7 +363,7 @@ docker compose run --rm cli-tools \
 poetry run -m essence review-sandbox /tmp/benchmarks/results humaneval_0
 ```
 
-**Note:** The `run-benchmarks` command defaults to `tensorrt-llm:8000` for TensorRT-LLM. Use `--inference-api-url inference-api:50051` for the legacy service.
+**Note:** The `run-benchmarks` command defaults to `tensorrt-llm:8000` for TensorRT-LLM. Use `--llm-url inference-api:50051` for the legacy service.
 
 See `docs/guides/QWEN3_BENCHMARK_EVALUATION.md` for detailed benchmark evaluation guide.
 
