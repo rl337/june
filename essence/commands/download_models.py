@@ -122,6 +122,20 @@ class ModelDownloader:
             
             # Get HuggingFace token from environment (for gated models)
             token = os.getenv("HUGGINGFACE_TOKEN")
+            
+            # Known gated models that require authentication
+            GATED_MODELS = [
+                "Qwen/Qwen3-30B-A3B-Thinking-2507",
+            ]
+            
+            # Fail fast for known gated models if token is not set
+            if model_name in GATED_MODELS and not token:
+                logger.error(f"Model {model_name} is gated and requires authentication")
+                logger.error("HUGGINGFACE_TOKEN environment variable must be set")
+                logger.error("Get your token from: https://huggingface.co/settings/tokens")
+                logger.error("Then set: export HUGGINGFACE_TOKEN=your_token_here")
+                return False
+            
             if not token:
                 logger.warning("HUGGINGFACE_TOKEN not set - model may be gated and require authentication")
                 logger.warning("Set HUGGINGFACE_TOKEN environment variable if download fails")
