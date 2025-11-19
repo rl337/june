@@ -149,6 +149,14 @@ class RunBenchmarksCommand(Command):
             default=os.getenv("BENCHMARK_ENABLE_NETWORK", "false").lower() == "true",
             help="Enable network access in sandboxes (default: disabled)",
         )
+        parser.add_argument(
+            "--num-attempts",
+            type=int,
+            default=int(os.getenv("BENCHMARK_NUM_ATTEMPTS", "1")),
+            help="Number of attempts per task for pass@k calculation (default: 1). "
+                 "Set to k (e.g., 5) to calculate pass@k accurately. "
+                 "Each attempt uses different random seeds/sampling parameters.",
+        )
 
     def init(self) -> None:
         """
@@ -185,6 +193,7 @@ class RunBenchmarksCommand(Command):
             network_disabled=not self.args.enable_network,
             max_iterations=self.args.max_iterations,
             timeout_seconds=self.args.timeout,
+            num_attempts_per_task=self.args.num_attempts,
         )
         logger.info("Benchmark evaluator initialized")
 

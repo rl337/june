@@ -10,6 +10,7 @@ import logging
 import shutil
 import statistics
 import time
+from collections import defaultdict
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
@@ -93,6 +94,7 @@ class TaskResult:
     files_created: int = 0
     files_modified: int = 0
     commands_executed: int = 0
+    attempt_number: Optional[int] = None  # Which attempt this is (1-indexed, None for single attempt)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -175,6 +177,7 @@ class BenchmarkEvaluator:
         network_disabled: bool = True,
         max_iterations: int = 10,
         timeout_seconds: int = 300,
+        num_attempts_per_task: int = 1,
     ):
         """
         Initialize the evaluator.
@@ -190,6 +193,9 @@ class BenchmarkEvaluator:
             network_disabled: Whether to disable network access in sandboxes
             max_iterations: Maximum agent iterations per task
             timeout_seconds: Maximum time per task in seconds
+            num_attempts_per_task: Number of attempts to make per task (default: 1). 
+                                 For proper pass@k calculation, set to k (e.g., 5 for pass@5).
+                                 Each attempt uses different random seeds/sampling parameters.
         """
         self.llm_url = llm_url
         self.model_name = model_name
@@ -200,16 +206,21 @@ class BenchmarkEvaluator:
         self.network_disabled = network_disabled
         self.max_iterations = max_iterations
         self.timeout_seconds = timeout_seconds
+        self.num_attempts_per_task = num_attempts_per_task
 
         # Ensure workspace base exists
         self.sandbox_workspace_base.mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"Initialized BenchmarkEvaluator with model {model_name}")
+        logger.info(
+            f"Initialized BenchmarkEvaluator with model {model_name}, "
+            f"{num_attempts_per_task} attempt(s) per task"
+        )
 
     def evaluate_task(
         self,
         task: BenchmarkTask,
         save_sandbox_snapshot: bool = True,
+        attempt_number: Optional[int] = None,
     ) -> TaskResult:
         """
         Evaluate a single benchmark task.
@@ -224,6 +235,8 @@ class BenchmarkEvaluator:
         with tracer.start_as_current_span("evaluator.evaluate_task") as span:
             span.set_attribute("task_id", task.task_id)
             span.set_attribute("dataset", task.dataset)
+            if attempt_number is not None:
+                span.set_attribute("attempt_number", attempt_number)
 
             task_start_time = time.time()
             sandbox: Optional[Sandbox] = None
@@ -385,6 +398,7 @@ class BenchmarkEvaluator:
                     commands_executed=sandbox_metrics.commands_executed
                     if sandbox_metrics
                     else 0,
+                    attempt_number=attempt_number,
                 )
 
                 span.set_attribute("task_success", result.success)
@@ -408,6 +422,7 @@ class BenchmarkEvaluator:
                     passed_tests=False,
                     error_message=str(e),
                     execution_time_seconds=execution_time,
+                    attempt_number=attempt_number,
                 )
             finally:
                 # Clean up sandbox
@@ -579,19 +594,33 @@ if __name__ == "__main__":
             )
 
             for i, task in enumerate(tasks, 1):
-                logger.info(f"Evaluating task {i}/{len(tasks)}: {task.task_id}")
-
-                result = self.evaluate_task(
-                    task,
-                    save_sandbox_snapshot=(output_dir is not None),
+                logger.info(
+                    f"Evaluating task {i}/{len(tasks)}: {task.task_id} "
+                    f"({self.num_attempts_per_task} attempt(s))"
                 )
-                task_results.append(result)
 
-                # Save intermediate results
-                if output_dir:
-                    result_file = output_dir / f"{task.task_id}_result.json"
-                    with open(result_file, "w") as f:
-                        json.dump(result.to_dict(), f, indent=2)
+                # Run multiple attempts if configured
+                for attempt in range(1, self.num_attempts_per_task + 1):
+                    if self.num_attempts_per_task > 1:
+                        logger.info(
+                            f"  Attempt {attempt}/{self.num_attempts_per_task} for task {task.task_id}"
+                        )
+
+                    result = self.evaluate_task(
+                        task,
+                        save_sandbox_snapshot=(output_dir is not None),
+                        attempt_number=attempt if self.num_attempts_per_task > 1 else None,
+                    )
+                    task_results.append(result)
+
+                    # Save intermediate results
+                    if output_dir:
+                        if self.num_attempts_per_task > 1:
+                            result_file = output_dir / f"{task.task_id}_attempt{attempt}_result.json"
+                        else:
+                            result_file = output_dir / f"{task.task_id}_result.json"
+                        with open(result_file, "w") as f:
+                            json.dump(result.to_dict(), f, indent=2)
 
             # Generate report
             report = self._generate_report(tasks, task_results)
@@ -614,34 +643,66 @@ if __name__ == "__main__":
             raise ValueError("No results to generate report from")
 
         dataset = results[0].dataset
-        total_tasks = len(results)
-        successful_tasks = sum(1 for r in results if r.success)
-        passed_tests = sum(1 for r in results if r.passed_tests)
-
-        # Calculate pass@k
-        # pass@k measures the probability that at least one of k attempts passes the tests.
-        # For pass@k, we need multiple independent attempts per task (each with different
-        # random seeds or model sampling parameters). The current implementation only runs
-        # each task once, so we can only calculate pass@1 accurately.
-        #
-        # To properly implement pass@k for k > 1, we would need to:
-        # 1. Run each task k times with different random seeds/sampling parameters
-        # 2. For each task, check if at least one of the k attempts passed
-        # 3. Calculate: pass@k = (# of tasks with at least one passing attempt) / total_tasks
-        #
-        # This is a known limitation documented in REFACTOR_PLAN.md. For now, we use
-        # pass@1 as a placeholder for all k values to maintain API compatibility.
-        pass_at_1 = passed_tests / total_tasks if total_tasks > 0 else 0.0
-
-        # Calculate pass@k for k in [1, 5, 10, 100]
-        # NOTE: Currently only pass@1 is accurate. For k > 1, this is a placeholder.
-        # See REFACTOR_PLAN.md "Known limitation" section for details.
-        pass_at_k = {
-            1: pass_at_1,
-            5: pass_at_1,  # TODO: Calculate properly with multiple attempts (future enhancement)
-            10: pass_at_1,  # TODO: Calculate properly with multiple attempts (future enhancement)
-            100: pass_at_1,  # TODO: Calculate properly with multiple attempts (future enhancement)
-        }
+        
+        # Determine if we have multiple attempts per task
+        has_multiple_attempts = any(r.attempt_number is not None for r in results)
+        
+        if has_multiple_attempts:
+            # Group results by task_id and sort by attempt_number
+            results_by_task: Dict[str, List[TaskResult]] = defaultdict(list)
+            for result in results:
+                results_by_task[result.task_id].append(result)
+            
+            # Sort attempts by attempt_number for each task
+            for task_id in results_by_task:
+                results_by_task[task_id].sort(key=lambda r: r.attempt_number or 0)
+            
+            total_tasks = len(results_by_task)
+            
+            # For pass@k calculation: count tasks where at least one of the first k attempts passed
+            # pass@k = (# of tasks with at least one passing attempt in first k attempts) / total_tasks
+            tasks_with_passing_attempt: Dict[int, int] = defaultdict(int)  # k -> count
+            
+            for task_id, task_results in results_by_task.items():
+                num_attempts = len(task_results)
+                
+                # For each k value, check if at least one of the first k attempts passed
+                for k in [1, 5, 10, 100]:
+                    # Get first k attempts (or all if k > num_attempts)
+                    attempts_to_check = task_results[:min(k, num_attempts)]
+                    # Check if at least one of these attempts passed
+                    if any(r.passed_tests for r in attempts_to_check):
+                        tasks_with_passing_attempt[k] += 1
+            
+            # Calculate pass@k
+            pass_at_k = {}
+            for k in [1, 5, 10, 100]:
+                if k <= self.num_attempts_per_task:
+                    # We have enough attempts to calculate pass@k accurately
+                    pass_at_k[k] = tasks_with_passing_attempt[k] / total_tasks if total_tasks > 0 else 0.0
+                else:
+                    # For k > num_attempts_per_task, use the best available estimate
+                    # (all tasks with at least one passing attempt in all attempts)
+                    max_available_k = min(k, self.num_attempts_per_task)
+                    pass_at_k[k] = tasks_with_passing_attempt.get(max_available_k, 0) / total_tasks if total_tasks > 0 else 0.0
+            
+            # Calculate other metrics (use first attempt or aggregate)
+            successful_tasks = sum(1 for task_results in results_by_task.values() if any(r.success for r in task_results))
+            passed_tests = sum(1 for task_results in results_by_task.values() if any(r.passed_tests for r in task_results))
+        else:
+            # Single attempt per task (original behavior)
+            total_tasks = len(results)
+            successful_tasks = sum(1 for r in results if r.success)
+            passed_tests = sum(1 for r in results if r.passed_tests)
+            
+            # Calculate pass@k (only pass@1 is accurate for single attempts)
+            pass_at_1 = passed_tests / total_tasks if total_tasks > 0 else 0.0
+            pass_at_k = {
+                1: pass_at_1,
+                5: pass_at_1,  # Placeholder - need multiple attempts for accurate calculation
+                10: pass_at_1,  # Placeholder - need multiple attempts for accurate calculation
+                100: pass_at_1,  # Placeholder - need multiple attempts for accurate calculation
+            }
 
         # Calculate efficiency metrics
         execution_times = [
