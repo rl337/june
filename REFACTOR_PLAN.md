@@ -112,11 +112,16 @@ All major refactoring phases have been completed:
 **IMPORTANT:** The agent CAN and SHOULD work on the `home_infra` project at `/home/rlee/dev/home_infra` to complete these tasks. This is NOT external work - it's part of the june project infrastructure. The agent has full access to modify `home_infra/docker-compose.yml` and related configuration files.
 
 **Tasks:**
-1. **Set up TensorRT-LLM container in home_infra:** ⏳ TODO
-   - Add TensorRT-LLM service to `home_infra/docker-compose.yml`
-   - Configure it to connect to shared-network
-   - Set up GPU access and resource limits
-   - Configure model storage and cache directories
+1. **Set up TensorRT-LLM container in home_infra:** ✅ COMPLETED
+   - ✅ Added TensorRT-LLM service to `home_infra/docker-compose.yml`
+   - ✅ Configured it to connect to shared-network
+   - ✅ Set up GPU access and resource limits (device 0, GPU capabilities)
+   - ✅ Configured model storage and cache directories (`/home/rlee/models` → `/models`)
+   - ✅ Exposed port 8000 internally on shared-network (accessible as `tensorrt-llm:8000`)
+   - ✅ Added health check endpoint
+   - ✅ Configured environment variables for model name, quantization, context length
+   - ✅ Added Jaeger tracing integration
+   - ⏳ **Note:** This is a basic configuration using Triton Inference Server. TensorRT-LLM requires model compilation/preparation and model repository setup, which will be handled in Task 2 (model loading/unloading API)
 
 2. **Implement model loading/unloading:** ⏳ TODO (can be done after TensorRT-LLM container is set up in task 1)
    - Create API/interface for loading models into TensorRT-LLM
