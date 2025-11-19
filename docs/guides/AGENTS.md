@@ -1310,6 +1310,78 @@ June Agent implements comprehensive security measures. All agents working on the
 3. **Data Reset:** Remove volumes and restart
 4. **Model Cache Clear:** Remove `~/.cache/huggingface` volume
 
+## 🔧 Learned Fixes and Best Practices
+
+This section documents important fixes and best practices discovered during development that prevent common issues and infinite loops.
+
+### Git Commit Management
+
+#### ❌ DO NOT Auto-Update Commit Counts
+
+**Problem:** Agents were automatically updating commit counts in `REFACTOR_PLAN.md` (e.g., "85 commits ahead of origin/main"), which created an infinite loop:
+- Agent updates commit count → commits change → count increments → agent updates again → repeat
+
+**Solution:**
+- **DO NOT automatically update commit counts** in `REFACTOR_PLAN.md`
+- Commit counts are **informational only** and do not need to be kept in sync
+- Only update commit counts if:
+  1. It's a major milestone (e.g., completing a major phase)
+  2. The count is significantly outdated (e.g., more than 100 commits off)
+  3. Explicitly requested by the user
+
+**Best Practice:** Focus on actual development work, not documentation maintenance of commit counts.
+
+#### ✅ Always Push After Committing
+
+**Problem:** Agents were committing changes but not pushing them, leading to:
+- Local commits not being available to other agents
+- GitHub Actions not running on latest changes
+- Potential merge conflicts when multiple agents work
+
+**Solution:**
+- **After each commit, immediately push to upstream:** `git push origin main`
+- If push fails (e.g., network issue), log the error but continue - the commit is still saved locally
+- **DO NOT leave uncommitted changes** - always commit and push your work before moving to the next task
+
+**Best Practice:** Make pushing part of your commit workflow - commit and push in the same step.
+
+### GitHub Actions Monitoring
+
+#### ✅ Check GitHub Actions Failures First
+
+**Problem:** Agents were working on new tasks while CI builds were failing, leading to:
+- Broken builds accumulating
+- New work based on broken code
+- Wasted effort on features that won't pass CI
+
+**Solution:**
+- **Before picking a new task, check GitHub Actions for failures:**
+  - Visit: https://github.com/rl337/june/actions
+  - Look for failed workflow runs (status: failed, red X icon)
+  - If failures found:
+    1. Click on the failed workflow run to view details
+    2. Read the error logs to identify the specific failure
+    3. Fix the issue causing the failure
+    4. Commit and push the fix
+    5. Verify the fix by checking if a new workflow run passes
+
+**Priority:** Fixing GitHub Actions failures takes precedence over new tasks.
+
+**Best Practice:** Make CI health checks part of your routine - check before starting new work.
+
+### Agent Loop Script Configuration
+
+The `scripts/refactor_agent_loop.sh` script includes these fixes in its prompt to prevent these issues:
+
+```bash
+# Key sections in the agent loop script:
+- CRITICAL - DO NOT UPDATE COMMIT COUNTS
+- CRITICAL - GIT COMMITS REQUIRED (with push requirement)
+- Check for GitHub Actions failures FIRST
+```
+
+**Best Practice:** When creating new agent scripts or prompts, include these learned fixes to prevent regression.
+
 ## 📝 Development Notes
 
 ### Current Limitations
