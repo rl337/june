@@ -138,6 +138,10 @@ Pare down the june project to bare essentials for the **voice message → STT �
   - ✅ Enhanced docstrings for SandboxMetrics and CommandLog dataclasses with comprehensive attribute documentation
 - ✅ Verification tools implemented (`essence/commands/verify_qwen3.py`, `benchmark_qwen3.py`)
   - ✅ Enhanced docstrings for all class methods with comprehensive documentation
+- ✅ Pre-flight environment check command implemented (`essence/commands/check_environment.py`) - Validates environment readiness before operational tasks
+  - ✅ Checks Docker, docker compose, GPU, NVIDIA Container Toolkit, HUGGINGFACE_TOKEN, model cache directory, docker-compose.yml, and Docker network
+  - ✅ Provides clear feedback on what's ready and what needs configuration
+  - ✅ Helps catch configuration issues early before attempting model downloads or service startup
 - ✅ Code quality improvements: Added return type annotations to all `get_db_connection()` functions
   - ✅ Added return type annotations to `get_db_connection()` in `cost_tracking.py`, `admin_auth.py`, and `conversation_storage.py`
   - ✅ Enhanced docstrings with `Raises` sections for better error documentation
@@ -163,6 +167,13 @@ Pare down the june project to bare essentials for the **voice message → STT �
 **Operational Guide (When Ready to Use):**
 
 When ready to use the Qwen3 model and coding agent, follow these steps:
+
+0. **Pre-flight environment check (recommended):**
+   ```bash
+   # Validate environment readiness before proceeding
+   poetry run -m essence check-environment
+   ```
+   **Note:** This checks Docker, GPU, NVIDIA Container Toolkit, HUGGINGFACE_TOKEN, and other prerequisites. Fix any issues before proceeding.
 
 1. **Download the model (containerized):**
    ```bash
