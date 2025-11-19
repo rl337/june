@@ -20,11 +20,11 @@ logger = logging.getLogger(__name__)
 
 class STTMetricsStorage:
     """Storage for STT transcription quality metrics."""
-    
+
     def __init__(self, db_path: Optional[str] = None):
         """
         Initialize metrics storage.
-        
+
         Args:
             db_path: Path to SQLite database. Defaults to stt_metrics.db in service directory.
         """
@@ -32,16 +32,17 @@ class STTMetricsStorage:
             # Default to stt_metrics.db in the STT service directory
             service_dir = Path(__file__).parent
             db_path = str(service_dir / "stt_metrics.db")
-        
+
         self.db_path = db_path
         self._init_database()
-    
+
     def _init_database(self):
         """Initialize the metrics database schema."""
         conn = sqlite3.connect(self.db_path)
         try:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS transcription_metrics (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -56,22 +57,29 @@ class STTMetricsStorage:
                     error_message TEXT,
                     metadata TEXT
                 )
-            """)
-            
+            """
+            )
+
             # Indexes for common queries
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_timestamp 
                 ON transcription_metrics(timestamp)
-            """)
-            cursor.execute("""
+            """
+            )
+            cursor.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_audio_format 
                 ON transcription_metrics(audio_format)
-            """)
-            cursor.execute("""
+            """
+            )
+            cursor.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_confidence 
                 ON transcription_metrics(confidence)
-            """)
-            
+            """
+            )
+
             conn.commit()
             logger.info(f"Metrics database initialized at {self.db_path}")
         except Exception as e:
@@ -79,7 +87,7 @@ class STTMetricsStorage:
             raise
         finally:
             conn.close()
-    
+
     def record_transcription(
         self,
         audio_format: str,
@@ -91,11 +99,11 @@ class STTMetricsStorage:
         processing_time_ms: int,
         source: Optional[str] = None,
         error_message: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> int:
         """
         Record a transcription metric.
-        
+
         Args:
             audio_format: Audio format (e.g., 'ogg', 'wav', 'pcm')
             audio_duration_seconds: Audio duration in seconds
@@ -107,7 +115,7 @@ class STTMetricsStorage:
             source: Source service (e.g., 'telegram', 'gateway')
             error_message: Error message if transcription failed
             metadata: Additional metadata dictionary
-            
+
         Returns:
             ID of the recorded metric
         """
@@ -115,25 +123,28 @@ class STTMetricsStorage:
         try:
             cursor = conn.cursor()
             metadata_json = json.dumps(metadata) if metadata else None
-            
-            cursor.execute("""
+
+            cursor.execute(
+                """
                 INSERT INTO transcription_metrics (
                     audio_format, audio_duration_seconds, audio_size_bytes,
                     sample_rate, transcript_length, confidence, processing_time_ms,
                     source, error_message, metadata
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                audio_format,
-                audio_duration_seconds,
-                audio_size_bytes,
-                sample_rate,
-                transcript_length,
-                confidence,
-                processing_time_ms,
-                source,
-                error_message,
-                metadata_json
-            ))
+            """,
+                (
+                    audio_format,
+                    audio_duration_seconds,
+                    audio_size_bytes,
+                    sample_rate,
+                    transcript_length,
+                    confidence,
+                    processing_time_ms,
+                    source,
+                    error_message,
+                    metadata_json,
+                ),
+            )
             metric_id = cursor.lastrowid
             conn.commit()
             logger.debug(f"Recorded transcription metric {metric_id}")
@@ -143,54 +154,55 @@ class STTMetricsStorage:
             raise
         finally:
             conn.close()
-    
+
     def get_metrics_summary(
         self,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
         audio_format: Optional[str] = None,
-        source: Optional[str] = None
+        source: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Get summary statistics for transcription metrics.
-        
+
         Args:
             start_date: Start date filter
             end_date: End date filter
             audio_format: Filter by audio format
             source: Filter by source service
-            
+
         Returns:
             Dictionary with summary statistics
         """
         conn = sqlite3.connect(self.db_path)
         try:
             cursor = conn.cursor()
-            
+
             # Build WHERE clause
             conditions = []
             params = []
-            
+
             if start_date:
                 conditions.append("timestamp >= ?")
                 params.append(start_date.isoformat())
-            
+
             if end_date:
                 conditions.append("timestamp <= ?")
                 params.append(end_date.isoformat())
-            
+
             if audio_format:
                 conditions.append("audio_format = ?")
                 params.append(audio_format)
-            
+
             if source:
                 conditions.append("source = ?")
                 params.append(source)
-            
+
             where_clause = " WHERE " + " AND ".join(conditions) if conditions else ""
-            
+
             # Get overall statistics
-            cursor.execute(f"""
+            cursor.execute(
+                f"""
                 SELECT 
                     COUNT(*) as total_transcriptions,
                     AVG(confidence) as avg_confidence,
@@ -201,25 +213,35 @@ class STTMetricsStorage:
                     SUM(CASE WHEN error_message IS NOT NULL THEN 1 ELSE 0 END) as error_count
                 FROM transcription_metrics
                 {where_clause}
-            """, params)
-            
+            """,
+                params,
+            )
+
             row = cursor.fetchone()
             total, avg_conf, min_conf, max_conf, avg_dur, avg_proc, error_count = row
-            
+
             # Get format distribution
-            cursor.execute(f"""
+            cursor.execute(
+                f"""
                 SELECT audio_format, COUNT(*) as count
                 FROM transcription_metrics
                 {where_clause}
                 GROUP BY audio_format
                 ORDER BY count DESC
-            """, params)
-            
+            """,
+                params,
+            )
+
             format_distribution = {row[0]: row[1] for row in cursor.fetchall()}
-            
+
             # Get duration distribution
-            duration_where = where_clause + " AND error_message IS NULL" if where_clause else " WHERE error_message IS NULL"
-            cursor.execute(f"""
+            duration_where = (
+                where_clause + " AND error_message IS NULL"
+                if where_clause
+                else " WHERE error_message IS NULL"
+            )
+            cursor.execute(
+                f"""
                 SELECT 
                     CASE 
                         WHEN audio_duration_seconds < 5 THEN '< 5s'
@@ -234,15 +256,18 @@ class STTMetricsStorage:
                 {duration_where}
                 GROUP BY duration_range
                 ORDER BY count DESC
-            """, params)
-            
+            """,
+                params,
+            )
+
             duration_distribution = [
                 {"range": row[0], "count": row[1], "avg_confidence": row[2]}
                 for row in cursor.fetchall()
             ]
-            
+
             # Get problematic formats (low confidence or high error rate)
-            cursor.execute(f"""
+            cursor.execute(
+                f"""
                 SELECT 
                     audio_format,
                     COUNT(*) as total,
@@ -253,18 +278,20 @@ class STTMetricsStorage:
                 GROUP BY audio_format
                 HAVING avg_confidence < 0.7 OR error_rate > 10
                 ORDER BY error_rate DESC, avg_confidence ASC
-            """, params)
-            
+            """,
+                params,
+            )
+
             problematic_formats = [
                 {
                     "format": row[0],
                     "total": row[1],
                     "avg_confidence": row[2],
-                    "error_rate": row[3]
+                    "error_rate": row[3],
                 }
                 for row in cursor.fetchall()
             ]
-            
+
             return {
                 "summary": {
                     "total_transcriptions": total or 0,
@@ -274,7 +301,7 @@ class STTMetricsStorage:
                     "avg_duration_seconds": round(avg_dur or 0.0, 2),
                     "avg_processing_time_ms": round(avg_proc or 0.0, 2),
                     "error_count": error_count or 0,
-                    "error_rate": round((error_count or 0) * 100.0 / (total or 1), 2)
+                    "error_rate": round((error_count or 0) * 100.0 / (total or 1), 2),
                 },
                 "format_distribution": format_distribution,
                 "duration_distribution": duration_distribution,
@@ -283,29 +310,30 @@ class STTMetricsStorage:
                     "start_date": start_date.isoformat() if start_date else None,
                     "end_date": end_date.isoformat() if end_date else None,
                     "audio_format": audio_format,
-                    "source": source
-                }
+                    "source": source,
+                },
             }
         except Exception as e:
             logger.error(f"Failed to get metrics summary: {e}")
             raise
         finally:
             conn.close()
-    
+
     def get_recent_metrics(self, limit: int = 100) -> List[Dict[str, Any]]:
         """
         Get recent transcription metrics.
-        
+
         Args:
             limit: Maximum number of records to return
-            
+
         Returns:
             List of metric records
         """
         conn = sqlite3.connect(self.db_path)
         try:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT 
                     id, timestamp, audio_format, audio_duration_seconds,
                     audio_size_bytes, sample_rate, transcript_length, confidence,
@@ -313,8 +341,10 @@ class STTMetricsStorage:
                 FROM transcription_metrics
                 ORDER BY timestamp DESC
                 LIMIT ?
-            """, (limit,))
-            
+            """,
+                (limit,),
+            )
+
             rows = cursor.fetchall()
             return [
                 {
@@ -329,7 +359,7 @@ class STTMetricsStorage:
                     "processing_time_ms": row[8],
                     "source": row[9],
                     "error_message": row[10],
-                    "metadata": json.loads(row[11]) if row[11] else None
+                    "metadata": json.loads(row[11]) if row[11] else None,
                 }
                 for row in rows
             ]

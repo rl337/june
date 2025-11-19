@@ -9,44 +9,40 @@ from google.protobuf import descriptor_pool as _descriptor_pool
 from google.protobuf import runtime_version as _runtime_version
 from google.protobuf import symbol_database as _symbol_database
 from google.protobuf.internal import builder as _builder
+
 _runtime_version.ValidateProtobufRuntimeVersion(
-    _runtime_version.Domain.PUBLIC,
-    6,
-    31,
-    1,
-    '',
-    'asr.proto'
+    _runtime_version.Domain.PUBLIC, 6, 31, 1, "", "asr.proto"
 )
 # @@protoc_insertion_point(imports)
 
 _sym_db = _symbol_database.Default()
 
 
-
-
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\tasr.proto\x12\x08june.asr\"o\n\nAudioChunk\x12\x12\n\naudio_data\x18\x01 \x01(\x0c\x12\x13\n\x0bsample_rate\x18\x02 \x01(\x05\x12\x10\n\x08\x63hannels\x18\x03 \x01(\x05\x12\x10\n\x08\x65ncoding\x18\x04 \x01(\t\x12\x14\n\x0ctimestamp_us\x18\x05 \x01(\x03\"|\n\x12RecognitionRequest\x12\x12\n\naudio_data\x18\x01 \x01(\x0c\x12\x13\n\x0bsample_rate\x18\x02 \x01(\x05\x12\x10\n\x08\x65ncoding\x18\x03 \x01(\t\x12+\n\x06\x63onfig\x18\x04 \x01(\x0b\x32\x1b.june.asr.RecognitionConfig\"\x89\x01\n\x11RecognitionConfig\x12\x10\n\x08language\x18\x01 \x01(\t\x12\x17\n\x0finterim_results\x18\x02 \x01(\x08\x12\x12\n\nenable_vad\x18\x03 \x01(\x08\x12\x1a\n\x12\x65nable_diarization\x18\x04 \x01(\x08\x12\x19\n\x11\x65nable_timestamps\x18\x05 \x01(\x08\"\xb0\x01\n\x11RecognitionResult\x12\x12\n\ntranscript\x18\x01 \x01(\t\x12\x10\n\x08is_final\x18\x02 \x01(\x08\x12\x12\n\nconfidence\x18\x03 \x01(\x02\x12!\n\x05words\x18\x04 \x03(\x0b\x32\x12.june.asr.WordInfo\x12\x15\n\rstart_time_us\x18\x05 \x01(\x03\x12\x13\n\x0b\x65nd_time_us\x18\x06 \x01(\x03\x12\x12\n\nspeaker_id\x18\x07 \x01(\t\"X\n\x08WordInfo\x12\x0c\n\x04word\x18\x01 \x01(\t\x12\x12\n\nconfidence\x18\x02 \x01(\x02\x12\x15\n\rstart_time_us\x18\x03 \x01(\x03\x12\x13\n\x0b\x65nd_time_us\x18\x04 \x01(\x03\"_\n\x13RecognitionResponse\x12,\n\x07results\x18\x01 \x03(\x0b\x32\x1b.june.asr.RecognitionResult\x12\x1a\n\x12processing_time_ms\x18\x02 \x01(\x05\"\x0f\n\rHealthRequest\"F\n\x0eHealthResponse\x12\x0f\n\x07healthy\x18\x01 \x01(\x08\x12\x0f\n\x07version\x18\x02 \x01(\t\x12\x12\n\nmodel_name\x18\x03 \x01(\t2\xe4\x01\n\x0cSpeechToText\x12H\n\x0fRecognizeStream\x12\x14.june.asr.AudioChunk\x1a\x1b.june.asr.RecognitionResult(\x01\x30\x01\x12H\n\tRecognize\x12\x1c.june.asr.RecognitionRequest\x1a\x1d.june.asr.RecognitionResponse\x12@\n\x0bHealthCheck\x12\x17.june.asr.HealthRequest\x1a\x18.june.asr.HealthResponseb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(
+    b'\n\tasr.proto\x12\x08june.asr"o\n\nAudioChunk\x12\x12\n\naudio_data\x18\x01 \x01(\x0c\x12\x13\n\x0bsample_rate\x18\x02 \x01(\x05\x12\x10\n\x08\x63hannels\x18\x03 \x01(\x05\x12\x10\n\x08\x65ncoding\x18\x04 \x01(\t\x12\x14\n\x0ctimestamp_us\x18\x05 \x01(\x03"|\n\x12RecognitionRequest\x12\x12\n\naudio_data\x18\x01 \x01(\x0c\x12\x13\n\x0bsample_rate\x18\x02 \x01(\x05\x12\x10\n\x08\x65ncoding\x18\x03 \x01(\t\x12+\n\x06\x63onfig\x18\x04 \x01(\x0b\x32\x1b.june.asr.RecognitionConfig"\x89\x01\n\x11RecognitionConfig\x12\x10\n\x08language\x18\x01 \x01(\t\x12\x17\n\x0finterim_results\x18\x02 \x01(\x08\x12\x12\n\nenable_vad\x18\x03 \x01(\x08\x12\x1a\n\x12\x65nable_diarization\x18\x04 \x01(\x08\x12\x19\n\x11\x65nable_timestamps\x18\x05 \x01(\x08"\xb0\x01\n\x11RecognitionResult\x12\x12\n\ntranscript\x18\x01 \x01(\t\x12\x10\n\x08is_final\x18\x02 \x01(\x08\x12\x12\n\nconfidence\x18\x03 \x01(\x02\x12!\n\x05words\x18\x04 \x03(\x0b\x32\x12.june.asr.WordInfo\x12\x15\n\rstart_time_us\x18\x05 \x01(\x03\x12\x13\n\x0b\x65nd_time_us\x18\x06 \x01(\x03\x12\x12\n\nspeaker_id\x18\x07 \x01(\t"X\n\x08WordInfo\x12\x0c\n\x04word\x18\x01 \x01(\t\x12\x12\n\nconfidence\x18\x02 \x01(\x02\x12\x15\n\rstart_time_us\x18\x03 \x01(\x03\x12\x13\n\x0b\x65nd_time_us\x18\x04 \x01(\x03"_\n\x13RecognitionResponse\x12,\n\x07results\x18\x01 \x03(\x0b\x32\x1b.june.asr.RecognitionResult\x12\x1a\n\x12processing_time_ms\x18\x02 \x01(\x05"\x0f\n\rHealthRequest"F\n\x0eHealthResponse\x12\x0f\n\x07healthy\x18\x01 \x01(\x08\x12\x0f\n\x07version\x18\x02 \x01(\t\x12\x12\n\nmodel_name\x18\x03 \x01(\t2\xe4\x01\n\x0cSpeechToText\x12H\n\x0fRecognizeStream\x12\x14.june.asr.AudioChunk\x1a\x1b.june.asr.RecognitionResult(\x01\x30\x01\x12H\n\tRecognize\x12\x1c.june.asr.RecognitionRequest\x1a\x1d.june.asr.RecognitionResponse\x12@\n\x0bHealthCheck\x12\x17.june.asr.HealthRequest\x1a\x18.june.asr.HealthResponseb\x06proto3'
+)
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
-_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'asr_pb2', _globals)
+_builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, "asr_pb2", _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
-  DESCRIPTOR._loaded_options = None
-  _globals['_AUDIOCHUNK']._serialized_start=23
-  _globals['_AUDIOCHUNK']._serialized_end=134
-  _globals['_RECOGNITIONREQUEST']._serialized_start=136
-  _globals['_RECOGNITIONREQUEST']._serialized_end=260
-  _globals['_RECOGNITIONCONFIG']._serialized_start=263
-  _globals['_RECOGNITIONCONFIG']._serialized_end=400
-  _globals['_RECOGNITIONRESULT']._serialized_start=403
-  _globals['_RECOGNITIONRESULT']._serialized_end=579
-  _globals['_WORDINFO']._serialized_start=581
-  _globals['_WORDINFO']._serialized_end=669
-  _globals['_RECOGNITIONRESPONSE']._serialized_start=671
-  _globals['_RECOGNITIONRESPONSE']._serialized_end=766
-  _globals['_HEALTHREQUEST']._serialized_start=768
-  _globals['_HEALTHREQUEST']._serialized_end=783
-  _globals['_HEALTHRESPONSE']._serialized_start=785
-  _globals['_HEALTHRESPONSE']._serialized_end=855
-  _globals['_SPEECHTOTEXT']._serialized_start=858
-  _globals['_SPEECHTOTEXT']._serialized_end=1086
+    DESCRIPTOR._loaded_options = None
+    _globals["_AUDIOCHUNK"]._serialized_start = 23
+    _globals["_AUDIOCHUNK"]._serialized_end = 134
+    _globals["_RECOGNITIONREQUEST"]._serialized_start = 136
+    _globals["_RECOGNITIONREQUEST"]._serialized_end = 260
+    _globals["_RECOGNITIONCONFIG"]._serialized_start = 263
+    _globals["_RECOGNITIONCONFIG"]._serialized_end = 400
+    _globals["_RECOGNITIONRESULT"]._serialized_start = 403
+    _globals["_RECOGNITIONRESULT"]._serialized_end = 579
+    _globals["_WORDINFO"]._serialized_start = 581
+    _globals["_WORDINFO"]._serialized_end = 669
+    _globals["_RECOGNITIONRESPONSE"]._serialized_start = 671
+    _globals["_RECOGNITIONRESPONSE"]._serialized_end = 766
+    _globals["_HEALTHREQUEST"]._serialized_start = 768
+    _globals["_HEALTHREQUEST"]._serialized_end = 783
+    _globals["_HEALTHRESPONSE"]._serialized_start = 785
+    _globals["_HEALTHRESPONSE"]._serialized_end = 855
+    _globals["_SPEECHTOTEXT"]._serialized_start = 858
+    _globals["_SPEECHTOTEXT"]._serialized_end = 1086
 # @@protoc_insertion_point(module_scope)

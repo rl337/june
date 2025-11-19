@@ -1,7 +1,13 @@
 import os
 import asyncio
 import logging
-from prometheus_client import Counter, Histogram, Gauge, CollectorRegistry, CONTENT_TYPE_LATEST
+from prometheus_client import (
+    Counter,
+    Histogram,
+    Gauge,
+    CollectorRegistry,
+    CONTENT_TYPE_LATEST,
+)
 from prometheus_client.exposition import start_http_server
 
 from inference_core import TtsGrpcApp
@@ -11,11 +17,13 @@ from inference_core.tts.espeak_strategy import EspeakTtsStrategy
 try:
     import sys
     from pathlib import Path
+
     # Add essence package to path for tracing import
     essence_path = Path(__file__).parent.parent.parent / "essence"
     if str(essence_path) not in sys.path:
         sys.path.insert(0, str(essence_path))
     from essence.chat.utils.tracing import setup_tracing
+
     setup_tracing(service_name="june-tts")
 except ImportError:
     pass
@@ -23,6 +31,7 @@ except ImportError:
 # Import rate limiting
 try:
     from june_rate_limit import RateLimitInterceptor, RateLimitConfig
+
     RATE_LIMIT_AVAILABLE = True
 except ImportError:
     RATE_LIMIT_AVAILABLE = False
@@ -35,11 +44,21 @@ logger = logging.getLogger(__name__)
 
 # Prometheus metrics
 REGISTRY = CollectorRegistry()
-TTS_REQUESTS_TOTAL = Counter('tts_requests_total', 'Total TTS requests', ['status'], registry=REGISTRY)
-TTS_SYNTHESIS_TIME = Histogram('tts_synthesis_time_seconds', 'TTS synthesis time', registry=REGISTRY)
-TTS_AUDIO_DURATION = Histogram('tts_audio_duration_seconds', 'Generated audio duration', registry=REGISTRY)
-TTS_ERRORS_TOTAL = Counter('tts_errors_total', 'Total errors', ['error_type'], registry=REGISTRY)
-ACTIVE_CONNECTIONS = Gauge('tts_active_connections', 'Active gRPC connections', registry=REGISTRY)
+TTS_REQUESTS_TOTAL = Counter(
+    "tts_requests_total", "Total TTS requests", ["status"], registry=REGISTRY
+)
+TTS_SYNTHESIS_TIME = Histogram(
+    "tts_synthesis_time_seconds", "TTS synthesis time", registry=REGISTRY
+)
+TTS_AUDIO_DURATION = Histogram(
+    "tts_audio_duration_seconds", "Generated audio duration", registry=REGISTRY
+)
+TTS_ERRORS_TOTAL = Counter(
+    "tts_errors_total", "Total errors", ["error_type"], registry=REGISTRY
+)
+ACTIVE_CONNECTIONS = Gauge(
+    "tts_active_connections", "Active gRPC connections", registry=REGISTRY
+)
 
 
 def main() -> None:
@@ -50,7 +69,7 @@ def main() -> None:
         logger.info(f"Started Prometheus metrics server on port {metrics_port}")
     except Exception as e:
         logger.warning(f"Failed to start metrics server on port {metrics_port}: {e}")
-    
+
     # Setup interceptors
     interceptors = []
     if RATE_LIMIT_AVAILABLE:
@@ -62,11 +81,11 @@ def main() -> None:
         )
         rate_limit_interceptor = RateLimitInterceptor(config=rate_limit_config)
         interceptors.append(rate_limit_interceptor)
-        logger.info("Rate limiting enabled for TTS service (in-memory, Redis not required)")
-    
-    strategy = EspeakTtsStrategy(
-        sample_rate=int(os.getenv("TTS_SAMPLE_RATE", "16000"))
-    )
+        logger.info(
+            "Rate limiting enabled for TTS service (in-memory, Redis not required)"
+        )
+
+    strategy = EspeakTtsStrategy(sample_rate=int(os.getenv("TTS_SAMPLE_RATE", "16000")))
     app = TtsGrpcApp(strategy, interceptors=interceptors if interceptors else None)
     app.initialize()
     app.run()

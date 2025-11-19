@@ -51,7 +51,7 @@ def get_auth_token(client, user_id):
                 "/auth/token",
                 params={"user_id": user_id},
                 name="/auth/token",
-                catch_response=True
+                catch_response=True,
             )
             if response.status_code == 200:
                 token_data = response.json()
@@ -68,40 +68,42 @@ def get_auth_token(client, user_id):
 
 class GatewayRESTUser(FastHttpUser):
     """Load test user for Gateway REST API endpoints."""
-    
+
     wait_time = between(1, 3)  # Wait 1-3 seconds between requests
-    
+
     def on_start(self):
         """Setup user session."""
         self.user_id = f"load_test_user_{random.randint(1000, 9999)}"
         self.token = get_auth_token(self.client, self.user_id)
         if not self.token:
             logger.warning(f"Failed to get auth token for {self.user_id}")
-    
+
     @task(10)
     def health_check(self):
         """Health check endpoint - lightweight, high frequency."""
-        with self.client.get("/health", name="/health", catch_response=True) as response:
+        with self.client.get(
+            "/health", name="/health", catch_response=True
+        ) as response:
             if response.status_code == 200:
                 response.success()
             else:
                 response.failure(f"Health check failed: {response.status_code}")
-    
+
     @task(30)
     def llm_generate(self):
         """LLM generation endpoint - high weight, core functionality."""
         if not self.token:
             return
-        
+
         prompt = random.choice(SAMPLE_PROMPTS)
         headers = {"Authorization": f"Bearer {self.token}"}
-        
+
         with self.client.post(
             "/api/v1/llm/generate",
             json={"prompt": prompt},
             headers=headers,
             name="/api/v1/llm/generate",
-            catch_response=True
+            catch_response=True,
         ) as response:
             if response.status_code == 200:
                 data = response.json()
@@ -113,26 +115,22 @@ class GatewayRESTUser(FastHttpUser):
                 response.failure("Rate limited")
             else:
                 response.failure(f"Request failed: {response.status_code}")
-    
+
     @task(20)
     def tts_speak(self):
         """TTS synthesis endpoint."""
         if not self.token:
             return
-        
+
         text = random.choice(SAMPLE_TTS_TEXTS)
         headers = {"Authorization": f"Bearer {self.token}"}
-        
+
         with self.client.post(
             "/api/v1/tts/speak",
-            json={
-                "text": text,
-                "language": "en",
-                "voice_id": "default"
-            },
+            json={"text": text, "language": "en", "voice_id": "default"},
             headers=headers,
             name="/api/v1/tts/speak",
-            catch_response=True
+            catch_response=True,
         ) as response:
             if response.status_code == 200:
                 data = response.json()
@@ -144,37 +142,34 @@ class GatewayRESTUser(FastHttpUser):
                 response.failure("Rate limited")
             else:
                 response.failure(f"Request failed: {response.status_code}")
-    
+
     @task(20)
     def audio_transcribe(self):
         """STT transcription endpoint - requires audio file."""
         if not self.token:
             return
-        
+
         # For load testing, we'll use a small test audio file
         # In production, this would be a real audio file
         # For now, we'll skip this or use a minimal test file
         # This is a placeholder - actual implementation would need audio file handling
         pass
-    
+
     @task(40)
     def chat(self):
         """Chat endpoint - most common operation."""
         if not self.token:
             return
-        
+
         message = random.choice(SAMPLE_PROMPTS)
         headers = {"Authorization": f"Bearer {self.token}"}
-        
+
         with self.client.post(
             "/chat",
-            json={
-                "type": "text",
-                "text": message
-            },
+            json={"type": "text", "text": message},
             headers=headers,
             name="/chat",
-            catch_response=True
+            catch_response=True,
         ) as response:
             if response.status_code == 200:
                 data = response.json()
@@ -186,11 +181,13 @@ class GatewayRESTUser(FastHttpUser):
                 response.failure("Rate limited")
             else:
                 response.failure(f"Request failed: {response.status_code}")
-    
+
     @task(5)
     def get_status(self):
         """Status endpoint."""
-        with self.client.get("/status", name="/status", catch_response=True) as response:
+        with self.client.get(
+            "/status", name="/status", catch_response=True
+        ) as response:
             if response.status_code == 200:
                 response.success()
             else:

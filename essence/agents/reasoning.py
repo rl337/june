@@ -20,6 +20,7 @@ tracer = get_tracer(__name__)
 
 class ReasoningStep(str, Enum):
     """Steps in the reasoning loop"""
+
     THINK = "think"
     PLAN = "plan"
     EXECUTE = "execute"
@@ -30,6 +31,7 @@ class ReasoningStep(str, Enum):
 @dataclass
 class Step:
     """Represents a single step in an execution plan"""
+
     step_id: int
     description: str
     tool_name: Optional[str] = None
@@ -41,26 +43,30 @@ class Step:
 @dataclass
 class Plan:
     """Represents an execution plan"""
+
     steps: List[Step] = field(default_factory=list)
     estimated_complexity: str = "simple"  # "simple", "moderate", "complex"
     success_criteria: List[str] = field(default_factory=list)
     required_tools: List[str] = field(default_factory=list)
-    
+
     def __str__(self) -> str:
-        step_descriptions = "\n".join(f"  {i+1}. {step.description}" for i, step in enumerate(self.steps))
+        step_descriptions = "\n".join(
+            f"  {i+1}. {step.description}" for i, step in enumerate(self.steps)
+        )
         return f"Plan ({self.estimated_complexity}):\n{step_descriptions}"
 
 
 @dataclass
 class ExecutionResult:
     """Result of executing a step"""
+
     step_id: int
     success: bool
     output: Any = None
     error: Optional[str] = None
     execution_time: float = 0.0
     tool_used: Optional[str] = None
-    
+
     def __str__(self) -> str:
         status = "✓" if self.success else "✗"
         return f"{status} Step {self.step_id}: {self.output if self.success else self.error}"
@@ -69,22 +75,26 @@ class ExecutionResult:
 @dataclass
 class ReflectionResult:
     """Result of reflection phase"""
+
     goal_achieved: bool
     issues_found: List[str] = field(default_factory=list)
     plan_adjustments: Optional[Plan] = None
     should_continue: bool = False
     final_response: Optional[str] = None
     confidence: float = 0.0  # 0.0 to 1.0
-    
+
     def __str__(self) -> str:
         status = "✓ Goal achieved" if self.goal_achieved else "✗ Goal not achieved"
-        issues = f"\n  Issues: {', '.join(self.issues_found)}" if self.issues_found else ""
+        issues = (
+            f"\n  Issues: {', '.join(self.issues_found)}" if self.issues_found else ""
+        )
         return f"{status}{issues}"
 
 
 @dataclass
 class ReasoningState:
     """Tracks state through reasoning loop"""
+
     current_step: ReasoningStep = ReasoningStep.THINK
     plan: Optional[Plan] = None
     execution_results: List[ExecutionResult] = field(default_factory=list)
@@ -92,7 +102,7 @@ class ReasoningState:
     iteration: int = 0
     start_time: float = field(default_factory=time.time)
     total_time: float = 0.0
-    
+
     def update_time(self) -> None:
         """Update total time elapsed"""
         self.total_time = time.time() - self.start_time
@@ -101,6 +111,7 @@ class ReasoningState:
 @dataclass
 class ReasoningResult:
     """Final result of reasoning loop"""
+
     success: bool
     final_response: str
     iterations: int
@@ -114,6 +125,7 @@ class ReasoningResult:
 @dataclass
 class ConversationContext:
     """Manages conversation state"""
+
     user_id: Optional[str] = None
     chat_id: Optional[str] = None
     message_history: List[Dict[str, Any]] = field(default_factory=list)
@@ -125,10 +137,10 @@ class ConversationContext:
 class AgenticReasoner:
     """
     Main reasoning orchestrator that executes the reasoning loop.
-    
+
     Implements: think → plan → execute → reflect → (repeat if needed)
     """
-    
+
     def __init__(
         self,
         planner: Optional[Any] = None,  # Planner instance
@@ -147,7 +159,7 @@ class AgenticReasoner:
     ):
         """
         Initialize the agentic reasoner.
-        
+
         Args:
             planner: Planner instance for creating execution plans
             executor: Executor instance for executing steps
@@ -176,7 +188,7 @@ class AgenticReasoner:
         self.cache = cache or (get_reasoning_cache() if enable_cache else None)
         self.enable_cache = enable_cache
         self.enable_early_termination = enable_early_termination
-    
+
     def reason(
         self,
         user_message: str,
@@ -185,12 +197,12 @@ class AgenticReasoner:
     ) -> ReasoningResult:
         """
         Execute reasoning loop: think → plan → execute → reflect.
-        
+
         Args:
             user_message: The user's request/message
             context: Conversation context (history, state, etc.)
             available_tools: List of available tools for execution
-            
+
         Returns:
             ReasoningResult with final response and execution details
         """
@@ -200,24 +212,28 @@ class AgenticReasoner:
                 span.set_attribute("max_iterations", self.max_iterations)
                 span.set_attribute("user_id", context.user_id or "unknown")
                 span.set_attribute("chat_id", context.chat_id or "unknown")
-                
+
                 # Early termination for simple requests
-                if self.enable_early_termination and self._is_simple_request(user_message, context):
+                if self.enable_early_termination and self._is_simple_request(
+                    user_message, context
+                ):
                     span.set_attribute("early_termination", True)
                     logger.debug("Early termination: simple request detected")
                     return self._handle_simple_request(user_message, context, span)
-                
+
                 state = ReasoningState()
                 available_tools = available_tools or []
-                
+
                 # Main reasoning loop
                 for iteration in range(self.max_iterations):
                     state.iteration = iteration + 1
                     state.update_time()
-                    
+
                     # Check total timeout
                     if state.total_time > self.total_timeout:
-                        logger.warning(f"Reasoning loop timed out after {state.total_time:.2f}s")
+                        logger.warning(
+                            f"Reasoning loop timed out after {state.total_time:.2f}s"
+                        )
                         span.set_attribute("timeout", True)
                         span.set_attribute("timeout_time", state.total_time)
                         return ReasoningResult(
@@ -227,12 +243,14 @@ class AgenticReasoner:
                             total_time=state.total_time,
                             error=f"Total timeout exceeded ({self.total_timeout}s)",
                         )
-                    
+
                     span.set_attribute("iteration", state.iteration)
                     span.set_attribute("current_step", state.current_step.value)
-                    
-                    logger.info(f"Reasoning iteration {state.iteration}/{self.max_iterations}, step: {state.current_step.value}")
-                    
+
+                    logger.info(
+                        f"Reasoning iteration {state.iteration}/{self.max_iterations}, step: {state.current_step.value}"
+                    )
+
                     # THINK phase
                     if state.current_step == ReasoningStep.THINK:
                         analysis = self._think(user_message, context, span)
@@ -245,7 +263,7 @@ class AgenticReasoner:
                                 error="Think phase failed",
                             )
                         state.current_step = ReasoningStep.PLAN
-                    
+
                     # PLAN phase
                     elif state.current_step == ReasoningStep.PLAN:
                         plan = self._plan(user_message, context, available_tools, span)
@@ -260,7 +278,7 @@ class AgenticReasoner:
                         state.plan = plan
                         state.current_step = ReasoningStep.EXECUTE
                         logger.info(f"Created plan with {len(plan.steps)} steps")
-                    
+
                     # EXECUTE phase
                     elif state.current_step == ReasoningStep.EXECUTE:
                         if state.plan is None:
@@ -271,12 +289,12 @@ class AgenticReasoner:
                                 total_time=state.total_time,
                                 error="No plan available for execution",
                             )
-                        
+
                         results = self._execute(state.plan, context, span)
                         state.execution_results.extend(results)
                         state.current_step = ReasoningStep.REFLECT
                         logger.info(f"Executed {len(results)} steps")
-                    
+
                     # REFLECT phase
                     elif state.current_step == ReasoningStep.REFLECT:
                         reflection = self._reflect(
@@ -287,22 +305,25 @@ class AgenticReasoner:
                             span,
                         )
                         state.reflection = reflection
-                        
+
                         if reflection.goal_achieved or not reflection.should_continue:
                             # Goal achieved or no need to continue
                             state.current_step = ReasoningStep.COMPLETE
                             state.update_time()
-                            
-                            final_response = reflection.final_response or self._format_response(
-                                state.plan,
-                                state.execution_results,
-                                reflection,
+
+                            final_response = (
+                                reflection.final_response
+                                or self._format_response(
+                                    state.plan,
+                                    state.execution_results,
+                                    reflection,
+                                )
                             )
-                            
+
                             span.set_attribute("success", True)
                             span.set_attribute("iterations", state.iteration)
                             span.set_attribute("total_time", state.total_time)
-                            
+
                             return ReasoningResult(
                                 success=True,
                                 final_response=final_response,
@@ -317,25 +338,29 @@ class AgenticReasoner:
                             if reflection.plan_adjustments:
                                 state.plan = reflection.plan_adjustments
                                 logger.info("Adjusting plan based on reflection")
-                            state.current_step = ReasoningStep.THINK  # Start over with adjusted plan
-                    
+                            state.current_step = (
+                                ReasoningStep.THINK
+                            )  # Start over with adjusted plan
+
                     # COMPLETE phase
                     elif state.current_step == ReasoningStep.COMPLETE:
                         break
-                
+
                 # Max iterations reached
                 state.update_time()
                 logger.warning(f"Reached max iterations ({self.max_iterations})")
                 span.set_attribute("max_iterations_reached", True)
-                
+
                 final_response = self._format_response(
                     state.plan,
                     state.execution_results,
                     state.reflection,
                 )
-                
+
                 return ReasoningResult(
-                    success=state.reflection.goal_achieved if state.reflection else False,
+                    success=state.reflection.goal_achieved
+                    if state.reflection
+                    else False,
                     final_response=final_response,
                     iterations=state.iteration,
                     total_time=state.total_time,
@@ -344,20 +369,20 @@ class AgenticReasoner:
                     reflection=state.reflection,
                     error=f"Reached max iterations ({self.max_iterations})",
                 )
-            
+
             except Exception as e:
                 logger.error(f"Error in reasoning loop: {e}", exc_info=True)
                 span.record_exception(e)
                 span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
-                
+
                 return ReasoningResult(
                     success=False,
                     final_response="I encountered an unexpected error while processing your request. Please try again.",
-                    iterations=state.iteration if 'state' in locals() else 0,
-                    total_time=state.total_time if 'state' in locals() else 0.0,
+                    iterations=state.iteration if "state" in locals() else 0,
+                    total_time=state.total_time if "state" in locals() else 0.0,
                     error=str(e),
                 )
-    
+
     def _think(
         self,
         user_message: str,
@@ -368,12 +393,14 @@ class AgenticReasoner:
         with tracer.start_as_current_span("reasoner.think") as think_span:
             try:
                 think_span.set_attribute("user_message_length", len(user_message))
-                
+
                 # Check cache first
                 if self.cache:
                     cache_key_data = {
                         "message": user_message,
-                        "context_length": len(context.message_history) if context.message_history else 0,
+                        "context_length": len(context.message_history)
+                        if context.message_history
+                        else 0,
                     }
                     cached_analysis = self.cache.get("think", cache_key_data)
                     if cached_analysis:
@@ -381,7 +408,7 @@ class AgenticReasoner:
                         logger.debug("Using cached think analysis")
                         return cached_analysis
                     think_span.set_attribute("cache_hit", False)
-                
+
                 # If LLM client is available, use it for thinking
                 if self.llm_client:
                     try:
@@ -389,28 +416,35 @@ class AgenticReasoner:
                         conversation_history = None
                         if context.message_history:
                             conversation_history = [
-                                {"role": msg.get("role", "user"), "content": msg.get("content", "")}
-                                for msg in context.message_history[-10:]  # Last 10 messages
+                                {
+                                    "role": msg.get("role", "user"),
+                                    "content": msg.get("content", ""),
+                                }
+                                for msg in context.message_history[
+                                    -10:
+                                ]  # Last 10 messages
                             ]
-                        
+
                         # Generate analysis using LLM
                         analysis = self.llm_client.think(
                             user_message=user_message,
                             conversation_history=conversation_history,
                         )
-                        
+
                         # Cache the analysis
                         if self.cache and analysis:
                             cache_key_data = {
                                 "message": user_message,
-                                "context_length": len(context.message_history) if context.message_history else 0,
+                                "context_length": len(context.message_history)
+                                if context.message_history
+                                else 0,
                             }
                             self.cache.put("think", cache_key_data, analysis)
-                        
+
                         think_span.set_attribute("llm_think_used", True)
                         think_span.set_attribute("analysis_length", len(analysis))
                         return analysis
-                    
+
                     except Exception as e:
                         logger.error(f"Error in LLM think phase: {e}", exc_info=True)
                         think_span.record_exception(e)
@@ -421,12 +455,12 @@ class AgenticReasoner:
                 else:
                     # Fallback: simple analysis
                     return f"Request analysis: {len(user_message)} characters"
-            
+
             except Exception as e:
                 logger.error(f"Error in think phase: {e}", exc_info=True)
                 think_span.record_exception(e)
                 return None
-    
+
     def _plan(
         self,
         user_message: str,
@@ -438,7 +472,9 @@ class AgenticReasoner:
         with tracer.start_as_current_span("reasoner.plan") as plan_span:
             try:
                 if self.planner:
-                    return self.planner.create_plan(user_message, available_tools, context)
+                    return self.planner.create_plan(
+                        user_message, available_tools, context
+                    )
                 else:
                     # Fallback: create a simple plan
                     return Plan(
@@ -446,12 +482,12 @@ class AgenticReasoner:
                         estimated_complexity="simple",
                         success_criteria=["Complete the request"],
                     )
-            
+
             except Exception as e:
                 logger.error(f"Error in plan phase: {e}", exc_info=True)
                 plan_span.record_exception(e)
                 return None
-    
+
     def _execute(
         self,
         plan: Plan,
@@ -462,7 +498,7 @@ class AgenticReasoner:
         with tracer.start_as_current_span("reasoner.execute") as execute_span:
             try:
                 results = []
-                
+
                 if self.executor:
                     for step in plan.steps:
                         result = self.executor.execute_step(step, context)
@@ -470,23 +506,27 @@ class AgenticReasoner:
                 else:
                     # Fallback: create mock results
                     for step in plan.steps:
-                        results.append(ExecutionResult(
-                            step_id=step.step_id,
-                            success=True,
-                            output=f"Executed: {step.description}",
-                            execution_time=0.1,
-                        ))
-                
+                        results.append(
+                            ExecutionResult(
+                                step_id=step.step_id,
+                                success=True,
+                                output=f"Executed: {step.description}",
+                                execution_time=0.1,
+                            )
+                        )
+
                 execute_span.set_attribute("steps_executed", len(results))
-                execute_span.set_attribute("successful_steps", sum(1 for r in results if r.success))
-                
+                execute_span.set_attribute(
+                    "successful_steps", sum(1 for r in results if r.success)
+                )
+
                 return results
-            
+
             except Exception as e:
                 logger.error(f"Error in execute phase: {e}", exc_info=True)
                 execute_span.record_exception(e)
                 return []
-    
+
     def _reflect(
         self,
         user_message: str,
@@ -508,7 +548,7 @@ class AgenticReasoner:
                         should_continue=not all_successful,
                         confidence=1.0 if all_successful else 0.5,
                     )
-            
+
             except Exception as e:
                 logger.error(f"Error in reflect phase: {e}", exc_info=True)
                 reflect_span.record_exception(e)
@@ -518,7 +558,7 @@ class AgenticReasoner:
                     should_continue=False,
                     confidence=0.0,
                 )
-    
+
     def _format_response(
         self,
         plan: Optional[Plan],
@@ -528,27 +568,27 @@ class AgenticReasoner:
         """Format the final response from plan, results, and reflection."""
         if reflection and reflection.final_response:
             return reflection.final_response
-        
+
         # Build response from execution results
         if execution_results:
             successful = [r for r in execution_results if r.success]
             failed = [r for r in execution_results if not r.success]
-            
+
             response_parts = []
             if successful:
                 response_parts.append("Completed the following steps:")
                 for result in successful:
                     response_parts.append(f"  ✓ {result.output}")
-            
+
             if failed:
                 response_parts.append("\nEncountered issues:")
                 for result in failed:
                     response_parts.append(f"  ✗ {result.error}")
-            
+
             return "\n".join(response_parts)
-        
+
         return "I've processed your request, but couldn't generate a detailed response."
-    
+
     def _is_simple_request(
         self,
         user_message: str,
@@ -556,11 +596,11 @@ class AgenticReasoner:
     ) -> bool:
         """
         Determine if a request is simple enough to skip full reasoning loop.
-        
+
         Args:
             user_message: The user's message
             context: Conversation context
-            
+
         Returns:
             True if request is simple, False otherwise
         """
@@ -569,33 +609,41 @@ class AgenticReasoner:
         # - No tool keywords
         # - No complex reasoning keywords
         # - No multi-turn conversation context
-        
+
         if len(user_message) < 50:
             # Check for simple question patterns
             simple_patterns = [
-                "hello", "hi", "hey", "thanks", "thank you",
-                "yes", "no", "ok", "okay", "sure",
+                "hello",
+                "hi",
+                "hey",
+                "thanks",
+                "thank you",
+                "yes",
+                "no",
+                "ok",
+                "okay",
+                "sure",
             ]
             if any(pattern in user_message.lower() for pattern in simple_patterns):
                 return True
-        
+
         # Check for tool keywords (indicates complexity)
         tool_keywords = ["file", "code", "write", "create", "modify", "execute", "run"]
         if any(keyword in user_message.lower() for keyword in tool_keywords):
             return False
-        
+
         # Check for reasoning keywords (indicates need for planning)
         reasoning_keywords = ["plan", "step", "reason", "think", "break down", "how to"]
         if any(keyword in user_message.lower() for keyword in reasoning_keywords):
             return False
-        
+
         # Check conversation history (multi-turn = more complex)
         if context.message_history and len(context.message_history) > 2:
             return False
-        
+
         # Very short messages without complexity indicators are simple
         return len(user_message) < 100
-    
+
     def _handle_simple_request(
         self,
         user_message: str,
@@ -604,12 +652,12 @@ class AgenticReasoner:
     ) -> ReasoningResult:
         """
         Handle simple requests without full reasoning loop.
-        
+
         Args:
             user_message: The user's message
             context: Conversation context
             span: Tracing span
-            
+
         Returns:
             ReasoningResult with direct response
         """
@@ -621,11 +669,13 @@ class AgenticReasoner:
                 estimated_complexity="simple",
                 success_criteria=["Respond to user"],
             )
-            
+
             # Execute the plan
             execution_results = []
             if self.executor:
-                execution_results = self.executor.execute_plan(simple_plan.steps, context)
+                execution_results = self.executor.execute_plan(
+                    simple_plan.steps, context
+                )
             else:
                 # Fallback: create mock result
                 execution_results = [
@@ -635,17 +685,19 @@ class AgenticReasoner:
                         output=f"Response to: {user_message}",
                     )
                 ]
-            
+
             # Simple reflection
             reflection = ReflectionResult(
                 goal_achieved=True,
                 confidence=0.9,
-                final_response=execution_results[0].output if execution_results else user_message,
+                final_response=execution_results[0].output
+                if execution_results
+                else user_message,
             )
-            
+
             span.set_attribute("simple_request", True)
             span.set_attribute("iterations", 1)
-            
+
             return ReasoningResult(
                 success=True,
                 final_response=reflection.final_response or user_message,

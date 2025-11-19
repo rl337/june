@@ -24,13 +24,6 @@ class PassthroughLlmStrategy(LlmStrategy):
             else:
                 prompt = str(payload)
                 params = {}
-        
+
         text = f"[passthrough] {prompt}"
-        return InferenceResponse(
-            payload={"text": text, "tokens": None},
-            metadata={}
-        )
-
-
-
-
+        return InferenceResponse(payload={"text": text, "tokens": None}, metadata={})

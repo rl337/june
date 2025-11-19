@@ -10,7 +10,7 @@ from inference_core import config
 def get_service_config() -> Any:
     """
     Get Telegram service configuration.
-    
+
     Returns:
         TelegramConfig instance from inference_core.config
     """
@@ -20,7 +20,7 @@ def get_service_config() -> Any:
 def get_stt_address() -> str:
     """
     Get STT service address.
-    
+
     Returns:
         STT service address as a string (host:port format)
     """
@@ -30,7 +30,7 @@ def get_stt_address() -> str:
 def get_tts_address() -> str:
     """
     Get TTS service address.
-    
+
     Returns:
         TTS service address as a string (host:port format)
     """
@@ -40,10 +40,10 @@ def get_tts_address() -> str:
 def get_llm_address() -> str:
     """
     Get LLM service address.
-    
+
     Returns:
         LLM service address as a string (host:port format)
-        
+
     Note:
         Defaults to TensorRT-LLM service (tensorrt-llm:8000) for optimized GPU inference.
         Can be overridden via LLM_URL environment variable.
@@ -58,11 +58,12 @@ def get_llm_address() -> str:
 def get_metrics_storage() -> Any:
     """
     Get metrics storage instance.
-    
+
     Returns:
         STTMetricsStorage instance from stt.stt_metrics
     """
     # Add parent directory to path to import stt_metrics
     sys.path.insert(0, str(Path(__file__).parent.parent.parent))
     from stt.stt_metrics import get_metrics_storage
+
     return get_metrics_storage()

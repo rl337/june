@@ -60,7 +60,9 @@ class RateLimiter:
 
     def is_allowed(self) -> bool:
         now = time.time()
-        self.requests = [req_time for req_time in self.requests if now - req_time < self.time_window]
+        self.requests = [
+            req_time for req_time in self.requests if now - req_time < self.time_window
+        ]
         if len(self.requests) < self.max_requests:
             self.requests.append(now)
             return True
@@ -75,7 +77,13 @@ class RateLimiter:
 
 
 class RetryConfig:
-    def __init__(self, max_attempts: int = 3, base_delay: float = 1.0, max_delay: float = 60.0, exponential_base: float = 2.0):
+    def __init__(
+        self,
+        max_attempts: int = 3,
+        base_delay: float = 1.0,
+        max_delay: float = 60.0,
+        exponential_base: float = 2.0,
+    ):
         self.max_attempts = max_attempts
         self.base_delay = base_delay
         self.max_delay = max_delay
@@ -93,8 +101,13 @@ async def retry_async(func, *args, config: Optional[RetryConfig] = None, **kwarg
             last_exception = e
             if attempt == config.max_attempts - 1:
                 break
-            delay = min(config.base_delay * (config.exponential_base ** attempt), config.max_delay)
-            logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying in {delay}s...")
+            delay = min(
+                config.base_delay * (config.exponential_base**attempt),
+                config.max_delay,
+            )
+            logger.warning(
+                f"Attempt {attempt + 1} failed: {e}. Retrying in {delay}s..."
+            )
             await asyncio.sleep(delay)
     raise last_exception
 
@@ -110,8 +123,13 @@ def retry_sync(func, *args, config: Optional[RetryConfig] = None, **kwargs):
             last_exception = e
             if attempt == config.max_attempts - 1:
                 break
-            delay = min(config.base_delay * (config.exponential_base ** attempt), config.max_delay)
-            logger.warning(f"Attempt {attempt + 1} failed: {e}. Retrying in {delay}s...")
+            delay = min(
+                config.base_delay * (config.exponential_base**attempt),
+                config.max_delay,
+            )
+            logger.warning(
+                f"Attempt {attempt + 1} failed: {e}. Retrying in {delay}s..."
+            )
             time.sleep(delay)
     raise last_exception
 
@@ -146,8 +164,11 @@ def setup_logging(level: str = "INFO", service_name: str = "june"):
     os.makedirs(log_dir, exist_ok=True)
     logging.basicConfig(
         level=getattr(logging, level.upper()),
-        format=f'%(asctime)s - {service_name} - %(name)s - %(levelname)s - %(message)s',
-        handlers=[logging.StreamHandler(), logging.FileHandler(f'{log_dir}/{service_name}.log')],
+        format=f"%(asctime)s - {service_name} - %(name)s - %(levelname)s - %(message)s",
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler(f"{log_dir}/{service_name}.log"),
+        ],
     )
 
 
@@ -181,8 +202,3 @@ class CircularBuffer:
 
     def size(self) -> int:
         return len(self.buffer)
-
-
-
-
-

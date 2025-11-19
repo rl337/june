@@ -5,29 +5,31 @@ import warnings
 
 from . import asr_pb2 as asr__pb2
 
-GRPC_GENERATED_VERSION = '1.76.0'
+GRPC_GENERATED_VERSION = "1.76.0"
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
 try:
     from grpc._utilities import first_version_is_lower
-    _version_not_supported = first_version_is_lower(GRPC_VERSION, GRPC_GENERATED_VERSION)
+
+    _version_not_supported = first_version_is_lower(
+        GRPC_VERSION, GRPC_GENERATED_VERSION
+    )
 except ImportError:
     _version_not_supported = True
 
 if _version_not_supported:
     raise RuntimeError(
-        f'The grpc package installed is at version {GRPC_VERSION},'
-        + ' but the generated code in asr_pb2_grpc.py depends on'
-        + f' grpcio>={GRPC_GENERATED_VERSION}.'
-        + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
-        + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
+        f"The grpc package installed is at version {GRPC_VERSION},"
+        + " but the generated code in asr_pb2_grpc.py depends on"
+        + f" grpcio>={GRPC_GENERATED_VERSION}."
+        + f" Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}"
+        + f" or downgrade your generated code using grpcio-tools<={GRPC_VERSION}."
     )
 
 
 class SpeechToTextStub(object):
-    """Speech Recognition Service
-    """
+    """Speech Recognition Service"""
 
     def __init__(self, channel):
         """Constructor.
@@ -36,92 +38,93 @@ class SpeechToTextStub(object):
             channel: A grpc.Channel.
         """
         self.RecognizeStream = channel.stream_stream(
-                '/june.asr.SpeechToText/RecognizeStream',
-                request_serializer=asr__pb2.AudioChunk.SerializeToString,
-                response_deserializer=asr__pb2.RecognitionResult.FromString,
-                _registered_method=True)
+            "/june.asr.SpeechToText/RecognizeStream",
+            request_serializer=asr__pb2.AudioChunk.SerializeToString,
+            response_deserializer=asr__pb2.RecognitionResult.FromString,
+            _registered_method=True,
+        )
         self.Recognize = channel.unary_unary(
-                '/june.asr.SpeechToText/Recognize',
-                request_serializer=asr__pb2.RecognitionRequest.SerializeToString,
-                response_deserializer=asr__pb2.RecognitionResponse.FromString,
-                _registered_method=True)
+            "/june.asr.SpeechToText/Recognize",
+            request_serializer=asr__pb2.RecognitionRequest.SerializeToString,
+            response_deserializer=asr__pb2.RecognitionResponse.FromString,
+            _registered_method=True,
+        )
         self.HealthCheck = channel.unary_unary(
-                '/june.asr.SpeechToText/HealthCheck',
-                request_serializer=asr__pb2.HealthRequest.SerializeToString,
-                response_deserializer=asr__pb2.HealthResponse.FromString,
-                _registered_method=True)
+            "/june.asr.SpeechToText/HealthCheck",
+            request_serializer=asr__pb2.HealthRequest.SerializeToString,
+            response_deserializer=asr__pb2.HealthResponse.FromString,
+            _registered_method=True,
+        )
 
 
 class SpeechToTextServicer(object):
-    """Speech Recognition Service
-    """
+    """Speech Recognition Service"""
 
     def RecognizeStream(self, request_iterator, context):
-        """Streaming speech recognition
-        """
+        """Streaming speech recognition"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
     def Recognize(self, request, context):
-        """One-shot recognition
-        """
+        """One-shot recognition"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
     def HealthCheck(self, request, context):
-        """Health check
-        """
+        """Health check"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
 
 def add_SpeechToTextServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'RecognizeStream': grpc.stream_stream_rpc_method_handler(
-                    servicer.RecognizeStream,
-                    request_deserializer=asr__pb2.AudioChunk.FromString,
-                    response_serializer=asr__pb2.RecognitionResult.SerializeToString,
-            ),
-            'Recognize': grpc.unary_unary_rpc_method_handler(
-                    servicer.Recognize,
-                    request_deserializer=asr__pb2.RecognitionRequest.FromString,
-                    response_serializer=asr__pb2.RecognitionResponse.SerializeToString,
-            ),
-            'HealthCheck': grpc.unary_unary_rpc_method_handler(
-                    servicer.HealthCheck,
-                    request_deserializer=asr__pb2.HealthRequest.FromString,
-                    response_serializer=asr__pb2.HealthResponse.SerializeToString,
-            ),
+        "RecognizeStream": grpc.stream_stream_rpc_method_handler(
+            servicer.RecognizeStream,
+            request_deserializer=asr__pb2.AudioChunk.FromString,
+            response_serializer=asr__pb2.RecognitionResult.SerializeToString,
+        ),
+        "Recognize": grpc.unary_unary_rpc_method_handler(
+            servicer.Recognize,
+            request_deserializer=asr__pb2.RecognitionRequest.FromString,
+            response_serializer=asr__pb2.RecognitionResponse.SerializeToString,
+        ),
+        "HealthCheck": grpc.unary_unary_rpc_method_handler(
+            servicer.HealthCheck,
+            request_deserializer=asr__pb2.HealthRequest.FromString,
+            response_serializer=asr__pb2.HealthResponse.SerializeToString,
+        ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'june.asr.SpeechToText', rpc_method_handlers)
+        "june.asr.SpeechToText", rpc_method_handlers
+    )
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('june.asr.SpeechToText', rpc_method_handlers)
+    server.add_registered_method_handlers("june.asr.SpeechToText", rpc_method_handlers)
 
 
- # This class is part of an EXPERIMENTAL API.
+# This class is part of an EXPERIMENTAL API.
 class SpeechToText(object):
-    """Speech Recognition Service
-    """
+    """Speech Recognition Service"""
 
     @staticmethod
-    def RecognizeStream(request_iterator,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+    def RecognizeStream(
+        request_iterator,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
         return grpc.experimental.stream_stream(
             request_iterator,
             target,
-            '/june.asr.SpeechToText/RecognizeStream',
+            "/june.asr.SpeechToText/RecognizeStream",
             asr__pb2.AudioChunk.SerializeToString,
             asr__pb2.RecognitionResult.FromString,
             options,
@@ -132,23 +135,26 @@ class SpeechToText(object):
             wait_for_ready,
             timeout,
             metadata,
-            _registered_method=True)
+            _registered_method=True,
+        )
 
     @staticmethod
-    def Recognize(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+    def Recognize(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/june.asr.SpeechToText/Recognize',
+            "/june.asr.SpeechToText/Recognize",
             asr__pb2.RecognitionRequest.SerializeToString,
             asr__pb2.RecognitionResponse.FromString,
             options,
@@ -159,23 +165,26 @@ class SpeechToText(object):
             wait_for_ready,
             timeout,
             metadata,
-            _registered_method=True)
+            _registered_method=True,
+        )
 
     @staticmethod
-    def HealthCheck(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+    def HealthCheck(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/june.asr.SpeechToText/HealthCheck',
+            "/june.asr.SpeechToText/HealthCheck",
             asr__pb2.HealthRequest.SerializeToString,
             asr__pb2.HealthResponse.FromString,
             options,
@@ -186,4 +195,5 @@ class SpeechToText(object):
             wait_for_ready,
             timeout,
             metadata,
-            _registered_method=True)
+            _registered_method=True,
+        )

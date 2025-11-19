@@ -21,14 +21,14 @@ def setup_agent_message_endpoint(
     default_chat_id: int = 888888,
     agent_script_name: str = "telegram_response_agent.sh",
     agent_script_simple_name: str = "telegram_response_agent_simple.sh",
-    max_message_length: int = 4096
+    max_message_length: int = 4096,
 ) -> None:
     """
     Setup the /api/agent/message test endpoint for a human interaction service.
-    
+
     This endpoint allows testing agent message processing without going through
     the actual chat platform (Telegram, Discord, etc.).
-    
+
     Args:
         app: FastAPI application instance
         platform: Platform name (e.g., "telegram", "discord")
@@ -42,18 +42,18 @@ def setup_agent_message_endpoint(
     """
     # Log that we're setting up the endpoint
     logger.info(f"Setting up /api/agent/message endpoint for {platform}")
-    
+
     @app.post("/api/agent/message")
     async def agent_message_endpoint(request: Request):
         """HTTP endpoint to test agent responses without the chat platform.
-        
+
         Request body:
             {
                 "message": "Your message here",
                 "user_id": 12345,  # Optional: for session support
                 "chat_id": 67890   # Optional: for session support
             }
-        
+
         Response:
             {
                 "success": true/false,
@@ -67,32 +67,36 @@ def setup_agent_message_endpoint(
             user_message = body.get("message", "")
             user_id = body.get("user_id")  # Optional: for session support
             chat_id = body.get("chat_id")  # Optional: for session support
-            
+
             if not user_message:
                 return JSONResponse(
                     status_code=400,
-                    content={"success": False, "error": "Missing 'message' field in request body"}
+                    content={
+                        "success": False,
+                        "error": "Missing 'message' field in request body",
+                    },
                 )
-            
+
             # Use default test values if not provided
             if user_id is None:
                 user_id = default_user_id
             if chat_id is None:
                 chat_id = default_chat_id
-            
+
             # Process through agent
             # Check if process_agent_message_func accepts platform parameter
             import inspect
+
             sig = inspect.signature(process_agent_message_func)
             params = list(sig.parameters.keys())
-            
+
             # Build kwargs based on function signature
             kwargs = {
                 "user_message": user_message,
                 "user_id": user_id,
                 "chat_id": chat_id,
             }
-            
+
             # Add platform-specific parameters if the function accepts them
             if "platform" in params:
                 kwargs["platform"] = platform
@@ -102,92 +106,95 @@ def setup_agent_message_endpoint(
                 kwargs["agent_script_simple_name"] = agent_script_simple_name
             if "max_message_length" in params:
                 kwargs["max_message_length"] = max_message_length
-            
+
             result = process_agent_message_func(**kwargs)
-            
+
             if result.get("success"):
                 # Validate the response using structured messaging
                 from essence.chat.message_builder import MessageBuilder
                 from essence.chat.platform_validators import get_validator
-                
+
                 message_text = result.get("message", "")
-                
+
                 # Build turn to validate structure
-                builder = MessageBuilder(service_name=platform, user_id=str(user_id), chat_id=str(chat_id))
+                builder = MessageBuilder(
+                    service_name=platform, user_id=str(user_id), chat_id=str(chat_id)
+                )
                 turn = builder.build_turn(user_message, message_text)
-                
+
                 # Render and validate for platform
                 rendered = builder.render_message()
                 validator = get_validator(platform)
                 is_valid, validation_errors = validator.validate(rendered)
-                
+
                 response_content = {
                     "success": True,
                     "message": message_text,
                     "rendered": rendered,
                     "validation": {
                         "is_valid": is_valid,
-                        "errors": validation_errors if not is_valid else []
+                        "errors": validation_errors if not is_valid else [],
                     },
                     "turn_id": turn.turn_id,
-                    "message_count": len(turn.messages)
+                    "message_count": len(turn.messages),
                 }
-                
+
                 # Log the turn
                 turn.log_to_file()
-                
-                return JSONResponse(
-                    status_code=200,
-                    content=response_content
-                )
+
+                return JSONResponse(status_code=200, content=response_content)
             else:
                 # Use structured error message
                 from essence.chat.error_handler import render_error_for_platform
+
                 error_text = render_error_for_platform(
                     Exception(result.get("error", "Unknown error")),
                     platform,
-                    result.get("message", "Error processing message")
+                    result.get("message", "Error processing message"),
                 )
-                
+
                 return JSONResponse(
                     status_code=500,
                     content={
                         "success": False,
                         "error": result.get("error", "Unknown error"),
                         "message": result.get("message", "Error processing message"),
-                        "rendered_error": error_text
-                    }
+                        "rendered_error": error_text,
+                    },
                 )
-                
+
         except json.JSONDecodeError:
             return JSONResponse(
                 status_code=400,
-                content={"success": False, "error": "Invalid JSON in request body"}
+                content={"success": False, "error": "Invalid JSON in request body"},
             )
         except Exception as e:
             logger.error(f"Error in agent message endpoint: {e}", exc_info=True)
             return JSONResponse(
-                status_code=500,
-                content={"success": False, "error": str(e)}
+                status_code=500, content={"success": False, "error": str(e)}
             )
-    
+
     # Verify the route was registered
     route_paths = [route.path for route in app.routes]
     if "/api/agent/message" in route_paths:
-        logger.info(f"Successfully registered /api/agent/message endpoint. Available routes: {route_paths}")
+        logger.info(
+            f"Successfully registered /api/agent/message endpoint. Available routes: {route_paths}"
+        )
     else:
-        logger.error(f"Failed to register /api/agent/message endpoint. Available routes: {route_paths}")
+        logger.error(
+            f"Failed to register /api/agent/message endpoint. Available routes: {route_paths}"
+        )
 
 
 def setup_health_endpoint(
     app: FastAPI,
     service_name: str,
     required_env_vars: list[str],
-    additional_checks: Optional[Callable[[], Dict[str, Any]]] = None
+    additional_checks: Optional[Callable[[], Dict[str, Any]]] = None,
 ) -> None:
     """
     Setup a standard health check endpoint for a human interaction service.
-    
+
     Args:
         app: FastAPI application instance
         service_name: Name of the service (e.g., "telegram-bot", "discord-bot")
@@ -195,61 +202,60 @@ def setup_health_endpoint(
         additional_checks: Optional function to perform additional health checks
             Should return a dict with check results
     """
+
     @app.get("/health")
     async def health_check():
         """Health check endpoint for service monitoring.
-        
+
         Returns:
             JSON response with service status and health check results
         """
         import os
-        
-        health_status = {
-            "status": "healthy",
-            "service": service_name,
-            "checks": {}
-        }
+
+        health_status = {"status": "healthy", "service": service_name, "checks": {}}
         overall_healthy = True
         http_status = 200
-        
+
         # Check required environment variables
         missing_vars = []
         for var in required_env_vars:
             if not os.getenv(var):
                 missing_vars.append(var)
-        
+
         if missing_vars:
             health_status["checks"]["environment"] = {
                 "status": "unhealthy",
-                "missing_variables": missing_vars
+                "missing_variables": missing_vars,
             }
             overall_healthy = False
             http_status = 503
         else:
             health_status["checks"]["environment"] = {"status": "healthy"}
-        
+
         # Run additional checks if provided
         if additional_checks:
             try:
                 additional_results = additional_checks()
                 health_status["checks"].update(additional_results)
-                
+
                 # Check if any additional check is unhealthy
                 for check_name, check_result in additional_results.items():
-                    if isinstance(check_result, dict) and check_result.get("status") == "unhealthy":
+                    if (
+                        isinstance(check_result, dict)
+                        and check_result.get("status") == "unhealthy"
+                    ):
                         overall_healthy = False
                         http_status = 503
             except Exception as e:
                 logger.error(f"Error in additional health checks: {e}", exc_info=True)
                 health_status["checks"]["additional"] = {
                     "status": "unhealthy",
-                    "error": str(e)
+                    "error": str(e),
                 }
                 overall_healthy = False
                 http_status = 503
-        
+
         if not overall_healthy:
             health_status["status"] = "unhealthy"
-        
-        return JSONResponse(content=health_status, status_code=http_status)
 
+        return JSONResponse(content=health_status, status_code=http_status)

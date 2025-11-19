@@ -19,12 +19,20 @@ class Command:
 
 def _configure_logging(level: str) -> None:
     numeric = getattr(logging, level.upper(), logging.INFO)
-    logging.basicConfig(level=numeric, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s")
+    logging.basicConfig(
+        level=numeric, format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
+    )
 
 
 def main(commands: Optional[List[Command]] = None) -> int:
-    parser = argparse.ArgumentParser(prog="inference-core", description="June Inference Core CLI")
-    parser.add_argument("--log-level", default="INFO", help="Logging level (DEBUG, INFO, WARNING, ERROR)")
+    parser = argparse.ArgumentParser(
+        prog="inference-core", description="June Inference Core CLI"
+    )
+    parser.add_argument(
+        "--log-level",
+        default="INFO",
+        help="Logging level (DEBUG, INFO, WARNING, ERROR)",
+    )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -40,8 +48,3 @@ def main(commands: Optional[List[Command]] = None) -> int:
     cmd: Command = getattr(args, "_cmd")
     cmd.initialize(args)
     return int(cmd.run(args))
-
-
-
-
-

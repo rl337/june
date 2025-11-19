@@ -16,14 +16,15 @@ logger = logging.getLogger(__name__)
 
 class TimeoutError(Exception):
     """Raised when inference exceeds timeout."""
+
     pass
 
 
 @contextmanager
 def timeout_context(seconds: float):
     """Context manager for timeout handling.
-    
-    Note: This is a best-effort timeout. For true interruption, 
+
+    Note: This is a best-effort timeout. For true interruption,
     use async/await with asyncio.wait_for or threading-based timeout.
     This implementation checks elapsed time and raises if exceeded.
     """
@@ -31,7 +32,9 @@ def timeout_context(seconds: float):
     yield
     elapsed = time.time() - start_time
     if elapsed > seconds:
-        raise TimeoutError(f"Operation timed out after {seconds} seconds (actual: {elapsed:.2f}s)")
+        raise TimeoutError(
+            f"Operation timed out after {seconds} seconds (actual: {elapsed:.2f}s)"
+        )
 
 
 class Qwen3LlmStrategy(LlmStrategy):
@@ -70,22 +73,26 @@ class Qwen3LlmStrategy(LlmStrategy):
         self.use_yarn = use_yarn if use_yarn is not None else config.model.use_yarn
         self.huggingface_token = huggingface_token or config.model.huggingface_token
         self.model_cache_dir = model_cache_dir or config.model.model_cache_dir
-        self.local_files_only = local_files_only if local_files_only is not None else False
-        
+        self.local_files_only = (
+            local_files_only if local_files_only is not None else False
+        )
+
         # GPU optimization settings
         # Default to quantization for CUDA devices (reduces memory usage significantly)
         if use_quantization is None:
             self.use_quantization = self.device.startswith("cuda")
         else:
             self.use_quantization = use_quantization
-        
+
         # Default to 8-bit quantization (supports CPU offloading if needed, more compatible)
         # 4-bit is more memory efficient but doesn't support CPU offloading
         if quantization_bits is None:
             self.quantization_bits = 8 if self.use_quantization else None
         else:
-            self.quantization_bits = quantization_bits if self.use_quantization else None
-        
+            self.quantization_bits = (
+                quantization_bits if self.use_quantization else None
+            )
+
         # Default to KV cache for faster inference
         if use_kv_cache is None:
             self.use_kv_cache = True
@@ -101,43 +108,45 @@ class Qwen3LlmStrategy(LlmStrategy):
         self._model = None
         self._tokenizer = None
         self._past_key_values = None  # For KV cache
-        
+
         # Initialize inference cache (can be disabled via environment variable)
         cache_enabled = os.getenv("LLM_CACHE_ENABLED", "true").lower() == "true"
         cache_max_size = int(os.getenv("LLM_CACHE_MAX_SIZE", "1000"))
         cache_ttl = float(os.getenv("LLM_CACHE_TTL_SECONDS", "3600"))  # 1 hour default
-        self._cache = get_llm_cache(max_size=cache_max_size, ttl_seconds=cache_ttl if cache_enabled else None)
+        self._cache = get_llm_cache(
+            max_size=cache_max_size, ttl_seconds=cache_ttl if cache_enabled else None
+        )
         if not cache_enabled:
             self._cache.enable_cache = False
 
     def _is_large_model(self) -> bool:
         """Check if this is a large model (30B+ parameters) that requires GPU.
-        
+
         Large models must NEVER be loaded on CPU as they consume 100GB+ memory.
-        
+
         Returns:
             True if model is 30B+ parameters, False otherwise
         """
         if not self.model_name:
             return False
-        
+
         model_name_lower = self.model_name.lower()
         # Check for common large model indicators in model name
         # Examples: "30B", "30-B", "30b", "70B", "70-B", etc.
         # Match patterns like "30B", "30-B", "30b", "70B", etc.
-        large_model_pattern = r'(\d+)[-_\s]?b\b'
+        large_model_pattern = r"(\d+)[-_\s]?b\b"
         match = re.search(large_model_pattern, model_name_lower)
         if match:
             param_count = int(match.group(1))
             # Consider 30B+ as large models
             return param_count >= 30
-        
+
         # Also check for explicit indicators
         if "30b" in model_name_lower or "30-b" in model_name_lower:
             return True
         if "70b" in model_name_lower or "70-b" in model_name_lower:
             return True
-        
+
         return False
 
     def warmup(self) -> None:
@@ -150,7 +159,7 @@ class Qwen3LlmStrategy(LlmStrategy):
                 self.device,
             )
             return
-        
+
         try:
             import torch
             from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -166,13 +175,15 @@ class Qwen3LlmStrategy(LlmStrategy):
             # CRITICAL: For large models (30B+), CPU fallback is FORBIDDEN - fail fast instead
             gpu_compatible = False
             is_large_model = self._is_large_model()
-            
+
             if self.device.startswith("cuda") and torch.cuda.is_available():
                 try:
                     device_capability = torch.cuda.get_device_capability(0)
                     device_name = torch.cuda.get_device_name(0)
-                    logger.info(f"GPU detected: {device_name} with compute capability {device_capability}")
-                    
+                    logger.info(
+                        f"GPU detected: {device_name} with compute capability {device_capability}"
+                    )
+
                     # PyTorch 2.5.1 supports: sm_50, sm_80, sm_86, sm_89, sm_90, sm_90a
                     # If GPU has compute capability >= 12 (e.g., sm_121), it's not supported
                     if device_capability[0] >= 12:
@@ -216,7 +227,11 @@ class Qwen3LlmStrategy(LlmStrategy):
                                     gpu_compatible = False
                         except RuntimeError as e:
                             error_msg = str(e).lower()
-                            if "no kernel image" in error_msg or "cuda" in error_msg or "kernel" in error_msg:
+                            if (
+                                "no kernel image" in error_msg
+                                or "cuda" in error_msg
+                                or "kernel" in error_msg
+                            ):
                                 full_error = f"GPU not compatible: {e}"
                                 if is_large_model:
                                     logger.error(full_error)
@@ -226,7 +241,9 @@ class Qwen3LlmStrategy(LlmStrategy):
                                         "Please use a compatible GPU or upgrade PyTorch."
                                     )
                                 else:
-                                    logger.warning(f"{full_error}. Falling back to CPU.")
+                                    logger.warning(
+                                        f"{full_error}. Falling back to CPU."
+                                    )
                                     self.device = "cpu"
                                     gpu_compatible = False
                             else:
@@ -260,7 +277,9 @@ class Qwen3LlmStrategy(LlmStrategy):
             else:
                 # CUDA device requested but not available
                 if is_large_model:
-                    error_msg = f"Large model (30B+) requires GPU, but CUDA is not available"
+                    error_msg = (
+                        f"Large model (30B+) requires GPU, but CUDA is not available"
+                    )
                     logger.error(error_msg)
                     raise RuntimeError(
                         f"{error_msg}. CPU fallback is FORBIDDEN for large models. "
@@ -269,7 +288,11 @@ class Qwen3LlmStrategy(LlmStrategy):
                 gpu_compatible = False
 
             # Set device for torch based on compatibility check
-            device_map = "auto" if (self.device.startswith("cuda") and gpu_compatible) else self.device
+            device_map = (
+                "auto"
+                if (self.device.startswith("cuda") and gpu_compatible)
+                else self.device
+            )
 
             # Load tokenizer
             logger.info("Loading tokenizer...")
@@ -298,17 +321,23 @@ class Qwen3LlmStrategy(LlmStrategy):
 
             # Apply quantization if enabled and GPU is compatible
             # Note: After compatibility check, self.device may have been changed to "cpu"
-            if self.use_quantization and self.device.startswith("cuda") and gpu_compatible:
+            if (
+                self.use_quantization
+                and self.device.startswith("cuda")
+                and gpu_compatible
+            ):
                 try:
                     from transformers import BitsAndBytesConfig
-                    
+
                     if self.quantization_bits == 4:
-                        logger.info("Using 4-bit quantization for maximum memory efficiency")
+                        logger.info(
+                            "Using 4-bit quantization for maximum memory efficiency"
+                        )
                         quantization_config = BitsAndBytesConfig(
                             load_in_4bit=True,
                             bnb_4bit_compute_dtype=torch.float16,
                             bnb_4bit_use_double_quant=True,
-                            bnb_4bit_quant_type="nf4"  # NormalFloat4 for optimal performance
+                            bnb_4bit_quant_type="nf4",  # NormalFloat4 for optimal performance
                         )
                         # 4-bit quantization doesn't support CPU/disk offloading
                         # Must fit entirely on GPU
@@ -317,7 +346,9 @@ class Qwen3LlmStrategy(LlmStrategy):
                     elif self.quantization_bits == 8:
                         # GPU compatibility was already checked earlier
                         if gpu_compatible:
-                            logger.info("Using 8-bit quantization (supports CPU offloading if needed)")
+                            logger.info(
+                                "Using 8-bit quantization (supports CPU offloading if needed)"
+                            )
                             quantization_config = BitsAndBytesConfig(
                                 load_in_8bit=True,
                                 llm_int8_threshold=6.0,  # Threshold for outlier detection
@@ -325,32 +356,48 @@ class Qwen3LlmStrategy(LlmStrategy):
                             )
                             model_kwargs["quantization_config"] = quantization_config
                             model_kwargs["device_map"] = "auto"
-                            logger.info("Using GPU with auto device_map for 8-bit quantization")
+                            logger.info(
+                                "Using GPU with auto device_map for 8-bit quantization"
+                            )
                         else:
                             # GPU not compatible or using CPU - disable quantization for CPU
-                            logger.warning("GPU not compatible or using CPU. Disabling quantization for CPU inference.")
+                            logger.warning(
+                                "GPU not compatible or using CPU. Disabling quantization for CPU inference."
+                            )
                             # Don't set quantization_config - model will load in full precision on CPU
                             model_kwargs["device_map"] = "cpu"
-                            model_kwargs["torch_dtype"] = torch.float32  # Use float32 for CPU
+                            model_kwargs[
+                                "torch_dtype"
+                            ] = torch.float32  # Use float32 for CPU
                         model_kwargs["low_cpu_mem_usage"] = True
                     else:
-                        raise ValueError(f"Unsupported quantization bits: {self.quantization_bits}. Use 4 or 8.")
-                    
+                        raise ValueError(
+                            f"Unsupported quantization bits: {self.quantization_bits}. Use 4 or 8."
+                        )
+
                     # Set torch_dtype based on device (float16 for GPU, float32 for CPU)
                     if not gpu_compatible or self.device == "cpu":
                         model_kwargs["torch_dtype"] = torch.float32
                     else:
                         model_kwargs["torch_dtype"] = torch.float16
-                    
+
                     if torch.cuda.is_available() and gpu_compatible:
                         # Check available GPU memory
-                        gpu_memory_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                        gpu_memory_gb = torch.cuda.get_device_properties(
+                            0
+                        ).total_memory / (1024**3)
                         logger.info(f"GPU memory available: {gpu_memory_gb:.2f} GB")
                     elif not gpu_compatible:
                         logger.info("Using CPU for model loading (GPU not compatible)")
                 except ImportError:
-                    logger.warning("bitsandbytes not available, falling back to standard loading")
-                    model_kwargs["torch_dtype"] = torch.float16 if self.device.startswith("cuda") else torch.float32
+                    logger.warning(
+                        "bitsandbytes not available, falling back to standard loading"
+                    )
+                    model_kwargs["torch_dtype"] = (
+                        torch.float16
+                        if self.device.startswith("cuda")
+                        else torch.float32
+                    )
                     if self.device.startswith("cuda"):
                         model_kwargs["device_map"] = "auto"
                         model_kwargs["low_cpu_mem_usage"] = True
@@ -366,7 +413,9 @@ class Qwen3LlmStrategy(LlmStrategy):
                     model_kwargs["torch_dtype"] = torch.float32
                     model_kwargs["device_map"] = "cpu" if not gpu_compatible else None
                     if not gpu_compatible:
-                        logger.info("Using CPU for model loading (GPU not compatible, no quantization)")
+                        logger.info(
+                            "Using CPU for model loading (GPU not compatible, no quantization)"
+                        )
 
             self._model = AutoModelForCausalLM.from_pretrained(
                 self.model_name,
@@ -376,7 +425,10 @@ class Qwen3LlmStrategy(LlmStrategy):
             # Move to device if not using device_map and not quantized
             # For quantized models with device_map, layers are already placed correctly
             if not self.use_quantization:
-                if (not self.device.startswith("cuda") or model_kwargs.get("device_map") is None):
+                if (
+                    not self.device.startswith("cuda")
+                    or model_kwargs.get("device_map") is None
+                ):
                     self._model = self._model.to(self.device)
 
             # Configure YaRN if enabled
@@ -397,38 +449,50 @@ class Qwen3LlmStrategy(LlmStrategy):
             if self.use_quantization and self.quantization_bits:
                 # Verify quantization was actually applied
                 quantization_applied = False
-                if hasattr(self._model, 'hf_quantizer'):
+                if hasattr(self._model, "hf_quantizer"):
                     quantization_applied = True
-                elif hasattr(self._model, 'quantization_config'):
+                elif hasattr(self._model, "quantization_config"):
                     quant_config = self._model.quantization_config
-                    if hasattr(quant_config, 'load_in_4bit') and quant_config.load_in_4bit:
+                    if (
+                        hasattr(quant_config, "load_in_4bit")
+                        and quant_config.load_in_4bit
+                    ):
                         quantization_applied = True
-                    elif hasattr(quant_config, 'load_in_8bit') and quant_config.load_in_8bit:
+                    elif (
+                        hasattr(quant_config, "load_in_8bit")
+                        and quant_config.load_in_8bit
+                    ):
                         quantization_applied = True
-                elif hasattr(self._model, 'base_model') and hasattr(self._model.base_model, 'hf_quantizer'):
+                elif hasattr(self._model, "base_model") and hasattr(
+                    self._model.base_model, "hf_quantizer"
+                ):
                     quantization_applied = True
-                
+
                 if quantization_applied:
                     logger.info(
                         "✅ Quantization successfully applied: %d-bit quantization active",
-                        self.quantization_bits
+                        self.quantization_bits,
                     )
                 else:
                     logger.warning(
                         "⚠️  Quantization was configured (%d-bit) but may not be active. "
                         "Check model loading logs above for details.",
-                        self.quantization_bits
+                        self.quantization_bits,
                     )
-            
+
             # Log memory usage if CUDA is available
             if torch.cuda.is_available() and gpu_compatible:
                 try:
                     memory_allocated = torch.cuda.memory_allocated(0) / (1024**3)
                     memory_reserved = torch.cuda.memory_reserved(0) / (1024**3)
-                    memory_total = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+                    memory_total = torch.cuda.get_device_properties(0).total_memory / (
+                        1024**3
+                    )
                     logger.info(
                         "GPU Memory Usage: %.2f GB allocated / %.2f GB reserved / %.2f GB total",
-                        memory_allocated, memory_reserved, memory_total
+                        memory_allocated,
+                        memory_reserved,
+                        memory_total,
                     )
                 except Exception as e:
                     logger.debug(f"Could not get GPU memory stats: {e}")
@@ -490,7 +554,10 @@ class Qwen3LlmStrategy(LlmStrategy):
                 if cached_result is not None:
                     logger.debug("Cache hit for LLM inference")
                     return InferenceResponse(
-                        payload={"text": cached_result["text"], "tokens": cached_result["tokens"]},
+                        payload={
+                            "text": cached_result["text"],
+                            "tokens": cached_result["tokens"],
+                        },
                         metadata={
                             "input_tokens": cached_result.get("input_tokens", 0),
                             "output_tokens": cached_result["tokens"],
@@ -509,11 +576,11 @@ class Qwen3LlmStrategy(LlmStrategy):
                 "do_sample": temperature > 0.0,
                 "pad_token_id": self._tokenizer.eos_token_id,
             }
-            
+
             # Add optional parameters if provided
             if top_k is not None and top_k > 0:
                 generation_kwargs["top_k"] = int(top_k)
-            
+
             if repetition_penalty is not None and repetition_penalty > 0:
                 generation_kwargs["repetition_penalty"] = repetition_penalty
 
@@ -529,12 +596,19 @@ class Qwen3LlmStrategy(LlmStrategy):
 
             # Measure inference performance
             inference_start_time = time.time()
-            
+
             # Get timeout from config or request metadata (default: 300 seconds = 5 minutes)
-            timeout_seconds = params.get("timeout", config.model.get("inference_timeout", 300) if hasattr(config.model, "get") else 300)
+            timeout_seconds = params.get(
+                "timeout",
+                config.model.get("inference_timeout", 300)
+                if hasattr(config.model, "get")
+                else 300,
+            )
             if isinstance(request, InferenceRequest) and request.metadata:
-                timeout_seconds = request.metadata.get("timeout_seconds", timeout_seconds)
-            
+                timeout_seconds = request.metadata.get(
+                    "timeout_seconds", timeout_seconds
+                )
+
             # Generate with timeout and OOM handling
             try:
                 with torch.no_grad():
@@ -542,15 +616,13 @@ class Qwen3LlmStrategy(LlmStrategy):
                     if timeout_seconds > 0 and timeout_seconds < 3600:  # Max 1 hour
                         with timeout_context(timeout_seconds):
                             outputs = self._model.generate(
-                                inputs.input_ids,
-                                **generation_kwargs
+                                inputs.input_ids, **generation_kwargs
                             )
                     else:
                         outputs = self._model.generate(
-                            inputs.input_ids,
-                            **generation_kwargs
+                            inputs.input_ids, **generation_kwargs
                         )
-                    
+
                     # Store past_key_values for potential reuse in future calls
                     # Note: This requires the model to return past_key_values in outputs
                     # For now, we enable use_cache which improves performance within a single generation
@@ -559,11 +631,17 @@ class Qwen3LlmStrategy(LlmStrategy):
                 # Clear CUDA cache if available
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
-                raise RuntimeError(f"Inference timed out after {timeout_seconds} seconds. Try reducing max_tokens or increasing timeout.") from e
+                raise RuntimeError(
+                    f"Inference timed out after {timeout_seconds} seconds. Try reducing max_tokens or increasing timeout."
+                ) from e
             except RuntimeError as e:
                 error_msg = str(e).lower()
                 # Check for OOM errors
-                if "out of memory" in error_msg or "cuda out of memory" in error_msg or "oom" in error_msg:
+                if (
+                    "out of memory" in error_msg
+                    or "cuda out of memory" in error_msg
+                    or "oom" in error_msg
+                ):
                     logger.error(f"Out of memory error during inference: {e}")
                     # Clear CUDA cache
                     if torch.cuda.is_available():
@@ -596,8 +674,10 @@ class Qwen3LlmStrategy(LlmStrategy):
 
             # Calculate performance metrics
             total_duration = inference_duration + decode_duration
-            tokens_per_second = output_tokens / total_duration if total_duration > 0 else 0.0
-            
+            tokens_per_second = (
+                output_tokens / total_duration if total_duration > 0 else 0.0
+            )
+
             # Log performance metrics
             logger.info(
                 "Qwen3 inference performance: %.2f tokens/s (%.2fs total, %d input tokens, %d output tokens, KV cache: %s)",
@@ -605,7 +685,9 @@ class Qwen3LlmStrategy(LlmStrategy):
                 total_duration,
                 input_tokens,
                 output_tokens,
-                "enabled" if self.use_kv_cache and generation_kwargs.get("use_cache") else "disabled"
+                "enabled"
+                if self.use_kv_cache and generation_kwargs.get("use_cache")
+                else "disabled",
             )
 
             # Cache result if deterministic (temperature=0)
@@ -629,7 +711,8 @@ class Qwen3LlmStrategy(LlmStrategy):
                     "inference_duration_seconds": inference_duration,
                     "total_duration_seconds": total_duration,
                     "tokens_per_second": tokens_per_second,
-                    "kv_cache_enabled": self.use_kv_cache and generation_kwargs.get("use_cache", False),
+                    "kv_cache_enabled": self.use_kv_cache
+                    and generation_kwargs.get("use_cache", False),
                 },
             )
 
@@ -641,6 +724,7 @@ class Qwen3LlmStrategy(LlmStrategy):
             # Clear CUDA cache on any error
             try:
                 import torch
+
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
             except Exception:

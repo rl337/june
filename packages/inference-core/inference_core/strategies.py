@@ -49,6 +49,3 @@ class LlmStrategy(InferenceStrategy, ABC):
     Input payload: dict {prompt: str, params: dict}
     Output payload: dict {text: str, tokens: Optional[int]}
     """
-
-
-

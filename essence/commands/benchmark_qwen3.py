@@ -26,6 +26,7 @@ import statistics
 try:
     import torch
     import psutil
+
     DEPENDENCIES_AVAILABLE = True
 except ImportError as e:
     DEPENDENCIES_AVAILABLE = False
@@ -35,6 +36,7 @@ try:
     from inference_core.llm.qwen3_strategy import Qwen3LlmStrategy
     from inference_core.strategies import InferenceRequest
     from inference_core.config import config
+
     INFERENCE_CORE_AVAILABLE = True
 except ImportError:
     INFERENCE_CORE_AVAILABLE = False
@@ -50,6 +52,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class BenchmarkResult:
     """Result from a single benchmark run."""
+
     prompt_length: int
     prompt_type: str  # 'short', 'medium', 'long'
     latency_seconds: float
@@ -68,6 +71,7 @@ class BenchmarkResult:
 @dataclass
 class ModelLoadMetrics:
     """Metrics for model loading."""
+
     load_time_seconds: float
     gpu_memory_after_load_mb: float
     cpu_memory_after_load_mb: float
@@ -78,6 +82,7 @@ class ModelLoadMetrics:
 @dataclass
 class ThroughputMetrics:
     """Metrics for throughput under load."""
+
     concurrent_requests: int
     total_requests: int
     successful_requests: int
@@ -95,6 +100,7 @@ class ThroughputMetrics:
 @dataclass
 class PerformanceReport:
     """Complete performance report."""
+
     model_name: str
     device: str
     benchmark_timestamp: str
@@ -106,37 +112,37 @@ class PerformanceReport:
 
 class GPUMonitor:
     """Monitor GPU memory usage."""
-    
+
     def __init__(self):
         self.has_gpu = torch.cuda.is_available() if DEPENDENCIES_AVAILABLE else False
         self.device = None
         if self.has_gpu:
             self.device = torch.cuda.current_device()
-    
+
     def get_memory_info(self) -> Tuple[float, float]:
         """Get GPU memory allocated and reserved in MB."""
         if not self.has_gpu:
             return 0.0, 0.0
-        
-        allocated = torch.cuda.memory_allocated(self.device) / (1024 ** 2)  # MB
-        reserved = torch.cuda.memory_reserved(self.device) / (1024 ** 2)  # MB
+
+        allocated = torch.cuda.memory_allocated(self.device) / (1024**2)  # MB
+        reserved = torch.cuda.memory_reserved(self.device) / (1024**2)  # MB
         return allocated, reserved
-    
+
     def reset_peak_stats(self) -> None:
         """
         Reset peak memory statistics.
-        
+
         Resets CUDA peak memory statistics for the GPU device if available.
         Has no effect if running on CPU.
         """
         if self.has_gpu:
             torch.cuda.reset_peak_memory_stats(self.device)
-    
+
     def get_peak_memory(self) -> float:
         """Get peak memory usage in MB."""
         if not self.has_gpu:
             return 0.0
-        return torch.cuda.max_memory_allocated(self.device) / (1024 ** 2)  # MB
+        return torch.cuda.max_memory_allocated(self.device) / (1024**2)  # MB
 
 
 def get_system_metrics() -> Tuple[float, float]:
@@ -145,59 +151,63 @@ def get_system_metrics() -> Tuple[float, float]:
         return 0.0, 0.0
     process = psutil.Process(os.getpid())
     cpu_percent = process.cpu_percent(interval=0.1)
-    memory_mb = process.memory_info().rss / (1024 ** 2)  # MB
+    memory_mb = process.memory_info().rss / (1024**2)  # MB
     return cpu_percent, memory_mb
 
 
 def generate_test_prompts() -> Dict[str, List[str]]:
     """Generate test prompts of different lengths."""
     return {
-        'short': [
+        "short": [
             "Hello, how are you?",
             "What is the capital of France?",
             "Explain quantum computing in one sentence.",
             "Write a haiku about AI.",
             "What is 2+2?",
         ],
-        'medium': [
+        "medium": [
             "Write a brief explanation of how neural networks work, including the concepts of forward propagation, backpropagation, and gradient descent.",
             "Explain the differences between supervised and unsupervised learning, and provide examples of each type of machine learning approach.",
             "Describe the transformer architecture and how it revolutionized natural language processing tasks.",
             "What are the key challenges in deploying machine learning models to production, and how can they be addressed?",
             "Explain the concept of transfer learning and how it can be used to improve model performance with limited data.",
         ],
-        'long': [
+        "long": [
             "Write a comprehensive guide to building a production-ready machine learning system. Include sections on data collection and preprocessing, model selection and training, evaluation metrics, deployment strategies, monitoring and maintenance, and scaling considerations. Provide code examples where appropriate.",
             "Explain in detail the evolution of large language models from early RNN architectures through transformers to modern models like GPT, BERT, and their successors. Discuss the key innovations at each stage, the trade-offs involved, and the impact on the field of AI.",
             "Create a detailed technical specification for a conversational AI system that can handle multi-turn conversations, maintain context, integrate with external APIs, and provide accurate, helpful responses. Include architecture diagrams, data flow descriptions, and implementation considerations.",
             "Describe a complete machine learning pipeline from raw data to deployed model, including data validation, feature engineering, model training with hyperparameter tuning, model validation, A/B testing, continuous monitoring, and retraining strategies.",
             "Write an in-depth analysis of the challenges and solutions for running large language models efficiently, covering topics such as model quantization, distillation, pruning, efficient attention mechanisms, distributed inference, and hardware optimization.",
-        ]
+        ],
     }
 
 
-def measure_model_loading(strategy: Qwen3LlmStrategy, gpu_monitor: GPUMonitor) -> ModelLoadMetrics:
+def measure_model_loading(
+    strategy: Qwen3LlmStrategy, gpu_monitor: GPUMonitor
+) -> ModelLoadMetrics:
     """Measure model loading time and resource usage."""
     logger.info("Measuring model loading time...")
-    
+
     start_time = time.time()
     gpu_monitor.reset_peak_stats()
-    
+
     try:
         strategy.warmup()
         load_time = time.time() - start_time
-        
+
         allocated, reserved = gpu_monitor.get_memory_info()
         cpu_percent, memory_mb = get_system_metrics()
-        
+
         logger.info(f"Model loaded in {load_time:.2f} seconds")
-        logger.info(f"GPU memory after load: {allocated:.2f} MB allocated, {reserved:.2f} MB reserved")
-        
+        logger.info(
+            f"GPU memory after load: {allocated:.2f} MB allocated, {reserved:.2f} MB reserved"
+        )
+
         return ModelLoadMetrics(
             load_time_seconds=load_time,
             gpu_memory_after_load_mb=allocated,
             cpu_memory_after_load_mb=memory_mb,
-            success=True
+            success=True,
         )
     except Exception as e:
         load_time = time.time() - start_time
@@ -207,7 +217,7 @@ def measure_model_loading(strategy: Qwen3LlmStrategy, gpu_monitor: GPUMonitor) -
             gpu_memory_after_load_mb=0.0,
             cpu_memory_after_load_mb=0.0,
             success=False,
-            error=str(e)
+            error=str(e),
         )
 
 
@@ -216,14 +226,14 @@ def run_single_benchmark(
     prompt: str,
     prompt_type: str,
     gpu_monitor: GPUMonitor,
-    max_tokens: int = 256
+    max_tokens: int = 256,
 ) -> BenchmarkResult:
     """Run a single benchmark with a given prompt."""
     try:
         # Get baseline metrics
         allocated_before, reserved_before = gpu_monitor.get_memory_info()
         cpu_before, memory_before = get_system_metrics()
-        
+
         # Create request
         request = InferenceRequest(
             payload={
@@ -232,31 +242,31 @@ def run_single_benchmark(
                     "temperature": 0.7,
                     "max_tokens": max_tokens,
                     "top_p": 0.9,
-                }
+                },
             },
-            metadata={}
+            metadata={},
         )
-        
+
         # Measure inference time
         start_time = time.time()
         response = strategy.infer(request)
         latency = time.time() - start_time
-        
+
         # Get metrics after inference
         allocated_after, reserved_after = gpu_monitor.get_memory_info()
         cpu_after, memory_after = get_system_metrics()
-        
+
         # Extract token counts
         if isinstance(response.payload, dict):
             output_tokens = response.payload.get("tokens", 0)
         else:
             output_tokens = 0
-        
+
         input_tokens = response.metadata.get("input_tokens", len(prompt.split()))
-        
+
         # Calculate tokens per second
         tokens_per_second = output_tokens / latency if latency > 0 else 0
-        
+
         return BenchmarkResult(
             prompt_length=len(prompt),
             prompt_type=prompt_type,
@@ -269,7 +279,7 @@ def run_single_benchmark(
             gpu_memory_reserved_mb=reserved_after,
             cpu_percent=cpu_after,
             memory_mb=memory_after,
-            success=True
+            success=True,
         )
     except Exception as e:
         logger.error(f"Benchmark failed for prompt type {prompt_type}: {e}")
@@ -286,29 +296,31 @@ def run_single_benchmark(
             cpu_percent=0.0,
             memory_mb=0.0,
             success=False,
-            error=str(e)
+            error=str(e),
         )
 
 
 def run_latency_benchmarks(
-    strategy: Qwen3LlmStrategy,
-    gpu_monitor: GPUMonitor,
-    iterations: int = 3
+    strategy: Qwen3LlmStrategy, gpu_monitor: GPUMonitor, iterations: int = 3
 ) -> List[BenchmarkResult]:
     """Run latency benchmarks for different prompt types."""
-    logger.info(f"Running latency benchmarks ({iterations} iterations per prompt type)...")
-    
+    logger.info(
+        f"Running latency benchmarks ({iterations} iterations per prompt type)..."
+    )
+
     prompts = generate_test_prompts()
     results = []
-    
+
     for prompt_type, prompt_list in prompts.items():
         logger.info(f"Testing {prompt_type} prompts...")
         for prompt in prompt_list:
             for i in range(iterations):
                 logger.info(f"  Iteration {i+1}/{iterations}: {prompt[:50]}...")
-                result = run_single_benchmark(strategy, prompt, prompt_type, gpu_monitor)
+                result = run_single_benchmark(
+                    strategy, prompt, prompt_type, gpu_monitor
+                )
                 results.append(result)
-                
+
                 if result.success:
                     logger.info(
                         f"    Latency: {result.latency_seconds:.3f}s, "
@@ -317,7 +329,7 @@ def run_latency_benchmarks(
                     )
                 else:
                     logger.warning(f"    Failed: {result.error}")
-    
+
     return results
 
 
@@ -326,26 +338,28 @@ def run_throughput_benchmark(
     gpu_monitor: GPUMonitor,
     concurrent_requests: int = 5,
     total_requests: int = 20,
-    prompt: str = "Write a short story about AI."
+    prompt: str = "Write a short story about AI.",
 ) -> ThroughputMetrics:
     """Run throughput benchmark with concurrent requests."""
-    logger.info(f"Running throughput benchmark: {concurrent_requests} concurrent, {total_requests} total requests...")
-    
+    logger.info(
+        f"Running throughput benchmark: {concurrent_requests} concurrent, {total_requests} total requests..."
+    )
+
     import concurrent.futures
-    
+
     latencies = []
     successful = 0
     failed = 0
-    
+
     def run_request():
         try:
             start = time.time()
             request = InferenceRequest(
                 payload={
                     "prompt": prompt,
-                    "params": {"max_tokens": 128, "temperature": 0.7}
+                    "params": {"max_tokens": 128, "temperature": 0.7},
                 },
-                metadata={}
+                metadata={},
             )
             strategy.infer(request)
             latency = time.time() - start
@@ -353,10 +367,12 @@ def run_throughput_benchmark(
         except Exception as e:
             logger.error(f"Request failed: {e}")
             return 0.0, False
-    
+
     start_time = time.time()
-    
-    with concurrent.futures.ThreadPoolExecutor(max_workers=concurrent_requests) as executor:
+
+    with concurrent.futures.ThreadPoolExecutor(
+        max_workers=concurrent_requests
+    ) as executor:
         futures = [executor.submit(run_request) for _ in range(total_requests)]
         for future in concurrent.futures.as_completed(futures):
             latency, success = future.result()
@@ -365,9 +381,9 @@ def run_throughput_benchmark(
                 successful += 1
             else:
                 failed += 1
-    
+
     total_time = time.time() - start_time
-    
+
     if latencies:
         latencies_sorted = sorted(latencies)
         return ThroughputMetrics(
@@ -379,10 +395,14 @@ def run_throughput_benchmark(
             requests_per_second=total_requests / total_time if total_time > 0 else 0,
             average_latency_seconds=statistics.mean(latencies),
             p50_latency_seconds=statistics.median(latencies),
-            p95_latency_seconds=latencies_sorted[int(len(latencies_sorted) * 0.95)] if latencies_sorted else 0,
-            p99_latency_seconds=latencies_sorted[int(len(latencies_sorted) * 0.99)] if latencies_sorted else 0,
+            p95_latency_seconds=latencies_sorted[int(len(latencies_sorted) * 0.95)]
+            if latencies_sorted
+            else 0,
+            p99_latency_seconds=latencies_sorted[int(len(latencies_sorted) * 0.99)]
+            if latencies_sorted
+            else 0,
             min_latency_seconds=min(latencies),
-            max_latency_seconds=max(latencies)
+            max_latency_seconds=max(latencies),
         )
     else:
         return ThroughputMetrics(
@@ -397,24 +417,24 @@ def run_throughput_benchmark(
             p95_latency_seconds=0.0,
             p99_latency_seconds=0.0,
             min_latency_seconds=0.0,
-            max_latency_seconds=0.0
+            max_latency_seconds=0.0,
         )
 
 
 def generate_summary(report: PerformanceReport) -> Dict:
     """Generate summary statistics from benchmark results."""
     successful_latency = [r for r in report.latency_benchmarks if r.success]
-    
+
     if not successful_latency:
         return {"error": "No successful benchmarks"}
-    
+
     # Group by prompt type
     by_type = {}
     for result in successful_latency:
         if result.prompt_type not in by_type:
             by_type[result.prompt_type] = []
         by_type[result.prompt_type].append(result)
-    
+
     summary = {
         "model_name": report.model_name,
         "device": report.device,
@@ -424,11 +444,11 @@ def generate_summary(report: PerformanceReport) -> Dict:
         "successful_benchmarks": len(successful_latency),
         "failed_benchmarks": len(report.latency_benchmarks) - len(successful_latency),
     }
-    
+
     # Overall statistics
     all_latencies = [r.latency_seconds for r in successful_latency]
     all_tokens_per_sec = [r.tokens_per_second for r in successful_latency]
-    
+
     summary["overall"] = {
         "average_latency_seconds": statistics.mean(all_latencies),
         "median_latency_seconds": statistics.median(all_latencies),
@@ -437,7 +457,7 @@ def generate_summary(report: PerformanceReport) -> Dict:
         "average_tokens_per_second": statistics.mean(all_tokens_per_sec),
         "median_tokens_per_second": statistics.median(all_tokens_per_sec),
     }
-    
+
     # Per-prompt-type statistics
     summary["by_prompt_type"] = {}
     for prompt_type, results in by_type.items():
@@ -452,7 +472,7 @@ def generate_summary(report: PerformanceReport) -> Dict:
             "average_tokens_per_second": statistics.mean(tokens_per_sec),
             "median_tokens_per_second": statistics.median(tokens_per_sec),
         }
-    
+
     # Throughput summary
     if report.throughput_benchmarks:
         throughput = report.throughput_benchmarks[0]
@@ -462,52 +482,70 @@ def generate_summary(report: PerformanceReport) -> Dict:
             "p95_latency_seconds": throughput.p95_latency_seconds,
             "p99_latency_seconds": throughput.p99_latency_seconds,
         }
-    
+
     return summary
 
 
 def save_report(report: PerformanceReport, output_dir: Path) -> None:
     """
     Save performance report to JSON and text files.
-    
+
     Args:
         report: Performance report to save
         output_dir: Directory where reports will be saved
     """
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Save JSON report
-    json_path = output_dir / f"qwen3_performance_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    with open(json_path, 'w') as f:
-        json.dump({
-            "model_name": report.model_name,
-            "device": report.device,
-            "benchmark_timestamp": report.benchmark_timestamp,
-            "model_load_metrics": asdict(report.model_load_metrics),
-            "latency_benchmarks": [asdict(r) for r in report.latency_benchmarks],
-            "throughput_benchmarks": [asdict(t) for t in report.throughput_benchmarks],
-            "summary": report.summary
-        }, f, indent=2)
-    
+    json_path = (
+        output_dir
+        / f"qwen3_performance_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    )
+    with open(json_path, "w") as f:
+        json.dump(
+            {
+                "model_name": report.model_name,
+                "device": report.device,
+                "benchmark_timestamp": report.benchmark_timestamp,
+                "model_load_metrics": asdict(report.model_load_metrics),
+                "latency_benchmarks": [asdict(r) for r in report.latency_benchmarks],
+                "throughput_benchmarks": [
+                    asdict(t) for t in report.throughput_benchmarks
+                ],
+                "summary": report.summary,
+            },
+            f,
+            indent=2,
+        )
+
     logger.info(f"JSON report saved to: {json_path}")
-    
+
     # Save human-readable text report
-    txt_path = output_dir / f"qwen3_performance_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-    with open(txt_path, 'w') as f:
+    txt_path = (
+        output_dir
+        / f"qwen3_performance_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+    )
+    with open(txt_path, "w") as f:
         f.write("=" * 80 + "\n")
         f.write("Qwen3-30B-A3B Performance Benchmark Report\n")
         f.write("=" * 80 + "\n\n")
         f.write(f"Model: {report.model_name}\n")
         f.write(f"Device: {report.device}\n")
         f.write(f"Benchmark Date: {report.benchmark_timestamp}\n\n")
-        
+
         f.write("Model Loading Metrics\n")
         f.write("-" * 80 + "\n")
-        f.write(f"Load Time: {report.model_load_metrics.load_time_seconds:.2f} seconds\n")
-        f.write(f"GPU Memory After Load: {report.model_load_metrics.gpu_memory_after_load_mb:.2f} MB\n")
-        f.write(f"CPU Memory After Load: {report.model_load_metrics.cpu_memory_after_load_mb:.2f} MB\n")
+        f.write(
+            f"Load Time: {report.model_load_metrics.load_time_seconds:.2f} seconds\n"
+        )
+        f.write(
+            f"GPU Memory After Load: {report.model_load_metrics.gpu_memory_after_load_mb:.2f} MB\n"
+        )
+        f.write(
+            f"CPU Memory After Load: {report.model_load_metrics.cpu_memory_after_load_mb:.2f} MB\n"
+        )
         f.write(f"Success: {report.model_load_metrics.success}\n\n")
-        
+
         f.write("Latency Benchmarks Summary\n")
         f.write("-" * 80 + "\n")
         summary = report.summary
@@ -516,77 +554,97 @@ def save_report(report: PerformanceReport, output_dir: Path) -> None:
             f.write(f"Successful: {summary['successful_benchmarks']}\n")
             f.write(f"Failed: {summary['failed_benchmarks']}\n\n")
             f.write("Overall Statistics:\n")
-            f.write(f"  Average Latency: {summary['overall']['average_latency_seconds']:.3f} seconds\n")
-            f.write(f"  Median Latency: {summary['overall']['median_latency_seconds']:.3f} seconds\n")
-            f.write(f"  Average Tokens/Second: {summary['overall']['average_tokens_per_second']:.2f}\n")
-            f.write(f"  Median Tokens/Second: {summary['overall']['median_tokens_per_second']:.2f}\n\n")
-            
+            f.write(
+                f"  Average Latency: {summary['overall']['average_latency_seconds']:.3f} seconds\n"
+            )
+            f.write(
+                f"  Median Latency: {summary['overall']['median_latency_seconds']:.3f} seconds\n"
+            )
+            f.write(
+                f"  Average Tokens/Second: {summary['overall']['average_tokens_per_second']:.2f}\n"
+            )
+            f.write(
+                f"  Median Tokens/Second: {summary['overall']['median_tokens_per_second']:.2f}\n\n"
+            )
+
             if "by_prompt_type" in summary:
                 f.write("By Prompt Type:\n")
                 for prompt_type, stats in summary["by_prompt_type"].items():
                     f.write(f"  {prompt_type.capitalize()}:\n")
                     f.write(f"    Count: {stats['count']}\n")
-                    f.write(f"    Average Latency: {stats['average_latency_seconds']:.3f} seconds\n")
-                    f.write(f"    Average Tokens/Second: {stats['average_tokens_per_second']:.2f}\n")
+                    f.write(
+                        f"    Average Latency: {stats['average_latency_seconds']:.3f} seconds\n"
+                    )
+                    f.write(
+                        f"    Average Tokens/Second: {stats['average_tokens_per_second']:.2f}\n"
+                    )
                 f.write("\n")
-        
+
         if "throughput" in summary:
             f.write("Throughput Benchmarks\n")
             f.write("-" * 80 + "\n")
-            f.write(f"Requests/Second: {summary['throughput']['requests_per_second']:.2f}\n")
-            f.write(f"Average Latency: {summary['throughput']['average_latency_seconds']:.3f} seconds\n")
-            f.write(f"P95 Latency: {summary['throughput']['p95_latency_seconds']:.3f} seconds\n")
-            f.write(f"P99 Latency: {summary['throughput']['p99_latency_seconds']:.3f} seconds\n\n")
-        
+            f.write(
+                f"Requests/Second: {summary['throughput']['requests_per_second']:.2f}\n"
+            )
+            f.write(
+                f"Average Latency: {summary['throughput']['average_latency_seconds']:.3f} seconds\n"
+            )
+            f.write(
+                f"P95 Latency: {summary['throughput']['p95_latency_seconds']:.3f} seconds\n"
+            )
+            f.write(
+                f"P99 Latency: {summary['throughput']['p99_latency_seconds']:.3f} seconds\n\n"
+            )
+
         f.write("=" * 80 + "\n")
-    
+
     logger.info(f"Text report saved to: {txt_path}")
-    
+
     return json_path, txt_path
 
 
 class BenchmarkQwen3Command(Command):
     """
     Command for benchmarking Qwen3-30B-A3B performance.
-    
+
     Runs comprehensive performance benchmarks on the Qwen3 model including:
     - Model loading time and memory usage
     - Latency benchmarks for different prompt types (short, medium, long, code)
     - Throughput benchmarks with concurrent requests
     - GPU utilization and memory metrics
-    
+
     Generates detailed reports with metrics for performance analysis and optimization.
     Essential for validating model performance and identifying bottlenecks.
     """
-    
+
     @classmethod
     def get_name(cls) -> str:
         """
         Get the command name.
-        
+
         Returns:
             Command name: "benchmark-qwen3"
         """
         return "benchmark-qwen3"
-    
+
     @classmethod
     def get_description(cls) -> str:
         """
         Get the command description.
-        
+
         Returns:
             Description of what this command does
         """
         return "Benchmark Qwen3-30B-A3B model performance"
-    
+
     @classmethod
     def add_args(cls, parser: argparse.ArgumentParser) -> None:
         """
         Add command-line arguments to the argument parser.
-        
+
         Configures benchmark execution options including output directory,
         iteration counts, and optional benchmark skipping.
-        
+
         Args:
             parser: Argument parser to add arguments to
         """
@@ -594,32 +652,30 @@ class BenchmarkQwen3Command(Command):
             "--output-dir",
             type=str,
             default="benchmark_reports",
-            help="Directory to save benchmark reports (default: benchmark_reports)"
+            help="Directory to save benchmark reports (default: benchmark_reports)",
         )
         parser.add_argument(
             "--iterations",
             type=int,
             default=3,
-            help="Number of iterations per prompt (default: 3)"
+            help="Number of iterations per prompt (default: 3)",
         )
         parser.add_argument(
             "--skip-load-test",
             action="store_true",
-            help="Skip model loading benchmark (useful if model is already loaded)"
+            help="Skip model loading benchmark (useful if model is already loaded)",
         )
         parser.add_argument(
-            "--skip-throughput",
-            action="store_true",
-            help="Skip throughput benchmark"
+            "--skip-throughput", action="store_true", help="Skip throughput benchmark"
         )
-    
+
     def init(self) -> None:
         """
         Initialize benchmark Qwen3 command.
-        
+
         Validates that required dependencies (torch, psutil) and the inference_core
         package are available before proceeding with benchmarks.
-        
+
         Raises:
             RuntimeError: If required dependencies or inference_core package are not available
         """
@@ -630,30 +686,32 @@ class BenchmarkQwen3Command(Command):
         if not INFERENCE_CORE_AVAILABLE:
             error_msg = "inference_core package not available"
             logger.error(error_msg)
-            raise RuntimeError(f"{error_msg}\nThis command must be run in a container with inference_core installed")
-    
+            raise RuntimeError(
+                f"{error_msg}\nThis command must be run in a container with inference_core installed"
+            )
+
     def run(self) -> None:
         """
         Run the benchmark.
-        
+
         Executes comprehensive performance benchmarks including:
         1. Model loading time and memory usage (unless skipped)
         2. Latency benchmarks across different prompt types
         3. Throughput benchmarks with concurrent requests (unless skipped)
         4. GPU and system resource monitoring
-        
+
         Generates detailed performance reports in both JSON and text formats
         saved to the specified output directory.
-        
+
         Exits:
             sys.exit(1): If model loading fails during load test
         """
         output_dir = Path(self.args.output_dir)
-        
+
         logger.info("Starting Qwen3-30B-A3B performance benchmarks...")
         logger.info(f"Model: {config.model.name}")
         logger.info(f"Device: {config.model.device}")
-        
+
         # Initialize strategy and GPU monitor
         strategy = Qwen3LlmStrategy(
             model_name=config.model.name,
@@ -663,9 +721,9 @@ class BenchmarkQwen3Command(Command):
             huggingface_token=config.model.huggingface_token,
             model_cache_dir=config.model.model_cache_dir,
         )
-        
+
         gpu_monitor = GPUMonitor()
-        
+
         # Measure model loading
         if self.args.skip_load_test:
             logger.info("Skipping model load test (assuming model is already loaded)")
@@ -673,7 +731,7 @@ class BenchmarkQwen3Command(Command):
                 load_time_seconds=0.0,
                 gpu_memory_after_load_mb=0.0,
                 cpu_memory_after_load_mb=0.0,
-                success=True
+                success=True,
             )
             # Still need to load the model
             strategy.warmup()
@@ -682,16 +740,18 @@ class BenchmarkQwen3Command(Command):
             if not model_load_metrics.success:
                 logger.error("Model loading failed, cannot continue benchmarks")
                 sys.exit(1)
-        
+
         # Run latency benchmarks
-        latency_results = run_latency_benchmarks(strategy, gpu_monitor, iterations=self.args.iterations)
-        
+        latency_results = run_latency_benchmarks(
+            strategy, gpu_monitor, iterations=self.args.iterations
+        )
+
         # Run throughput benchmarks
         throughput_results = []
         if not self.args.skip_throughput:
             throughput_metrics = run_throughput_benchmark(strategy, gpu_monitor)
             throughput_results.append(throughput_metrics)
-        
+
         # Generate report
         report = PerformanceReport(
             model_name=config.model.name,
@@ -700,31 +760,37 @@ class BenchmarkQwen3Command(Command):
             model_load_metrics=model_load_metrics,
             latency_benchmarks=latency_results,
             throughput_benchmarks=throughput_results,
-            summary={}
+            summary={},
         )
-        
+
         report.summary = generate_summary(report)
-        
+
         # Save reports
         json_path, txt_path = save_report(report, output_dir)
-        
+
         # Print summary
         print("\n" + "=" * 80)
         print("Benchmark Summary")
         print("=" * 80)
         if "overall" in report.summary:
-            print(f"Average Latency: {report.summary['overall']['average_latency_seconds']:.3f} seconds")
-            print(f"Average Tokens/Second: {report.summary['overall']['average_tokens_per_second']:.2f}")
+            print(
+                f"Average Latency: {report.summary['overall']['average_latency_seconds']:.3f} seconds"
+            )
+            print(
+                f"Average Tokens/Second: {report.summary['overall']['average_tokens_per_second']:.2f}"
+            )
             if "throughput" in report.summary:
-                print(f"Throughput: {report.summary['throughput']['requests_per_second']:.2f} requests/second")
+                print(
+                    f"Throughput: {report.summary['throughput']['requests_per_second']:.2f} requests/second"
+                )
         print(f"\nReports saved to:")
         print(f"  JSON: {json_path}")
         print(f"  Text: {txt_path}")
-    
+
     def cleanup(self) -> None:
         """
         Clean up benchmark Qwen3 command.
-        
+
         Releases any resources held by the benchmark command, including
         model instances and GPU monitoring connections. Actual cleanup is
         handled automatically when the command completes.

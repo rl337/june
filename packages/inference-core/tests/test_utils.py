@@ -1,6 +1,13 @@
 from inference_core import (
-    serialize_json, deserialize_json, Timer, RateLimiter, RetryConfig,
-    retry_sync, HealthChecker, get_timestamp, generate_id,
+    serialize_json,
+    deserialize_json,
+    Timer,
+    RateLimiter,
+    RetryConfig,
+    retry_sync,
+    HealthChecker,
+    get_timestamp,
+    generate_id,
 )
 
 
@@ -31,6 +38,7 @@ def test_retry_sync_succeeds_after_failures():
 
 def test_health_checker():
     import asyncio
+
     hc = HealthChecker()
     hc.add_check("ok", lambda: True)
     loop = asyncio.new_event_loop()
@@ -47,5 +55,3 @@ def test_helpers():
     gid = generate_id()
     assert isinstance(ts, str) and len(ts) > 0
     assert isinstance(gid, str) and len(gid) > 0
-
-

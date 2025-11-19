@@ -16,8 +16,8 @@ from unittest.mock import MagicMock
 # Find site-packages directory with telegram (check both system and user)
 _site_packages = None
 for sp_dir in list(site.getsitepackages()) + [site.getusersitepackages()]:
-    if sp_dir and 'site-packages' in sp_dir:
-        _telegram_pkg_path = os.path.join(sp_dir, 'telegram', '__init__.py')
+    if sp_dir and "site-packages" in sp_dir:
+        _telegram_pkg_path = os.path.join(sp_dir, "telegram", "__init__.py")
         if os.path.exists(_telegram_pkg_path):
             _site_packages = sp_dir
             break
@@ -30,21 +30,21 @@ if _site_packages and _site_packages not in sys.path:
 
 # Mock opentelemetry before any essence imports (essence.chat.utils.tracing requires it)
 # This prevents ModuleNotFoundError when running tests without opentelemetry installed
-sys.modules['opentelemetry'] = MagicMock()
-sys.modules['opentelemetry.trace'] = MagicMock()
-sys.modules['opentelemetry.sdk'] = MagicMock()
-sys.modules['opentelemetry.sdk.trace'] = MagicMock()
-sys.modules['opentelemetry.sdk.trace.export'] = MagicMock()
-sys.modules['opentelemetry.sdk.resources'] = MagicMock()
-sys.modules['opentelemetry.exporter'] = MagicMock()
-sys.modules['opentelemetry.exporter.jaeger'] = MagicMock()
-sys.modules['opentelemetry.exporter.jaeger.thrift'] = MagicMock()
-sys.modules['opentelemetry.instrumentation'] = MagicMock()
-sys.modules['opentelemetry.instrumentation.grpc'] = MagicMock()
+sys.modules["opentelemetry"] = MagicMock()
+sys.modules["opentelemetry.trace"] = MagicMock()
+sys.modules["opentelemetry.sdk"] = MagicMock()
+sys.modules["opentelemetry.sdk.trace"] = MagicMock()
+sys.modules["opentelemetry.sdk.trace.export"] = MagicMock()
+sys.modules["opentelemetry.sdk.resources"] = MagicMock()
+sys.modules["opentelemetry.exporter"] = MagicMock()
+sys.modules["opentelemetry.exporter.jaeger"] = MagicMock()
+sys.modules["opentelemetry.exporter.jaeger.thrift"] = MagicMock()
+sys.modules["opentelemetry.instrumentation"] = MagicMock()
+sys.modules["opentelemetry.instrumentation.grpc"] = MagicMock()
 
 # Create mock tracer for get_tracer() function
 mock_tracer = MagicMock()
 mock_tracer.start_as_current_span = MagicMock(return_value=MagicMock())
 mock_trace = MagicMock()
 mock_trace.get_tracer = MagicMock(return_value=mock_tracer)
-sys.modules['opentelemetry.trace'] = mock_trace
+sys.modules["opentelemetry.trace"] = mock_trace

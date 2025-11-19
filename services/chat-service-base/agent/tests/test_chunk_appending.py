@@ -19,6 +19,7 @@ from pathlib import Path
 
 # Add parent directories to path
 import sys
+
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "essence"))
 
 from essence.chat.markdown_parser import parse_markdown
@@ -29,13 +30,15 @@ def load_test_data(filename):
     """Load JSON test data from file."""
     test_data_dir = Path(__file__).parent / "test_data"
     file_path = test_data_dir / filename
-    
+
     if not file_path.exists():
         pytest.skip(f"Test data file not found: {file_path}")
-    
-    with open(file_path, 'r') as f:
-        lines = [line.strip() for line in f if line.strip() and line.strip().startswith('{')]
-    
+
+    with open(file_path, "r") as f:
+        lines = [
+            line.strip() for line in f if line.strip() and line.strip().startswith("{")
+        ]
+
     return lines
 
 
@@ -73,20 +76,22 @@ def extract_result_message(json_lines):
 def append_chunks_directly(chunks):
     """
     Append chunks together directly without adding separators.
-    
+
     This mimics the simplified logic: just concatenate chunks as-is.
     However, if a chunk contains the accumulated message, it's the full accumulated
     and should replace (not append). Also skip chunks that are prefixes of what we already have.
-    
+
     Additionally, if a chunk is significantly longer and appears to be a full restart
     (starts with the same pattern as the first chunk), it's likely the full accumulated message.
     """
     if not chunks:
         return ""
-    
+
     accumulated = chunks[0]
-    first_chunk_start = chunks[0][:20] if len(chunks[0]) >= 20 else chunks[0]  # First 20 chars as pattern
-    
+    first_chunk_start = (
+        chunks[0][:20] if len(chunks[0]) >= 20 else chunks[0]
+    )  # First 20 chars as pattern
+
     for chunk in chunks[1:]:
         # If chunk contains accumulated, it's the full accumulated message - replace
         if accumulated in chunk:
@@ -94,29 +99,31 @@ def append_chunks_directly(chunks):
         elif chunk in accumulated:
             # This chunk is a prefix/substring of what we already have - skip it (duplicate/restart)
             continue
-        elif len(chunk) > len(accumulated) * 0.8 and chunk.startswith(first_chunk_start):
+        elif len(chunk) > len(accumulated) * 0.8 and chunk.startswith(
+            first_chunk_start
+        ):
             # Chunk is significantly long and starts with the same pattern - likely full accumulated
             # This handles cases where cursor-agent sends the full message after sending partial chunks
             accumulated = chunk
         else:
             # Otherwise, append
             accumulated = accumulated + chunk
-    
+
     return accumulated
 
 
 # Test data files - comprehensive markdown coverage
 TEST_FILES = [
-    "test_headers.json",          # Headers (h1-h6)
-    "test_lists.json",            # Bullet and numbered lists
-    "test_code_block.json",       # Code blocks with syntax
-    "test_formatting.json",       # Bold, italic, bold+italic
-    "test_table.json",            # Tables
-    "test_links.json",            # Links [text](url)
-    "test_inline_code.json",      # Inline code with backticks
-    "test_blockquote.json",       # Blockquotes (>)
-    "test_strikethrough.json",    # Strikethrough (~~)
-    "test_mixed.json",            # Mixed markdown (all types together)
+    "test_headers.json",  # Headers (h1-h6)
+    "test_lists.json",  # Bullet and numbered lists
+    "test_code_block.json",  # Code blocks with syntax
+    "test_formatting.json",  # Bold, italic, bold+italic
+    "test_table.json",  # Tables
+    "test_links.json",  # Links [text](url)
+    "test_inline_code.json",  # Inline code with backticks
+    "test_blockquote.json",  # Blockquotes (>)
+    "test_strikethrough.json",  # Strikethrough (~~)
+    "test_mixed.json",  # Mixed markdown (all types together)
     "test_duplication_headers.json",  # Headers with duplication issue (real-world case)
 ]
 
@@ -125,24 +132,24 @@ TEST_FILES = [
 def test_chunk_appending_matches_result(test_file):
     """Test that appended assistant chunks match the result message."""
     json_lines = load_test_data(test_file)
-    
+
     # Extract chunks and result
     assistant_chunks = extract_assistant_chunks(json_lines)
     result_message = extract_result_message(json_lines)
-    
+
     # Skip if no data
     if not assistant_chunks:
         pytest.skip(f"No assistant chunks found in {test_file}")
     if not result_message:
         pytest.skip(f"No result message found in {test_file}")
-    
+
     # Append chunks using our logic (direct concatenation with duplicate detection)
     appended = append_chunks_directly(assistant_chunks)
-    
+
     # Normalize for comparison (handle potential newline differences)
-    appended_normalized = appended.replace('\n\n', '\n').strip()
-    result_normalized = result_message.replace('\n\n', '\n').strip()
-    
+    appended_normalized = appended.replace("\n\n", "\n").strip()
+    result_normalized = result_message.replace("\n\n", "\n").strip()
+
     # Assert they match
     assert appended_normalized == result_normalized, (
         f"Appended chunks don't match result message.\n"
@@ -150,7 +157,7 @@ def test_chunk_appending_matches_result(test_file):
         f"Appended: {repr(appended[:200])}\n"
         f"Result: {repr(result_message[:200])}"
     )
-    
+
     # Special check for duplication test: ensure no repeated content
     if "duplication" in test_file:
         # Check that the result doesn't contain the same header sequence multiple times
@@ -190,7 +197,6 @@ Syntax:
 • `###### Header 6` — six hashes
 
 Note: Add a space after the hashes. These are supported in Telegram when using markdown formatting.""",
-    
     "test_lists.json": """Here are examples of bullet points and numbered lists:
 
 **Bullet points:**
@@ -222,7 +228,6 @@ Note: Add a space after the hashes. These are supported in Telegram when using m
 • Subtask D
 
 Need help with tasks, projects, or documentation? I can show lists from those services.""",
-    
     "test_code_block.json": """Python code block example:
 
 ```python
@@ -268,7 +273,6 @@ This shows:
 • Basic Python syntax
 
 Need a different example or a specific use case?""",
-    
     "test_formatting.json": """Here are examples of bold and italic formatting in markdown:
 
 **Bold text:**
@@ -293,7 +297,6 @@ Need a different example or a specific use case?""",
 • This is ***bold and italic***
 
 Telegram supports these markdown styles. Use them in your messages.""",
-    
     "test_table.json": """Here's a table with Name, Age, and City:
 
 Name  | Age | City    
@@ -305,7 +308,6 @@ David | 31  | Paris
 Emma  | 29  | Sydney  
 
 Want me to add specific rows or change the columns?""",
-    
     "test_links.json": """Markdown link examples:
 
 **Basic format:**
@@ -337,7 +339,6 @@ Want me to add specific rows or change the columns?""",
 ```
 
 Telegram supports this markdown format, so links will be clickable.""",
-    
     "test_inline_code.json": """Here are examples of inline code with backticks:
 
 **Single backticks for inline code:**
@@ -368,7 +369,6 @@ Telegram supports this markdown format, so links will be clickable.""",
   ```
 
 Want a specific example or help formatting something?""",
-    
     "test_blockquote.json": """Here's a blockquote example:
 
 _This is a blockquote. It's used to highlight quoted text or important information._
@@ -394,7 +394,6 @@ quote.
 In markdown, blockquotes are created using the `>` character at the start of each line. For Telegram, the formatting depends on your bot's parse mode (Markdown or HTML).
 
 Need help formatting something specific?""",
-    
     "test_strikethrough.json": """Strikethrough in markdown uses double tildes: `~~text~~`
 
 Here's an example:
@@ -413,7 +412,6 @@ Here's an example:
 • `~~completed task~~` → ~~completed task~~
 
 Useful for showing deleted or outdated information, marking completed items, or indicating changes.""",
-    
     "test_mixed.json": None,  # Complex mixed content - will validate it renders without errors
 }
 
@@ -422,36 +420,37 @@ Useful for showing deleted or outdated information, marking completed items, or 
 def test_markdown_translation(test_file):
     """Test that markdown is correctly translated to Telegram format."""
     json_lines = load_test_data(test_file)
-    
+
     # Get the result message (full accumulated text)
     result_message = extract_result_message(json_lines)
     if not result_message:
         pytest.skip(f"No result message found in {test_file}")
-    
+
     # Parse markdown and translate
     widgets = parse_markdown(result_message)
     translator = get_translator("telegram")
     rendered = translator.render_message(widgets)
-    
+
     # Check if we have an expected translation
     expected = EXPECTED_TRANSLATIONS.get(test_file)
     if expected is not None:
         # Normalize for comparison (handle character encoding differences like curly vs straight apostrophes)
         # Also normalize Unicode quotes and apostrophes
         import unicodedata
+
         def normalize_text(text):
             # Normalize Unicode characters
-            text = unicodedata.normalize('NFKD', text)
+            text = unicodedata.normalize("NFKD", text)
             # Replace various quote/apostrophe variants with standard ASCII ones
             # U+2019 (right single quotation mark) -> U+0027 (apostrophe)
             # U+2018 (left single quotation mark) -> U+0027 (apostrophe)
-            text = text.replace('\u2019', "'").replace('\u2018', "'")
-            text = text.replace('\u201C', '"').replace('\u201D', '"')  # Smart quotes
+            text = text.replace("\u2019", "'").replace("\u2018", "'")
+            text = text.replace("\u201C", '"').replace("\u201D", '"')  # Smart quotes
             return text.strip()
-        
+
         rendered_normalized = normalize_text(rendered)
         expected_normalized = normalize_text(expected)
-        
+
         assert rendered_normalized == expected_normalized, (
             f"Translation doesn't match expected.\n"
             f"Rendered: {repr(rendered[:200])}\n"
@@ -470,11 +469,12 @@ def test_chunk_count_and_sizes():
         json_lines = load_test_data(test_file)
         chunks = extract_assistant_chunks(json_lines)
         result = extract_result_message(json_lines)
-        
+
         if chunks and result:
             print(f"\n{test_file}:")
             print(f"  Chunks: {len(chunks)}")
             print(f"  Total chunk length: {sum(len(c) for c in chunks)}")
             print(f"  Result length: {len(result)}")
-            print(f"  Average chunk size: {sum(len(c) for c in chunks) / len(chunks):.1f} chars")
-
+            print(
+                f"  Average chunk size: {sum(len(c) for c in chunks) / len(chunks):.1f} chars"
+            )

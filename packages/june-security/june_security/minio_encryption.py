@@ -15,15 +15,15 @@ class MinIOEncryption:
     """
     Helper class for encrypting/decrypting files in MinIO.
     """
-    
+
     def __init__(
         self,
         minio_client: Minio,
-        encryption_manager: Optional[EncryptionManager] = None
+        encryption_manager: Optional[EncryptionManager] = None,
     ):
         """
         Initialize MinIO encryption helper.
-        
+
         Args:
             minio_client: MinIO client instance
             encryption_manager: Optional EncryptionManager instance.
@@ -31,7 +31,7 @@ class MinIOEncryption:
         """
         self.minio_client = minio_client
         self._encryption_manager = encryption_manager or get_encryption_manager()
-    
+
     def put_encrypted_object(
         self,
         bucket_name: str,
@@ -39,11 +39,11 @@ class MinIOEncryption:
         data: bytes,
         length: Optional[int] = None,
         content_type: str = "application/octet-stream",
-        metadata: Optional[dict] = None
+        metadata: Optional[dict] = None,
     ) -> None:
         """
         Upload and encrypt an object to MinIO.
-        
+
         Args:
             bucket_name: Bucket name
             object_name: Object name (key)
@@ -54,13 +54,13 @@ class MinIOEncryption:
         """
         # Encrypt the data
         encrypted_data = self._encryption_manager.encrypt_bytes(data)
-        
+
         # Add encryption metadata
         if metadata is None:
             metadata = {}
-        metadata['encrypted'] = 'true'
-        metadata['original_length'] = str(len(data))
-        
+        metadata["encrypted"] = "true"
+        metadata["original_length"] = str(len(data))
+
         # Upload encrypted data
         data_stream = io.BytesIO(encrypted_data)
         self.minio_client.put_object(
@@ -69,21 +69,17 @@ class MinIOEncryption:
             data_stream,
             length=len(encrypted_data) if length is None else length,
             content_type=content_type,
-            metadata=metadata
+            metadata=metadata,
         )
-    
-    def get_encrypted_object(
-        self,
-        bucket_name: str,
-        object_name: str
-    ) -> bytes:
+
+    def get_encrypted_object(self, bucket_name: str, object_name: str) -> bytes:
         """
         Download and decrypt an object from MinIO.
-        
+
         Args:
             bucket_name: Bucket name
             object_name: Object name (key)
-            
+
         Returns:
             Decrypted data as bytes
         """
@@ -92,28 +88,24 @@ class MinIOEncryption:
         encrypted_data = response.read()
         response.close()
         response.release_conn()
-        
+
         # Check if object is encrypted
         stat = self.minio_client.stat_object(bucket_name, object_name)
-        is_encrypted = stat.metadata.get('encrypted', 'false').lower() == 'true'
-        
+        is_encrypted = stat.metadata.get("encrypted", "false").lower() == "true"
+
         if is_encrypted:
             # Decrypt the data
             return self._encryption_manager.decrypt_bytes(encrypted_data)
         else:
             # Not encrypted, return as-is (for backward compatibility)
             return encrypted_data
-    
+
     def copy_encrypted_object(
-        self,
-        source_bucket: str,
-        source_object: str,
-        dest_bucket: str,
-        dest_object: str
+        self, source_bucket: str, source_object: str, dest_bucket: str, dest_object: str
     ) -> None:
         """
         Copy an encrypted object within MinIO (preserves encryption).
-        
+
         Args:
             source_bucket: Source bucket name
             source_object: Source object name
@@ -122,27 +114,23 @@ class MinIOEncryption:
         """
         # Use MinIO copy_object which preserves metadata
         from minio.commonconfig import CopySource
-        
+
         copy_source = CopySource(source_bucket, source_object)
-        self.minio_client.copy_object(
-            dest_bucket,
-            dest_object,
-            copy_source
-        )
-    
+        self.minio_client.copy_object(dest_bucket, dest_object, copy_source)
+
     def is_encrypted(self, bucket_name: str, object_name: str) -> bool:
         """
         Check if an object is encrypted.
-        
+
         Args:
             bucket_name: Bucket name
             object_name: Object name
-            
+
         Returns:
             True if object is encrypted, False otherwise
         """
         try:
             stat = self.minio_client.stat_object(bucket_name, object_name)
-            return stat.metadata.get('encrypted', 'false').lower() == 'true'
+            return stat.metadata.get("encrypted", "false").lower() == "true"
         except S3Error:
             return False

@@ -9,6 +9,7 @@ from .strategies import (
 from .runtime import InferenceApp
 from .cli import main as cli_main, Command
 from .config import Config, config
+
 # Import from utils.py (file) - need to import the file directly, not the utils/ directory
 # Use importlib to import the utils.py file as a module
 import sys
@@ -16,10 +17,12 @@ import importlib.util
 from pathlib import Path
 
 # Get the path to utils.py
-utils_py_path = Path(__file__).parent / 'utils.py'
-spec = importlib.util.spec_from_file_location('inference_core._utils', str(utils_py_path))
+utils_py_path = Path(__file__).parent / "utils.py"
+spec = importlib.util.spec_from_file_location(
+    "inference_core._utils", str(utils_py_path)
+)
 _utils = importlib.util.module_from_spec(spec)
-sys.modules['inference_core._utils'] = _utils
+sys.modules["inference_core._utils"] = _utils
 spec.loader.exec_module(_utils)
 
 # Import the needed items from utils.py
@@ -59,6 +62,3 @@ __all__ = [
     "TtsGrpcApp",
     "LlmGrpcApp",
 ]
-
-
-

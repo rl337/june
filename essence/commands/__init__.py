@@ -33,5 +33,26 @@ from . import verify_tensorrt_llm  # noqa: F401
 from . import verify_nim  # noqa: F401
 from . import compile_model  # noqa: F401
 
-__all__ = ["telegram_service", "discord_service", "tts_service", "stt_service", "inference_api_service", "review_sandbox", "monitor_gpu", "verify_qwen3", "download_models", "benchmark_qwen3", "run_benchmarks", "generate_alice_dataset", "integration_test_service", "coding_agent", "check_environment", "get_message_history", "manage_tensorrt_llm", "setup_triton_repository", "verify_tensorrt_llm", "verify_nim", "compile_model"]
-
+__all__ = [
+    "telegram_service",
+    "discord_service",
+    "tts_service",
+    "stt_service",
+    "inference_api_service",
+    "review_sandbox",
+    "monitor_gpu",
+    "verify_qwen3",
+    "download_models",
+    "benchmark_qwen3",
+    "run_benchmarks",
+    "generate_alice_dataset",
+    "integration_test_service",
+    "coding_agent",
+    "check_environment",
+    "get_message_history",
+    "manage_tensorrt_llm",
+    "setup_triton_repository",
+    "verify_tensorrt_llm",
+    "verify_nim",
+    "compile_model",
+]

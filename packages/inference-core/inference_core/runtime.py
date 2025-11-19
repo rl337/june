@@ -13,7 +13,9 @@ class InferenceApp:
     request handling to the provided Strategy.
     """
 
-    def __init__(self, strategy: InferenceStrategy, logger: Optional[logging.Logger] = None) -> None:
+    def __init__(
+        self, strategy: InferenceStrategy, logger: Optional[logging.Logger] = None
+    ) -> None:
         self.strategy = strategy
         self.logger = logger or logging.getLogger("inference-core")
 
@@ -23,6 +25,3 @@ class InferenceApp:
 
     def handle(self, request: InferenceRequest) -> InferenceResponse:
         return self.strategy.infer(request)
-
-
-

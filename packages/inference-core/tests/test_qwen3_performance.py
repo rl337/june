@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 # These tests are expensive and should be run explicitly
 pytestmark = pytest.mark.skipif(
     os.getenv("PERFORMANCE_TESTS") != "1",
-    reason="Performance tests require PERFORMANCE_TESTS=1 environment variable"
+    reason="Performance tests require PERFORMANCE_TESTS=1 environment variable",
 )
 
 
@@ -65,7 +65,7 @@ def test_model_loading_time(qwen3_strategy):
 def test_short_prompt_latency(qwen3_strategy):
     """Test that short prompts have acceptable latency (< 2s)."""
     prompt = "Hello, how are you?"
-    
+
     start_time = time.time()
     request = InferenceRequest(
         payload={
@@ -74,13 +74,13 @@ def test_short_prompt_latency(qwen3_strategy):
                 "temperature": 0.7,
                 "max_tokens": 128,
                 "top_p": 0.9,
-            }
+            },
         },
-        metadata={}
+        metadata={},
     )
     response = qwen3_strategy.infer(request)
     latency = time.time() - start_time
-    
+
     assert response is not None
     assert latency < 2.0, f"Short prompt latency {latency:.3f}s exceeds 2s threshold"
     logger.info(f"Short prompt latency: {latency:.3f}s")
@@ -89,7 +89,7 @@ def test_short_prompt_latency(qwen3_strategy):
 def test_medium_prompt_latency(qwen3_strategy):
     """Test that medium prompts have acceptable latency (< 5s)."""
     prompt = "Write a brief explanation of how neural networks work, including forward propagation and backpropagation."
-    
+
     start_time = time.time()
     request = InferenceRequest(
         payload={
@@ -98,13 +98,13 @@ def test_medium_prompt_latency(qwen3_strategy):
                 "temperature": 0.7,
                 "max_tokens": 256,
                 "top_p": 0.9,
-            }
+            },
         },
-        metadata={}
+        metadata={},
     )
     response = qwen3_strategy.infer(request)
     latency = time.time() - start_time
-    
+
     assert response is not None
     assert latency < 5.0, f"Medium prompt latency {latency:.3f}s exceeds 5s threshold"
     logger.info(f"Medium prompt latency: {latency:.3f}s")
@@ -113,7 +113,7 @@ def test_medium_prompt_latency(qwen3_strategy):
 def test_tokens_per_second_rate(qwen3_strategy):
     """Test that token generation rate is reasonable (> 1 token/second)."""
     prompt = "Write a short story about artificial intelligence."
-    
+
     start_time = time.time()
     request = InferenceRequest(
         payload={
@@ -122,24 +122,26 @@ def test_tokens_per_second_rate(qwen3_strategy):
                 "temperature": 0.7,
                 "max_tokens": 256,
                 "top_p": 0.9,
-            }
+            },
         },
-        metadata={}
+        metadata={},
     )
     response = qwen3_strategy.infer(request)
     latency = time.time() - start_time
-    
+
     assert response is not None
-    
+
     # Extract token count
     if isinstance(response.payload, dict):
         output_tokens = response.payload.get("tokens", 0)
     else:
         output_tokens = 0
-    
+
     if output_tokens > 0 and latency > 0:
         tokens_per_second = output_tokens / latency
-        assert tokens_per_second > 1.0, f"Token generation rate {tokens_per_second:.2f} tokens/s is too low"
+        assert (
+            tokens_per_second > 1.0
+        ), f"Token generation rate {tokens_per_second:.2f} tokens/s is too low"
         logger.info(f"Token generation rate: {tokens_per_second:.2f} tokens/s")
     else:
         pytest.skip("Could not determine token count")
@@ -149,16 +151,16 @@ def test_gpu_memory_usage(qwen3_strategy):
     """Test that GPU memory usage is reasonable."""
     if not torch.cuda.is_available():
         pytest.skip("CUDA not available")
-    
+
     device = torch.cuda.current_device()
-    allocated = torch.cuda.memory_allocated(device) / (1024 ** 3)  # GB
-    reserved = torch.cuda.memory_reserved(device) / (1024 ** 3)  # GB
-    
+    allocated = torch.cuda.memory_allocated(device) / (1024**3)  # GB
+    reserved = torch.cuda.memory_reserved(device) / (1024**3)  # GB
+
     # For a 30B model, we expect significant memory usage
     # But it should be reasonable (e.g., < 100GB for full precision)
     logger.info(f"GPU memory allocated: {allocated:.2f} GB")
     logger.info(f"GPU memory reserved: {reserved:.2f} GB")
-    
+
     # Just log, don't fail - memory usage depends on model precision and optimization
     assert allocated > 0, "Model should use some GPU memory"
 
@@ -167,7 +169,7 @@ def test_multiple_requests_consistency(qwen3_strategy):
     """Test that multiple requests have consistent performance."""
     prompt = "What is the capital of France?"
     latencies = []
-    
+
     for i in range(3):
         start_time = time.time()
         request = InferenceRequest(
@@ -177,32 +179,36 @@ def test_multiple_requests_consistency(qwen3_strategy):
                     "temperature": 0.7,
                     "max_tokens": 64,
                     "top_p": 0.9,
-                }
+                },
             },
-            metadata={}
+            metadata={},
         )
         response = qwen3_strategy.infer(request)
         latency = time.time() - start_time
         latencies.append(latency)
-        
+
         assert response is not None
-    
+
     # Check that latencies are reasonably consistent (within 2x of each other)
     if len(latencies) > 1:
         min_latency = min(latencies)
         max_latency = max(latencies)
-        ratio = max_latency / min_latency if min_latency > 0 else float('inf')
-        
+        ratio = max_latency / min_latency if min_latency > 0 else float("inf")
+
         # Allow some variance but not extreme differences
-        assert ratio < 3.0, f"Latency variance too high: {min_latency:.3f}s to {max_latency:.3f}s"
-        logger.info(f"Latency consistency: {min_latency:.3f}s - {max_latency:.3f}s (ratio: {ratio:.2f})")
+        assert (
+            ratio < 3.0
+        ), f"Latency variance too high: {min_latency:.3f}s to {max_latency:.3f}s"
+        logger.info(
+            f"Latency consistency: {min_latency:.3f}s - {max_latency:.3f}s (ratio: {ratio:.2f})"
+        )
 
 
 def test_long_prompt_handling(qwen3_strategy):
     """Test that long prompts are handled correctly."""
     # Create a longer prompt
     prompt = " ".join(["Explain machine learning."] * 50)  # ~1000 words
-    
+
     start_time = time.time()
     request = InferenceRequest(
         payload={
@@ -211,13 +217,13 @@ def test_long_prompt_handling(qwen3_strategy):
                 "temperature": 0.7,
                 "max_tokens": 128,
                 "top_p": 0.9,
-            }
+            },
         },
-        metadata={}
+        metadata={},
     )
     response = qwen3_strategy.infer(request)
     latency = time.time() - start_time
-    
+
     assert response is not None
     # Long prompts may take longer, but should still complete
     assert latency < 30.0, f"Long prompt latency {latency:.3f}s is too high"

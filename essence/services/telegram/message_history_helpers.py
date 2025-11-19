@@ -20,11 +20,11 @@ async def reply_text_with_history(
     parse_mode: Optional[str] = None,
     message_type: str = "text",
     rendering_metadata: Optional[Dict[str, Any]] = None,
-    raw_text: Optional[str] = None
+    raw_text: Optional[str] = None,
 ) -> Message:
     """
     Send a reply text message and track it in history.
-    
+
     Args:
         update: Telegram update object
         text: Message text to send (formatted/rendered text)
@@ -32,27 +32,27 @@ async def reply_text_with_history(
         message_type: Type of message ("text", "error", "status")
         rendering_metadata: Additional metadata about rendering
         raw_text: Raw text before formatting (if different from text)
-        
+
     Returns:
         Sent Message object
     """
     message = await update.message.reply_text(text, parse_mode=parse_mode)
-    
+
     # Store in history with enhanced metadata
     try:
         user_id = str(update.effective_user.id) if update.effective_user else "unknown"
         chat_id = str(update.effective_chat.id) if update.effective_chat else "unknown"
         message_id = str(message.message_id) if message else None
-        
+
         # Build comprehensive rendering metadata
         metadata = {
             "parse_mode": parse_mode,
             "message_length": len(text),
             "telegram_max_length": 4096,
             "within_limit": len(text) <= 4096,
-            **(rendering_metadata or {})
+            **(rendering_metadata or {}),
         }
-        
+
         # Add split/truncation info if present in rendering_metadata
         if rendering_metadata:
             if "part" in rendering_metadata and "total_parts" in rendering_metadata:
@@ -61,7 +61,7 @@ async def reply_text_with_history(
                 metadata["total_parts"] = rendering_metadata["total_parts"]
             if "truncated" in rendering_metadata:
                 metadata["was_truncated"] = True
-        
+
         get_message_history().add_message(
             platform="telegram",
             user_id=user_id,
@@ -71,11 +71,11 @@ async def reply_text_with_history(
             message_id=message_id,
             raw_text=raw_text or text,
             formatted_text=text if parse_mode else None,
-            rendering_metadata=metadata
+            rendering_metadata=metadata,
         )
     except Exception as e:
         logger.warning(f"Failed to store message in history: {e}")
-    
+
     return message
 
 
@@ -87,11 +87,11 @@ async def edit_text_with_history(
     chat_id: Optional[str] = None,
     message_type: str = "text",
     rendering_metadata: Optional[Dict[str, Any]] = None,
-    raw_text: Optional[str] = None
+    raw_text: Optional[str] = None,
 ) -> Message:
     """
     Edit a message text and track it in history.
-    
+
     Args:
         message: Telegram Message object to edit
         text: New message text (formatted/rendered text)
@@ -101,22 +101,24 @@ async def edit_text_with_history(
         message_type: Type of message ("text", "error", "status")
         rendering_metadata: Additional metadata about rendering
         raw_text: Raw text before formatting (if different from text)
-        
+
     Returns:
         Edited Message object
     """
     edited_message = await message.edit_text(text, parse_mode=parse_mode)
-    
+
     # Store in history with enhanced metadata
     try:
         if not user_id and message.chat:
-            user_id = str(message.chat.id)  # Fallback to chat_id if user_id not available
+            user_id = str(
+                message.chat.id
+            )  # Fallback to chat_id if user_id not available
         if not chat_id and message.chat:
             chat_id = str(message.chat.id)
-        
+
         if user_id and chat_id:
             message_id = str(edited_message.message_id) if edited_message else None
-            
+
             # Build comprehensive rendering metadata
             metadata = {
                 "parse_mode": parse_mode,
@@ -124,9 +126,9 @@ async def edit_text_with_history(
                 "telegram_max_length": 4096,
                 "within_limit": len(text) <= 4096,
                 "is_edit": True,
-                **(rendering_metadata or {})
+                **(rendering_metadata or {}),
             }
-            
+
             # Add split/truncation info if present in rendering_metadata
             if rendering_metadata:
                 if "part" in rendering_metadata and "total_parts" in rendering_metadata:
@@ -137,7 +139,7 @@ async def edit_text_with_history(
                     metadata["was_truncated"] = True
                 if "fallback" in rendering_metadata:
                     metadata["was_fallback"] = rendering_metadata["fallback"]
-            
+
             get_message_history().add_message(
                 platform="telegram",
                 user_id=user_id,
@@ -147,11 +149,11 @@ async def edit_text_with_history(
                 message_id=message_id,
                 raw_text=raw_text or text,
                 formatted_text=text if parse_mode else None,
-                rendering_metadata=metadata
+                rendering_metadata=metadata,
             )
     except Exception as e:
         logger.warning(f"Failed to store edited message in history: {e}")
-    
+
     return edited_message
 
 
@@ -160,32 +162,32 @@ async def send_voice_with_history(
     voice_path: str,
     caption: Optional[str] = None,
     message_type: str = "voice",
-    rendering_metadata: Optional[Dict[str, Any]] = None
+    rendering_metadata: Optional[Dict[str, Any]] = None,
 ) -> Message:
     """
     Send a voice message and track it in history.
-    
+
     Args:
         update: Telegram update object
         voice_path: Path to voice file
         caption: Optional caption text
         message_type: Type of message (default: "voice")
         rendering_metadata: Additional metadata about rendering
-        
+
     Returns:
         Sent Message object
     """
-    with open(voice_path, 'rb') as voice_file:
+    with open(voice_path, "rb") as voice_file:
         message = await update.message.reply_voice(voice=voice_file, caption=caption)
-    
+
     # Store in history
     try:
         user_id = str(update.effective_user.id) if update.effective_user else "unknown"
         chat_id = str(update.effective_chat.id) if update.effective_chat else "unknown"
         message_id = str(message.message_id) if message else None
-        
+
         content = f"[Voice message]" + (f" - {caption}" if caption else "")
-        
+
         get_message_history().add_message(
             platform="telegram",
             user_id=user_id,
@@ -197,10 +199,10 @@ async def send_voice_with_history(
             rendering_metadata={
                 **(rendering_metadata or {}),
                 "voice_file": voice_path,
-                "has_caption": caption is not None
-            }
+                "has_caption": caption is not None,
+            },
         )
     except Exception as e:
         logger.warning(f"Failed to store voice message in history: {e}")
-    
+
     return message

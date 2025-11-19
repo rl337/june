@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 try:
     from essence.agents.evaluator import BenchmarkEvaluator
     from essence.agents.dataset_loader import DatasetLoader
+
     DEPENDENCIES_AVAILABLE = True
 except ImportError as e:
     DEPENDENCIES_AVAILABLE = False
@@ -34,54 +35,54 @@ except ImportError as e:
 class RunBenchmarksCommand(Command):
     """
     Command for running benchmark evaluations with sandboxed execution.
-    
+
     Orchestrates evaluation of coding agents on benchmark datasets (HumanEval, MBPP)
     using isolated Docker container sandboxes. All task execution happens in containers
     to ensure security, reproducibility, and full activity logging.
-    
+
     Supports multiple datasets, configurable sandbox resources, and generates detailed
     evaluation reports with metrics including pass@k, execution time, and efficiency scores.
     """
-    
+
     def __init__(self, args: argparse.Namespace):
         """
         Initialize command with parsed arguments.
-        
+
         Args:
             args: Parsed command-line arguments containing benchmark configuration
         """
         super().__init__(args)
         self._evaluator = None
         self._output_dir = None
-    
+
     @classmethod
     def get_name(cls) -> str:
         """
         Get the command name.
-        
+
         Returns:
             Command name: "run-benchmarks"
         """
         return "run-benchmarks"
-    
+
     @classmethod
     def get_description(cls) -> str:
         """
         Get the command description.
-        
+
         Returns:
             Description of what this command does
         """
         return "Run benchmark evaluations with sandboxed execution"
-    
+
     @classmethod
     def add_args(cls, parser: argparse.ArgumentParser) -> None:
         """
         Add command-line arguments to the argument parser.
-        
+
         Configures all benchmark evaluation parameters including dataset selection,
         sandbox configuration, resource limits, and output options.
-        
+
         Args:
             parser: Argument parser to add arguments to
         """
@@ -146,14 +147,14 @@ class RunBenchmarksCommand(Command):
             default=os.getenv("BENCHMARK_ENABLE_NETWORK", "false").lower() == "true",
             help="Enable network access in sandboxes (default: disabled)",
         )
-    
+
     def init(self) -> None:
         """
         Initialize benchmark evaluation.
-        
+
         Sets up OpenTelemetry tracing, creates output directories, and initializes
         the BenchmarkEvaluator with configured sandbox and inference API settings.
-        
+
         Raises:
             RuntimeError: If required dependencies (evaluator, dataset_loader) are not available
         """
@@ -162,15 +163,15 @@ class RunBenchmarksCommand(Command):
                 f"Required dependencies not available: {IMPORT_ERROR}\n"
                 "Make sure essence.agents.evaluator and essence.agents.dataset_loader are available."
             )
-        
+
         # Setup tracing
         setup_tracing(service_name="june-benchmark-evaluator")
-        
+
         # Create output directory
         self._output_dir = self.args.output_dir
         self._output_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Output directory: {self._output_dir}")
-        
+
         # Initialize evaluator
         self._evaluator = BenchmarkEvaluator(
             inference_api_url=self.args.inference_api_url,
@@ -184,22 +185,22 @@ class RunBenchmarksCommand(Command):
             timeout_seconds=self.args.timeout,
         )
         logger.info("Benchmark evaluator initialized")
-    
+
     def run(self) -> None:
         """
         Run benchmark evaluations.
-        
+
         Loads datasets (HumanEval, MBPP, or both), evaluates each task in isolated
         sandboxes, collects metrics, and generates detailed reports. Supports
         evaluating subsets of tasks via --max-tasks and generates both per-dataset
         and combined reports.
-        
+
         For each dataset:
         - Loads tasks from the dataset loader
         - Evaluates tasks using the BenchmarkEvaluator
         - Prints summary statistics (pass@1, execution time, efficiency)
         - Saves detailed reports and sandbox snapshots to output directory
-        
+
         If multiple datasets are evaluated, generates a combined report with
         aggregated results across all datasets.
         """
@@ -209,12 +210,12 @@ class RunBenchmarksCommand(Command):
             datasets_to_evaluate = ["humaneval", "mbpp"]
         else:
             datasets_to_evaluate = [self.args.dataset]
-        
+
         all_reports = []
-        
+
         for dataset_name in datasets_to_evaluate:
             logger.info(f"Loading {dataset_name} dataset...")
-            
+
             try:
                 if dataset_name == "humaneval":
                     tasks = DatasetLoader.load_humaneval()
@@ -223,9 +224,9 @@ class RunBenchmarksCommand(Command):
                 else:
                     logger.error(f"Unknown dataset: {dataset_name}")
                     continue
-                
+
                 logger.info(f"Loaded {len(tasks)} tasks from {dataset_name}")
-                
+
                 # Evaluate dataset
                 dataset_output_dir = self._output_dir / dataset_name
                 report = self._evaluator.evaluate_dataset(
@@ -233,9 +234,9 @@ class RunBenchmarksCommand(Command):
                     output_dir=dataset_output_dir,
                     max_tasks=self.args.max_tasks,
                 )
-                
+
                 all_reports.append(report)
-                
+
                 # Print summary
                 logger.info(f"\n{'='*60}")
                 logger.info(f"Evaluation Report: {dataset_name}")
@@ -244,11 +245,13 @@ class RunBenchmarksCommand(Command):
                 logger.info(f"Successful tasks: {report.successful_tasks}")
                 logger.info(f"Passed tests: {report.passed_tests}")
                 logger.info(f"Pass@1: {report.pass_at_1:.2%}")
-                logger.info(f"Average execution time: {report.average_execution_time:.2f}s")
+                logger.info(
+                    f"Average execution time: {report.average_execution_time:.2f}s"
+                )
                 logger.info(f"Average iterations: {report.average_iterations:.2f}")
                 logger.info(f"Average commands: {report.average_commands:.2f}")
                 logger.info(f"Efficiency score: {report.efficiency_score:.4f}")
-                
+
                 # Print baseline comparisons
                 if report.baseline_comparisons:
                     logger.info(f"\n--- Baseline Comparisons ---")
@@ -258,14 +261,14 @@ class RunBenchmarksCommand(Command):
                         logger.info(f"  Baseline Pass@1: {comp.baseline_pass_at_1:.2%}")
                         logger.info(f"  Our Pass@1: {comp.our_pass_at_1:.2%}")
                         logger.info(f"  Delta: {delta_sign}{comp.pass_at_1_delta:.2%}")
-                
+
                 logger.info(f"\nResults saved to: {dataset_output_dir}")
                 logger.info(f"{'='*60}\n")
-                
+
             except Exception as e:
                 logger.error(f"Failed to evaluate {dataset_name}: {e}", exc_info=True)
                 continue
-        
+
         # Generate combined report if multiple datasets
         if len(all_reports) > 1:
             combined_output = self._output_dir / "combined_report.json"
@@ -274,16 +277,16 @@ class RunBenchmarksCommand(Command):
                 "model_name": self.args.model_name,
                 "datasets": [r.to_dict() for r in all_reports],
             }
-            with open(combined_output, 'w') as f:
+            with open(combined_output, "w") as f:
                 json.dump(combined_data, f, indent=2)
             logger.info(f"Combined report saved to: {combined_output}")
-        
+
         logger.info("Benchmark evaluation completed!")
-    
+
     def cleanup(self) -> None:
         """
         Clean up benchmark evaluation resources.
-        
+
         Releases any resources held by the benchmark evaluator, including
         sandbox containers and connections. Should be called when the command
         is finished to ensure proper resource cleanup.

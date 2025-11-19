@@ -47,8 +47,12 @@ class ModelConfig:
     huggingface_cache_dir: str = "/home/rlee/models/huggingface"
     transformers_cache_dir: str = "/home/rlee/models/transformers"
     # Quantization parameters
-    use_quantization: bool = True  # Enable quantization by default for memory efficiency
-    quantization_bits: int = 8  # 4 or 8 bits (8-bit is more compatible, 4-bit is more memory efficient)
+    use_quantization: bool = (
+        True  # Enable quantization by default for memory efficiency
+    )
+    quantization_bits: int = (
+        8  # 4 or 8 bits (8-bit is more compatible, 4-bit is more memory efficient)
+    )
     # Generation parameters (defaults, can be overridden per request)
     temperature: float = 0.7
     max_tokens: int = 2048
@@ -111,21 +115,23 @@ class Config:
             port=int(os.getenv("POSTGRES_PORT", "5432")),
             database=os.getenv("POSTGRES_DB", "june"),
             username=os.getenv("POSTGRES_USER", "june"),
-            password=os.getenv("POSTGRES_PASSWORD", "changeme")
+            password=os.getenv("POSTGRES_PASSWORD", "changeme"),
         )
 
         self.minio = MinIOConfig(
-            endpoint=os.getenv("MINIO_ENDPOINT", ""),  # Empty string indicates not configured
+            endpoint=os.getenv(
+                "MINIO_ENDPOINT", ""
+            ),  # Empty string indicates not configured
             access_key=os.getenv("MINIO_ACCESS_KEY", "admin"),
             secret_key=os.getenv("MINIO_SECRET_KEY", "changeme"),
             bucket_name=os.getenv("MINIO_BUCKET", "june-storage"),
-            secure=os.getenv("MINIO_SECURE", "false").lower() == "true"
+            secure=os.getenv("MINIO_SECURE", "false").lower() == "true",
         )
 
         self.nats = NATSConfig(
             url=os.getenv("NATS_URL", ""),  # Empty string indicates not configured
             max_reconnect_attempts=int(os.getenv("NATS_MAX_RECONNECT", "10")),
-            reconnect_time_wait=int(os.getenv("NATS_RECONNECT_WAIT", "2"))
+            reconnect_time_wait=int(os.getenv("NATS_RECONNECT_WAIT", "2")),
         )
 
         self.model = ModelConfig(
@@ -135,15 +141,21 @@ class Config:
             use_yarn=os.getenv("USE_YARN", "true").lower() == "true",
             huggingface_token=os.getenv("HUGGINGFACE_TOKEN"),
             model_cache_dir=os.getenv("MODEL_CACHE_DIR", "/home/rlee/models"),
-            huggingface_cache_dir=os.getenv("HUGGINGFACE_CACHE_DIR", "/home/rlee/models/huggingface"),
-            transformers_cache_dir=os.getenv("TRANSFORMERS_CACHE_DIR", "/home/rlee/models/transformers"),
+            huggingface_cache_dir=os.getenv(
+                "HUGGINGFACE_CACHE_DIR", "/home/rlee/models/huggingface"
+            ),
+            transformers_cache_dir=os.getenv(
+                "TRANSFORMERS_CACHE_DIR", "/home/rlee/models/transformers"
+            ),
             use_quantization=os.getenv("USE_QUANTIZATION", "true").lower() == "true",
             quantization_bits=int(os.getenv("QUANTIZATION_BITS", "8")),
             temperature=float(os.getenv("MODEL_TEMPERATURE", "0.7")),
             max_tokens=int(os.getenv("MODEL_MAX_TOKENS", "2048")),
             top_p=float(os.getenv("MODEL_TOP_P", "0.9")),
             top_k=int(os.getenv("MODEL_TOP_K")) if os.getenv("MODEL_TOP_K") else None,
-            repetition_penalty=float(os.getenv("MODEL_REPETITION_PENALTY")) if os.getenv("MODEL_REPETITION_PENALTY") else None,
+            repetition_penalty=float(os.getenv("MODEL_REPETITION_PENALTY"))
+            if os.getenv("MODEL_REPETITION_PENALTY")
+            else None,
         )
 
         self.stt = STTConfig(
@@ -151,35 +163,39 @@ class Config:
             device=os.getenv("STT_DEVICE", "cuda:0"),
             sample_rate=int(os.getenv("STT_SAMPLE_RATE", "16000")),
             chunk_length=float(os.getenv("STT_CHUNK_LENGTH", "30.0")),
-            enable_vad=os.getenv("STT_ENABLE_VAD", "true").lower() == "true"
+            enable_vad=os.getenv("STT_ENABLE_VAD", "true").lower() == "true",
         )
 
         self.tts = TTSConfig(
             model_name=os.getenv("TTS_MODEL", "facebook/fastspeech2-en-ljspeech"),
             device=os.getenv("TTS_DEVICE", "cuda:0"),
             sample_rate=int(os.getenv("TTS_SAMPLE_RATE", "22050")),
-            voice_id=os.getenv("TTS_VOICE_ID", "default")
+            voice_id=os.getenv("TTS_VOICE_ID", "default"),
         )
 
         self.telegram = TelegramConfig(
             bot_token=os.getenv("TELEGRAM_BOT_TOKEN"),
             webhook_url=os.getenv("TELEGRAM_WEBHOOK_URL"),
-            max_file_size=int(os.getenv("TELEGRAM_MAX_FILE_SIZE", str(20 * 1024 * 1024)))
+            max_file_size=int(
+                os.getenv("TELEGRAM_MAX_FILE_SIZE", str(20 * 1024 * 1024))
+            ),
         )
 
         self.auth = AuthConfig(
             jwt_secret=os.getenv("JWT_SECRET", "change-this-secret"),
             jwt_algorithm=os.getenv("JWT_ALGORITHM", "HS256"),
             jwt_expiration_hours=int(os.getenv("JWT_EXPIRATION_HOURS", "24")),
-            rate_limit_per_minute=int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
+            rate_limit_per_minute=int(os.getenv("RATE_LIMIT_PER_MINUTE", "60")),
         )
 
         self.monitoring = MonitoringConfig(
             enable_tracing=os.getenv("ENABLE_TRACING", "true").lower() == "true",
             enable_metrics=os.getenv("ENABLE_METRICS", "true").lower() == "true",
-            jaeger_endpoint=os.getenv("JAEGER_ENDPOINT", "http://jaeger:14268/api/traces"),
+            jaeger_endpoint=os.getenv(
+                "JAEGER_ENDPOINT", "http://jaeger:14268/api/traces"
+            ),
             prometheus_port=int(os.getenv("PROMETHEUS_PORT", "8000")),
-            log_level=os.getenv("LOG_LEVEL", "INFO")
+            log_level=os.getenv("LOG_LEVEL", "INFO"),
         )
 
         self.cuda_visible_devices = os.getenv("CUDA_VISIBLE_DEVICES", "0")
@@ -192,11 +208,11 @@ class Config:
         if not env_path.exists():
             logger.warning(f"Environment file {env_file} not found")
             return
-        with open(env_path, 'r') as f:
+        with open(env_path, "r") as f:
             for line in f:
                 line = line.strip()
-                if line and not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)
+                if line and not line.startswith("#") and "=" in line:
+                    key, value = line.split("=", 1)
                     os.environ[key.strip()] = value.strip()
 
     def to_dict(self) -> Dict[str, Any]:
@@ -211,7 +227,7 @@ class Config:
             "auth": self.auth.__dict__,
             "monitoring": self.monitoring.__dict__,
             "cuda_visible_devices": self.cuda_visible_devices,
-            "cuda_mps_enable": self.cuda_mps_enable
+            "cuda_mps_enable": self.cuda_mps_enable,
         }
 
     def validate(self) -> bool:
@@ -229,8 +245,3 @@ class Config:
 
 
 config = Config()
-
-
-
-
-

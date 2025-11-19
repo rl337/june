@@ -19,6 +19,7 @@ def main() -> None:
         import numpy as np
         import io
         import struct
+
         sr = 16000
         t = np.linspace(0, 1.0, int(sr), endpoint=False)
         tone = (0.2 * np.sin(2 * np.pi * 440 * t)).astype(np.float32)
@@ -26,17 +27,28 @@ def main() -> None:
         pcm = (np.clip(tone, -1.0, 1.0) * 32767.0).astype(np.int16).tobytes()
         buf = io.BytesIO()
         # Write WAV header
-        buf.write(b'RIFF')
-        buf.write(struct.pack('<I', len(pcm) + 36))
-        buf.write(b'WAVE')
-        buf.write(b'fmt ')
-        buf.write(struct.pack('<I', 16))
-        buf.write(struct.pack('<HHIIHH', 1, 1, sr, sr * 2, 2, 16))
-        buf.write(b'data')
-        buf.write(struct.pack('<I', len(pcm)))
+        buf.write(b"RIFF")
+        buf.write(struct.pack("<I", len(pcm) + 36))
+        buf.write(b"WAVE")
+        buf.write(b"fmt ")
+        buf.write(struct.pack("<I", 16))
+        buf.write(struct.pack("<HHIIHH", 1, 1, sr, sr * 2, 2, 16))
+        buf.write(b"data")
+        buf.write(struct.pack("<I", len(pcm)))
         buf.write(pcm)
         data = buf.getvalue()
-    result = client.recognize.__wrapped__(client, audio_data=data, sample_rate=16000, encoding="wav", config=cfg, timeout=30.0) if hasattr(client.recognize, "__wrapped__") else None
+    result = (
+        client.recognize.__wrapped__(
+            client,
+            audio_data=data,
+            sample_rate=16000,
+            encoding="wav",
+            config=cfg,
+            timeout=30.0,
+        )
+        if hasattr(client.recognize, "__wrapped__")
+        else None
+    )
     if result is None:
         # If async, fallback to a simple print note (tool run context). Real validation uses validate_stt.sh with asyncio
         print("Shim constructed; async recognize to be exercised in integration tests.")
@@ -46,5 +58,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-

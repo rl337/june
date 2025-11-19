@@ -14,10 +14,10 @@ class WhisperSttStrategy(SttStrategy):
         self,
         model_name: str = "base.en",  # Upgraded from tiny.en for better accuracy
         device: str = "cpu",
-        whisper_adapter: Optional[WhisperModelAdapter] = None
+        whisper_adapter: Optional[WhisperModelAdapter] = None,
     ) -> None:
         """Initialize Whisper STT strategy.
-        
+
         Args:
             model_name: Whisper model name (e.g., "tiny.en", "base")
             device: Device to run on ("cpu", "cuda")
@@ -38,7 +38,7 @@ class WhisperSttStrategy(SttStrategy):
                 self.device,
             )
             return
-        
+
         if self._adapter is None:
             try:
                 self._model = WhisperModelImpl(self.model_name, self.device)
@@ -60,7 +60,7 @@ class WhisperSttStrategy(SttStrategy):
         data, sr = sf.read(io.BytesIO(audio_bytes), dtype="float32")
         if data.ndim > 1:
             data = data.mean(axis=1)
-        
+
         # Ensure audio is in the right format for Whisper
         # Whisper expects 16kHz audio, but can handle other rates
         # Normalize audio levels for better recognition
@@ -68,17 +68,17 @@ class WhisperSttStrategy(SttStrategy):
             max_val = np.abs(data).max()
             if max_val > 0:
                 data = data / max_val
-        
+
         # Use language hint and better transcription options
         # Use a minimal prompt that helps with common words without adding noise
         # Keep it short to avoid interfering with recognition
         initial_prompt = "Hello world test one two three"
-        
+
         # Check for empty audio before processing
         if len(data) == 0:
             logger.warning("Received empty audio data")
             return InferenceResponse(payload="", metadata={"confidence": 0.0})
-        
+
         result: Dict[str, Any] = self._model.transcribe(
             data,
             fp16=False,
@@ -90,6 +90,6 @@ class WhisperSttStrategy(SttStrategy):
         confidence = result.get("no_speech_prob", 0.0)
         # Convert no_speech_prob to confidence (inverse)
         actual_confidence = 1.0 - confidence if confidence else 0.9
-        return InferenceResponse(payload=text, metadata={"confidence": actual_confidence})
-
-
+        return InferenceResponse(
+            payload=text, metadata={"confidence": actual_confidence}
+        )

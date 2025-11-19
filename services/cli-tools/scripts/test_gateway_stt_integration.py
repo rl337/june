@@ -25,7 +25,7 @@ def main() -> int:
             # If wav not present, skip (we used in-memory before; here just smoke test)
             if not audio_path.exists():
                 # fallback: submit flac bytes
-                audio_path = Path(item["audio"]) 
+                audio_path = Path(item["audio"])
             files = {"audio": (audio_path.name, open(audio_path, "rb"), "audio/wav")}
             r = client.post(f"{gw_url}/api/v1/audio/transcribe", files=files)
             if r.status_code != 200:
@@ -43,7 +43,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
-
-
-

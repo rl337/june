@@ -42,11 +42,11 @@ DEFAULT_LANGUAGE = "en"
 def get_language_preference(user_id: str, chat_id: str) -> str:
     """
     Get language preference for a user/chat.
-    
+
     Args:
         user_id: Telegram user ID
         chat_id: Telegram chat ID
-        
+
     Returns:
         Language code (ISO 639-1), defaults to "en"
     """
@@ -59,23 +59,23 @@ def get_language_preference(user_id: str, chat_id: str) -> str:
 def set_language_preference(user_id: str, chat_id: str, language_code: str) -> bool:
     """
     Set language preference for a user/chat.
-    
+
     Args:
         user_id: Telegram user ID
         chat_id: Telegram chat ID
         language_code: Language code (ISO 639-1)
-        
+
     Returns:
         True if language was set, False if language code is invalid
     """
     # Normalize language code (lowercase)
     language_code = language_code.lower()
-    
+
     # Validate language code
     if language_code not in SUPPORTED_LANGUAGES:
         logger.warning(f"Unsupported language code: {language_code}")
         return False
-    
+
     key = (user_id, chat_id)
     _language_preferences[key] = language_code
     logger.info(f"Set language preference for {user_id}/{chat_id}: {language_code}")
@@ -85,7 +85,7 @@ def set_language_preference(user_id: str, chat_id: str, language_code: str) -> b
 def get_supported_languages() -> Dict[str, str]:
     """
     Get dictionary of supported language codes and names.
-    
+
     Returns:
         Dictionary mapping language codes to language names
     """
@@ -95,10 +95,10 @@ def get_supported_languages() -> Dict[str, str]:
 def is_language_supported(language_code: str) -> bool:
     """
     Check if a language code is supported.
-    
+
     Args:
         language_code: Language code to check
-        
+
     Returns:
         True if supported, False otherwise
     """

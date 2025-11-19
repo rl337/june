@@ -5,7 +5,9 @@ from pathlib import Path
 from urllib.request import urlretrieve
 import json
 
-DATA_DIR = Path(os.environ.get("JUNE_DATA_DIR", "/data")) / "datasets" / "librispeech_small"
+DATA_DIR = (
+    Path(os.environ.get("JUNE_DATA_DIR", "/data")) / "datasets" / "librispeech_small"
+)
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # Use a small sample archive (dev-clean subset with few files). If not available, point to test-clean and limit.
@@ -23,7 +25,11 @@ def main() -> None:
 
     print("Extracting archive (subset)...")
     with tarfile.open(archive_path, "r:gz") as tf:
-        members = [m for m in tf.getmembers() if m.isfile() and (m.name.endswith(".flac") or m.name.endswith(".txt"))]
+        members = [
+            m
+            for m in tf.getmembers()
+            if m.isfile() and (m.name.endswith(".flac") or m.name.endswith(".txt"))
+        ]
         # Limit extraction for speed
         limited = members[:200]
         tf.extractall(DATA_DIR, limited)
@@ -45,7 +51,9 @@ def main() -> None:
                     audio = cand
                     break
                 if audio and audio.exists():
-                    pairs.append({"id": utt_id, "audio": str(audio), "text": transcript})
+                    pairs.append(
+                        {"id": utt_id, "audio": str(audio), "text": transcript}
+                    )
                 if len(pairs) >= 20:
                     break
         if len(pairs) >= 20:
@@ -60,7 +68,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-
-
-
