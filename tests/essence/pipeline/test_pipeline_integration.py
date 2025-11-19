@@ -7,7 +7,14 @@ They will skip if services are not running or if grpc is mocked.
 import pytest
 import os
 import sys
-from unittest.mock import MagicMock
+
+# Import MagicMock first, before any other imports that might use it
+try:
+    from unittest.mock import MagicMock
+except ImportError:
+    # Fallback if unittest.mock is not available (shouldn't happen in Python 3.3+)
+    MagicMock = None
+
 from tests.essence.pipeline.test_pipeline_framework import PipelineTestFramework
 
 
@@ -16,29 +23,37 @@ from tests.essence.pipeline.test_pipeline_framework import PipelineTestFramework
 # starts collecting tests, which avoids issues with decorator evaluation
 _GRPC_AVAILABLE = False
 try:
-    # Check if grpc is already mocked in sys.modules (from other test modules)
-    if 'grpc' in sys.modules:
-        grpc_module = sys.modules['grpc']
-        if isinstance(grpc_module, MagicMock):
-            _GRPC_AVAILABLE = False
+    # First, check if MagicMock is available (should always be, but be safe)
+    if MagicMock is None:
+        _GRPC_AVAILABLE = False
+    else:
+        # Check if grpc is already mocked in sys.modules (from other test modules)
+        if 'grpc' in sys.modules:
+            try:
+                grpc_module = sys.modules['grpc']
+                if isinstance(grpc_module, MagicMock):
+                    _GRPC_AVAILABLE = False
+                else:
+                    # Not mocked, try to verify it's real
+                    try:
+                        import grpc
+                        if not isinstance(grpc, MagicMock) and hasattr(grpc, 'insecure_channel'):
+                            _GRPC_AVAILABLE = True
+                    except (ImportError, AttributeError, TypeError, Exception):
+                        _GRPC_AVAILABLE = False
+            except (AttributeError, KeyError, Exception):
+                _GRPC_AVAILABLE = False
         else:
-            # Not mocked, try to verify it's real
+            # grpc not in sys.modules, try to import it
             try:
                 import grpc
                 if not isinstance(grpc, MagicMock) and hasattr(grpc, 'insecure_channel'):
                     _GRPC_AVAILABLE = True
-            except (ImportError, AttributeError, TypeError):
+            except (ImportError, AttributeError, TypeError, Exception):
                 _GRPC_AVAILABLE = False
-    else:
-        # grpc not in sys.modules, try to import it
-        try:
-            import grpc
-            if not isinstance(grpc, MagicMock) and hasattr(grpc, 'insecure_channel'):
-                _GRPC_AVAILABLE = True
-        except (ImportError, AttributeError, TypeError):
-            _GRPC_AVAILABLE = False
 except Exception:
     # Catch absolutely everything - assume unavailable if anything goes wrong
+    # This ensures the module can always be imported, even if grpc checking fails
     _GRPC_AVAILABLE = False
 
 
