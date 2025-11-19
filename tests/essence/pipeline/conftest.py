@@ -15,6 +15,28 @@ def pipeline_framework():
 @pytest.fixture
 def pipeline_framework_real():
     """Fixture providing a pipeline test framework with real services (if available)."""
+    # Always skip in CI - check first before any other operations
+    try:
+        if os.getenv('CI') == 'true':
+            pytest.skip("Skipping integration test (CI environment)")
+    except Exception:
+        # If we can't check CI status, skip to be safe
+        pytest.skip("Skipping integration test (unable to determine CI status)")
+    
+    # Check if PipelineTestFramework is available
+    if PipelineTestFramework is None:
+        pytest.skip("PipelineTestFramework not available")
+    
+    # Check if grpc is available and not mocked
+    try:
+        import grpc
+        from unittest.mock import MagicMock
+        # Check if grpc is mocked (from conftest.py in other test modules)
+        if isinstance(grpc, MagicMock) or not hasattr(grpc, 'insecure_channel'):
+            pytest.skip("Skipping integration test (grpc unavailable or mocked)")
+    except (ImportError, AttributeError, Exception):
+        pytest.skip("Skipping integration test (grpc unavailable)")
+    
     return PipelineTestFramework(use_real_services=True)
 
 

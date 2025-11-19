@@ -3,47 +3,10 @@ Integration tests for pipeline framework with real services.
 
 These tests use the PipelineTestFramework with real services when available.
 They will skip if services are not running or if grpc is mocked.
+
+The `pipeline_framework_real` fixture is defined in conftest.py with skip logic.
 """
 import pytest
-import os
-
-# Wrap all imports in try/except to ensure module can always be imported
-# This is critical for CI environments where pytest collection must not fail
-# Even though tests are excluded via marker, pytest still imports the module to check markers
-PipelineTestFramework = None
-try:
-    from tests.essence.pipeline.test_pipeline_framework import PipelineTestFramework
-except Exception:
-    # If import fails for any reason, set to None - fixture will skip
-    PipelineTestFramework = None
-
-
-@pytest.fixture
-def pipeline_framework_real():
-    """Fixture providing a pipeline test framework with real services."""
-    # Always skip in CI - check first before any other operations
-    try:
-        if os.getenv('CI') == 'true':
-            pytest.skip("Skipping integration test (CI environment)")
-    except Exception:
-        # If we can't check CI status, skip to be safe
-        pytest.skip("Skipping integration test (unable to determine CI status)")
-    
-    # Check if PipelineTestFramework is available
-    if PipelineTestFramework is None:
-        pytest.skip("PipelineTestFramework not available")
-    
-    # Check if grpc is available and not mocked
-    try:
-        import grpc
-        from unittest.mock import MagicMock
-        # Check if grpc is mocked (from conftest.py in other test modules)
-        if isinstance(grpc, MagicMock) or not hasattr(grpc, 'insecure_channel'):
-            pytest.skip("Skipping integration test (grpc unavailable or mocked)")
-    except (ImportError, AttributeError, Exception):
-        pytest.skip("Skipping integration test (grpc unavailable)")
-    
-    return PipelineTestFramework(use_real_services=True)
 
 
 @pytest.mark.integration
