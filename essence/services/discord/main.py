@@ -247,7 +247,8 @@ class DiscordBotService:
                                         rendered_parts[0],
                                         user_id=str(user_id),
                                         message_type="text",
-                                        rendering_metadata={"part": 1, "total_parts": len(rendered_parts)}
+                                        rendering_metadata={"part": 1, "total_parts": len(rendered_parts)},
+                                        raw_text=raw_llm_response if raw_llm_response else None
                                     )
                                     logger.info(f"Replaced status with final message (first part: {len(rendered_parts[0])} chars)")
                                 except Exception as edit_err:
@@ -262,7 +263,8 @@ class DiscordBotService:
                                             rendered_parts[0],
                                             user_id=str(user_id),
                                             message_type="text",
-                                            rendering_metadata={"part": 1, "total_parts": len(rendered_parts), "fallback": True}
+                                            rendering_metadata={"part": 1, "total_parts": len(rendered_parts), "fallback": True},
+                                            raw_text=raw_llm_response if raw_llm_response else None
                                         )
                             else:
                                 # No status message, send as new
@@ -271,7 +273,8 @@ class DiscordBotService:
                                     rendered_parts[0],
                                     user_id=str(user_id),
                                     message_type="text",
-                                    rendering_metadata={"part": 1, "total_parts": len(rendered_parts)}
+                                    rendering_metadata={"part": 1, "total_parts": len(rendered_parts)},
+                                    raw_text=raw_llm_response if raw_llm_response else None
                                 )
                                 logger.info(f"Sent final message (first part: {len(rendered_parts[0])} chars)")
                             
@@ -283,7 +286,8 @@ class DiscordBotService:
                                     part,
                                     user_id=str(user_id),
                                     message_type="text",
-                                    rendering_metadata={"part": i + 1, "total_parts": len(rendered_parts)}
+                                    rendering_metadata={"part": i + 1, "total_parts": len(rendered_parts)},
+                                    raw_text=raw_llm_response if raw_llm_response and i == 0 else None
                                 )
                         
                         # Log the turn for debugging

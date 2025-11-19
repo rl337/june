@@ -250,7 +250,8 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                                             user_id=user_id,
                                             chat_id=chat_id,
                                             message_type="text",
-                                            rendering_metadata={"part": 1, "total_parts": len(rendered_parts)}
+                                            rendering_metadata={"part": 1, "total_parts": len(rendered_parts)},
+                                            raw_text=raw_llm_response if raw_llm_response else None
                                         )
                                         logger.info(f"Replaced status with final message (first part: {len(rendered_parts[0])} chars)")
                                         render_span.set_attribute("message_sent", True)
@@ -266,7 +267,8 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                                                 rendered_parts[0],
                                                 parse_mode="HTML",
                                                 message_type="text",
-                                                rendering_metadata={"part": 1, "total_parts": len(rendered_parts), "fallback": True}
+                                                rendering_metadata={"part": 1, "total_parts": len(rendered_parts), "fallback": True},
+                                                raw_text=raw_llm_response if raw_llm_response else None
                                             )
                                 else:
                                     # No status message, send as new
@@ -275,7 +277,8 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                                         rendered_parts[0],
                                         parse_mode="HTML",
                                         message_type="text",
-                                        rendering_metadata={"part": 1, "total_parts": len(rendered_parts)}
+                                        rendering_metadata={"part": 1, "total_parts": len(rendered_parts)},
+                                        raw_text=raw_llm_response if raw_llm_response else None
                                     )
                                     logger.info(f"Sent final message (first part: {len(rendered_parts[0])} chars)")
                                     render_span.set_attribute("message_sent", True)
@@ -288,7 +291,8 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                                         part,
                                         parse_mode="HTML",
                                         message_type="text",
-                                        rendering_metadata={"part": i + 1, "total_parts": len(rendered_parts)}
+                                        rendering_metadata={"part": i + 1, "total_parts": len(rendered_parts)},
+                                        raw_text=raw_llm_response if raw_llm_response and i == 0 else None
                                     )
                             
                             # Log the turn for debugging
