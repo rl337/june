@@ -5,9 +5,11 @@ Comprehensive load testing framework for June services to validate 10x capacity 
 ## Overview
 
 This framework provides load testing capabilities for:
-- **Gateway REST API** - HTTP endpoints (chat, LLM, TTS, STT)
-- **Gateway WebSocket** - Real-time WebSocket connections
-- **gRPC Services** - STT, TTS, and Inference API services
+- **gRPC Services** - STT, TTS, and LLM inference services (TensorRT-LLM, default)
+- **Gateway REST API** - ⚠️ **OBSOLETE** - Gateway service has been removed (tests kept for reference)
+- **Gateway WebSocket** - ⚠️ **OBSOLETE** - Gateway service has been removed (tests kept for reference)
+
+**Note:** Gateway service was removed as part of the refactoring. Services now communicate directly via gRPC. Gateway load tests are kept for reference but are not functional in the current architecture.
 
 ## Features
 
@@ -134,11 +136,14 @@ Load tests must meet these criteria:
 For interactive testing and monitoring:
 
 ```bash
-# Start Locust web UI
-locust -f load_tests/locust/gateway_rest.py --host=http://localhost:8000
+# Start Locust web UI for gRPC tests
+# Note: Gateway tests are obsolete (gateway service removed)
+locust -f load_tests/grpc/grpc_load_test.py --host=grpc://localhost:50052
 
 # Open browser to http://localhost:8089
 ```
+
+**Note:** Gateway REST/WebSocket tests are obsolete since the gateway service was removed. Use gRPC load tests instead.
 
 ## CI/CD Integration
 
@@ -176,14 +181,15 @@ reports/
 
 Ensure all June services are running:
 ```bash
-docker-compose ps
+docker compose ps
 ```
 
 ### High Error Rates
 
-1. Check service health: `curl http://localhost:8000/health`
-2. Review service logs: `docker-compose logs gateway`
+1. Check service health: Use gRPC health checks or service-specific HTTP endpoints
+2. Review service logs: `docker compose logs <service-name>` (e.g., `telegram`, `discord`, `stt`, `tts`)
 3. Check resource utilization: `docker stats`
+4. For LLM service: Check TensorRT-LLM status (in home_infra/shared-network as `tensorrt-llm:8000`)
 
 ### gRPC Tests Failing
 
