@@ -2,7 +2,7 @@
 
 ## Status: ✅ **CORE REFACTORING COMPLETE** → 🚀 **FORWARD DEVELOPMENT IN PROGRESS**
 
-**Last Updated:** 2025-11-19 (Fixed GitHub Actions CI - Simplified module-level code, check CI first in fixture)
+**Last Updated:** 2025-11-19 (Fixed GitHub Actions CI - Moved fixture skip logic to conftest.py, removed duplicate fixture)
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
@@ -260,6 +260,7 @@ All major refactoring phases have been completed:
    - ✅ Made fixture skip logic more defensive (run #305) - Enhanced fixture with nested try/except blocks to safely handle any evaluation errors when checking `_IS_CI` and `_GRPC_AVAILABLE` constants, defaulting to skip if any error occurs
    - ✅ Removed module-level constant references from fixture (run #307) - Changed fixture to use direct `os.getenv('CI')` and `import grpc` checks instead of referencing module-level constants, avoiding any potential collection-time evaluation issues
    - ✅ Simplified module-level code, check CI first in fixture (run #309) - Removed all complex module-level constant evaluation and grpc checking code. Module now only imports `PipelineTestFramework` wrapped in try/except. Fixture checks CI first, then PipelineTestFramework availability, then grpc availability. This ensures module can always be imported safely even when grpc is mocked by other conftest.py files.
+   - ✅ Moved fixture skip logic to conftest.py, removed duplicate fixture (run #311) - Found duplicate `pipeline_framework_real` fixture definition in both `test_pipeline_integration.py` and `conftest.py`. Moved all skip logic to the fixture in `conftest.py` and removed the duplicate from the test file. This fixes pytest collection errors caused by duplicate fixture definitions.
    - ✅ Total: 161 tests passing (153 existing + 8 pipeline tests, 3 integration tests excluded from CI via marker)
 
 2. **Test STT → LLM → TTS flow:** ⏳ TODO (framework ready, requires real services)
