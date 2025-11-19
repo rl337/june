@@ -24,6 +24,15 @@ jobs:
         POETRY_VIRTUALENVS_IN_PROJECT: "true"
       run: |
         poetry install --no-interaction --no-ansi --no-root
+    - name: Check test collection
+      run: |
+        echo "Checking pytest collection..."
+        poetry run pytest tests/essence/ -m "not integration" --co -q || {
+          echo "ERROR: Test collection failed!"
+          echo "Attempting to collect all tests (including integration) to see what's available..."
+          poetry run pytest tests/essence/ --co -q || true
+          exit 1
+        }
     - name: Run tests
       run: |
         poetry run pytest tests/essence/ -m "not integration" -v --tb=short
