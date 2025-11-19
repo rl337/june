@@ -29,6 +29,10 @@ poetry run -m essence <command-name> [arguments]
 - `manage-tensorrt-llm` - Manage TensorRT-LLM models (load/unload/list/status)
 - `setup-triton-repository` - Setup and validate Triton Inference Server model repository structure
 - `compile-model` - Validate prerequisites and provide guidance for TensorRT-LLM model compilation
+  - `--check-prerequisites` - Check GPU, repository structure, and build tools
+  - `--generate-template` - Generate compilation command templates
+  - `--generate-config` - Generate config.pbtxt template file
+  - `--generate-tokenizer-commands` - Generate commands to copy tokenizer files
 
 ## Creating a New Command
 

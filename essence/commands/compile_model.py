@@ -291,6 +291,134 @@ trtllm-build \\
     return template
 
 
+def check_tokenizer_files(model_hf_name: str, model_cache_dir: str = "/home/rlee/models") -> Tuple[bool, str, List[str]]:
+    """
+    Check if tokenizer files exist in the HuggingFace model directory.
+    
+    Args:
+        model_hf_name: HuggingFace model name (e.g., "Qwen/Qwen3-30B-A3B-Thinking-2507")
+        model_cache_dir: Base model cache directory (default: /home/rlee/models)
+    
+    Returns:
+        Tuple of (files_exist, message, list_of_tokenizer_files)
+    """
+    import glob
+    
+    # Common tokenizer file patterns
+    tokenizer_patterns = [
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "vocab.json",
+        "merges.txt",
+        "special_tokens_map.json",
+        "added_tokens.json",
+        "tokenizer.model",
+        "vocab.txt"
+    ]
+    
+    # Try to find the model directory
+    # HuggingFace cache structure: models/huggingface/hub/models--{org}--{model}/
+    model_cache_path = Path(model_cache_dir)
+    model_dir_pattern = model_cache_path / "huggingface" / "hub" / f"models--{model_hf_name.replace('/', '--')}"
+    
+    # Check if directory exists
+    if not model_dir_pattern.exists():
+        # Try alternative: direct model name directory
+        model_dir_pattern = model_cache_path / model_hf_name.replace("/", "--")
+        if not model_dir_pattern.exists():
+            return False, f"Model directory not found: {model_hf_name}", []
+    
+    # Search for tokenizer files
+    found_files = []
+    for pattern in tokenizer_patterns:
+        # Search recursively
+        matches = list(model_dir_pattern.rglob(pattern))
+        if matches:
+            found_files.extend([str(f.relative_to(model_dir_pattern)) for f in matches])
+    
+    if found_files:
+        return True, f"Found {len(found_files)} tokenizer file(s)", found_files
+    else:
+        return False, "No tokenizer files found", []
+
+
+def generate_tokenizer_copy_commands(
+    model_name: str,
+    model_hf_name: str,
+    repository_path: str = "/home/rlee/models/triton-repository",
+    model_cache_dir: str = "/home/rlee/models"
+) -> str:
+    """
+    Generate commands to copy tokenizer files from HuggingFace model to Triton repository.
+    
+    Args:
+        model_name: Local model name (e.g., "qwen3-30b")
+        model_hf_name: HuggingFace model name (e.g., "Qwen/Qwen3-30B-A3B-Thinking-2507")
+        repository_path: Path to Triton repository
+        model_cache_dir: Base model cache directory
+    
+    Returns:
+        String with copy commands
+    """
+    # Check if tokenizer files exist
+    files_exist, msg, tokenizer_files = check_tokenizer_files(model_hf_name, model_cache_dir)
+    
+    # Find model directory
+    model_dir_pattern = Path(model_cache_dir) / "huggingface" / "hub" / f"models--{model_hf_name.replace('/', '--')}"
+    if not model_dir_pattern.exists():
+        model_dir_pattern = Path(model_cache_dir) / model_hf_name.replace("/", "--")
+    
+    target_dir = Path(repository_path) / model_name / "1"
+    
+    if not files_exist:
+        return f"""# Tokenizer Files Not Found
+
+⚠️  Could not find tokenizer files for {model_hf_name} in {model_cache_dir}
+
+**Manual Steps:**
+1. Locate the HuggingFace model directory (usually in {model_cache_dir}/huggingface/hub/)
+2. Find tokenizer files (tokenizer.json, tokenizer_config.json, vocab.json, etc.)
+3. Copy them to: {target_dir}
+
+**Example:**
+```bash
+# Find model directory
+find {model_cache_dir}/huggingface -name "*{model_hf_name.split('/')[-1]}*" -type d
+
+# Copy tokenizer files (adjust paths as needed)
+cp <model_dir>/tokenizer*.json {target_dir}/
+cp <model_dir>/vocab*.json {target_dir}/
+```
+"""
+    
+    # Generate copy commands
+    commands = [f"# Copy Tokenizer Files for {model_name}"]
+    commands.append("")
+    commands.append(f"# Source: {model_dir_pattern}")
+    commands.append(f"# Target: {target_dir}")
+    commands.append("")
+    commands.append("```bash")
+    
+    # Generate individual copy commands
+    for file in tokenizer_files:
+        source_file = model_dir_pattern / file
+        target_file = target_dir / Path(file).name
+        commands.append(f"cp '{source_file}' '{target_file}'")
+    
+    # Or use rsync for all files at once
+    commands.append("")
+    commands.append("# Or copy all tokenizer files at once:")
+    commands.append(f"rsync -av '{model_dir_pattern}/'tokenizer* '{model_dir_pattern}/'vocab* '{target_dir}/'")
+    
+    commands.append("```")
+    commands.append("")
+    commands.append(f"**Found {len(tokenizer_files)} tokenizer file(s):**")
+    for file in tokenizer_files:
+        commands.append(f"- {file}")
+    
+    return "\n".join(commands)
+
+
 def generate_config_pbtxt(model_name: str, max_batch_size: int = 0, max_input_len: int = 131072) -> str:
     """
     Generate a config.pbtxt template for Triton Inference Server.
@@ -411,6 +539,11 @@ class CompileModelCommand(Command):
             '--generate-config',
             action='store_true',
             help='Generate config.pbtxt template file'
+        )
+        self.parser.add_argument(
+            '--generate-tokenizer-commands',
+            action='store_true',
+            help='Generate commands to copy tokenizer files'
         )
         self.parser.add_argument(
             '--json',
@@ -560,14 +693,31 @@ class CompileModelCommand(Command):
             print(json.dumps(results, indent=2))
             sys.exit(0)
         
+        # Generate tokenizer copy commands
+        if self.args.generate_tokenizer_commands:
+            tokenizer_commands = generate_tokenizer_copy_commands(
+                model_name,
+                self.args.model_hf_name or model_name,
+                self.args.repository_path,
+                os.getenv("MODEL_CACHE_DIR", "/home/rlee/models")
+            )
+            if not self.args.json:
+                print("\n" + "="*70)
+                print("TOKENIZER FILE COPY COMMANDS")
+                print("="*70)
+                print(tokenizer_commands)
+            else:
+                results['tokenizer_commands'] = tokenizer_commands
+        
         # Default: show summary
-        if not self.args.check_prerequisites and not self.args.generate_template and not self.args.generate_config:
+        if not self.args.check_prerequisites and not self.args.generate_template and not self.args.generate_config and not self.args.generate_tokenizer_commands:
             print("Model compilation helper for TensorRT-LLM")
             print(f"\nModel: {model_name}")
             print("\nUse --check-prerequisites to validate setup")
             print("Use --generate-template to get compilation command template")
             print("Use --generate-config to generate config.pbtxt template")
+            print("Use --generate-tokenizer-commands to get tokenizer file copy commands")
             print("\nExample:")
-            print(f"  poetry run -m essence compile-model --model {model_name} --check-prerequisites --generate-template --generate-config")
+            print(f"  poetry run -m essence compile-model --model {model_name} --check-prerequisites --generate-template --generate-config --generate-tokenizer-commands")
         
         sys.exit(0)

@@ -174,19 +174,25 @@ It also generates compilation command templates with proper options.
    ```
    This creates a `config.pbtxt` file in the model directory with proper TensorRT-LLM configuration.
 
-5. **Compile the model** using TensorRT-LLM build tools:
+5. **Get tokenizer file copy commands**:
+   ```bash
+   poetry run -m essence compile-model --model qwen3-30b --model-hf-name Qwen/Qwen3-30B-A3B-Thinking-2507 --generate-tokenizer-commands
+   ```
+   This generates commands to copy tokenizer files from the HuggingFace model directory to the Triton repository.
+
+6. **Compile the model** using TensorRT-LLM build tools:
    - Use the command template from step 3
    - Configure quantization (8-bit as specified in environment variables)
    - Set max context length (131072 tokens)
    - Generate TensorRT-LLM engine files
    - **Note:** This step requires TensorRT-LLM build tools and must be done manually or via external scripts
 
-6. **Place compiled files** in the model repository:
+7. **Place compiled files** in the model repository:
    - Copy engine files to `/home/rlee/models/triton-repository/<model_name>/<version>/`
    - Review and adjust `config.pbtxt` if needed (already created in step 4)
-   - Copy tokenizer files from HuggingFace model directory
+   - Copy tokenizer files using commands from step 5 (or manually copy from HuggingFace model directory)
 
-7. **Validate compiled model**:
+8. **Validate compiled model**:
    ```bash
    poetry run -m essence setup-triton-repository --action validate --model qwen3-30b
    ```
