@@ -192,7 +192,7 @@ class TelegramHTMLValidator(PlatformValidator):
             "a",
         }
         # Self-closing tags (Telegram doesn't use these, but check for completeness)
-        self.self_closing_tags = set()
+        self.self_closing_tags: set[str] = set()
 
     def validate(self, html: str, lenient: bool = False) -> Tuple[bool, List[str]]:
         """
@@ -338,7 +338,7 @@ class DiscordValidator(PlatformValidator):
     - Headings are not supported (must use bold)
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Patterns for Discord markdown
         self.bold_pattern = re.compile(r"\*\*([^*]+)\*\*")
         self.italic_pattern = re.compile(r"(?<!\*)\*([^*]+)\*(?!\*)")
