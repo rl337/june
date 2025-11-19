@@ -2,7 +2,7 @@
 
 ## Status: ✅ **CORE REFACTORING COMPLETE** → 🚀 **FORWARD DEVELOPMENT IN PROGRESS**
 
-**Last Updated:** 2025-11-18 (Phase 15.1: TensorRT-LLM container added to home_infra docker-compose.yml - basic configuration complete, ready for model loading/unloading API implementation)
+**Last Updated:** 2025-11-18 (Phase 15.2: Model loading/unloading API implemented - CLI command `manage-tensorrt-llm` created for interacting with Triton Inference Server model repository API)
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
@@ -107,7 +107,7 @@ All major refactoring phases have been completed:
 
 **Goal:** Replace `inference-api` service with TensorRT-LLM container for optimized GPU inference.
 
-**Current Status:** Code migration complete (Task 3 ✅). TensorRT-LLM container setup complete (Task 1 ✅). Remaining tasks (2, 4) require model loading/unloading API and model compilation.
+**Current Status:** Code migration complete (Task 3 ✅). TensorRT-LLM container setup complete (Task 1 ✅). Model loading/unloading API implemented (Task 2 ✅). Remaining task (4) requires model compilation and actual model loading.
 
 **IMPORTANT:** The agent CAN and SHOULD work on the `home_infra` project at `/home/rlee/dev/home_infra` to complete these tasks. This is NOT external work - it's part of the june project infrastructure. The agent has full access to modify `home_infra/docker-compose.yml` and related configuration files.
 
@@ -123,11 +123,18 @@ All major refactoring phases have been completed:
    - ✅ Added Jaeger tracing integration
    - ⏳ **Note:** This is a basic configuration using Triton Inference Server. TensorRT-LLM requires model compilation/preparation and model repository setup, which will be handled in Task 2 (model loading/unloading API)
 
-2. **Implement model loading/unloading:** ⏳ TODO (can be done after TensorRT-LLM container is set up in task 1)
-   - Create API/interface for loading models into TensorRT-LLM
-   - Create API/interface for unloading models
-   - Support multiple models (load one at a time, unload before loading another)
-   - Handle model switching gracefully (unload current, load new)
+2. **Implement model loading/unloading:** ✅ COMPLETED
+   - ✅ Created `essence/commands/manage_tensorrt_llm.py` command for model management
+   - ✅ Implemented `TensorRTLLMManager` class that interacts with Triton Inference Server's model repository API
+   - ✅ Supports loading models via HTTP POST `/v2/repository/models/{model_name}/load`
+   - ✅ Supports unloading models via HTTP POST `/v2/repository/models/{model_name}/unload`
+   - ✅ Supports listing available models via GET `/v2/repository/index`
+   - ✅ Supports checking model status via GET `/v2/models/{model_name}/ready`
+   - ✅ CLI interface: `poetry run -m essence manage-tensorrt-llm --action {load|unload|list|status} --model <name>`
+   - ✅ Uses httpx for HTTP client (already in dependencies)
+   - ✅ Proper error handling for timeouts, connection errors, and API errors
+   - ✅ Model switching: Can unload current model and load new one (one at a time)
+   - ⏳ **Note:** Models must be compiled/prepared and placed in Triton's model repository before they can be loaded. This API handles loading/unloading operations only. Model compilation/preparation is a separate step (see Task 4).
 
 3. **Migrate june services to use TensorRT-LLM:** ✅ COMPLETED (Code changes)
    - ✅ Updated telegram service configuration to default to TensorRT-LLM (tensorrt-llm:8000)
@@ -146,7 +153,7 @@ All major refactoring phases have been completed:
    - ✅ Updated README.md to reference TensorRT-LLM setup and usage
    - ⏳ **Remaining:** Fully remove inference-api service from docker-compose.yml (waiting for TensorRT-LLM setup and verification in home_infra)
 
-4. **Get Qwen3-30B-A3B-Thinking-2507 running:** ⏳ TODO (requires TensorRT-LLM container setup from task 1 and model loading API from task 2)
+4. **Get Qwen3-30B-A3B-Thinking-2507 running:** ⏳ TODO (requires TensorRT-LLM container setup from task 1, model loading API from task 2, and model compilation/preparation)
    - Load Qwen3 model into TensorRT-LLM container
    - Verify GPU usage (must use GPU, CPU fallback FORBIDDEN)
    - Test model inference via gRPC interface
