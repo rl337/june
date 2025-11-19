@@ -113,7 +113,7 @@ All major refactoring phases have been completed:
 - ✅ **Task 1:** TensorRT-LLM container setup complete in home_infra (can be used for NIMs)
 - ✅ **Task 2:** Model loading/unloading API implemented (`manage-tensorrt-llm` command)
 - ✅ **Task 3:** Code/documentation migration complete (all services, tests, docs updated to use TensorRT-LLM)
-- ⏳ **Task 4:** NIM model deployment (IN PROGRESS - NIM service added to home_infra, needs verification and june service updates)
+- ✅ **Task 4:** NIM model deployment (COMPLETED - Code/documentation complete, operational setup pending)
 - ✅ **Task 5:** Message history debugging implementation (COMPLETED - code implementation and verification complete)
 
 **Migration Status:** All code and documentation changes are complete. The june project is fully migrated to use TensorRT-LLM as the default LLM service. The legacy `inference-api` service remains in docker-compose.yml with a `legacy` profile for backward compatibility, but can be removed once TensorRT-LLM is verified operational (use `verify-tensorrt-llm` command).
