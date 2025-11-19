@@ -2,7 +2,7 @@
 
 ## Status: ✅ **CORE REFACTORING COMPLETE** → 🚀 **FORWARD DEVELOPMENT IN PROGRESS**
 
-**Last Updated:** 2025-11-19 (Fixed GitHub Actions CI - Use module-level constant for grpc availability check)
+**Last Updated:** 2025-11-19 (Fixed GitHub Actions CI - Made MagicMock import safer in test collection)
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
@@ -247,6 +247,7 @@ All major refactoring phases have been completed:
    - ✅ All 3 integration tests passing (2 skipped when grpc mocked/unavailable, 1 service availability check)
    - ✅ Fixed GitHub Actions CI failure (run #269) - Tests now skip gracefully when grpc is mocked
    - ✅ Enhanced grpc availability check to use module-level constant (run #278) - Changed from function call to constant evaluated at import time to avoid pytest collection issues
+   - ✅ Made MagicMock import safer (run #280) - Added try/except around MagicMock import and additional exception handling in grpc availability check
    - ✅ Total: 162 tests passing (153 existing + 9 pipeline tests)
 
 2. **Test STT → LLM → TTS flow:** ⏳ TODO (framework ready, requires real services)
