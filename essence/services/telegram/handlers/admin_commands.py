@@ -293,14 +293,18 @@ async def system_status_command(update: Update, context: ContextTypes.DEFAULT_TY
     except Exception:
         tts_status = "❌ Offline"
 
-    # Check LLM service (if available)
-    llm_address = os.getenv("LLM_SERVICE_URL", "http://orchestrator:8080")
+    # Check LLM service (uses gRPC, not HTTP)
+    # Note: TensorRT-LLM uses gRPC for health checks, not HTTP
+    # We can't easily check gRPC health here, so we'll just note the configured address
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"{llm_address}/health")
-            llm_status = "✅ Online" if response.status_code == 200 else "❌ Offline"
+        from essence.services.telegram.dependencies.config import get_llm_address
+
+        llm_address = get_llm_address()
+        # LLM service uses gRPC, so we can't check HTTP health
+        # Just indicate the configured address
+        llm_status = f"✅ Configured ({llm_address})"
     except Exception:
-        llm_status = "❌ Offline"
+        llm_status = "❌ Configuration Error"
 
     # Get database stats
     try:
