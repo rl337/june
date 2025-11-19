@@ -169,7 +169,9 @@ def check_model_files(model_name: str, repository_path: str = "/home/rlee/models
         'has_config': False,
         'has_engine_files': False,
         'has_tokenizer': False,
-        'files_found': []
+        'files_found': [],
+        'missing_files': [],
+        'ready_for_loading': False
     }
     
     if not model_dir.exists():
@@ -180,25 +182,116 @@ def check_model_files(model_name: str, repository_path: str = "/home/rlee/models
     if config_file.exists():
         details['has_config'] = True
         details['files_found'].append('config.pbtxt')
+    else:
+        details['missing_files'].append('config.pbtxt')
     
     # Check for engine files (typical TensorRT-LLM output)
     engine_files = list(model_dir.glob("*.engine"))
     if engine_files:
         details['has_engine_files'] = True
         details['files_found'].extend([f.name for f in engine_files])
+    else:
+        details['missing_files'].append('*.engine files')
     
     # Check for tokenizer files
     tokenizer_files = list(model_dir.glob("tokenizer*.json")) + list(model_dir.glob("vocab*.json"))
     if tokenizer_files:
         details['has_tokenizer'] = True
         details['files_found'].extend([f.name for f in tokenizer_files])
+    else:
+        details['missing_files'].append('tokenizer files (tokenizer*.json or vocab*.json)')
     
-    if details['has_config'] and details['has_engine_files']:
-        return True, f"Model appears to be compiled (found config.pbtxt and engine files)", details
+    # Model is ready for loading if all critical files are present
+    details['ready_for_loading'] = details['has_config'] and details['has_engine_files'] and details['has_tokenizer']
+    
+    if details['ready_for_loading']:
+        return True, f"Model is ready for loading (all required files present)", details
+    elif details['has_config'] and details['has_engine_files']:
+        return True, f"Model appears to be compiled (found config.pbtxt and engine files, but missing tokenizer files)", details
     elif details['has_config']:
         return False, "Model directory exists but missing engine files (compilation incomplete)", details
     else:
         return False, "Model directory exists but missing required files (needs compilation)", details
+
+
+def check_model_readiness(model_name: str, repository_path: str = "/home/rlee/models/triton-repository") -> Tuple[bool, str, Dict[str, Any]]:
+    """
+    Comprehensive check to verify if model is ready for loading into Triton.
+    
+    Checks for:
+    - Model directory exists
+    - config.pbtxt is present
+    - Engine files are present
+    - Tokenizer files are present
+    - Config.pbtxt is valid (basic syntax check)
+    
+    Returns:
+        Tuple of (ready, message, details_dict)
+    """
+    model_dir = Path(repository_path) / model_name / "1"
+    details = {
+        'model_name': model_name,
+        'model_dir': str(model_dir),
+        'checks': {},
+        'ready': False,
+        'issues': []
+    }
+    
+    # Check 1: Directory exists
+    if not model_dir.exists():
+        details['checks']['directory'] = {'success': False, 'message': f"Model directory does not exist: {model_dir}"}
+        details['issues'].append("Model directory does not exist")
+        return False, "Model directory does not exist", details
+    details['checks']['directory'] = {'success': True, 'message': f"Model directory exists: {model_dir}"}
+    
+    # Check 2: config.pbtxt exists and is readable
+    config_file = model_dir / "config.pbtxt"
+    if not config_file.exists():
+        details['checks']['config'] = {'success': False, 'message': "config.pbtxt not found"}
+        details['issues'].append("Missing config.pbtxt")
+    else:
+        # Basic validation: check if file is readable and not empty
+        try:
+            config_content = config_file.read_text()
+            if len(config_content.strip()) == 0:
+                details['checks']['config'] = {'success': False, 'message': "config.pbtxt is empty"}
+                details['issues'].append("config.pbtxt is empty")
+            elif 'name:' not in config_content or 'platform:' not in config_content:
+                details['checks']['config'] = {'success': False, 'message': "config.pbtxt appears invalid (missing required fields)"}
+                details['issues'].append("config.pbtxt appears invalid")
+            else:
+                details['checks']['config'] = {'success': True, 'message': "config.pbtxt exists and appears valid"}
+        except Exception as e:
+            details['checks']['config'] = {'success': False, 'message': f"Error reading config.pbtxt: {e}"}
+            details['issues'].append(f"Cannot read config.pbtxt: {e}")
+    
+    # Check 3: Engine files exist
+    engine_files = list(model_dir.glob("*.engine"))
+    if not engine_files:
+        details['checks']['engine_files'] = {'success': False, 'message': "No .engine files found"}
+        details['issues'].append("Missing TensorRT-LLM engine files")
+    else:
+        details['checks']['engine_files'] = {'success': True, 'message': f"Found {len(engine_files)} engine file(s)"}
+    
+    # Check 4: Tokenizer files exist
+    tokenizer_files = list(model_dir.glob("tokenizer*.json")) + list(model_dir.glob("vocab*.json"))
+    if not tokenizer_files:
+        details['checks']['tokenizer'] = {'success': False, 'message': "No tokenizer files found"}
+        details['issues'].append("Missing tokenizer files")
+    else:
+        details['checks']['tokenizer'] = {'success': True, 'message': f"Found {len(tokenizer_files)} tokenizer file(s)"}
+    
+    # Overall readiness
+    all_checks_passed = all(
+        check.get('success', False) 
+        for check in details['checks'].values()
+    )
+    details['ready'] = all_checks_passed
+    
+    if all_checks_passed:
+        return True, "✅ Model is ready for loading! All required files are present and valid.", details
+    else:
+        return False, f"❌ Model is not ready for loading. {len(details['issues'])} issue(s) found.", details
 
 
 def generate_compilation_template(model_name: str, model_hf_name: str = None) -> str:
@@ -546,6 +639,11 @@ class CompileModelCommand(Command):
             help='Generate commands to copy tokenizer files'
         )
         self.parser.add_argument(
+            '--check-readiness',
+            action='store_true',
+            help='Check if model is ready for loading (validates all required files are present)'
+        )
+        self.parser.add_argument(
             '--json',
             action='store_true',
             help='Output results as JSON'
@@ -709,15 +807,53 @@ class CompileModelCommand(Command):
             else:
                 results['tokenizer_commands'] = tokenizer_commands
         
+        # Check readiness (comprehensive check for loading)
+        if self.args.check_readiness:
+            print("\n🔍 Checking if model is ready for loading...\n")
+            ready, msg, readiness_details = check_model_readiness(model_name, self.args.repository_path)
+            results['readiness'] = {
+                'ready': ready,
+                'message': msg,
+                'details': readiness_details
+            }
+            
+            if not self.args.json:
+                # Print individual checks
+                for check_name, check_result in readiness_details['checks'].items():
+                    status = "✅" if check_result.get('success', False) else "❌"
+                    print(f"{status} {check_name.replace('_', ' ').title()}: {check_result.get('message', '')}")
+                
+                print(f"\n{msg}")
+                
+                if not ready and readiness_details.get('issues'):
+                    print("\nIssues to fix:")
+                    for issue in readiness_details['issues']:
+                        print(f"  - {issue}")
+                    
+                    print("\n💡 Next steps:")
+                    if not readiness_details['checks'].get('config', {}).get('success'):
+                        print("  1. Generate config.pbtxt: --generate-config")
+                    if not readiness_details['checks'].get('engine_files', {}).get('success'):
+                        print("  2. Compile the model using TensorRT-LLM build tools: --generate-template")
+                    if not readiness_details['checks'].get('tokenizer', {}).get('success'):
+                        print("  3. Copy tokenizer files: --generate-tokenizer-commands")
+                elif ready:
+                    print("\n🚀 Ready to load! Use:")
+                    print(f"   poetry run -m essence manage-tensorrt-llm --action load --model {model_name}")
+            else:
+                results['readiness'] = readiness_details
+        
         # Default: show summary
-        if not self.args.check_prerequisites and not self.args.generate_template and not self.args.generate_config and not self.args.generate_tokenizer_commands:
+        if not self.args.check_prerequisites and not self.args.generate_template and not self.args.generate_config and not self.args.generate_tokenizer_commands and not self.args.check_readiness:
             print("Model compilation helper for TensorRT-LLM")
             print(f"\nModel: {model_name}")
             print("\nUse --check-prerequisites to validate setup")
             print("Use --generate-template to get compilation command template")
             print("Use --generate-config to generate config.pbtxt template")
             print("Use --generate-tokenizer-commands to get tokenizer file copy commands")
+            print("Use --check-readiness to verify model is ready for loading")
             print("\nExample:")
             print(f"  poetry run -m essence compile-model --model {model_name} --check-prerequisites --generate-template --generate-config --generate-tokenizer-commands")
+            print(f"  poetry run -m essence compile-model --model {model_name} --check-readiness  # After compilation")
         
         sys.exit(0)

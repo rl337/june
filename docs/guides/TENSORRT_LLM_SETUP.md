@@ -192,7 +192,13 @@ It also generates compilation command templates with proper options.
    - Review and adjust `config.pbtxt` if needed (already created in step 4)
    - Copy tokenizer files using commands from step 5 (or manually copy from HuggingFace model directory)
 
-8. **Validate compiled model**:
+8. **Check if model is ready for loading**:
+   ```bash
+   poetry run -m essence compile-model --model qwen3-30b --check-readiness
+   ```
+   This verifies all required files (config.pbtxt, engine files, tokenizer files) are present and valid.
+
+9. **Validate compiled model** (alternative):
    ```bash
    poetry run -m essence setup-triton-repository --action validate --model qwen3-30b
    ```

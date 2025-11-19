@@ -33,6 +33,7 @@ poetry run -m essence <command-name> [arguments]
   - `--generate-template` - Generate compilation command templates
   - `--generate-config` - Generate config.pbtxt template file
   - `--generate-tokenizer-commands` - Generate commands to copy tokenizer files
+  - `--check-readiness` - Verify model is ready for loading (checks all required files)
 
 ## Creating a New Command
 
