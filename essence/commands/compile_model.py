@@ -613,62 +613,66 @@ class CompileModelCommand(Command):
     def get_name(cls) -> str:
         return "compile-model"
     
-    def init(self) -> None:
-        """Initialize command arguments."""
-        self.parser = argparse.ArgumentParser(
-            description="Validate prerequisites and provide guidance for TensorRT-LLM model compilation",
-            formatter_class=argparse.RawDescriptionHelpFormatter
-        )
-        self.parser.add_argument(
+    @classmethod
+    def get_description(cls) -> str:
+        return "Validate prerequisites and provide guidance for TensorRT-LLM model compilation"
+    
+    @classmethod
+    def add_args(cls, parser: argparse.ArgumentParser) -> None:
+        """Add command-line arguments to the argument parser."""
+        parser.add_argument(
             '--model',
             type=str,
             required=True,
-            help='Model name (e.g., qwen3-30b)'
+            help='Model name (e.g., qwen3-30b) - maps to Qwen/Qwen3-30B-A3B-Thinking-2507'
         )
-        self.parser.add_argument(
+        parser.add_argument(
             '--model-hf-name',
             type=str,
             default=None,
-            help='HuggingFace model name (e.g., Qwen/Qwen3-30B-A3B-Thinking-2507)'
+            help='HuggingFace model name (e.g., Qwen/Qwen3-30B-A3B-Thinking-2507). If not specified, will be inferred from --model'
         )
-        self.parser.add_argument(
+        parser.add_argument(
             '--repository-path',
             type=str,
             default='/home/rlee/models/triton-repository',
             help='Path to Triton model repository (default: /home/rlee/models/triton-repository)'
         )
-        self.parser.add_argument(
+        parser.add_argument(
             '--check-prerequisites',
             action='store_true',
             help='Check all prerequisites for model compilation'
         )
-        self.parser.add_argument(
+        parser.add_argument(
             '--generate-template',
             action='store_true',
             help='Generate compilation command template'
         )
-        self.parser.add_argument(
+        parser.add_argument(
             '--generate-config',
             action='store_true',
             help='Generate config.pbtxt template file'
         )
-        self.parser.add_argument(
+        parser.add_argument(
             '--generate-tokenizer-commands',
             action='store_true',
             help='Generate commands to copy tokenizer files'
         )
-        self.parser.add_argument(
+        parser.add_argument(
             '--check-readiness',
             action='store_true',
             help='Check if model is ready for loading (validates all required files are present)'
         )
-        self.parser.add_argument(
+        parser.add_argument(
             '--json',
             action='store_true',
             help='Output results as JSON'
         )
-        
-        self.args = self.parser.parse_args()
+    
+    def init(self) -> None:
+        """Initialize the command."""
+        # Args are already parsed by the main command parser
+        pass
     
     def run(self) -> None:
         """Run the compilation helper command."""
@@ -874,5 +878,7 @@ class CompileModelCommand(Command):
             print("\nExample:")
             print(f"  poetry run -m essence compile-model --model {model_name} --check-prerequisites --generate-template --generate-config --generate-tokenizer-commands")
             print(f"  poetry run -m essence compile-model --model {model_name} --check-readiness  # After compilation")
-        
-        sys.exit(0)
+    
+    def cleanup(self) -> None:
+        """Clean up resources (no-op for this command)."""
+        pass
