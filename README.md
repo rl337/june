@@ -218,17 +218,43 @@ June uses Qwen3-30B-A3B-Thinking-2507 for LLM inference. The model runs in Docke
      poetry run -m essence download-models --model Qwen/Qwen3-30B-A3B-Thinking-2507
    ```
 
-2. **Start TensorRT-LLM service (in home_infra):**
+2. **Set up model repository structure:**
+   ```bash
+   # Create Triton model repository structure
+   poetry run -m essence setup-triton-repository --action create --model qwen3-30b
+   ```
+
+3. **Validate compilation prerequisites:**
+   ```bash
+   # Check GPU, repository structure, and get compilation guidance
+   poetry run -m essence compile-model --model qwen3-30b --check-prerequisites --generate-template
+   ```
+
+4. **Compile the model** (requires TensorRT-LLM build tools):
+   - Use the compilation template from step 3
+   - See `docs/guides/TENSORRT_LLM_SETUP.md` for detailed compilation instructions
+
+5. **Start TensorRT-LLM service (in home_infra):**
    ```bash
    # TensorRT-LLM is set up in home_infra and connected via shared-network
    # June services will automatically connect to tensorrt-llm:8000
    # See REFACTOR_PLAN.md Phase 15 for TensorRT-LLM setup instructions
    ```
 
-3. **Verify TensorRT-LLM is accessible:**
+6. **Load the compiled model:**
    ```bash
-   # Check that TensorRT-LLM is running in home_infra
-   # June services connect via shared-network to tensorrt-llm:8000
+   # Load model into TensorRT-LLM
+   poetry run -m essence manage-tensorrt-llm --action load --model qwen3-30b
+   
+   # Verify model is loaded
+   poetry run -m essence manage-tensorrt-llm --action status --model qwen3-30b
+   ```
+
+7. **Verify TensorRT-LLM is accessible:**
+   ```bash
+   # Check that TensorRT-LLM is running and ready
+   poetry run -m essence verify-tensorrt-llm
+   
    # Legacy inference-api service available via: docker compose --profile legacy up -d inference-api
    ```
 
