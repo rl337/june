@@ -401,7 +401,6 @@ When committing changes across multiple files:
 - Docker Compose configuration
 - Container health and connectivity
 - Service endpoints and gRPC services
-- Database connectivity
 - Model cache integrity
 - TODO MCP Service integration
 - System-wide health checks
