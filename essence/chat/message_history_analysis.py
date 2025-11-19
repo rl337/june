@@ -4,6 +4,7 @@ Message history analysis tools for agents and debugging.
 Provides programmatic access to message history with analysis capabilities
 for comparing expected vs actual message content and identifying rendering issues.
 """
+import difflib
 import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
@@ -198,10 +199,9 @@ def compare_expected_vs_actual(
             best_similarity = 1.0
             break
 
-        # Calculate simple similarity (common substring ratio)
+        # Calculate similarity using SequenceMatcher (more robust than simple char comparison)
         if msg.raw_text:
-            common_chars = sum(1 for a, b in zip(expected_text, msg.raw_text) if a == b)
-            similarity = common_chars / max(len(expected_text), len(msg.raw_text))
+            similarity = difflib.SequenceMatcher(None, expected_text, msg.raw_text).ratio()
             if similarity > best_similarity:
                 best_similarity = similarity
                 best_match = msg
