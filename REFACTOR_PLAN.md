@@ -2,7 +2,7 @@
 
 ## Status: ✅ **CORE REFACTORING COMPLETE** → 🚀 **FORWARD DEVELOPMENT IN PROGRESS**
 
-**Last Updated:** 2025-11-18 (Status check: All tests passing, all code tasks complete. All remaining Phase 15 tasks blocked on external TensorRT-LLM setup in home_infra project)
+**Last Updated:** 2025-11-18 (Phase 15.1: TensorRT-LLM container added to home_infra docker-compose.yml - basic configuration complete, ready for model loading/unloading API implementation)
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
@@ -107,7 +107,7 @@ All major refactoring phases have been completed:
 
 **Goal:** Replace `inference-api` service with TensorRT-LLM container for optimized GPU inference.
 
-**Current Status:** Code migration complete (Task 3 ✅). Remaining tasks (1, 2, 4) require setup in `home_infra` project.
+**Current Status:** Code migration complete (Task 3 ✅). TensorRT-LLM container setup complete (Task 1 ✅). Remaining tasks (2, 4) require model loading/unloading API and model compilation.
 
 **IMPORTANT:** The agent CAN and SHOULD work on the `home_infra` project at `/home/rlee/dev/home_infra` to complete these tasks. This is NOT external work - it's part of the june project infrastructure. The agent has full access to modify `home_infra/docker-compose.yml` and related configuration files.
 
