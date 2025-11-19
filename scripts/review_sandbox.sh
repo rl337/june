@@ -202,3 +202,4 @@ echo ""
 echo "For more detailed analysis, use:"
 echo "  poetry run -m essence review-sandbox \"$SANDBOX_DIR\""
 
+
