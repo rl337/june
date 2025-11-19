@@ -12,7 +12,9 @@ June uses a minimal microservices architecture with the following essential serv
 - **Discord Service** - Receives voice messages from Discord, orchestrates the pipeline
 - **STT Service** - Speech-to-text conversion using Whisper
 - **TTS Service** - Text-to-speech conversion using FastSpeech2/espeak
-- **Inference API** - LLM processing using Qwen3
+- **TensorRT-LLM** - LLM processing using Qwen3 (via Triton Inference Server in home_infra/shared-network)
+
+**Note:** Legacy `inference-api` service is deprecated and disabled by default. All services now use TensorRT-LLM for optimized GPU inference.
 
 ### Architecture Flow
 
@@ -23,7 +25,7 @@ Telegram/Discord Service
   ↓
 STT Service → Transcript
   ↓
-Inference API → Response Text
+TensorRT-LLM (tensorrt-llm:8000) → Response Text
   ↓
 TTS Service → Audio
   ↓
@@ -38,6 +40,7 @@ Telegram/Discord Service → User (Voice Response)
 - Rate limiting: In-memory (in telegram/discord services)
 
 **Optional Infrastructure (from home_infra):**
+- **TensorRT-LLM** - LLM inference service (Triton Inference Server) - available in shared-network as `tensorrt-llm:8000`
 - **Jaeger** - Distributed tracing (OpenTelemetry) - available in shared-network
 - **Prometheus + Grafana** - Metrics collection and visualization - available in shared-network
 - **nginx** - Reverse proxy (replaces removed gateway service) - available in shared-network
