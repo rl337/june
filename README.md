@@ -344,20 +344,24 @@ for chunk in response:
 
 ### Benchmark Evaluation
 
-Run coding benchmarks to evaluate the agent:
+Run coding benchmarks to evaluate the agent (requires TensorRT-LLM service running):
 
 ```bash
-# Option 1: Use the script wrapper (handles container setup automatically)
-./scripts/run_benchmarks.sh --dataset humaneval --max-tasks 10
+# Ensure TensorRT-LLM is running with model loaded
+poetry run -m essence manage-tensorrt-llm --action status --model qwen3-30b
 
-# Option 2: Use the command directly (when running in container or with proper setup)
+# Run benchmarks (defaults to tensorrt-llm:8000)
 poetry run -m essence run-benchmarks --dataset humaneval --max-tasks 10
 
+# Or run in container
+docker compose run --rm cli-tools \
+  poetry run -m essence run-benchmarks --dataset humaneval --max-tasks 10
+
 # Review results
-./scripts/review_sandbox.sh /tmp/benchmarks/results humaneval_0
-# Or use the command directly:
 poetry run -m essence review-sandbox /tmp/benchmarks/results humaneval_0
 ```
+
+**Note:** The `run-benchmarks` command defaults to `tensorrt-llm:8000` for TensorRT-LLM. Use `--inference-api-url inference-api:50051` for the legacy service.
 
 See `docs/guides/QWEN3_BENCHMARK_EVALUATION.md` for detailed benchmark evaluation guide.
 
