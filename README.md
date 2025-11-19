@@ -303,11 +303,16 @@ for chunk in response:
 Run coding benchmarks to evaluate the agent:
 
 ```bash
-# Run HumanEval benchmark
+# Option 1: Use the script wrapper (handles container setup automatically)
 ./scripts/run_benchmarks.sh --dataset humaneval --max-tasks 10
+
+# Option 2: Use the command directly (when running in container or with proper setup)
+poetry run -m essence run-benchmarks --dataset humaneval --max-tasks 10
 
 # Review results
 ./scripts/review_sandbox.sh /tmp/benchmarks/results humaneval_0
+# Or use the command directly:
+poetry run -m essence review-sandbox /tmp/benchmarks/results humaneval_0
 ```
 
 See `docs/guides/QWEN3_BENCHMARK_EVALUATION.md` for detailed benchmark evaluation guide.
