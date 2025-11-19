@@ -2,7 +2,7 @@
 
 ## Status: ✅ **CORE REFACTORING COMPLETE** → 🚀 **FORWARD DEVELOPMENT IN PROGRESS**
 
-**Last Updated:** 2025-11-19 (CI run #432 in progress, runs #431-#428 failed - fix applied but CI still failing. Added @pytest.mark.integration marker to test_reasoning_integration.py. All local tests pass consistently (244 passed, 1 skipped, 17 integration tests deselected). Verified: integration marker correctly set, tests properly deselected locally, CI simulation (CI=true) works correctly. Without CI log access, cannot diagnose root cause - manual investigation needed. Completed: Added compile-model command for Phase 15 Task 4 - validates prerequisites and provides compilation guidance. Added --generate-config flag to generate config.pbtxt templates. Added --generate-tokenizer-commands flag to generate tokenizer file copy commands. Added --check-readiness flag to verify model is ready for loading. Enhanced manage-tensorrt-llm command with better error handling and user guidance. Added complete workflow example to TensorRT-LLM setup guide. Added comprehensive unit tests for all TensorRT-LLM commands: compile-model (22 tests), manage-tensorrt-llm (28 tests), setup-triton-repository (27 tests), verify-tensorrt-llm (23 tests). Updated REFACTOR_PLAN.md with comprehensive test coverage documentation. Updated TensorRT-LLM setup guide and README.md with compile-model usage. Updated benchmark evaluation guide and README to use TensorRT-LLM as default)
+**Last Updated:** 2025-11-19 (CI runs #439-#436 successful! CI is now passing. Added @pytest.mark.integration marker to test_reasoning_integration.py. All local tests pass consistently (244 passed, 1 skipped, 17 integration tests deselected). Completed: Refactored compile-model command to use Command pattern properly (add_args instead of init with parser). Added NVIDIA NIM service to home_infra/docker-compose.yml for Phase 15 Task 4 - NIMs provide pre-built inference containers (no compilation required), faster iteration than TensorRT-LLM compilation. NIM service configured with GPU access, shared-network connection, gRPC endpoint on port 8001. Updated REFACTOR_PLAN.md to document NIM integration progress. Added comprehensive unit tests for all TensorRT-LLM commands: compile-model (22 tests), manage-tensorrt-llm (28 tests), setup-triton-repository (27 tests), verify-tensorrt-llm (23 tests). Updated TensorRT-LLM setup guide and README.md with compile-model usage. Updated benchmark evaluation guide and README to use TensorRT-LLM as default)
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
@@ -155,6 +155,19 @@ All major refactoring phases have been completed:
    - ✅ Proper error handling for timeouts, connection errors, and API errors
    - ✅ Model switching: Can unload current model and load new one (one at a time)
    - ⏳ **Note:** Models must be compiled/prepared and placed in Triton's model repository before they can be loaded. This API handles loading/unloading operations only. Model compilation/preparation is a separate step (see Task 4).
+
+4. **Set up NVIDIA NIM container in home_infra:** ⏳ IN PROGRESS
+   - ✅ Added NIM service (`nim-qwen3`) to `home_infra/docker-compose.yml`
+   - ✅ Configured it to connect to shared-network
+   - ✅ Set up GPU access and resource limits (device 0, GPU capabilities)
+   - ✅ Configured model storage and cache directories (`/home/rlee/models` → `/models`)
+   - ✅ Exposed port 8001 internally on shared-network (accessible as `nim-qwen3:8001`)
+   - ✅ Added health check endpoint (port 8003)
+   - ✅ Configured environment variables (NGC_API_KEY, MAX_CONTEXT_LENGTH, tracing)
+   - ✅ Added Jaeger tracing integration
+   - ⏳ **Note:** NIM image name may need verification (currently using `nvcr.io/nvstaging/nim_qwen3_30b_instruct:latest`)
+   - ⏳ **Note:** Requires NGC API key for authentication (set `NGC_API_KEY` environment variable)
+   - ⏳ **Remaining:** Verify NIM container starts correctly, test gRPC connectivity, update june services to use NIM endpoint
 
 3. **Migrate june services to use TensorRT-LLM:** ✅ COMPLETED (Code changes)
    - ✅ Updated telegram service configuration to default to TensorRT-LLM (tensorrt-llm:8000)
