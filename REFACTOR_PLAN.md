@@ -283,6 +283,7 @@ All major refactoring phases have been completed:
    - ✅ Updated README.md Infrastructure section to include TensorRT-LLM
    - ⏳ **Remaining:** Fully remove inference-api service from docker-compose.yml (waiting for TensorRT-LLM setup and verification in home_infra)
      - Use `poetry run -m essence verify-tensorrt-llm` to check migration readiness before removal
+     - ✅ Improved docker-compose.yml comments to reference verify-tensorrt-llm command for migration verification
    - ✅ **Code Improvement:** Renamed `inference_api_url` parameter to `llm_url` across all agent classes and commands for clarity
      - Updated CodingAgent, LLMClient, and BenchmarkEvaluator to use `llm_url` parameter
      - Updated command-line arguments from `--inference-api-url` to `--llm-url`
