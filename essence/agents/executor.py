@@ -67,7 +67,9 @@ class Executor:
                 if step.dependencies:
                     completed = set(completed_step_ids or [])
                     missing_dependencies = [
-                        dep_id for dep_id in step.dependencies if dep_id not in completed
+                        dep_id
+                        for dep_id in step.dependencies
+                        if dep_id not in completed
                     ]
                     if missing_dependencies:
                         error_msg = (
@@ -76,7 +78,9 @@ class Executor:
                         )
                         logger.warning(error_msg)
                         span.set_attribute("error", error_msg)
-                        span.set_attribute("missing_dependencies", str(missing_dependencies))
+                        span.set_attribute(
+                            "missing_dependencies", str(missing_dependencies)
+                        )
                         return ExecutionResult(
                             step_id=step.step_id,
                             success=False,
