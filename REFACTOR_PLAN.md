@@ -2,7 +2,7 @@
 
 ## Status: ✅ **CORE REFACTORING COMPLETE** → 🚀 **FORWARD DEVELOPMENT IN PROGRESS**
 
-**Last Updated:** 2025-11-19 (Fixed GitHub Actions CI - Removed module-level constant references from fixture)
+**Last Updated:** 2025-11-19 (Fixed GitHub Actions CI - Simplified module-level code, check CI first in fixture)
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
@@ -259,6 +259,7 @@ All major refactoring phases have been completed:
    - ✅ Removed skipif decorators, moved skip logic to fixture (run #303) - Removed skipif decorators from test functions and moved skip logic to `pipeline_framework_real` fixture to avoid pytest collection-time evaluation issues. Fixture now checks CI environment and grpc availability before returning framework instance.
    - ✅ Made fixture skip logic more defensive (run #305) - Enhanced fixture with nested try/except blocks to safely handle any evaluation errors when checking `_IS_CI` and `_GRPC_AVAILABLE` constants, defaulting to skip if any error occurs
    - ✅ Removed module-level constant references from fixture (run #307) - Changed fixture to use direct `os.getenv('CI')` and `import grpc` checks instead of referencing module-level constants, avoiding any potential collection-time evaluation issues
+   - ✅ Simplified module-level code, check CI first in fixture (run #309) - Removed all complex module-level constant evaluation and grpc checking code. Module now only imports `PipelineTestFramework` wrapped in try/except. Fixture checks CI first, then PipelineTestFramework availability, then grpc availability. This ensures module can always be imported safely even when grpc is mocked by other conftest.py files.
    - ✅ Total: 161 tests passing (153 existing + 8 pipeline tests, 3 integration tests excluded from CI via marker)
 
 2. **Test STT → LLM → TTS flow:** ⏳ TODO (framework ready, requires real services)
