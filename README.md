@@ -267,6 +267,21 @@ The coding agent provides an interface for sending coding tasks to the Qwen3 mod
 
 ### Usage
 
+**Option 1: CLI Command (Recommended for quick tasks)**
+
+```bash
+# Run a single task
+poetry run -m essence coding-agent --task "Write a function to calculate fibonacci numbers"
+
+# Run in interactive mode
+poetry run -m essence coding-agent --interactive
+
+# Specify workspace directory
+poetry run -m essence coding-agent --task "Your task here" --workspace-dir /path/to/workspace
+```
+
+**Option 2: Python API (For programmatic use)**
+
 ```python
 from essence.agents.coding_agent import CodingAgent
 
