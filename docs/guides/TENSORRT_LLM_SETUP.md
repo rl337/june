@@ -131,7 +131,26 @@ Each model directory must contain:
 
 **Status:** ⏳ TODO - Requires TensorRT-LLM build tools
 
-Models must be compiled using TensorRT-LLM build tools before they can be loaded. The compilation process:
+Models must be compiled using TensorRT-LLM build tools before they can be loaded. Use the `compile-model` command to validate prerequisites and get compilation guidance.
+
+### Prerequisites Check
+
+Before compiling, validate your environment:
+
+```bash
+# Check prerequisites and get compilation guidance
+poetry run -m essence compile-model --model qwen3-30b --check-prerequisites --generate-template
+```
+
+This command checks:
+- ✅ GPU availability (nvidia-smi)
+- ✅ Model repository structure
+- ✅ TensorRT-LLM build tools availability
+- ✅ Whether model is already compiled
+
+It also generates compilation command templates with proper options.
+
+### Compilation Process
 
 1. **Download the model** (if not already downloaded):
    ```bash
@@ -139,16 +158,32 @@ Models must be compiled using TensorRT-LLM build tools before they can be loaded
      poetry run -m essence download-models --model Qwen/Qwen3-30B-A3B-Thinking-2507
    ```
 
-2. **Compile the model** using TensorRT-LLM build tools:
+2. **Validate prerequisites**:
+   ```bash
+   poetry run -m essence compile-model --model qwen3-30b --check-prerequisites
+   ```
+
+3. **Get compilation template**:
+   ```bash
+   poetry run -m essence compile-model --model qwen3-30b --generate-template
+   ```
+
+4. **Compile the model** using TensorRT-LLM build tools:
+   - Use the command template from step 3
    - Configure quantization (8-bit as specified in environment variables)
    - Set max context length (131072 tokens)
    - Generate TensorRT-LLM engine files
-   - **Note:** This step requires TensorRT-LLM build tools and is not yet automated
+   - **Note:** This step requires TensorRT-LLM build tools and must be done manually or via external scripts
 
-3. **Place compiled files** in the model repository:
+5. **Place compiled files** in the model repository:
    - Copy engine files to `/home/rlee/models/triton-repository/<model_name>/<version>/`
    - Create `config.pbtxt` with model configuration
    - Copy tokenizer files from HuggingFace model directory
+
+6. **Validate compiled model**:
+   ```bash
+   poetry run -m essence setup-triton-repository --action validate --model qwen3-30b
+   ```
 
 ## Model Management
 
