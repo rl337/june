@@ -184,7 +184,8 @@ All major refactoring phases have been completed:
        - ⏳ Enable agents to ask user for direction/clarification when stuck
        - ⏳ Enable agents to request help when encountering blockers
        - ⏳ Enable agents to report progress and ask for feedback
-       - ⏳ Create secure channel for agent-to-user communication (via Telegram/Discord)
+       - ⏳ Create secure channel for agent-to-user communication (prefer Telegram, fallback to Discord)
+       - ⏳ **Priority:** Telegram is the preferred channel for agent communication, but both platforms should be supported
      - ⏳ Fix rendering issues discovered through message history analysis
        - ⏳ Use `get_message_history()` to inspect what was actually sent
        - ⏳ Compare expected vs actual output
@@ -198,9 +199,13 @@ All major refactoring phases have been completed:
    - **Use Cases:**
      - Agents can query: "What messages did I send to user X in the last hour?"
      - Agents can analyze: "What format did Telegram actually accept for message Y?"
-     - Agents can communicate: "I need clarification on requirement Z" (sent directly to user)
-     - Agents can ask: "I'm blocked on task X, can you help?" (sent directly to user)
+     - Agents can communicate: "I need clarification on requirement Z" (sent directly to user via Telegram, fallback to Discord)
+     - Agents can ask: "I'm blocked on task X, can you help?" (sent directly to user via Telegram, fallback to Discord)
      - Debugging: Compare what we tried to send vs what was actually sent
+   - **Communication Channel Priority:**
+     - **Primary:** Telegram (preferred channel for agent-to-user communication)
+     - **Fallback:** Discord (available if Telegram is unavailable or user prefers Discord)
+     - Both channels should be open and functional, but Telegram is checked first
 
 3. **Migrate june services to use TensorRT-LLM:** ✅ COMPLETED (Code changes)
    - ✅ Updated telegram service configuration to default to TensorRT-LLM (tensorrt-llm:8000)
