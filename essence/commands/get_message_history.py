@@ -96,8 +96,14 @@ class GetMessageHistoryCommand(Command):
         # Handle validation request
         if self.args.validate:
             if not self.args.platform:
-                print("Error: --validate requires --platform to be specified", file=sys.stderr)
-                print("Usage: poetry run python -m essence get-message-history --validate 'TEXT' --platform telegram", file=sys.stderr)
+                print(
+                    "Error: --validate requires --platform to be specified",
+                    file=sys.stderr,
+                )
+                print(
+                    "Usage: poetry run python -m essence get-message-history --validate 'TEXT' --platform telegram",
+                    file=sys.stderr,
+                )
                 sys.exit(1)
 
             result = validate_message_for_platform(
