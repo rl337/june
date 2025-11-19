@@ -209,8 +209,10 @@ All major refactoring phases have been completed:
      - ✅ Generates config.pbtxt template files with TensorRT-LLM configuration
      - ✅ Automatically saves config.pbtxt to model directory if repository exists
      - ✅ Generates tokenizer file copy commands (checks HuggingFace model directory, provides copy commands)
+     - ✅ Model readiness check (validates all required files are present and valid before loading)
      - ✅ Provides step-by-step guidance for compilation process
      - ✅ Usage: `poetry run -m essence compile-model --model <name> --check-prerequisites --generate-template --generate-config --generate-tokenizer-commands`
+     - ✅ Usage (after compilation): `poetry run -m essence compile-model --model <name> --check-readiness`
    - **Model Compilation (Operational):**
      - ⏳ Compile Qwen3-30B-A3B-Thinking-2507 using TensorRT-LLM build tools (use `compile-model` command for guidance)
      - ⏳ Configure quantization (8-bit as specified in environment variables)
