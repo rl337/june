@@ -115,6 +115,14 @@ All major refactoring phases have been completed:
 
 **Migration Status:** All code and documentation changes are complete. The june project is fully migrated to use TensorRT-LLM as the default LLM service. The legacy `inference-api` service remains in docker-compose.yml with a `legacy` profile for backward compatibility, but can be removed once TensorRT-LLM is verified operational (use `verify-tensorrt-llm` command).
 
+**Ready for Operational Work:**
+- ✅ **Infrastructure:** TensorRT-LLM container configured in home_infra
+- ✅ **Management Tools:** `manage-tensorrt-llm` command for model loading/unloading
+- ✅ **Repository Tools:** `setup-triton-repository` command for repository structure management
+- ✅ **Verification Tools:** `verify-tensorrt-llm` command for migration readiness checks
+- ✅ **Documentation:** Comprehensive setup guide (`docs/guides/TENSORRT_LLM_SETUP.md`)
+- ⏳ **Next Step:** Model compilation using TensorRT-LLM build tools (operational work, requires external tools)
+
 **IMPORTANT:** The agent CAN and SHOULD work on the `home_infra` project at `/home/rlee/dev/home_infra` to complete these tasks. This is NOT external work - it's part of the june project infrastructure. The agent has full access to modify `home_infra/docker-compose.yml` and related configuration files.
 
 **Tasks:**
