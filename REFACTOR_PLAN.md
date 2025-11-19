@@ -237,6 +237,7 @@ All major refactoring phases have been completed:
          - ✅ Documented programmatic usage examples with code samples
          - ✅ Added common debugging workflows (debug specific message, find all issues, validate before sending)
          - ✅ Added result interpretation guide (analysis results, comparison results, validation results)
+         - ✅ Improved error handling in get-message-history command (removed unused datetime import, added proper exit codes and usage hints)
      - ✅ Verify message history works for both Telegram and Discord
        - ✅ Test message history retrieval for both platforms
        - ✅ Test agent communication interface for both platforms

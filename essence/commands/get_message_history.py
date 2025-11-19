@@ -9,7 +9,7 @@ Also provides programmatic access for agents via essence.chat.message_history_an
 import argparse
 import json
 import logging
-from datetime import datetime
+import sys
 from typing import Optional
 
 from essence.chat.message_history import get_message_history
@@ -96,8 +96,9 @@ class GetMessageHistoryCommand(Command):
         # Handle validation request
         if self.args.validate:
             if not self.args.platform:
-                print("Error: --validate requires --platform to be specified")
-                return
+                print("Error: --validate requires --platform to be specified", file=sys.stderr)
+                print("Usage: poetry run python -m essence get-message-history --validate 'TEXT' --platform telegram", file=sys.stderr)
+                sys.exit(1)
 
             result = validate_message_for_platform(
                 self.args.validate,
