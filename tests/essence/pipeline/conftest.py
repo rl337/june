@@ -1,16 +1,24 @@
 """
 Pytest configuration for pipeline tests.
 """
-import pytest
-import os
-
-# Wrap import in try/except to ensure conftest.py can always be imported
+# Wrap entire module in try/except to ensure conftest.py can always be imported
 # This is critical for CI environments where pytest collection must not fail
-PipelineTestFramework = None
 try:
-    from tests.essence.pipeline.test_pipeline_framework import PipelineTestFramework
+    import pytest
+    import os
+    
+    # Wrap import in try/except to ensure conftest.py can always be imported
+    # This is critical for CI environments where pytest collection must not fail
+    PipelineTestFramework = None
+    try:
+        from tests.essence.pipeline.test_pipeline_framework import PipelineTestFramework
+    except Exception:
+        # If import fails for any reason, set to None - fixture will skip
+        PipelineTestFramework = None
 except Exception:
-    # If import fails for any reason, set to None - fixture will skip
+    # If anything fails during import, set safe defaults
+    import pytest
+    import os
     PipelineTestFramework = None
 
 
