@@ -23,6 +23,7 @@ poetry run -m essence <command-name> [arguments]
 - `download-models` - Download models for June Agent
 - `monitor-gpu` - Monitor GPU metrics and export to Prometheus
 - `review-sandbox` - Review sandbox snapshots from benchmark evaluations
+- `run-benchmarks` - Run benchmark evaluations with sandboxed execution (HumanEval, MBPP)
 - `verify-qwen3` - Verify Qwen3 quantization settings and model performance (legacy inference-api)
 - `benchmark-qwen3` - Benchmark Qwen3-30B-A3B model performance
 - `verify-tensorrt-llm` - Verify TensorRT-LLM setup and migration readiness
@@ -40,6 +41,15 @@ poetry run -m essence <command-name> [arguments]
   - `--grpc-port PORT` - NIM gRPC port (default: 8001)
   - `--check-protocol` - Check gRPC protocol compatibility (requires june_grpc_api)
   - `--json` - Output results as JSON
+- `get-message-history` - Retrieve and analyze message history for debugging Telegram and Discord rendering issues
+  - `--user-id ID` - Filter by user ID
+  - `--chat-id ID` - Filter by chat/channel ID
+  - `--platform PLATFORM` - Filter by platform (telegram, discord)
+  - `--analyze` - Analyze messages for rendering issues
+  - `--compare TEXT` - Compare expected text with actual sent message
+  - `--validate TEXT` - Validate message text for platform (requires --platform)
+  - `--stats` - Show statistics instead of messages
+  - `--format FORMAT` - Output format (text, json)
 
 ## Creating a New Command
 
