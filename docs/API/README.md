@@ -20,7 +20,7 @@ This directory contains comprehensive API documentation for all June services.
 - WebSocket: `/ws/{user_id}`
 
 ### gRPC Services
-- Inference API: `localhost:50051`
+- Inference API: `tensorrt-llm:8000` (TensorRT-LLM, default) or `inference-api:50051` (legacy)
 - STT Service: `localhost:50052`
 - TTS Service: `localhost:50053`
 
@@ -53,7 +53,9 @@ response = requests.get("http://localhost:8000/health", headers=headers)
 import grpc
 from june_grpc_api import llm as llm_shim
 
-async with grpc.aio.insecure_channel("localhost:50051") as channel:
+# Default: TensorRT-LLM (tensorrt-llm:8000)
+# Legacy: inference-api (inference-api:50051)
+async with grpc.aio.insecure_channel("tensorrt-llm:8000") as channel:
     client = llm_shim.LLMClient(channel)
     response = await client.generate(request)
 ```

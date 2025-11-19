@@ -2,11 +2,15 @@
 
 The Inference API provides gRPC endpoints for LLM (Large Language Model) inference, including text generation, chat, and embeddings.
 
+**Current Implementation:** TensorRT-LLM (via Triton Inference Server)  
+**Legacy Implementation:** inference-api service (available via `--profile legacy`)
+
 ## Service Definition
 
 **Service Name:** `june.llm.LLMInference`
 
-**Default Address:** `localhost:50051`
+**Default Address:** `tensorrt-llm:8000` (TensorRT-LLM in home_infra/shared-network)  
+**Legacy Address:** `inference-api:50051` (legacy inference-api service, requires `--profile legacy`)
 
 ## Protocol Buffer Definition
 
@@ -57,7 +61,9 @@ import grpc
 from june_grpc_api import llm as llm_shim
 
 async def generate_stream():
-    async with grpc.aio.insecure_channel("localhost:50051") as channel:
+    # Default: TensorRT-LLM (tensorrt-llm:8000)
+    # Legacy: inference-api (inference-api:50051)
+    async with grpc.aio.insecure_channel("tensorrt-llm:8000") as channel:
         client = llm_shim.LLMClient(channel)
         
         request = llm_shim.GenerationRequest(
@@ -109,7 +115,8 @@ import grpc
 from june_grpc_api import llm as llm_shim
 
 async def generate():
-    async with grpc.aio.insecure_channel("localhost:50051") as channel:
+    # Default: TensorRT-LLM (tensorrt-llm:8000)
+    async with grpc.aio.insecure_channel("tensorrt-llm:8000") as channel:
         client = llm_shim.LLMClient(channel)
         
         request = llm_shim.GenerationRequest(
@@ -168,7 +175,8 @@ import grpc
 from june_grpc_api import llm as llm_shim
 
 async def chat_stream():
-    async with grpc.aio.insecure_channel("localhost:50051") as channel:
+    # Default: TensorRT-LLM (tensorrt-llm:8000)
+    async with grpc.aio.insecure_channel("tensorrt-llm:8000") as channel:
         client = llm_shim.LLMClient(channel)
         
         messages = [
@@ -220,7 +228,8 @@ import grpc
 from june_grpc_api import llm as llm_shim
 
 async def chat():
-    async with grpc.aio.insecure_channel("localhost:50051") as channel:
+    # Default: TensorRT-LLM (tensorrt-llm:8000)
+    async with grpc.aio.insecure_channel("tensorrt-llm:8000") as channel:
         client = llm_shim.LLMClient(channel)
         
         messages = [
@@ -266,7 +275,8 @@ import grpc
 from june_grpc_api import llm as llm_shim
 
 async def embed():
-    async with grpc.aio.insecure_channel("localhost:50051") as channel:
+    # Default: TensorRT-LLM (tensorrt-llm:8000)
+    async with grpc.aio.insecure_channel("tensorrt-llm:8000") as channel:
         client = llm_shim.LLMClient(channel)
         
         request = llm_shim.EmbeddingRequest(
@@ -309,7 +319,8 @@ import grpc
 from june_grpc_api import llm as llm_shim
 
 async def health_check():
-    async with grpc.aio.insecure_channel("localhost:50051") as channel:
+    # Default: TensorRT-LLM (tensorrt-llm:8000)
+    async with grpc.aio.insecure_channel("tensorrt-llm:8000") as channel:
         client = llm_shim.LLMClient(channel)
         
         response = await client.health_check(llm_shim.HealthRequest())
@@ -432,7 +443,8 @@ from june_grpc_api import llm as llm_shim
 
 async def generate_with_error_handling():
     try:
-        async with grpc.aio.insecure_channel("localhost:50051") as channel:
+        # Default: TensorRT-LLM (tensorrt-llm:8000)
+        async with grpc.aio.insecure_channel("tensorrt-llm:8000") as channel:
             client = llm_shim.LLMClient(channel)
             request = llm_shim.GenerationRequest(prompt="Hello")
             response = await client.generate(request)
@@ -474,9 +486,10 @@ async def use_pool():
 ```python
 async def robust_stream():
     try:
-        async with grpc.aio.insecure_channel("localhost:50051") as channel:
-            client = llm_shim.LLMClient(channel)
-            request = llm_shim.GenerationRequest(prompt="Hello", stream=True)
+            # Default: TensorRT-LLM (tensorrt-llm:8000)
+            async with grpc.aio.insecure_channel("tensorrt-llm:8000") as channel:
+                client = llm_shim.LLMClient(channel)
+                request = llm_shim.GenerationRequest(prompt="Hello", stream=True)
             
             async for chunk in client.generate_stream(request):
                 if chunk.token:
@@ -499,10 +512,26 @@ gRPC authentication can be configured via channel credentials. For production, u
 import grpc
 
 # TLS credentials
+# Default: TensorRT-LLM (tensorrt-llm:8000)
 credentials = grpc.ssl_channel_credentials()
-channel = grpc.aio.secure_channel("localhost:50051", credentials)
+channel = grpc.aio.secure_channel("tensorrt-llm:8000", credentials)
 ```
 
 ## Rate Limiting
 
-Rate limiting is handled at the Gateway service level. Direct gRPC connections may have different limits. Check service documentation for specific rate limits.
+Rate limiting is handled at the service level. Direct gRPC connections may have different limits. Check service documentation for specific rate limits.
+
+## Migration from inference-api to TensorRT-LLM
+
+The project is migrating from the legacy `inference-api` service to TensorRT-LLM for optimized GPU inference. 
+
+**Current Status:**
+- ✅ TensorRT-LLM is the default implementation (`tensorrt-llm:8000`)
+- ✅ All services default to TensorRT-LLM
+- ⏳ Legacy `inference-api` service still available via `--profile legacy` for backward compatibility
+
+**To use legacy inference-api:**
+- Set `LLM_URL=grpc://inference-api:50051` environment variable
+- Start service with `docker compose --profile legacy up -d inference-api`
+
+**See:** `docs/guides/TENSORRT_LLM_SETUP.md` for TensorRT-LLM setup and migration guide.
