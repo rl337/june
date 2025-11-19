@@ -24,7 +24,7 @@ jobs:
         POETRY_VIRTUALENVS_CREATE: "true"
         POETRY_VIRTUALENVS_IN_PROJECT: "true"
       run: |
-        poetry install --no-interaction --no-ansi
+        poetry install --no-interaction --no-ansi --no-root
     - name: Run tests
       run: |
         poetry run pytest tests/essence/
