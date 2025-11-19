@@ -56,11 +56,11 @@ docker compose logs -f inference-api
 Run a small evaluation to test the setup:
 
 ```bash
-# Run HumanEval with first 5 tasks
-./scripts/run_benchmarks.sh --dataset humaneval --max-tasks 5
+# Run HumanEval with first 5 tasks (recommended - uses command pattern)
+poetry run -m essence run-benchmarks --dataset humaneval --max-tasks 5
 
-# Or use Python script directly
-poetry run python scripts/run_benchmarks.py --dataset humaneval --max-tasks 5
+# Alternative: Use shell script wrapper
+./scripts/run_benchmarks.sh --dataset humaneval --max-tasks 5
 ```
 
 ### 3. Review Results
@@ -79,14 +79,14 @@ poetry run python scripts/review_sandbox.py /tmp/benchmarks/results humaneval_0
 
 ### Command-Line Options
 
-The `run_benchmarks.sh` script supports various configuration options:
+The `run-benchmarks` command supports various configuration options:
 
 ```bash
 poetry run -m essence run-benchmarks \
   --dataset humaneval \          # Dataset: humaneval, mbpp, or all
   --max-tasks 10 \               # Limit number of tasks (default: all)
   --output-dir /path/to/results \ # Output directory
-  --inference-api-url tensorrt-llm:8000 \  # gRPC endpoint (default: tensorrt-llm:8000 for TensorRT-LLM)
+  --llm-url tensorrt-llm:8000 \  # gRPC endpoint (default: tensorrt-llm:8000 for TensorRT-LLM)
   --model-name Qwen/Qwen3-30B-A3B-Thinking-2507 \  # Model name
   --sandbox-image python:3.11-slim \  # Sandbox base image
   --sandbox-memory 4g \          # Max memory per sandbox
@@ -96,7 +96,7 @@ poetry run -m essence run-benchmarks \
   --enable-network                # Enable network access in sandboxes
 ```
 
-**Note:** The default `--inference-api-url` is `tensorrt-llm:8000` for TensorRT-LLM. Use `inference-api:50051` for the legacy service.
+**Note:** The default `--llm-url` is `tensorrt-llm:8000` for TensorRT-LLM. Use `inference-api:50051` for the legacy service or `nim-qwen3:8001` for NVIDIA NIM.
 
 ### Environment Variables
 
@@ -106,7 +106,7 @@ You can also set these via environment variables:
 export DATASET=humaneval
 export MAX_TASKS=10
 export OUTPUT_DIR=/tmp/my_benchmarks
-export INFERENCE_API_URL=tensorrt-llm:8000  # Default: tensorrt-llm:8000 (use inference-api:50051 for legacy)
+export LLM_URL=tensorrt-llm:8000  # Default: tensorrt-llm:8000 (use inference-api:50051 for legacy, nim-qwen3:8001 for NVIDIA NIM)
 export MODEL_NAME="Qwen/Qwen3-30B-A3B-Thinking-2507"
 export SANDBOX_IMAGE=python:3.11-slim
 export SANDBOX_MEMORY=4g
@@ -118,6 +118,8 @@ export ENABLE_NETWORK=false
 poetry run -m essence run-benchmarks
 ```
 
+**Note:** The command also accepts `INFERENCE_API_URL` for backward compatibility, but `LLM_URL` is preferred.
+
 ## Supported Datasets
 
 ### HumanEval
@@ -125,10 +127,13 @@ poetry run -m essence run-benchmarks
 Python coding problems (164 problems total).
 
 ```bash
-# Download and evaluate all HumanEval tasks
-./scripts/run_benchmarks.sh --dataset humaneval
+# Download and evaluate all HumanEval tasks (recommended - uses command pattern)
+poetry run -m essence run-benchmarks --dataset humaneval
 
 # Evaluate first 10 tasks
+poetry run -m essence run-benchmarks --dataset humaneval --max-tasks 10
+
+# Alternative: Use shell script wrapper
 ./scripts/run_benchmarks.sh --dataset humaneval --max-tasks 10
 ```
 
@@ -141,6 +146,9 @@ The dataset is automatically downloaded from GitHub on first use.
 ```bash
 # Note: MBPP requires manual download or HuggingFace dataset
 # See dataset_loader.py for instructions
+poetry run -m essence run-benchmarks --dataset mbpp
+
+# Alternative: Use shell script wrapper
 ./scripts/run_benchmarks.sh --dataset mbpp
 ```
 
@@ -149,6 +157,9 @@ The dataset is automatically downloaded from GitHub on first use.
 Run evaluation on all supported datasets:
 
 ```bash
+poetry run -m essence run-benchmarks --dataset all
+
+# Alternative: Use shell script wrapper
 ./scripts/run_benchmarks.sh --dataset all
 ```
 
@@ -282,6 +293,9 @@ docker ps
 docker stats
 
 # Increase sandbox memory limit if needed
+poetry run -m essence run-benchmarks --dataset humaneval --sandbox-memory 8g
+
+# Alternative: Use shell script wrapper
 ./scripts/run_benchmarks.sh --sandbox-memory 8g
 ```
 
@@ -303,10 +317,13 @@ If you see OOM errors:
 
 ```bash
 # Reduce sandbox memory
-./scripts/run_benchmarks.sh --sandbox-memory 2g
+poetry run -m essence run-benchmarks --dataset humaneval --sandbox-memory 2g
 
 # Reduce max tasks
-./scripts/run_benchmarks.sh --max-tasks 5
+poetry run -m essence run-benchmarks --dataset humaneval --max-tasks 5
+
+# Alternative: Use shell script wrapper
+./scripts/run_benchmarks.sh --sandbox-memory 2g --max-tasks 5
 
 # Check GPU memory
 nvidia-smi
@@ -334,9 +351,12 @@ poetry run -m essence run-benchmarks --dataset humaneval --max-tasks 10
 Use a custom base image for sandboxes:
 
 ```bash
-./scripts/run_benchmarks.sh \
-  --sandbox-image python:3.12-slim \
-  --sandbox-image ubuntu:22.04
+poetry run -m essence run-benchmarks \
+  --dataset humaneval \
+  --sandbox-image python:3.12-slim
+
+# Alternative: Use shell script wrapper
+./scripts/run_benchmarks.sh --sandbox-image python:3.12-slim
 ```
 
 ### Network Access in Sandboxes
@@ -344,6 +364,9 @@ Use a custom base image for sandboxes:
 Enable network access for tasks that need internet:
 
 ```bash
+poetry run -m essence run-benchmarks --dataset humaneval --enable-network
+
+# Alternative: Use shell script wrapper
 ./scripts/run_benchmarks.sh --enable-network
 ```
 
@@ -355,6 +378,10 @@ For full dataset evaluations, consider running in background:
 
 ```bash
 # Run in background with logging
+# Run in background (recommended - uses command pattern)
+nohup poetry run -m essence run-benchmarks --dataset humaneval > benchmark.log 2>&1 &
+
+# Alternative: Use shell script wrapper
 nohup ./scripts/run_benchmarks.sh --dataset humaneval > benchmark.log 2>&1 &
 
 # Monitor progress

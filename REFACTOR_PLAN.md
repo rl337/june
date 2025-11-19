@@ -28,6 +28,7 @@ All major refactoring phases have been completed:
 - ✅ **Package Simplification (Phase 6):** Removed unused packages, migrated to Poetry in-place installation
 - ✅ **Documentation Cleanup (Phase 7):** Updated all documentation to reflect current architecture
 - ✅ **Command Documentation:** Added `run-benchmarks` and `get-message-history` commands to docs/guides/COMMANDS.md
+- ✅ **Benchmark Evaluation Documentation:** Updated docs/guides/QWEN3_BENCHMARK_EVALUATION.md to use command pattern consistently (prefer `poetry run -m essence run-benchmarks` over script wrapper), fixed `--inference-api-url` to `--llm-url` to match actual command arguments, added note about NVIDIA NIM support
 - ✅ **Documentation Updates:** 
   - Updated essence/README.md to reflect current module structure (added essence.agents, essence.commands, essence.services, essence.command modules)
   - Updated tests/README.md to clarify inference-api deprecation status (added notes about legacy service, migration guide reference)
