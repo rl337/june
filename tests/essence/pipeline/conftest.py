@@ -17,6 +17,8 @@ except Exception:
 @pytest.fixture
 def pipeline_framework():
     """Fixture providing a pipeline test framework with mocked services."""
+    if PipelineTestFramework is None:
+        pytest.skip("PipelineTestFramework not available")
     return PipelineTestFramework(use_real_services=False)
 
 
