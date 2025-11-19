@@ -83,12 +83,18 @@ def pipeline_framework_real():
     """Fixture providing a pipeline test framework with real services."""
     if PipelineTestFramework is None:
         pytest.skip("PipelineTestFramework not available")
+    # Skip if grpc is not available or if we're in CI
+    try:
+        if _IS_CI or not _GRPC_AVAILABLE:
+            pytest.skip("Skipping integration test (CI environment or grpc unavailable/mocked)")
+    except (NameError, AttributeError):
+        # If constants aren't defined, skip to be safe
+        pytest.skip("Skipping integration test (grpc availability check failed)")
     return PipelineTestFramework(use_real_services=True)
 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-@pytest.mark.skipif(_SKIP_INTEGRATION_TESTS, reason="Skipping integration test (CI environment or grpc unavailable/mocked)")
 async def test_pipeline_with_real_services(pipeline_framework_real):
     """Test complete pipeline with real services (if available)."""
     # Generate test audio
@@ -112,7 +118,6 @@ async def test_pipeline_with_real_services(pipeline_framework_real):
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-@pytest.mark.skipif(_SKIP_INTEGRATION_TESTS, reason="Skipping integration test (CI environment or grpc unavailable/mocked)")
 async def test_pipeline_performance_with_real_services(pipeline_framework_real):
     """Test pipeline performance with real services."""
     # Generate test audio
@@ -140,7 +145,6 @@ async def test_pipeline_performance_with_real_services(pipeline_framework_real):
 
 @pytest.mark.integration
 @pytest.mark.asyncio
-@pytest.mark.skipif(_SKIP_INTEGRATION_TESTS, reason="Skipping integration test (CI environment or grpc unavailable/mocked)")
 async def test_service_availability_check(pipeline_framework_real):
     """Test service availability checking."""
     import os
