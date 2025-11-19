@@ -200,11 +200,12 @@ All major refactoring phases have been completed:
          - ✅ `send_message_to_user()` raises `ServiceRunningError` if service is running (prevents race conditions)
          - ✅ Solution: Disable Telegram service (`docker compose stop telegram`) when agent communication is active
          - ✅ For Discord: Same consideration applies if agent communication uses Discord
-     - ⏳ Fix rendering issues discovered through message history analysis
-       - ⏳ Use `get_message_history()` to inspect what was actually sent
-       - ✅ Improved `compare_expected_vs_actual()` similarity calculation using difflib.SequenceMatcher for more robust text matching
-       - ⏳ Compare expected vs actual output (tools ready, requires actual message history data)
-       - ⏳ Fix any formatting/markdown issues (requires analysis of actual message history)
+    - ⏳ Fix rendering issues discovered through message history analysis
+      - ⏳ Use `get_message_history()` to inspect what was actually sent
+      - ✅ Improved `compare_expected_vs_actual()` similarity calculation using difflib.SequenceMatcher for more robust text matching
+      - ✅ Enhanced `compare_expected_vs_actual()` to check all message text fields (raw_text, message_content, formatted_text) and use best similarity score across all fields
+      - ⏳ Compare expected vs actual output (tools ready, requires actual message history data)
+      - ⏳ Fix any formatting/markdown issues (requires analysis of actual message history)
        - ✅ Document Telegram message format requirements and limitations
        - ✅ Document Discord message format requirements and limitations
        - ✅ Created comprehensive documentation: `docs/guides/MESSAGE_FORMAT_REQUIREMENTS.md`
