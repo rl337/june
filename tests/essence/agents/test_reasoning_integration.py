@@ -5,6 +5,8 @@ Tests the full reasoning loop integration (think → plan → execute → reflec
 with mocked LLM client. These tests verify that all components work together correctly.
 """
 import pytest
+
+pytestmark = pytest.mark.integration
 from unittest.mock import Mock, MagicMock, patch
 from typing import List, Dict, Any, Optional
 
