@@ -34,6 +34,12 @@ poetry run -m essence <command-name> [arguments]
   - `--generate-config` - Generate config.pbtxt template file
   - `--generate-tokenizer-commands` - Generate commands to copy tokenizer files
   - `--check-readiness` - Verify model is ready for loading (checks all required files)
+- `verify-nim` - Verify NVIDIA NIM (NVIDIA Inference Microservice) setup and connectivity
+  - `--nim-host HOST` - NIM service hostname (default: nim-qwen3)
+  - `--http-port PORT` - NIM HTTP health port (default: 8003)
+  - `--grpc-port PORT` - NIM gRPC port (default: 8001)
+  - `--check-protocol` - Check gRPC protocol compatibility (requires june_grpc_api)
+  - `--json` - Output results as JSON
 
 ## Creating a New Command
 

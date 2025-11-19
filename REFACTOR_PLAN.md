@@ -170,6 +170,7 @@ All major refactoring phases have been completed:
    - ✅ Updated june services to support NIM endpoint (updated config.py, docker-compose.yml, documentation)
    - ✅ Added NIM as LLM option in configuration (can be set via LLM_URL=grpc://nim-qwen3:8001)
    - ✅ Verified `verify-nim` command works correctly (properly detects when service is not running)
+   - ✅ Added `verify-nim` command documentation to `docs/guides/COMMANDS.md` (command options and usage)
    - ⏳ **Note:** NIM image name may need verification (currently using `nvcr.io/nvstaging/nim_qwen3_30b_instruct:latest`)
    - ⏳ **Operational Task:** Start NIM service (requires `NGC_API_KEY` environment variable to be set in home_infra):
      - Set `NGC_API_KEY` in home_infra environment (or `.env` file)
