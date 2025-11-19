@@ -4,7 +4,7 @@ Reflection Component
 Evaluates execution results and determines if goals were achieved.
 """
 import logging
-from typing import Optional, List
+from typing import Optional, List, Any
 from essence.agents.reasoning import Plan, ExecutionResult, ReflectionResult, ConversationContext
 from essence.agents.reasoning_cache import get_reasoning_cache, ReasoningCache
 from essence.chat.utils.tracing import get_tracer
