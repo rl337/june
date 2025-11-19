@@ -312,9 +312,18 @@ class ManageTensorRTLLMCommand(Command):
             success, message = self.manager.load_model(self.args.model)
             if success:
                 print(f"✅ {message}")
+                print(f"\n💡 Tip: Check model status with:")
+                print(f"   poetry run -m essence manage-tensorrt-llm --action status --model {self.args.model}")
                 sys.exit(0)
             else:
                 print(f"❌ {message}")
+                print(f"\n💡 Troubleshooting tips:")
+                print(f"   1. Verify model is ready for loading:")
+                print(f"      poetry run -m essence compile-model --model {self.args.model} --check-readiness")
+                print(f"   2. Check if TensorRT-LLM service is running:")
+                print(f"      poetry run -m essence verify-tensorrt-llm")
+                print(f"   3. Verify model files are in repository:")
+                print(f"      poetry run -m essence setup-triton-repository --action validate --model {self.args.model}")
                 sys.exit(1)
         
         elif action == "unload":
@@ -336,12 +345,21 @@ class ManageTensorRTLLMCommand(Command):
                         name = model.get("name", "unknown")
                         versions = model.get("versions", [])
                         state = model.get("state", "UNKNOWN")
-                        print(f"  • {name} (versions: {versions}, state: {state})")
+                        state_icon = "✅" if state == "READY" else "⏳" if state == "LOADING" else "❌"
+                        print(f"  {state_icon} {name} (versions: {versions}, state: {state})")
+                    print(f"\n💡 Tip: Load a model with:")
+                    print(f"   poetry run -m essence manage-tensorrt-llm --action load --model <model_name>")
                 else:
                     print("  (no models found)")
+                    print(f"\n💡 Tip: Add models to the repository first:")
+                    print(f"   1. Create repository structure: poetry run -m essence setup-triton-repository --action create --model <name>")
+                    print(f"   2. Compile model: poetry run -m essence compile-model --model <name> --generate-template")
+                    print(f"   3. Check readiness: poetry run -m essence compile-model --model <name> --check-readiness")
                 sys.exit(0)
             else:
                 print(f"❌ {message}")
+                print(f"\n💡 Tip: Check if TensorRT-LLM service is running:")
+                print(f"   poetry run -m essence verify-tensorrt-llm")
                 sys.exit(1)
         
         elif action == "status":
@@ -349,13 +367,23 @@ class ManageTensorRTLLMCommand(Command):
             if success:
                 if status == "READY":
                     print(f"✅ {message}")
+                    print(f"\n💡 Model is ready for inference!")
+                    print(f"   Use gRPC endpoint: tensorrt-llm:8000")
                 elif status == "UNAVAILABLE":
                     print(f"⚠️  {message}")
+                    print(f"\n💡 Model is not loaded. Load it with:")
+                    print(f"   poetry run -m essence manage-tensorrt-llm --action load --model {self.args.model}")
                 else:
                     print(f"❌ {message}")
+                    print(f"\n💡 Troubleshooting:")
+                    print(f"   1. Check if model files are ready: poetry run -m essence compile-model --model {self.args.model} --check-readiness")
+                    print(f"   2. Verify repository structure: poetry run -m essence setup-triton-repository --action validate --model {self.args.model}")
                 sys.exit(0)
             else:
                 print(f"❌ {message}")
+                print(f"\n💡 Troubleshooting:")
+                print(f"   1. Check if TensorRT-LLM service is accessible: poetry run -m essence verify-tensorrt-llm")
+                print(f"   2. Verify model exists in repository: poetry run -m essence manage-tensorrt-llm --action list")
                 sys.exit(1)
     
     def cleanup(self) -> None:
