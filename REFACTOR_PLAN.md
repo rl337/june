@@ -98,6 +98,7 @@ Pare down the june project to bare essentials for the **voice message → STT �
 - Removed references to removed services
 - ✅ Fixed documentation inconsistencies: Updated `docs/guides/AGENTS.md` to reference `REFACTOR_PLAN.md` instead of outdated `TODO.md` as the source of truth
 - ✅ Updated `docs/README.md` last updated date to 2025-11-18
+- ✅ Marked PostgreSQL optimization docs as obsolete: Added obsolete warnings to `docs/database_optimization_summary.md` and `docs/query_optimization_guide.md` (PostgreSQL removed for MVP)
 - ✅ **COMPLETED:** Updated `docs/guides/AGENTS.md` Architecture Overview section to reflect current minimal architecture - removed references to Gateway, Webapp, PostgreSQL, MinIO, and NATS services; updated to show Telegram/Discord services, in-memory storage, and current infrastructure setup
 - ✅ **COMPLETED:** Removed outdated "Database connectivity" reference from `docs/guides/AGENTS.md` run_checks.sh validation list (PostgreSQL service removed)
 - ✅ Fixed CPU fallback documentation inconsistency in README.md - Corrected misleading statement that CPU fallback is allowed for large models (30B+). Updated to reflect Critical Requirements that CPU fallback is FORBIDDEN for large models and service will fail to start if GPU is not available
