@@ -2,7 +2,7 @@
 
 ## Status: ✅ **CORE REFACTORING COMPLETE** → 🚀 **FORWARD DEVELOPMENT IN PROGRESS**
 
-**Last Updated:** 2025-11-19 (Fixed GitHub Actions CI - Made _is_grpc_available() ultra-defensive)
+**Last Updated:** 2025-11-19 (Fixed GitHub Actions CI - Use module-level constant for grpc availability check)
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
@@ -246,7 +246,7 @@ All major refactoring phases have been completed:
    - ✅ All 8 basic pipeline tests passing (complete flow, custom responses, performance, error handling, languages, concurrent requests)
    - ✅ All 3 integration tests passing (2 skipped when grpc mocked/unavailable, 1 service availability check)
    - ✅ Fixed GitHub Actions CI failure (run #269) - Tests now skip gracefully when grpc is mocked
-   - ✅ Enhanced `_is_grpc_available()` function to be ultra-defensive (run #276) - Added nested try/except blocks to catch all possible exceptions during test collection
+   - ✅ Enhanced grpc availability check to use module-level constant (run #278) - Changed from function call to constant evaluated at import time to avoid pytest collection issues
    - ✅ Total: 162 tests passing (153 existing + 9 pipeline tests)
 
 2. **Test STT → LLM → TTS flow:** ⏳ TODO (framework ready, requires real services)
