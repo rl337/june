@@ -4,20 +4,15 @@ This directory contains comprehensive API documentation for all June services.
 
 ## Available Documentation
 
-- **[Gateway API](gateway.md)** - REST endpoints, WebSocket API, authentication, rate limiting
-- **[Inference API](inference.md)** - gRPC methods, request/response formats, streaming, embeddings
-- **[STT Service](stt.md)** - gRPC methods, audio format requirements, streaming, language detection
-- **[TTS Service](tts.md)** - gRPC methods, voice options, prosody control, streaming
-- **[Telegram Bot API](telegram.md)** - Commands, message handling, webhook setup, admin commands
+- **[Inference API](inference.md)** - LLM gRPC service (TensorRT-LLM, default) with request/response formats, streaming, embeddings
+- **[STT Service](stt.md)** - Speech-to-text gRPC service with audio format requirements, streaming, language detection
+- **[TTS Service](tts.md)** - Text-to-speech gRPC service with voice options, prosody control, streaming
+- **[Telegram Bot API](telegram.md)** - Telegram bot integration with commands, message handling, webhook setup, admin commands
 - **[TODO MCP Service](todo-mcp.md)** - Task management endpoints, MCP compatibility, relationships
 
-## Quick Reference
+**Note:** Gateway API was removed for MVP. Services now communicate directly via gRPC. See [gateway.md.obsolete](gateway.md.obsolete) for historical reference.
 
-### Gateway Service
-- Base URL: `http://localhost:8000`
-- Authentication: JWT Bearer tokens
-- Main endpoints: `/api/v1/audio/transcribe`, `/api/v1/llm/generate`, `/api/v1/tts/speak`, `/chat`
-- WebSocket: `/ws/{user_id}`
+## Quick Reference
 
 ### gRPC Services
 - Inference API: `tensorrt-llm:8000` (TensorRT-LLM, default) or `inference-api:50051` (legacy)
@@ -30,23 +25,12 @@ This directory contains comprehensive API documentation for all June services.
 
 ## Getting Started
 
-1. **Authentication**: Start with `/auth/login` to get access tokens
-2. **Check Health**: Use `/health` endpoints to verify services are running
-3. **Read Service Docs**: Each service has detailed documentation with examples
-4. **Use Examples**: All documentation includes curl and Python examples
+1. **Check Service Health**: Use gRPC health checks or HTTP health endpoints (if available) to verify services are running
+2. **Read Service Docs**: Each service has detailed documentation with examples
+3. **Use Examples**: All documentation includes Python gRPC examples
+4. **Direct gRPC Access**: Services communicate directly via gRPC - no gateway required
 
 ## Common Patterns
-
-### Authentication Flow
-```python
-# 1. Login
-response = requests.post("http://localhost:8000/auth/login", json={"username": "user", "password": "pass"})
-tokens = response.json()
-
-# 2. Use token
-headers = {"Authorization": f"Bearer {tokens['access_token']}"}
-response = requests.get("http://localhost:8000/health", headers=headers)
-```
 
 ### gRPC Client Usage
 ```python

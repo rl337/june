@@ -2,7 +2,7 @@
 
 ## Status: ✅ **CORE REFACTORING COMPLETE** → 🚀 **FORWARD DEVELOPMENT IN PROGRESS**
 
-**Last Updated:** 2025-11-18 (Phase 15.3: Documented verify-tensorrt-llm command in guides)
+**Last Updated:** 2025-11-18 (Phase 15.3: Cleaned up Gateway API references in docs/API/README.md)
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
@@ -170,6 +170,7 @@ All major refactoring phases have been completed:
    - ✅ Created `essence/commands/verify_tensorrt_llm.py` command for migration verification
    - ✅ Updated docs/guides/TENSORRT_LLM_SETUP.md to document verify-tensorrt-llm command
    - ✅ Updated docs/guides/COMMANDS.md to include verify-tensorrt-llm, manage-tensorrt-llm, and setup-triton-repository commands
+   - ✅ Updated docs/API/README.md to remove Gateway API references (service was removed for MVP)
    - ⏳ **Remaining:** Fully remove inference-api service from docker-compose.yml (waiting for TensorRT-LLM setup and verification in home_infra)
      - Use `poetry run -m essence verify-tensorrt-llm` to check migration readiness before removal
 
