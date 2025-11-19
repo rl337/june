@@ -490,7 +490,7 @@ class TestRealLLMPerformance:
         """Test latency with real TensorRT-LLM service."""
         # This test requires TensorRT-LLM to be running
         # It will be skipped in CI but can be run manually
-        llm_client = LLMClient(inference_api_url="tensorrt-llm:8000")
+        llm_client = LLMClient(llm_url="tensorrt-llm:8000")
 
         planner = Planner(llm_client=llm_client, enable_cache=True)
         executor = Executor(available_tools={})

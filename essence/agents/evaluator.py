@@ -166,7 +166,7 @@ class BenchmarkEvaluator:
 
     def __init__(
         self,
-        inference_api_url: str = "tensorrt-llm:8000",
+        llm_url: str = "tensorrt-llm:8000",
         model_name: str = "Qwen/Qwen3-30B-A3B-Thinking-2507",
         sandbox_base_image: str = "python:3.11-slim",
         sandbox_workspace_base: Optional[Path] = None,
@@ -180,8 +180,8 @@ class BenchmarkEvaluator:
         Initialize the evaluator.
 
         Args:
-            inference_api_url: gRPC endpoint for LLM inference service (default: "tensorrt-llm:8000" for TensorRT-LLM).
-                              Can use "inference-api:50051" for legacy service.
+            llm_url: gRPC endpoint for LLM inference service (default: "tensorrt-llm:8000" for TensorRT-LLM).
+                    Can use "inference-api:50051" for legacy service or "nim-qwen3:8001" for NVIDIA NIM.
             model_name: Name of the model to evaluate
             sandbox_base_image: Docker base image for sandboxes
             sandbox_workspace_base: Base directory for sandbox workspaces (defaults to /tmp/benchmarks)
@@ -191,7 +191,7 @@ class BenchmarkEvaluator:
             max_iterations: Maximum agent iterations per task
             timeout_seconds: Maximum time per task in seconds
         """
-        self.inference_api_url = inference_api_url
+        self.llm_url = llm_url
         self.model_name = model_name
         self.sandbox_base_image = sandbox_base_image
         self.sandbox_workspace_base = sandbox_workspace_base or Path("/tmp/benchmarks")
@@ -260,7 +260,7 @@ class BenchmarkEvaluator:
 
                 # Initialize coding agent
                 agent = CodingAgent(
-                    inference_api_url=self.inference_api_url,
+                    llm_url=self.llm_url,
                     model_name=self.model_name,
                 )
                 agent.set_workspace(str(workspace_dir))

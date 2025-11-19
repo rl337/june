@@ -97,9 +97,11 @@ class CodingAgentCommand(Command):
             help="Workspace directory for agent operations (default: /tmp/coding_agent_workspace)",
         )
         parser.add_argument(
-            "--inference-api-url",
-            default=os.getenv("INFERENCE_API_URL", "tensorrt-llm:8000"),
-            help="gRPC endpoint for LLM inference service (default: tensorrt-llm:8000 for TensorRT-LLM, can use localhost:50051 for local testing)",
+            "--llm-url",
+            default=os.getenv(
+                "LLM_URL", os.getenv("INFERENCE_API_URL", "tensorrt-llm:8000")
+            ),
+            help="gRPC endpoint for LLM inference service (default: tensorrt-llm:8000 for TensorRT-LLM, can use localhost:50051 for local testing, nim-qwen3:8001 for NVIDIA NIM)",
         )
         parser.add_argument(
             "--model-name",
@@ -147,7 +149,7 @@ class CodingAgentCommand(Command):
 
         # Initialize coding agent
         self._agent = CodingAgent(
-            inference_api_url=self.args.inference_api_url,
+            llm_url=self.args.llm_url,
             model_name=self.args.model_name,
             max_context_length=self.args.max_context_length,
             temperature=self.args.temperature,
@@ -158,7 +160,7 @@ class CodingAgentCommand(Command):
         self._agent.set_workspace(str(self.args.workspace_dir))
 
         logger.info("Coding agent initialized")
-        logger.info(f"  Inference API: {self.args.inference_api_url}")
+        logger.info(f"  LLM URL: {self.args.llm_url}")
         logger.info(f"  Model: {self.args.model_name}")
         logger.info(f"  Workspace: {self.args.workspace_dir}")
 
@@ -215,7 +217,7 @@ class CodingAgentCommand(Command):
             logger.error(f"Connection error executing task: {e}", exc_info=True)
             print(f"\n❌ Connection Error: {e}")
             print(
-                f"💡 Tip: Verify that the LLM inference service is running at {self.args.inference_api_url}"
+                f"💡 Tip: Verify that the LLM inference service is running at {self.args.llm_url}"
             )
             sys.exit(1)
         except Exception as e:
@@ -284,7 +286,7 @@ class CodingAgentCommand(Command):
                     logger.error(f"Connection error executing task: {e}", exc_info=True)
                     print(f"\n❌ Connection Error: {e}")
                     print(
-                        f"💡 Tip: Verify that the LLM inference service is running at {self.args.inference_api_url}"
+                        f"💡 Tip: Verify that the LLM inference service is running at {self.args.llm_url}"
                     )
                 except Exception as e:
                     logger.error(f"Error executing task: {e}", exc_info=True)

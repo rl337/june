@@ -105,9 +105,11 @@ class RunBenchmarksCommand(Command):
             help="Output directory for results and snapshots (default: /tmp/benchmarks/results)",
         )
         parser.add_argument(
-            "--inference-api-url",
-            default=os.getenv("INFERENCE_API_URL", "tensorrt-llm:8000"),
-            help="gRPC endpoint for LLM inference service (default: tensorrt-llm:8000 for TensorRT-LLM, can use inference-api:50051 for legacy service)",
+            "--llm-url",
+            default=os.getenv(
+                "LLM_URL", os.getenv("INFERENCE_API_URL", "tensorrt-llm:8000")
+            ),
+            help="gRPC endpoint for LLM inference service (default: tensorrt-llm:8000 for TensorRT-LLM, can use inference-api:50051 for legacy service, nim-qwen3:8001 for NVIDIA NIM)",
         )
         parser.add_argument(
             "--model-name",
@@ -174,7 +176,7 @@ class RunBenchmarksCommand(Command):
 
         # Initialize evaluator
         self._evaluator = BenchmarkEvaluator(
-            inference_api_url=self.args.inference_api_url,
+            llm_url=self.args.llm_url,
             model_name=self.args.model_name,
             sandbox_base_image=self.args.sandbox_image,
             sandbox_workspace_base=self._output_dir / "sandboxes",

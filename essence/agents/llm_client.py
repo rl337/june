@@ -33,7 +33,7 @@ class LLMClient:
 
     def __init__(
         self,
-        inference_api_url: str = "tensorrt-llm:8000",
+        llm_url: str = "tensorrt-llm:8000",
         model_name: str = "Qwen/Qwen3-30B-A3B-Thinking-2507",
         max_context_length: int = 131072,
         temperature: float = 0.7,
@@ -43,13 +43,14 @@ class LLMClient:
         Initialize the LLM client.
 
         Args:
-            inference_api_url: gRPC endpoint for LLM inference service
+            llm_url: gRPC endpoint for LLM inference service (default: "tensorrt-llm:8000" for TensorRT-LLM).
+                    Can use "inference-api:50051" for legacy service or "nim-qwen3:8001" for NVIDIA NIM.
             model_name: Name of the model to use
             max_context_length: Maximum context length for the model
             temperature: Sampling temperature
             max_tokens: Maximum tokens to generate
         """
-        self.inference_api_url = inference_api_url
+        self.llm_url = llm_url
         self.model_name = model_name
         self.max_context_length = max_context_length
         self.temperature = temperature
@@ -61,11 +62,9 @@ class LLMClient:
     def _ensure_connection(self) -> None:
         """Ensure gRPC connection to LLM inference service is established."""
         if self._channel is None or self._stub is None:
-            self._channel = grpc.insecure_channel(self.inference_api_url)
+            self._channel = grpc.insecure_channel(self.llm_url)
             self._stub = llm_pb2_grpc.LLMInferenceStub(self._channel)
-            logger.info(
-                f"Connected to LLM inference service at {self.inference_api_url}"
-            )
+            logger.info(f"Connected to LLM inference service at {self.llm_url}")
 
     def _create_chat_message(self, role: str, content: str) -> ChatMessage:
         """Create a ChatMessage protobuf object."""
