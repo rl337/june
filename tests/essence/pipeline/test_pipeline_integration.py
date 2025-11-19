@@ -16,17 +16,21 @@ def _is_grpc_available():
     try:
         # Check if grpc is in sys.modules and if it's mocked
         if 'grpc' in sys.modules:
-            grpc = sys.modules['grpc']
+            grpc_module = sys.modules['grpc']
             # Check if grpc is mocked (from conftest.py in other test modules)
-            if isinstance(grpc, MagicMock):
+            if isinstance(grpc_module, MagicMock):
                 return False
         # Try to import grpc to see if it's available
         import grpc
         # Double-check it's not mocked after import
         if isinstance(grpc, MagicMock):
             return False
+        # Verify grpc has essential attributes (not just a mock)
+        if not hasattr(grpc, 'insecure_channel'):
+            return False
         return True
-    except (ImportError, AttributeError):
+    except (ImportError, AttributeError, TypeError, KeyError):
+        # Catch all possible exceptions during import/check
         return False
 
 
