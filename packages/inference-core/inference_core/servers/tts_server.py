@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-import os
 import asyncio
+import logging
+import os
+from typing import Optional
+
 import grpc
 from grpc import aio
-from typing import Optional
-import logging
-
-from ..strategies import TtsStrategy, InferenceRequest
-from ..utils import setup_logging
-from ..config import config
 from june_grpc_api.generated import tts_pb2, tts_pb2_grpc
+
+from ..config import config
+from ..strategies import InferenceRequest, TtsStrategy
+from ..utils import setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -24,8 +25,9 @@ try:
     essence_path = Path(__file__).parent.parent.parent.parent / "essence"
     if str(essence_path) not in sys.path:
         sys.path.insert(0, str(essence_path))
-    from essence.chat.utils.tracing import get_tracer
     from opentelemetry import trace
+
+    from essence.chat.utils.tracing import get_tracer
 
     tracer = get_tracer(__name__)
 except (ImportError, Exception) as e:

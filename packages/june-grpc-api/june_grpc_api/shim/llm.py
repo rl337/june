@@ -1,5 +1,6 @@
+from typing import AsyncGenerator, Dict, List, Optional
+
 import grpc
-from typing import Optional, List, Dict, AsyncGenerator
 
 from ..generated import llm_pb2, llm_pb2_grpc
 

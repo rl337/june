@@ -1,5 +1,6 @@
-import grpc
 from typing import Optional
+
+import grpc
 
 from ..generated import tts_pb2, tts_pb2_grpc
 

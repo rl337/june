@@ -1,14 +1,14 @@
 """Helper module for calling chat response agent and formatting responses."""
 import json
 import logging
-import subprocess
 import os
-import time
-import threading
 import queue
+import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
-from typing import Optional, Dict, Any, Iterator, Tuple
+from typing import Any, Dict, Iterator, Optional, Tuple
 
 # Add essence module to path for streaming_popen_generator
 essence_path = Path(__file__).parent.parent.parent.parent / "essence"

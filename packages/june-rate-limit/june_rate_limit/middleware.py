@@ -3,11 +3,12 @@ FastAPI middleware for rate limiting.
 """
 import logging
 from typing import Callable, Optional
+
 from fastapi import Request, Response, status
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from .rate_limiter import RateLimiter, RateLimitConfig, RateLimitResult
+from .rate_limiter import RateLimitConfig, RateLimiter, RateLimitResult
 
 logger = logging.getLogger(__name__)
 

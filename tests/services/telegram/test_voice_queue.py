@@ -1,9 +1,10 @@
 """Tests for voice message queue."""
-import pytest
 import asyncio
-import json
 import base64
+import json
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from essence.services.telegram.voice_queue import (
     VoiceMessageQueue,

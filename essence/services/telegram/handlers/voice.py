@@ -1,69 +1,68 @@
 """Voice message handler for Telegram bot."""
 import io
 import logging
-import tempfile
 import os
+import re
 import sys
+import tempfile
 import time
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
 from pathlib import Path
+from typing import TYPE_CHECKING, Optional
 
 import grpc.aio
 import librosa
+from opentelemetry import trace
 from pydub import AudioSegment
 from telegram import Update
-from telegram.ext import ContextTypes
 from telegram.error import (
+    BadRequest,
+    Conflict,
+    NetworkError,
+    RetryAfter,
     TelegramError,
     TimedOut,
-    NetworkError,
-    BadRequest,
-    RetryAfter,
-    Conflict,
 )
-
-from essence.services.telegram.conversation_storage import ConversationStorage
-from essence.services.telegram.language_preferences import (
-    get_supported_languages,
-    is_language_supported,
-    DEFAULT_LANGUAGE,
-)
-import re
-
-from essence.services.telegram.cost_tracking import (
-    calculate_stt_cost,
-    calculate_tts_cost,
-    calculate_llm_cost,
-    record_cost,
-    get_conversation_id_from_user_chat,
-)
-
-from essence.services.telegram.audio_utils import (
-    enhance_audio_for_stt,
-    prepare_audio_for_stt,  # Keep for backward compatibility
-    AudioValidationError,
-    MAX_AUDIO_DURATION_SECONDS,
-    MAX_AUDIO_SIZE_BYTES,
-    export_audio_to_ogg_optimized,
-    find_optimal_compression,
-)
+from telegram.ext import ContextTypes
 
 from essence.chat.utils.tracing import get_tracer
-from opentelemetry import trace
+from essence.services.grpc_metrics import record_grpc_call
 
 # Import metrics
 from essence.services.shared_metrics import (
-    GRPC_REQUESTS_TOTAL,
+    ERRORS_TOTAL,
     GRPC_REQUEST_DURATION_SECONDS,
-    VOICE_MESSAGES_PROCESSED_TOTAL,
-    VOICE_PROCESSING_DURATION_SECONDS,
+    GRPC_REQUESTS_TOTAL,
+    LLM_GENERATION_DURATION_SECONDS,
     STT_TRANSCRIPTION_DURATION_SECONDS,
     TTS_SYNTHESIS_DURATION_SECONDS,
-    LLM_GENERATION_DURATION_SECONDS,
-    ERRORS_TOTAL,
+    VOICE_MESSAGES_PROCESSED_TOTAL,
+    VOICE_PROCESSING_DURATION_SECONDS,
 )
-from essence.services.grpc_metrics import record_grpc_call
+from essence.services.telegram.audio_utils import (
+    prepare_audio_for_stt,  # Keep for backward compatibility
+)
+from essence.services.telegram.audio_utils import (
+    MAX_AUDIO_DURATION_SECONDS,
+    MAX_AUDIO_SIZE_BYTES,
+    AudioValidationError,
+    enhance_audio_for_stt,
+    export_audio_to_ogg_optimized,
+    find_optimal_compression,
+)
+from essence.services.telegram.conversation_storage import ConversationStorage
+from essence.services.telegram.cost_tracking import (
+    calculate_llm_cost,
+    calculate_stt_cost,
+    calculate_tts_cost,
+    get_conversation_id_from_user_chat,
+    record_cost,
+)
+from essence.services.telegram.language_preferences import (
+    DEFAULT_LANGUAGE,
+    get_supported_languages,
+    is_language_supported,
+)
 
 PLATFORM = "telegram"
 SERVICE_NAME = "telegram"
@@ -801,11 +800,12 @@ async def handle_voice_message(
             # Import here to avoid circular dependencies
             from june_grpc_api import asr as asr_shim
             from june_grpc_api.shim.asr import (
-                STTError,
-                STTTimeoutError,
                 STTConnectionError,
+                STTError,
                 STTServiceError,
+                STTTimeoutError,
             )
+
             from essence.services.telegram.dependencies.grpc_pool import get_grpc_pool
             from essence.services.telegram.dependencies.retry import (
                 retry_with_exponential_backoff,
@@ -1254,6 +1254,7 @@ async def handle_voice_message(
         await status_msg.edit_text("?? Processing with LLM...")
         try:
             from june_grpc_api.shim.llm import LLMClient
+
             from essence.services.telegram.dependencies.config import get_llm_address
 
             llm_address = get_llm_address()
@@ -1449,6 +1450,7 @@ async def handle_voice_message(
         tts_status = "ok"
         try:
             from june_grpc_api.shim.tts import TextToSpeechClient
+
             from essence.services.telegram.dependencies.config import get_tts_address
 
             tts_address = get_tts_address()
@@ -1785,10 +1787,10 @@ async def handle_voice_message_from_queue(
             # Import here to avoid circular dependencies
             from june_grpc_api import asr as asr_shim
             from june_grpc_api.shim.asr import (
-                STTError,
-                STTTimeoutError,
                 STTConnectionError,
+                STTError,
                 STTServiceError,
+                STTTimeoutError,
             )
 
             # Initialize variables for streaming transcription
@@ -2156,6 +2158,7 @@ async def handle_voice_message_from_queue(
         await status_msg.edit_text("?? Processing with LLM...")
         try:
             from june_grpc_api.shim.llm import LLMClient
+
             from essence.services.telegram.dependencies.config import get_llm_address
 
             llm_address = get_llm_address()
@@ -2321,6 +2324,7 @@ async def handle_voice_message_from_queue(
         await status_msg.edit_text("?? Generating voice response...")
         try:
             from june_grpc_api.shim.tts import TextToSpeechClient
+
             from essence.services.telegram.dependencies.config import get_tts_address
 
             tts_address = get_tts_address()

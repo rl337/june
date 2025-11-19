@@ -5,13 +5,14 @@ Tests to ensure existing capabilities still work.
 """
 
 import pytest
-from tests.agentic.simulation.mock_task_service import (
-    MockTaskService,
-    TaskType,
-    TaskStatus,
-)
+
 from tests.agentic.simulation.mock_execution import ExecutionSimulator
 from tests.agentic.simulation.mock_git import GitSimulator
+from tests.agentic.simulation.mock_task_service import (
+    MockTaskService,
+    TaskStatus,
+    TaskType,
+)
 
 
 class TestCommonWorkflows:

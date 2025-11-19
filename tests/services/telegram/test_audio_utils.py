@@ -9,32 +9,32 @@ Tests cover:
 - Noise reduction
 - Volume normalization
 """
-import pytest
 import io
-import wave
 import sys
+import wave
 from pathlib import Path
 
+import pytest
 from pydub import AudioSegment
 from pydub.generators import Sine
 
 from essence.services.telegram.audio_utils import (
-    convert_ogg_to_wav,
-    convert_to_16khz_mono,
-    validate_audio,
-    AudioValidationError,
+    COMPRESSION_PRESETS,
     MAX_AUDIO_DURATION_SECONDS,
     MAX_AUDIO_SIZE_BYTES,
+    TELEGRAM_MAX_FILE_SIZE,
+    TELEGRAM_RECOMMENDED_BITRATE,
+    AudioValidationError,
     compress_audio_for_telegram,
+    convert_ogg_to_wav,
+    convert_to_16khz_mono,
+    enhance_audio_for_stt,
     export_audio_to_ogg_optimized,
     find_optimal_compression,
-    COMPRESSION_PRESETS,
-    TELEGRAM_RECOMMENDED_BITRATE,
-    TELEGRAM_MAX_FILE_SIZE,
-    reduce_noise,
     normalize_volume,
-    enhance_audio_for_stt,
     prepare_audio_for_stt,
+    reduce_noise,
+    validate_audio,
 )
 
 
@@ -361,8 +361,8 @@ class TestCompressionOptimization:
 
     def test_export_audio_to_ogg_optimized(self, sample_audio_segment, tmp_path):
         """Test exporting audio to OGG with optimization."""
-        import shutil
         import os
+        import shutil
 
         # Skip test if ffmpeg is not available
         if not shutil.which("ffmpeg"):

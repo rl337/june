@@ -8,13 +8,14 @@ Supports:
 - Report generation and comparison
 """
 import argparse
+import json
+import logging
 import subprocess
 import sys
-import json
-import yaml
-from pathlib import Path
 from datetime import datetime
-import logging
+from pathlib import Path
+
+import yaml
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

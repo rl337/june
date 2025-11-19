@@ -1,11 +1,12 @@
 """
 Tests for ConversationStorage class.
 """
-import pytest
-import sys
-import os
-from unittest.mock import patch, MagicMock
 import json
+import os
+import sys
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Mock psycopg2 before importing conversation_storage
 sys.modules["psycopg2"] = MagicMock()
@@ -13,8 +14,8 @@ sys.modules["psycopg2.extras"] = MagicMock()
 sys.modules["psycopg2.extras"].RealDictCursor = MagicMock
 
 from essence.services.telegram.conversation_storage import (
-    ConversationStorage,
     DEFAULT_LANGUAGE,
+    ConversationStorage,
 )
 
 

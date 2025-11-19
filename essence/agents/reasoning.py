@@ -6,13 +6,14 @@ Implements the think → plan → execute → reflect loop.
 """
 import logging
 import time
-from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
-from essence.chat.utils.tracing import get_tracer
-from essence.agents.reasoning_cache import get_reasoning_cache, ReasoningCache
 from opentelemetry import trace
+
+from essence.agents.reasoning_cache import ReasoningCache, get_reasoning_cache
+from essence.chat.utils.tracing import get_tracer
 
 logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)

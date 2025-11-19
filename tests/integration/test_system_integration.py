@@ -1,18 +1,19 @@
 """
 Comprehensive integration test suite for June Agent system.
 """
-import pytest
 import asyncio
 import json
-import numpy as np
-from unittest.mock import AsyncMock, MagicMock, patch
-import grpc
-from grpc import aio
-import httpx
-from fastapi.testclient import TestClient
 
 # Import service modules
 import sys
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import grpc
+import httpx
+import numpy as np
+import pytest
+from fastapi.testclient import TestClient
+from grpc import aio
 
 sys.path.append("services/gateway")
 sys.path.append("services/inference-api")
@@ -26,9 +27,9 @@ from tts.main import TTSService
 
 # Import protobuf classes
 sys.path.append("proto")
-from llm_pb2 import GenerationRequest, GenerationParameters, Context
-from asr_pb2 import RecognitionRequest, RecognitionConfig, AudioChunk
-from tts_pb2 import SynthesisRequest, SynthesisConfig
+from asr_pb2 import AudioChunk, RecognitionConfig, RecognitionRequest
+from llm_pb2 import Context, GenerationParameters, GenerationRequest
+from tts_pb2 import SynthesisConfig, SynthesisRequest
 
 
 @pytest.fixture
@@ -156,7 +157,7 @@ class TestInferenceAPIIntegration:
     @pytest.mark.asyncio
     async def test_inference_chat(self, mock_inference_service):
         """Test inference API chat functionality."""
-        from llm_pb2 import ChatRequest, ChatMessage
+        from llm_pb2 import ChatMessage, ChatRequest
 
         messages = [
             ChatMessage(role="user", content="What is 2+2?"),
@@ -581,6 +582,7 @@ class TestConfigurationIntegration:
     def test_environment_variables(self):
         """Test environment variable handling."""
         import os
+
         from inference_core.config import config
 
         # Test that configuration loads properly

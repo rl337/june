@@ -5,14 +5,15 @@ Tests the extraction and accumulation logic to ensure messages are properly
 accumulated and streamed incrementally to Telegram.
 """
 import json
-import pytest
-from unittest.mock import Mock, patch, MagicMock
 from typing import Iterator, Tuple
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 # Import from essence package (code moved from services/chat-service-base to essence/chat/agent)
 from essence.chat.agent.response import (
-    stream_chat_response_agent,
     _extract_human_readable_from_json_line,
+    stream_chat_response_agent,
 )
 
 

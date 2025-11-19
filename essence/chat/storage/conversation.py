@@ -5,16 +5,17 @@ Provides methods to store and retrieve conversation information including
 language preferences stored in the conversations.metadata JSONB field.
 Also provides analytics and reporting capabilities.
 """
-import os
-import logging
-import psycopg2
-from psycopg2 import IntegrityError
-from typing import Optional, Dict, Any, List
-from psycopg2.extras import RealDictCursor
-import json
-from datetime import datetime, timedelta
 import csv
 import io
+import json
+import logging
+import os
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+
+import psycopg2
+from psycopg2 import IntegrityError
+from psycopg2.extras import RealDictCursor
 
 logger = logging.getLogger(__name__)
 
@@ -1352,21 +1353,21 @@ class ConversationStorage:
                 elif format.lower() == "pdf":
                     # Generate PDF export
                     try:
+                        from reportlab.lib.enums import TA_CENTER, TA_LEFT
                         from reportlab.lib.pagesizes import letter
                         from reportlab.lib.styles import (
-                            getSampleStyleSheet,
                             ParagraphStyle,
+                            getSampleStyleSheet,
                         )
                         from reportlab.lib.units import inch
-                        from reportlab.platypus import (
-                            SimpleDocTemplate,
-                            Paragraph,
-                            Spacer,
-                            PageBreak,
-                        )
-                        from reportlab.lib.enums import TA_LEFT, TA_CENTER
                         from reportlab.pdfbase import pdfmetrics
                         from reportlab.pdfbase.ttfonts import TTFont
+                        from reportlab.platypus import (
+                            PageBreak,
+                            Paragraph,
+                            SimpleDocTemplate,
+                            Spacer,
+                        )
                     except ImportError:
                         raise ImportError(
                             "reportlab is required for PDF export. Install it with: pip install reportlab"

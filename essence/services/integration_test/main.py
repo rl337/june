@@ -14,32 +14,31 @@ import subprocess
 import threading
 import time
 import uuid
+from dataclasses import asdict, dataclass
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, asdict
 from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-
-from essence.chat.utils.tracing import setup_tracing, get_tracer
-from essence.services.shared_metrics import (
-    HTTP_REQUESTS_TOTAL,
-    HTTP_REQUEST_DURATION_SECONDS,
-    SERVICE_HEALTH,
-    REGISTRY,
-)
+from fastapi import BackgroundTasks, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, Response
 from prometheus_client import (
-    generate_latest,
     CONTENT_TYPE_LATEST,
     Counter,
-    Histogram,
     Gauge,
+    Histogram,
+    generate_latest,
 )
-from fastapi.responses import Response
+
+from essence.chat.utils.tracing import get_tracer, setup_tracing
+from essence.services.shared_metrics import (
+    HTTP_REQUEST_DURATION_SECONDS,
+    HTTP_REQUESTS_TOTAL,
+    REGISTRY,
+    SERVICE_HEALTH,
+)
 
 # Test-specific metrics
 TEST_RUNS_TOTAL = Counter(

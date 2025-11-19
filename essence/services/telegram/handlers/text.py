@@ -1,21 +1,22 @@
 """Text message handler for Telegram bot - uses TelegramResponse agent."""
+import asyncio
 import logging
 import re
 import time
-import asyncio
 from typing import Optional
+
+from opentelemetry import trace
 from telegram import Update
 from telegram.ext import ContextTypes
 
 from essence.chat.agent.handler import stream_agent_message
-from essence.services.telegram.conversation_storage import ConversationStorage
 from essence.chat.message_builder import MessageBuilder
 from essence.chat.utils.tracing import get_tracer
+from essence.services.telegram.conversation_storage import ConversationStorage
 from essence.services.telegram.message_history_helpers import (
-    reply_text_with_history,
     edit_text_with_history,
+    reply_text_with_history,
 )
-from opentelemetry import trace
 
 logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)

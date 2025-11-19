@@ -5,27 +5,28 @@ Provides an interface for sending coding tasks to the Qwen3 model via inference 
 Handles tool calling, code execution, file operations, and multi-turn conversations.
 All operations run in containers - no host system pollution.
 """
-import logging
 import json
-import subprocess
-from typing import Optional, Dict, Any, Iterator, List, Tuple
-from pathlib import Path
-import grpc
+import logging
 import os
+import subprocess
+from pathlib import Path
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
-from june_grpc_api.llm_pb2 import (
-    ChatRequest,
-    ChatMessage,
-    GenerationParameters,
-    ChatChunk,
-    ToolDefinition,
-    ToolCall,
-    FunctionCall,
-    Context,
-)
+import grpc
 from june_grpc_api import llm_pb2_grpc
-from essence.chat.utils.tracing import get_tracer
+from june_grpc_api.llm_pb2 import (
+    ChatChunk,
+    ChatMessage,
+    ChatRequest,
+    Context,
+    FunctionCall,
+    GenerationParameters,
+    ToolCall,
+    ToolDefinition,
+)
 from opentelemetry import trace
+
+from essence.chat.utils.tracing import get_tracer
 
 logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)

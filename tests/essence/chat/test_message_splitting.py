@@ -5,16 +5,17 @@ Tests verify that messages are properly split when too long and truncated
 when exceeding 2x the maximum length.
 """
 
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
+from essence.chat.human_interface import EscapedText, Message, Paragraph
 from essence.chat.message_builder import MessageBuilder
-from essence.chat.human_interface import Message, EscapedText, Paragraph
 
 
 class TestMessageSplitting:

@@ -5,9 +5,9 @@ This conftest.py handles the telegram package name conflict between
 python-telegram-bot (installed package) and essence/services/telegram (local code).
 Also mocks opentelemetry and other dependencies that may not be available in test environment.
 """
-import sys
 import os
 import site
+import sys
 from unittest.mock import MagicMock
 
 # Ensure we import from installed python-telegram-bot, not local telegram dir

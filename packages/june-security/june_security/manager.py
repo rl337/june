@@ -3,13 +3,13 @@ Security Manager - High-level interface that integrates all security components.
 """
 
 import logging
-from typing import Dict, Any, Optional, Tuple
 from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
 
-from .validator import SecurityValidator, ValidationResult, OperationType
-from .audit import AuditLogger, AuditEventType
+from .audit import AuditEventType, AuditLogger
 from .monitoring import SecurityMonitor, SecurityThreat
 from .sandbox import SandboxManager
+from .validator import OperationType, SecurityValidator, ValidationResult
 
 logger = logging.getLogger(__name__)
 

@@ -11,14 +11,14 @@ Provides feedback and improvement suggestions to users.
 """
 import io
 import logging
+import os
 import subprocess
 import tempfile
-import os
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List, Optional
 
 try:
-    import numpy as np
     import librosa
+    import numpy as np
 
     NUMPY_AVAILABLE = True
     LIBROSA_AVAILABLE = True

@@ -9,12 +9,13 @@ Tests cover:
 - Clearing user rate limit history
 - Concurrent access (thread safety)
 """
-import pytest
 import asyncio
-import time
-import sys
 import os
-from unittest.mock import patch, MagicMock
+import sys
+import time
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 # Mock inference_core before importing rate_limit
 sys.modules["inference_core"] = MagicMock()

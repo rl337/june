@@ -3,12 +3,13 @@ Helper utilities for instrumenting gRPC calls with metrics.
 """
 import time
 from contextlib import asynccontextmanager
-from typing import Optional, AsyncIterator, Any
+from typing import Any, AsyncIterator, Optional
+
 import grpc
 
 from essence.services.shared_metrics import (
-    GRPC_REQUESTS_TOTAL,
     GRPC_REQUEST_DURATION_SECONDS,
+    GRPC_REQUESTS_TOTAL,
 )
 
 

@@ -4,9 +4,10 @@ Performance Tests for Agent Capabilities
 Tests agent performance, resource usage, and scalability.
 """
 
-import pytest
 import time
-from typing import Dict, Any
+from typing import Any, Dict
+
+import pytest
 
 
 class TestAgentPerformance:
@@ -43,8 +44,9 @@ class TestAgentPerformance:
 
     def test_concurrent_task_processing(self):
         """Test performance with concurrent task processing."""
-        from tests.agentic.simulation.mock_task_service import MockTaskService, TaskType
         import threading
+
+        from tests.agentic.simulation.mock_task_service import MockTaskService, TaskType
 
         service = MockTaskService()
         project = service.create_project(
@@ -138,6 +140,7 @@ class TestResourceUsage:
     def test_memory_usage_is_reasonable(self):
         """Test that agent operations don't use excessive memory."""
         import sys
+
         from tests.agentic.simulation.mock_task_service import MockTaskService, TaskType
 
         service = MockTaskService()

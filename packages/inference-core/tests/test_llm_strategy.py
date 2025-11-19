@@ -1,7 +1,8 @@
 """Tests for LLM strategies."""
 import os
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
 
 try:
     import torch
@@ -105,8 +106,8 @@ def test_qwen3_strategy_initialization():
 
 def test_qwen3_strategy_initialization_defaults():
     """Test Qwen3LlmStrategy uses config defaults when parameters not provided."""
-    from inference_core.llm.qwen3_strategy import Qwen3LlmStrategy
     from inference_core.config import config
+    from inference_core.llm.qwen3_strategy import Qwen3LlmStrategy
 
     strategy = Qwen3LlmStrategy()
 

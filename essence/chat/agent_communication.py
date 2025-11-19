@@ -11,8 +11,8 @@ status and warns if services are running.
 import logging
 import os
 import subprocess
-from typing import Optional, Dict, Any, List
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
 from essence.chat.message_history import get_message_history
 from essence.chat.message_history_analysis import validate_message_for_platform

@@ -6,8 +6,8 @@ import asyncio
 import logging
 import os
 import time
-from typing import Dict, Tuple, Optional
 from collections import defaultdict
+from typing import Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

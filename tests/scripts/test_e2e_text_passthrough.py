@@ -21,14 +21,15 @@ through the entire audio processing pipeline.
 **Status:** This test file is kept for reference but is not functional.
 To test the pipeline without gateway, use direct gRPC calls to STT, LLM, and TTS services.
 """
-import os
-import sys
 import asyncio
 import logging
+import os
+import sys
+from pathlib import Path
+from typing import Optional
+
 import grpc
 import httpx
-from typing import Optional
-from pathlib import Path
 
 # Setup logging
 logging.basicConfig(
@@ -37,7 +38,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Import shim clients
-from june_grpc_api import tts as tts_shim, asr as asr_shim
+from june_grpc_api import asr as asr_shim
+from june_grpc_api import tts as tts_shim
 
 
 class EndToEndTextPassthroughTest:
@@ -138,8 +140,8 @@ class EndToEndTextPassthroughTest:
         sample_width: int = 2,
     ) -> bytes:
         """Convert raw PCM audio data to WAV format."""
-        import wave
         import io
+        import wave
 
         wav_buffer = io.BytesIO()
         with wave.open(wav_buffer, "wb") as wav_file:

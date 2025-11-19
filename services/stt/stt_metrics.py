@@ -7,13 +7,13 @@ Tracks transcription metrics including:
 - Problematic audio formats/lengths
 - Confidence scores
 """
-import sqlite3
-import logging
 import json
-from typing import Optional, Dict, List, Any
+import logging
+import os
+import sqlite3
 from datetime import datetime
 from pathlib import Path
-import os
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

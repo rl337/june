@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-import os
-import grpc
 import logging
+import os
 from concurrent import futures
-from typing import Optional, Iterator
+from typing import Iterator, Optional
 
-from ..strategies import LlmStrategy, InferenceRequest
-from ..utils import setup_logging
-from ..config import config
+import grpc
 from june_grpc_api.generated import llm_pb2, llm_pb2_grpc
+
+from ..config import config
+from ..strategies import InferenceRequest, LlmStrategy
+from ..utils import setup_logging
 
 logger = logging.getLogger(__name__)
 

@@ -1,9 +1,10 @@
 """gRPC connection pooling for production use."""
 import asyncio
 import logging
-import grpc.aio
-from typing import Optional, Dict
 from contextlib import asynccontextmanager
+from typing import Dict, Optional
+
+import grpc.aio
 
 logger = logging.getLogger(__name__)
 
@@ -202,12 +203,13 @@ def get_grpc_pool() -> GrpcConnectionPool:
     """Get global gRPC connection pool instance."""
     global _pool
     if _pool is None:
+        import os
+
         from dependencies.config import (
+            get_llm_address,
             get_stt_address,
             get_tts_address,
-            get_llm_address,
         )
-        import os
 
         max_connections = int(os.getenv("GRPC_MAX_CONNECTIONS_PER_SERVICE", "10"))
         keepalive_time_ms = int(os.getenv("GRPC_KEEPALIVE_TIME_MS", "30000"))

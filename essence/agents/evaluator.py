@@ -5,20 +5,21 @@ Provides test harness for running coding benchmarks (HumanEval, MBPP, etc.)
 with sandboxed execution, result collection, and efficiency metrics.
 All operations run in containers - no host system pollution.
 """
-import logging
 import json
-import time
+import logging
 import shutil
-from pathlib import Path
-from typing import Dict, Any, List, Optional, Iterator, Tuple
-from dataclasses import dataclass, asdict
-from datetime import datetime
 import statistics
+import time
+from dataclasses import asdict, dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
-from essence.agents.sandbox import Sandbox, SandboxMetrics, CommandLog
-from essence.agents.coding_agent import CodingAgent
-from essence.chat.utils.tracing import get_tracer
 from opentelemetry import trace
+
+from essence.agents.coding_agent import CodingAgent
+from essence.agents.sandbox import CommandLog, Sandbox, SandboxMetrics
+from essence.chat.utils.tracing import get_tracer
 
 logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)

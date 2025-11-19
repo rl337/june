@@ -5,14 +5,14 @@ Uses in-memory storage for MVP (PostgreSQL removed).
 Provides methods to store and retrieve conversation information including
 language preferences and prompt templates.
 """
-import os
-import logging
-from typing import Optional, Dict, Any, List
-import json
-from datetime import datetime, timedelta
-from collections import defaultdict
 import csv
 import io
+import json
+import logging
+import os
+from collections import defaultdict
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
 
 # PostgreSQL removed for MVP - make imports optional
 try:
@@ -868,21 +868,21 @@ class ConversationStorage:
                 elif format.lower() == "pdf":
                     # Generate PDF export
                     try:
+                        from reportlab.lib.enums import TA_CENTER, TA_LEFT
                         from reportlab.lib.pagesizes import letter
                         from reportlab.lib.styles import (
-                            getSampleStyleSheet,
                             ParagraphStyle,
+                            getSampleStyleSheet,
                         )
                         from reportlab.lib.units import inch
-                        from reportlab.platypus import (
-                            SimpleDocTemplate,
-                            Paragraph,
-                            Spacer,
-                            PageBreak,
-                        )
-                        from reportlab.lib.enums import TA_LEFT, TA_CENTER
                         from reportlab.pdfbase import pdfmetrics
                         from reportlab.pdfbase.ttfonts import TTFont
+                        from reportlab.platypus import (
+                            PageBreak,
+                            Paragraph,
+                            SimpleDocTemplate,
+                            Spacer,
+                        )
                     except ImportError:
                         raise ImportError(
                             "reportlab is required for PDF export. Install it with: pip install reportlab"

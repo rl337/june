@@ -11,14 +11,14 @@ The core concepts:
 - Translation: Platform-specific rendering of markdown widgets
 """
 
+import gzip
 import json
 import logging
-import gzip
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import List, Optional, Dict, Any, Union, Literal
-from dataclasses import dataclass, field, asdict
 from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Literal, Optional, Union
 
 logger = logging.getLogger(__name__)
 

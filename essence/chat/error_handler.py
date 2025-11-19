@@ -5,7 +5,8 @@ Error handling utilities for structured error messages.
 import logging
 import traceback
 from typing import Optional
-from .human_interface import ErrorMessage, Message, EscapedText
+
+from .human_interface import ErrorMessage, EscapedText, Message
 from .message_builder import MessageBuilder
 
 logger = logging.getLogger(__name__)

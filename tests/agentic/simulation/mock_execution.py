@@ -6,10 +6,10 @@ Simulates code execution for safe testing without running actual code.
 
 import os
 import tempfile
-from pathlib import Path
-from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
 
 
 class ExecutionResult:

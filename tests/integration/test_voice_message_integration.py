@@ -7,19 +7,21 @@ Tests the complete end-to-end voice message flow:
 Uses real services (STT, TTS, TensorRT-LLM or Inference API) - not mocks.
 Tests error scenarios and concurrent requests.
 """
-import pytest
 import asyncio
+import base64
+import logging
 import os
+import struct
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, Dict, List, Optional
+
 import grpc
 import httpx
 import numpy as np
-import struct
-import base64
-from typing import List, Dict, Any, Optional
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import logging
-
-from june_grpc_api import asr as asr_shim, tts as tts_shim, llm as llm_shim
+import pytest
+from june_grpc_api import asr as asr_shim
+from june_grpc_api import llm as llm_shim
+from june_grpc_api import tts as tts_shim
 
 # Setup logging
 logging.basicConfig(

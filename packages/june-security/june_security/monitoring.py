@@ -4,10 +4,10 @@ Security Monitor - Detects suspicious patterns and security threats.
 
 import logging
 import re
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
 from collections import defaultdict, deque
+from datetime import datetime, timedelta
 from enum import Enum
+from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

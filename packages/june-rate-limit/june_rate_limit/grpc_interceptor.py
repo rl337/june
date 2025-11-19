@@ -3,9 +3,10 @@ gRPC interceptor for rate limiting.
 """
 import logging
 from typing import Callable, Optional
+
 import grpc
 
-from .rate_limiter import RateLimiter, RateLimitConfig, RateLimitResult
+from .rate_limiter import RateLimitConfig, RateLimiter, RateLimitResult
 
 logger = logging.getLogger(__name__)
 

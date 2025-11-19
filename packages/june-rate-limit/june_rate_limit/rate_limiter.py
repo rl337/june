@@ -5,11 +5,12 @@ import asyncio
 import logging
 import os
 import time
-from typing import Dict, Optional, Tuple
 from datetime import timedelta
+from typing import Dict, Optional, Tuple
+
 import redis.asyncio as aioredis
-from redis.exceptions import RedisError, ConnectionError
-from prometheus_client import Counter, Histogram, Gauge
+from prometheus_client import Counter, Gauge, Histogram
+from redis.exceptions import ConnectionError, RedisError
 
 logger = logging.getLogger(__name__)
 

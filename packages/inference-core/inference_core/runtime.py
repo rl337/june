@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from .strategies import InferenceStrategy, InferenceRequest, InferenceResponse
+from .strategies import InferenceRequest, InferenceResponse, InferenceStrategy
 
 
 class InferenceApp:

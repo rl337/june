@@ -6,16 +6,17 @@ This script provides basic testing for STT and TTS services without requiring
 full dataset downloads. It creates synthetic test cases and evaluates performance.
 """
 
-import os
-import sys
 import json
-import time
 import logging
+import os
 import subprocess
-import requests
-from pathlib import Path
-from typing import List, Dict, Any
+import sys
 import tempfile
+import time
+from pathlib import Path
+from typing import Any, Dict, List
+
+import requests
 
 # Setup logging
 logging.basicConfig(

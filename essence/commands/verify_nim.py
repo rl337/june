@@ -18,7 +18,7 @@ import json
 import logging
 import os
 import sys
-from typing import Dict, Any, Tuple
+from typing import Any, Dict, Tuple
 
 try:
     import grpc
@@ -156,7 +156,7 @@ def check_grpc_protocol_compatibility(
     try:
         # Import the gRPC service definition
         try:
-            from june_grpc_api.generated import llm_pb2_grpc, llm_pb2
+            from june_grpc_api.generated import llm_pb2, llm_pb2_grpc
         except ImportError:
             return (
                 False,

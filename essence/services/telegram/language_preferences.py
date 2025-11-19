@@ -5,7 +5,7 @@ Stores language preferences per user/chat. Uses in-memory storage
 (can be upgraded to persistent storage later if needed).
 """
 import logging
-from typing import Optional, Dict
+from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 

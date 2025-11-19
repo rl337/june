@@ -1,17 +1,17 @@
-import os
 import asyncio
 import logging
-from prometheus_client import (
-    Counter,
-    Histogram,
-    Gauge,
-    CollectorRegistry,
-    CONTENT_TYPE_LATEST,
-)
-from prometheus_client.exposition import start_http_server
+import os
 
 from inference_core import TtsGrpcApp
 from inference_core.tts.espeak_strategy import EspeakTtsStrategy
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    Counter,
+    Gauge,
+    Histogram,
+)
+from prometheus_client.exposition import start_http_server
 
 # Initialize tracing early
 try:
@@ -30,7 +30,7 @@ except ImportError:
 
 # Import rate limiting
 try:
-    from june_rate_limit import RateLimitInterceptor, RateLimitConfig
+    from june_rate_limit import RateLimitConfig, RateLimitInterceptor
 
     RATE_LIMIT_AVAILABLE = True
 except ImportError:

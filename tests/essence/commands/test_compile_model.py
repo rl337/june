@@ -3,22 +3,23 @@ Unit tests for compile_model command.
 
 Tests validation functions, template generation, and command execution.
 """
-import pytest
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-from typing import Dict, Any
+from typing import Any, Dict
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 from essence.commands.compile_model import (
-    check_tensorrt_llm_build_tools,
-    check_model_repository_structure,
+    CompileModelCommand,
     check_gpu_availability,
     check_model_files,
     check_model_readiness,
+    check_model_repository_structure,
+    check_tensorrt_llm_build_tools,
     check_tokenizer_files,
     generate_compilation_template,
     generate_config_pbtxt,
     generate_tokenizer_copy_commands,
-    CompileModelCommand,
 )
 from essence.commands.setup_triton_repository import TritonRepositoryManager
 

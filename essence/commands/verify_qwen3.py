@@ -16,7 +16,7 @@ import json
 import logging
 import os
 import sys
-from typing import Dict, Any
+from typing import Any, Dict
 
 from essence.command import Command
 

@@ -4,10 +4,10 @@ Mock Task Service
 Simulates TODO MCP Service for agent testing without requiring real service.
 """
 
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
 
 class TaskStatus(str, Enum):

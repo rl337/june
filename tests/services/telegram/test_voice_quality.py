@@ -8,19 +8,19 @@ Tests cover:
 - Overall quality assessment
 - Feedback and suggestions generation
 """
-import pytest
 import io
-import wave
 import struct
 import sys
+import wave
 from pathlib import Path
 
+import pytest
 from pydub import AudioSegment
 from pydub.generators import Sine, WhiteNoise
 
 from essence.services.telegram.voice_quality import (
-    VoiceQualityScorer,
     VoiceQualityError,
+    VoiceQualityScorer,
 )
 
 

@@ -6,10 +6,10 @@ markdown parser. They can validate that rendered markdown will be accepted
 by the platform and can be used to catch regressions.
 """
 
-import re
 import logging
-from typing import List, Tuple, Optional
+import re
 from abc import ABC, abstractmethod
+from typing import List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

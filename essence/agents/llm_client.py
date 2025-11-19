@@ -5,19 +5,20 @@ Provides a unified interface for LLM interactions used by reasoning components.
 Wraps the gRPC LLM inference service (TensorRT-LLM) for use in reasoning phases.
 """
 import logging
-from typing import Optional, List, Dict, Any, Iterator
-import grpc
+from typing import Any, Dict, Iterator, List, Optional
 
-from june_grpc_api.llm_pb2 import (
-    ChatRequest,
-    ChatMessage,
-    GenerationParameters,
-    ChatChunk,
-    Context,
-)
+import grpc
 from june_grpc_api import llm_pb2_grpc
-from essence.chat.utils.tracing import get_tracer
+from june_grpc_api.llm_pb2 import (
+    ChatChunk,
+    ChatMessage,
+    ChatRequest,
+    Context,
+    GenerationParameters,
+)
 from opentelemetry import trace
+
+from essence.chat.utils.tracing import get_tracer
 
 logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)

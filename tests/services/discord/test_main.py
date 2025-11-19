@@ -9,15 +9,16 @@ Tests cover:
 - Command handlers (ping)
 - Health check endpoints
 """
-import pytest
 import asyncio
-import os
-import sys
-from unittest.mock import AsyncMock, MagicMock, patch, Mock
 
 # Fix import conflict: ensure we import from installed discord.py, not local discord dir
 import importlib
+import os
 import site
+import sys
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
+import pytest
 
 # Find site-packages directory with discord (check both system and user)
 _site_packages = None

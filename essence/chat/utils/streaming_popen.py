@@ -4,13 +4,13 @@ Reusable streaming Popen implementation using PTY for real-time output streaming
 This module provides a generator-based interface for streaming subprocess output
 with proper PTY allocation for immediate, unbuffered output capture.
 """
+import logging
 import os
 import pty
 import select
 import termios
 import tty
-import logging
-from typing import Iterator, Tuple, Optional, Dict
+from typing import Dict, Iterator, Optional, Tuple
 
 # Import tracing utilities
 try:

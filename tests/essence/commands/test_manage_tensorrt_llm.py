@@ -3,13 +3,14 @@ Unit tests for manage_tensorrt_llm command.
 
 Tests TensorRTLLMManager and ManageTensorRTLLMCommand classes.
 """
-import pytest
-from unittest.mock import Mock, patch, MagicMock
 from typing import Dict, List, Optional
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 from essence.commands.manage_tensorrt_llm import (
-    TensorRTLLMManager,
     ManageTensorRTLLMCommand,
+    TensorRTLLMManager,
 )
 
 

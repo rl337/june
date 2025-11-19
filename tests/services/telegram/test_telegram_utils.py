@@ -1,18 +1,18 @@
 """
 Tests for Telegram streaming utilities.
 """
-import pytest
 import asyncio
-import sys
-import importlib
-from unittest.mock import AsyncMock, MagicMock, patch
-from pathlib import Path
 
 # Fix import conflict: ensure we import from installed python-telegram-bot, not local telegram dir
 # Strategy: Remove local telegram from module cache, import from installed package
 import importlib
-import site
 import os.path
+import site
+import sys
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Find site-packages directory with telegram
 _site_packages = None
@@ -61,9 +61,9 @@ if _local_telegram_dir and _local_telegram_dir not in sys.path:
     sys.path.insert(0, _local_telegram_dir)
 
 from essence.services.telegram.telegram_utils import (
-    stream_text_message,
-    stream_llm_response_to_telegram,
     TELEGRAM_MAX_MESSAGE_LENGTH,
+    stream_llm_response_to_telegram,
+    stream_text_message,
 )
 
 

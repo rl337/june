@@ -1,7 +1,7 @@
 import os
 import sys
-import grpc
 
+import grpc
 from june_grpc_api import asr as asr_shim
 
 STT_ADDR = os.getenv("STT_ADDR", "stt:50052")
@@ -16,9 +16,10 @@ def main() -> None:
             data = f.read()
     except FileNotFoundError:
         # Fallback: generate a 1s 440Hz tone at 16kHz
-        import numpy as np
         import io
         import struct
+
+        import numpy as np
 
         sr = 16000
         t = np.linspace(0, 1.0, int(sr), endpoint=False)

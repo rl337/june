@@ -11,9 +11,10 @@ import logging
 import uuid
 from datetime import datetime
 from typing import List, Optional
-from .human_interface import Turn, Message, ContentWidget
+
+from .human_interface import ContentWidget, Message, Turn
 from .markdown_parser import parse_markdown
-from .platform_translators import get_translator, PlatformTranslator
+from .platform_translators import PlatformTranslator, get_translator
 
 logger = logging.getLogger(__name__)
 

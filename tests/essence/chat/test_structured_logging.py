@@ -4,19 +4,20 @@ Tests for structured logging functionality.
 Tests verify that turns are properly logged to files and can be read back.
 """
 
-import pytest
-import json
 import gzip
-import tempfile
+import json
 import sys
-from pathlib import Path
+import tempfile
 from datetime import datetime
+from pathlib import Path
+
+import pytest
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from essence.chat.human_interface import Turn, Message, EscapedText, Paragraph
+from essence.chat.human_interface import EscapedText, Message, Paragraph, Turn
 from essence.chat.message_builder import MessageBuilder
 
 

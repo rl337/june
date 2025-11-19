@@ -4,8 +4,9 @@ Unit Tests for Agent Verification Logic
 Tests agent verification and validation capabilities.
 """
 
+from typing import Any, Dict, List
+
 import pytest
-from typing import Dict, Any, List
 
 
 class TestVerificationLogic:

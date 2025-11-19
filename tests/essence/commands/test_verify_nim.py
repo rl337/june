@@ -3,15 +3,16 @@ Unit tests for verify_nim command.
 
 Tests verification functions and VerifyNIMCommand class.
 """
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
 
 from essence.commands.verify_nim import (
-    check_http_health,
+    VerifyNIMCommand,
+    check_gpu_availability,
     check_grpc_connectivity,
     check_grpc_protocol_compatibility,
-    check_gpu_availability,
-    VerifyNIMCommand,
+    check_http_health,
 )
 
 

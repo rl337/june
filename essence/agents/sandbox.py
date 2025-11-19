@@ -4,15 +4,16 @@ Sandbox Management for Benchmark Evaluation
 Provides isolated Docker container-based sandboxes for running benchmark tasks.
 Each task runs in a fresh container with full activity logging and reviewability.
 """
-import logging
 import json
+import logging
+import shutil
 import subprocess
 import time
-import shutil
-from pathlib import Path
-from typing import Optional, Dict, Any, List
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 import docker
 from docker.errors import DockerException
 

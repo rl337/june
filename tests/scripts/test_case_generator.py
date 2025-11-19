@@ -10,8 +10,8 @@ Generates diverse test cases organized by:
 Target: ~1000 test cases total with good coverage.
 """
 import random
-from typing import List, Tuple
 from dataclasses import dataclass
+from typing import List, Tuple
 
 
 @dataclass

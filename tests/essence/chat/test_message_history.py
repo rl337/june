@@ -1,8 +1,10 @@
 """
 Unit tests for message history storage.
 """
-import pytest
 from datetime import datetime
+
+import pytest
+
 from essence.chat.message_history import (
     MessageHistory,
     MessageHistoryEntry,

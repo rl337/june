@@ -12,19 +12,20 @@ This is an excellent way to validate the integrated performance of both services
 """
 
 import argparse
-import os
-import sys
-import logging
 import json
+import logging
+import os
+import subprocess
+import sys
 import time
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
+
+import jiwer
+import librosa
 import numpy as np
 import soundfile as sf
-import librosa
-import jiwer
-from pathlib import Path
-from typing import List, Dict, Any, Tuple
-from dataclasses import dataclass, asdict
-import subprocess
 
 # Setup logging
 logging.basicConfig(

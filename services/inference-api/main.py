@@ -2,37 +2,37 @@
 Inference API Service - LLM orchestration with RAG and tool invocation.
 """
 import asyncio
+import json
 import logging
 import os
 import re
 import sys
-import json
 import uuid
-from typing import Dict, List, Optional, Any, AsyncGenerator
 from datetime import datetime
-import numpy as np
 from pathlib import Path
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
-import grpc
-from grpc import aio
-import nats
-import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy import text
 import asyncpg
+import grpc
+import nats
+import numpy as np
+import torch
+from grpc import aio
 
 # MinIO removed - not needed for MVP
 from prometheus_client import (
-    Counter,
-    Histogram,
-    Gauge,
-    generate_latest,
-    CollectorRegistry,
     CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    Counter,
+    Gauge,
+    Histogram,
+    generate_latest,
 )
 from prometheus_client.exposition import start_http_server
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # Import gRPC authentication and protobuf classes
 # grpc_auth.py is copied to /app/grpc_auth.py in the Dockerfile
@@ -54,29 +54,28 @@ except ImportError:
         return True
 
 
-from june_grpc_api.llm_pb2 import (
-    GenerationRequest,
-    GenerationResponse,
-    GenerationChunk,
-    ChatRequest,
-    ChatResponse,
-    ChatChunk,
-    ChatMessage,
-    EmbeddingRequest,
-    EmbeddingResponse,
-    HealthRequest,
-    HealthResponse,
-    GenerationParameters,
-    Context,
-    ToolDefinition,
-    FinishReason,
-    UsageStats,
-)
-from june_grpc_api import llm_pb2_grpc
-
-from inference_core import config, setup_logging, Timer, HealthChecker, CircularBuffer
+from inference_core import CircularBuffer, HealthChecker, Timer, config, setup_logging
 from inference_core.llm.qwen3_strategy import Qwen3LlmStrategy
 from inference_core.strategies import InferenceRequest, InferenceResponse
+from june_grpc_api import llm_pb2_grpc
+from june_grpc_api.llm_pb2 import (
+    ChatChunk,
+    ChatMessage,
+    ChatRequest,
+    ChatResponse,
+    Context,
+    EmbeddingRequest,
+    EmbeddingResponse,
+    FinishReason,
+    GenerationChunk,
+    GenerationParameters,
+    GenerationRequest,
+    GenerationResponse,
+    HealthRequest,
+    HealthResponse,
+    ToolDefinition,
+    UsageStats,
+)
 
 # Initialize tracing early
 tracer = None
@@ -85,8 +84,9 @@ try:
     essence_path = Path(__file__).parent.parent.parent / "essence"
     if str(essence_path) not in sys.path:
         sys.path.insert(0, str(essence_path))
-    from essence.chat.utils.tracing import setup_tracing, get_tracer
     from opentelemetry import trace
+
+    from essence.chat.utils.tracing import get_tracer, setup_tracing
 
     setup_tracing(service_name="june-inference-api")
     tracer = get_tracer(__name__)
@@ -99,7 +99,7 @@ logger = logging.getLogger(__name__)
 
 # Import rate limiting (after logger is initialized)
 try:
-    from june_rate_limit import RateLimitInterceptor, RateLimitConfig
+    from june_rate_limit import RateLimitConfig, RateLimitInterceptor
 
     RATE_LIMIT_AVAILABLE = True
 except ImportError:
@@ -112,7 +112,7 @@ except ImportError:
 
 # Import input validation
 try:
-    from june_security import get_input_validator, InputValidationError
+    from june_security import InputValidationError, get_input_validator
 
     input_validator = get_input_validator()
     VALIDATION_AVAILABLE = True

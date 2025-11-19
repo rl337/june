@@ -5,7 +5,7 @@ Provides common endpoints and utilities for testing and health checks.
 """
 import json
 import logging
-from typing import Optional, Callable, Dict, Any
+from typing import Any, Callable, Dict, Optional
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse

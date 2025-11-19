@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, Any
+from typing import Any, Dict
 
-from ..strategies import LlmStrategy, InferenceRequest, InferenceResponse
+from ..strategies import InferenceRequest, InferenceResponse, LlmStrategy
 
 logger = logging.getLogger(__name__)
 

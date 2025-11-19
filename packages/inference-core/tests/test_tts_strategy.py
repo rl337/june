@@ -1,12 +1,12 @@
 """Tests for TTS strategies with mocked dependencies."""
-import pytest
-from unittest.mock import Mock, patch, MagicMock
-import numpy as np
-import tempfile
 import os
+import tempfile
+from unittest.mock import MagicMock, Mock, patch
 
-from inference_core.tts.espeak_strategy import EspeakTtsStrategy
+import numpy as np
+import pytest
 from inference_core.strategies import InferenceRequest, InferenceResponse
+from inference_core.tts.espeak_strategy import EspeakTtsStrategy
 
 
 @pytest.fixture

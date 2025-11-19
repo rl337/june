@@ -3,14 +3,15 @@
 Round-Trip Audio Validation Test using Alice's Adventures in Wonderland Dataset
 Tests against REAL STT/TTS services via gRPC: Text -> TTS -> Audio -> STT -> Text
 """
-import os
-import json
 import asyncio
+import json
 import logging
-import grpc
-from pathlib import Path
-from typing import Dict, List, Optional, Any
+import os
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import grpc
 
 # Setup logging
 logging.basicConfig(
@@ -24,10 +25,10 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "proto"))
 
 try:
-    from tts_pb2 import SynthesisRequest, SynthesisConfig, AudioResponse
+    import asr_pb2_grpc
     import tts_pb2_grpc
     from asr_pb2 import RecognitionRequest, RecognitionResponse
-    import asr_pb2_grpc
+    from tts_pb2 import AudioResponse, SynthesisConfig, SynthesisRequest
 except ImportError as e:
     logger.error(f"Failed to import protobuf classes: {e}")
     logger.error(

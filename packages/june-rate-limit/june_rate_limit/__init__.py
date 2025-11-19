@@ -9,9 +9,9 @@ This module provides:
 - Prometheus metrics for monitoring
 """
 
-from .rate_limiter import RateLimiter, RateLimitConfig, RateLimitResult
-from .middleware import RateLimitMiddleware
 from .grpc_interceptor import RateLimitInterceptor
+from .middleware import RateLimitMiddleware
+from .rate_limiter import RateLimitConfig, RateLimiter, RateLimitResult
 
 __all__ = [
     "RateLimiter",

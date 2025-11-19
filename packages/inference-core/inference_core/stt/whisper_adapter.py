@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+from typing import Any, Dict
+
 import numpy as np
 
 
@@ -49,8 +50,9 @@ class WhisperModelImpl(WhisperModelAdapter):
             device: Device to run on ("cpu", "cuda")
             download_root: Root directory for model cache (defaults to ~/.cache/whisper)
         """
-        import whisper  # type: ignore
         import os
+
+        import whisper  # type: ignore
 
         # Use /models/whisper if MODEL_CACHE_DIR is set and download_root not specified
         if download_root is None:

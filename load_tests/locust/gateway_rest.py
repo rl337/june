@@ -9,11 +9,12 @@ Tests:
 - Chat endpoints
 """
 import json
+import logging
 import random
 import time
-from locust import HttpUser, task, between, events
+
+from locust import HttpUser, between, events, task
 from locust.contrib.fasthttp import FastHttpUser
-import logging
 
 logger = logging.getLogger(__name__)
 

@@ -10,11 +10,11 @@ Tests verify that:
 """
 import pytest
 from prometheus_client import (
-    generate_latest,
     CollectorRegistry,
     Counter,
-    Histogram,
     Gauge,
+    Histogram,
+    generate_latest,
 )
 
 # Create a test registry to avoid interfering with other tests

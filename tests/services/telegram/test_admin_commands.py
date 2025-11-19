@@ -1,10 +1,11 @@
 """Tests for admin commands."""
-import pytest
-import sys
-import os
 import importlib
+import os
 import site
-from unittest.mock import Mock, patch, AsyncMock, MagicMock
+import sys
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
+import pytest
 
 # Fix import conflict: ensure we import from installed python-telegram-bot, not local telegram dir
 # Find site-packages directory with telegram
@@ -39,26 +40,26 @@ if _site_packages:
     sys.path.insert(0, _site_packages)
 
 # Now import telegram from installed package
-from telegram import Update, Message, User, Chat
+from telegram import Chat, Message, Update, User
 
 # Restore original sys.path
 sys.path[:] = _original_sys_path
 
 from essence.services.telegram.admin_auth import (
-    is_admin,
-    require_admin,
     add_admin,
+    is_admin,
     remove_admin,
+    require_admin,
 )
 from essence.services.telegram.admin_db import (
     block_user,
-    unblock_user,
-    is_user_blocked,
-    get_blocked_users,
     clear_conversation,
     clear_user_conversations,
-    log_audit_action,
     get_audit_logs,
+    get_blocked_users,
+    is_user_blocked,
+    log_audit_action,
+    unblock_user,
 )
 
 

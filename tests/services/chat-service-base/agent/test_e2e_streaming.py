@@ -13,12 +13,13 @@ behavior is correct throughout.
 """
 
 import json
-import pytest
-from pathlib import Path
-from unittest.mock import Mock, patch
 
 # Add parent directories to path
 import sys
+from pathlib import Path
+from unittest.mock import Mock, patch
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "essence"))
 

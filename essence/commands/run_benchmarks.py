@@ -14,15 +14,15 @@ import os
 import sys
 from pathlib import Path
 
-from essence.command import Command
 from essence.chat.utils.tracing import setup_tracing
+from essence.command import Command
 
 logger = logging.getLogger(__name__)
 
 # Import evaluator and dataset loader (may not be available in all environments)
 try:
-    from essence.agents.evaluator import BenchmarkEvaluator
     from essence.agents.dataset_loader import DatasetLoader
+    from essence.agents.evaluator import BenchmarkEvaluator
 
     DEPENDENCIES_AVAILABLE = True
 except ImportError as e:

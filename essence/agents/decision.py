@@ -4,7 +4,7 @@ Decision Logic for Agentic Flow
 Determines when to use agentic reasoning flow vs direct response.
 """
 import logging
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

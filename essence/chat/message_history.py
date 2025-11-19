@@ -5,10 +5,10 @@ Provides in-memory storage for all sent messages, allowing inspection of what
 was actually rendered and sent to users.
 """
 import logging
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, List, Dict, Any
-from collections import defaultdict
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

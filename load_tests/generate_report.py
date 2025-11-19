@@ -2,14 +2,15 @@
 """
 Generate comprehensive load test reports with metrics analysis and comparisons.
 """
-import json
 import argparse
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-from pathlib import Path
-from datetime import datetime
+import json
 import logging
+from datetime import datetime
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

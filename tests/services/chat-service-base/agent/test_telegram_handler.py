@@ -4,10 +4,11 @@ Unit tests for Telegram handler message accumulation.
 Tests that the Telegram handler properly accumulates and updates messages
 in place as chunks arrive from the streaming function.
 """
-import pytest
-from unittest.mock import AsyncMock, Mock, patch
 import sys
 from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 
 # Add parent directories to path
 base_path = Path(__file__).parent.parent.parent.parent

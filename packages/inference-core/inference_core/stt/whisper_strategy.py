@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
-from ..strategies import SttStrategy, InferenceRequest, InferenceResponse
+from ..strategies import InferenceRequest, InferenceResponse, SttStrategy
 from .whisper_adapter import WhisperModelAdapter, WhisperModelImpl
 
 logger = logging.getLogger(__name__)
@@ -53,8 +53,9 @@ class WhisperSttStrategy(SttStrategy):
             audio_bytes = request
         else:
             audio_bytes = request.payload
-        import numpy as np
         import io
+
+        import numpy as np
         import soundfile as sf
 
         data, sr = sf.read(io.BytesIO(audio_bytes), dtype="float32")

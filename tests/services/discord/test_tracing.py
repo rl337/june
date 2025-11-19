@@ -10,10 +10,11 @@ Tests verify that:
 Note: These tests verify the tracing pattern and span creation logic
 without requiring full service integration.
 """
-import pytest
-import sys
 import os
+import sys
 from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 # Mock dependencies before importing
 sys.modules["inference_core"] = MagicMock()

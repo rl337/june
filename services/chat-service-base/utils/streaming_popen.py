@@ -9,7 +9,7 @@ import pty
 import select
 import termios
 import tty
-from typing import Iterator, Tuple, Optional, Dict
+from typing import Dict, Iterator, Optional, Tuple
 
 
 def streaming_popen_generator(

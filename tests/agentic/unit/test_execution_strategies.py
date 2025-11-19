@@ -4,8 +4,9 @@ Unit Tests for Agent Execution Strategies
 Tests agent execution strategies and code generation capabilities.
 """
 
+from typing import Any, Dict, List
+
 import pytest
-from typing import Dict, Any, List
 
 
 class TestExecutionStrategies:

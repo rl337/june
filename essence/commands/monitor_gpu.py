@@ -15,7 +15,7 @@ import time
 from typing import Optional
 
 try:
-    from prometheus_client import start_http_server, Gauge, CollectorRegistry
+    from prometheus_client import CollectorRegistry, Gauge, start_http_server
 
     PROMETHEUS_AVAILABLE = True
 except ImportError:

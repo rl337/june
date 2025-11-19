@@ -1,20 +1,22 @@
-from .strategies import (
-    InferenceStrategy,
-    SttStrategy,
-    TtsStrategy,
-    LlmStrategy,
-    InferenceRequest,
-    InferenceResponse,
-)
-from .runtime import InferenceApp
-from .cli import main as cli_main, Command
-from .config import Config, config
+import importlib.util
 
 # Import from utils.py (file) - need to import the file directly, not the utils/ directory
 # Use importlib to import the utils.py file as a module
 import sys
-import importlib.util
 from pathlib import Path
+
+from .cli import Command
+from .cli import main as cli_main
+from .config import Config, config
+from .runtime import InferenceApp
+from .strategies import (
+    InferenceRequest,
+    InferenceResponse,
+    InferenceStrategy,
+    LlmStrategy,
+    SttStrategy,
+    TtsStrategy,
+)
 
 # Get the path to utils.py
 utils_py_path = Path(__file__).parent / "utils.py"
@@ -41,9 +43,9 @@ generate_id = _utils.generate_id
 CircularBuffer = _utils.CircularBuffer
 # Import server classes optionally - they require grpc which may not be available
 try:
+    from .servers.llm_server import LlmGrpcApp
     from .servers.stt_server import SttGrpcApp
     from .servers.tts_server import TtsGrpcApp
-    from .servers.llm_server import LlmGrpcApp
 except ImportError:
     # grpc not available - these classes won't be available
     SttGrpcApp = None

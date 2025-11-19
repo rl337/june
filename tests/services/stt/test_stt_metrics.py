@@ -1,11 +1,12 @@
 """
 Tests for STT transcription quality metrics.
 """
-import pytest
 import os
 import sys
 import tempfile
 from datetime import datetime, timedelta
+
+import pytest
 
 # Import stt_metrics from services/stt directory
 stt_service_dir = os.path.abspath(

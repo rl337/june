@@ -9,12 +9,13 @@ Tests:
 """
 import asyncio
 import json
-import random
-import time
-import websocket
-from locust import User, task, between, events
 import logging
+import random
 import threading
+import time
+
+import websocket
+from locust import User, between, events, task
 
 logger = logging.getLogger(__name__)
 

@@ -8,28 +8,29 @@ import logging
 import os
 import signal
 import sys
-from typing import Optional, Dict, Any
+import time
+from typing import Any, Dict, Optional
 
+import discord
+import uvicorn
+from discord.ext import commands
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
-import uvicorn
-import discord
-from discord.ext import commands
-from prometheus_client import generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST
-import time
-
 from inference_core import config, setup_logging
-from essence.chat.message_builder import MessageBuilder
+from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_latest
+
 from essence.chat.agent.handler import process_agent_message, stream_agent_message
+from essence.chat.message_builder import MessageBuilder
 from essence.services.discord.message_history_helpers import (
-    send_with_history,
     edit_with_history,
+    send_with_history,
 )
 
 # Initialize tracing early
 try:
-    from essence.chat.utils.tracing import setup_tracing, get_tracer
     from opentelemetry import trace
+
+    from essence.chat.utils.tracing import get_tracer, setup_tracing
 
     setup_tracing(service_name="june-discord")
     tracer = get_tracer(__name__)
@@ -39,13 +40,13 @@ except ImportError:
 
 # Import shared metrics
 from essence.services.shared_metrics import (
-    HTTP_REQUESTS_TOTAL,
-    HTTP_REQUEST_DURATION_SECONDS,
-    GRPC_REQUESTS_TOTAL,
-    GRPC_REQUEST_DURATION_SECONDS,
     ERRORS_TOTAL,
-    SERVICE_HEALTH,
+    GRPC_REQUEST_DURATION_SECONDS,
+    GRPC_REQUESTS_TOTAL,
+    HTTP_REQUEST_DURATION_SECONDS,
+    HTTP_REQUESTS_TOTAL,
     REGISTRY,
+    SERVICE_HEALTH,
 )
 
 # Setup logging early

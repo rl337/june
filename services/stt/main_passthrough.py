@@ -3,34 +3,33 @@
 Pass-through STT Service - Simple speech-to-text that returns mock transcriptions.
 """
 import asyncio
-import logging
-import json
 import base64
-import numpy as np
-from typing import Dict, List, Optional, Any, AsyncGenerator
-from datetime import datetime
-import uuid
-
-import grpc
-from grpc import aio
-import nats
-from prometheus_client import Counter, Histogram, Gauge, generate_latest
+import json
+import logging
 
 # Import generated protobuf classes
 import sys
+import uuid
+from datetime import datetime
+from typing import Any, AsyncGenerator, Dict, List, Optional
+
+import grpc
+import nats
+import numpy as np
+from grpc import aio
+from prometheus_client import Counter, Gauge, Histogram, generate_latest
 
 sys.path.append("./proto")
+import asr_pb2_grpc
 from asr_pb2 import (
-    RecognitionRequest,
-    RecognitionConfig,
-    RecognitionResult,
-    RecognitionResponse,
     HealthRequest,
     HealthResponse,
+    RecognitionConfig,
+    RecognitionRequest,
+    RecognitionResponse,
+    RecognitionResult,
 )
-import asr_pb2_grpc
-
-from inference_core import config, setup_logging, Timer, HealthChecker, CircularBuffer
+from inference_core import CircularBuffer, HealthChecker, Timer, config, setup_logging
 
 # Setup logging
 setup_logging(config.monitoring.log_level, "stt")

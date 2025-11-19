@@ -4,11 +4,12 @@ Telegram utility functions for streaming text messages.
 Provides functions to stream LLM responses character-by-character to Telegram
 using the edit_message API, improving perceived response time.
 """
-import logging
 import asyncio
+import logging
 from typing import Optional
+
 from telegram import Message
-from telegram.error import TelegramError, TimedOut, NetworkError
+from telegram.error import NetworkError, TelegramError, TimedOut
 
 from essence.chat.message_history import get_message_history
 

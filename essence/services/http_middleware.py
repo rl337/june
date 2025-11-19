@@ -12,8 +12,8 @@ from fastapi import Request
 from opentelemetry import trace
 
 from essence.services.shared_metrics import (
-    HTTP_REQUESTS_TOTAL,
     HTTP_REQUEST_DURATION_SECONDS,
+    HTTP_REQUESTS_TOTAL,
 )
 
 logger = logging.getLogger(__name__)

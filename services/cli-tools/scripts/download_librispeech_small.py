@@ -1,9 +1,9 @@
+import json
 import os
 import tarfile
 import tempfile
 from pathlib import Path
 from urllib.request import urlretrieve
-import json
 
 DATA_DIR = (
     Path(os.environ.get("JUNE_DATA_DIR", "/data")) / "datasets" / "librispeech_small"

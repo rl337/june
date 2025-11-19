@@ -4,12 +4,12 @@ import logging
 import os
 import subprocess
 import tempfile
-import numpy as np
-from typing import Dict, Any
+from typing import Any, Dict
 
+import numpy as np
 import soundfile as sf
 
-from ..strategies import TtsStrategy, InferenceRequest, InferenceResponse
+from ..strategies import InferenceRequest, InferenceResponse, TtsStrategy
 
 logger = logging.getLogger(__name__)
 

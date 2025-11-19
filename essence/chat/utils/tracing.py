@@ -4,19 +4,22 @@ Tracing utilities for OpenTelemetry integration with Jaeger.
 This module provides tracing setup and utilities for instrumenting
 the chat agent streaming pipeline.
 """
-import os
 import logging
+import os
 from typing import Optional
+
 from opentelemetry import trace
+from opentelemetry.exporter.jaeger.thrift import JaegerExporter
+from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.exporter.jaeger.thrift import JaegerExporter
 
 # Import gRPC instrumentation for automatic trace propagation
 try:
-    from opentelemetry.instrumentation.grpc import GrpcInstrumentorClient
-    from opentelemetry.instrumentation.grpc import GrpcInstrumentorServer
+    from opentelemetry.instrumentation.grpc import (
+        GrpcInstrumentorClient,
+        GrpcInstrumentorServer,
+    )
 
     GRPC_INSTRUMENTATION_AVAILABLE = True
 except ImportError:

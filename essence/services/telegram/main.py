@@ -9,29 +9,29 @@ import logging
 import os
 import signal
 import threading
+import time
 from pathlib import Path
 from typing import Optional
 
+import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response
-import uvicorn
+from inference_core import config, setup_logging
+from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_latest
 from telegram import Update
 from telegram.ext import (
     Application,
     CommandHandler,
+    ContextTypes,
     MessageHandler,
     filters,
-    ContextTypes,
 )
-from prometheus_client import generate_latest, CollectorRegistry, CONTENT_TYPE_LATEST
-import time
-
-from inference_core import config, setup_logging
 
 # Initialize tracing early
 try:
-    from essence.chat.utils.tracing import setup_tracing, get_tracer
     from opentelemetry import trace
+
+    from essence.chat.utils.tracing import get_tracer, setup_tracing
 
     setup_tracing(service_name="june-telegram")
     tracer = get_tracer(__name__)
@@ -41,44 +41,44 @@ except ImportError:
 
 # Import shared metrics
 from essence.services.shared_metrics import (
-    HTTP_REQUESTS_TOTAL,
-    HTTP_REQUEST_DURATION_SECONDS,
-    GRPC_REQUESTS_TOTAL,
+    ERRORS_TOTAL,
     GRPC_REQUEST_DURATION_SECONDS,
-    VOICE_MESSAGES_PROCESSED_TOTAL,
-    VOICE_PROCESSING_DURATION_SECONDS,
+    GRPC_REQUESTS_TOTAL,
+    HTTP_REQUEST_DURATION_SECONDS,
+    HTTP_REQUESTS_TOTAL,
+    LLM_GENERATION_DURATION_SECONDS,
+    REGISTRY,
+    SERVICE_HEALTH,
     STT_TRANSCRIPTION_DURATION_SECONDS,
     TTS_SYNTHESIS_DURATION_SECONDS,
-    LLM_GENERATION_DURATION_SECONDS,
-    ERRORS_TOTAL,
-    SERVICE_HEALTH,
-    REGISTRY,
-)
-from essence.services.telegram.handlers import (
-    start_command,
-    help_command,
-    status_command,
-    language_command,
-    handle_voice_message,
-)
-from essence.services.telegram.handlers.text import handle_text_message
-from essence.services.telegram.handlers.admin_commands import (
-    block_command,
-    unblock_command,
-    list_blocked_command,
-    clear_conversation_command,
-    clear_user_conversations_command,
-    system_status_command,
-    admin_message_history_command,
-    admin_help_command,
+    VOICE_MESSAGES_PROCESSED_TOTAL,
+    VOICE_PROCESSING_DURATION_SECONDS,
 )
 from essence.services.telegram.dependencies.config import (
+    get_metrics_storage,
     get_service_config,
     get_stt_address,
-    get_metrics_storage,
 )
-from essence.services.telegram.dependencies.rate_limit import get_rate_limiter
 from essence.services.telegram.dependencies.grpc_pool import shutdown_grpc_pool
+from essence.services.telegram.dependencies.rate_limit import get_rate_limiter
+from essence.services.telegram.handlers import (
+    handle_voice_message,
+    help_command,
+    language_command,
+    start_command,
+    status_command,
+)
+from essence.services.telegram.handlers.admin_commands import (
+    admin_help_command,
+    admin_message_history_command,
+    block_command,
+    clear_conversation_command,
+    clear_user_conversations_command,
+    list_blocked_command,
+    system_status_command,
+    unblock_command,
+)
+from essence.services.telegram.handlers.text import handle_text_message
 
 # Import admin_db for blocked user check
 # Disabled: No PostgreSQL service available
@@ -252,13 +252,13 @@ class TelegramBotService:
                 health_status["checks"]["environment"] = {"status": "healthy"}
 
             # Check service connectivity (STT, TTS, LLM)
-            from dependencies.grpc_pool import get_grpc_pool
+            import grpc
             from dependencies.config import (
+                get_llm_address,
                 get_stt_address,
                 get_tts_address,
-                get_llm_address,
             )
-            import grpc
+            from dependencies.grpc_pool import get_grpc_pool
 
             services_to_check = {
                 "stt": get_stt_address(),
@@ -353,11 +353,11 @@ class TelegramBotService:
             )
 
         # Setup agent message test endpoint using shared base
-        from essence.chat.interaction import setup_agent_message_endpoint
-        from typing import Optional, Dict, Any
+        from typing import Any, Dict, Optional
 
         # Import from essence.chat.agent.handler (chat-service-base is now in essence)
         from essence.chat.agent.handler import process_agent_message
+        from essence.chat.interaction import setup_agent_message_endpoint
 
         def process_message_wrapper(
             user_message: str,

@@ -4,8 +4,9 @@ Unit Tests for Agent Planning Logic
 Tests agent planning, task analysis, and decomposition capabilities.
 """
 
+from typing import Any, Dict
+
 import pytest
-from typing import Dict, Any
 
 
 class TestAgentPlanning:

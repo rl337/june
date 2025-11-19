@@ -15,12 +15,12 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 
 try:
     import requests
-    from huggingface_hub import hf_hub_download, snapshot_download
     import whisper
+    from huggingface_hub import hf_hub_download, snapshot_download
     from TTS.api import TTS
 
     DEPENDENCIES_AVAILABLE = True

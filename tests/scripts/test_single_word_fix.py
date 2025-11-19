@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Quick test to verify single-word recognition fix."""
 import asyncio
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from test_validate_tts_stt import TtsSttValidator

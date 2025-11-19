@@ -12,6 +12,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+
 import grpc
 
 from essence.command import Command

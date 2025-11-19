@@ -6,7 +6,8 @@ or service-to-service API keys.
 """
 import logging
 import os
-from typing import Optional, Callable, Any
+from typing import Any, Callable, Optional
+
 import grpc
 from jose import JWTError, jwt
 

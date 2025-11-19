@@ -14,11 +14,12 @@ just use the result message, but the e2e test ensures the full flow works.
 
 import json
 import os
-import pytest
-from pathlib import Path
 
 # Add parent directories to path
 import sys
+from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "essence"))
 

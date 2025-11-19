@@ -1,8 +1,8 @@
-import grpc
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from june_grpc_api import asr, tts, llm
+import grpc
+import pytest
+from june_grpc_api import asr, llm, tts
 from june_grpc_api.generated import asr_pb2
 
 

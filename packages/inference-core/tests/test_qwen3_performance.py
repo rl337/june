@@ -11,11 +11,12 @@ Note: These tests require the actual model to be loaded and may take significant
 They should be run separately from unit tests.
 """
 
-import os
-import pytest
-import time
 import logging
+import os
+import time
 from pathlib import Path
+
+import pytest
 
 try:
     import torch
@@ -23,9 +24,9 @@ except ImportError:
     torch = None
     pytest.skip("torch not available", allow_module_level=True)
 
+from inference_core.config import config
 from inference_core.llm.qwen3_strategy import Qwen3LlmStrategy
 from inference_core.strategies import InferenceRequest
-from inference_core.config import config
 
 logger = logging.getLogger(__name__)
 

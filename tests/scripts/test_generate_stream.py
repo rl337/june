@@ -7,18 +7,15 @@ Tests streaming text generation from the inference API.
 import asyncio
 import sys
 import time
-import grpc
 from typing import List
+
+import grpc
 
 # Add project root to path
 sys.path.insert(0, "/app")
 
-from june_grpc_api.llm_pb2 import (
-    GenerationRequest,
-    GenerationParameters,
-    Context,
-)
 from june_grpc_api import llm_pb2_grpc
+from june_grpc_api.llm_pb2 import Context, GenerationParameters, GenerationRequest
 
 
 async def test_generate_stream(

@@ -5,10 +5,12 @@ Executes planned steps using available tools.
 """
 import logging
 import time
-from typing import Optional, Dict, Any, List
-from essence.agents.reasoning import Step, ExecutionResult, ConversationContext
-from essence.chat.utils.tracing import get_tracer
+from typing import Any, Dict, List, Optional
+
 from opentelemetry import trace
+
+from essence.agents.reasoning import ConversationContext, ExecutionResult, Step
+from essence.chat.utils.tracing import get_tracer
 
 logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)

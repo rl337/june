@@ -6,20 +6,20 @@ allowing inspection of what messages were actually sent to users.
 
 Also provides programmatic access for agents via essence.chat.message_history_analysis module.
 """
+import argparse
 import json
 import logging
 from datetime import datetime
 from typing import Optional
-import argparse
 
-from essence.command import Command
 from essence.chat.message_history import get_message_history
 from essence.chat.message_history_analysis import (
     analyze_rendering_issues,
     compare_expected_vs_actual,
-    validate_message_for_platform,
     get_message_statistics,
+    validate_message_for_platform,
 )
+from essence.command import Command
 
 logger = logging.getLogger(__name__)
 

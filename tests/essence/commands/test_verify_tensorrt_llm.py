@@ -3,17 +3,18 @@ Unit tests for verify_tensorrt_llm command.
 
 Tests verification functions and VerifyTensorRTLLMCommand class.
 """
-import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 from essence.commands.verify_tensorrt_llm import (
+    VerifyTensorRTLLMCommand,
     check_container_connectivity,
+    check_gpu_availability,
     check_grpc_connectivity,
     check_model_repository,
-    check_gpu_availability,
-    VerifyTensorRTLLMCommand,
 )
 
 

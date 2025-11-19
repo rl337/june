@@ -4,7 +4,7 @@ Shared Prometheus metrics for june services.
 This module provides standardized metrics that all services should use
 for consistent observability across the platform.
 """
-from prometheus_client import Counter, Histogram, Gauge, CollectorRegistry
+from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
 
 # Create a shared registry (services can use their own if needed)
 REGISTRY = CollectorRegistry()

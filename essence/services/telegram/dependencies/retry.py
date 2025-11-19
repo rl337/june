@@ -1,10 +1,11 @@
 """Retry logic with exponential backoff for service calls."""
 import asyncio
 import logging
+from functools import wraps
+from typing import Callable, List, Optional, TypeVar
+
 import grpc
 import httpx
-from typing import Callable, TypeVar, Optional, List
-from functools import wraps
 
 logger = logging.getLogger(__name__)
 

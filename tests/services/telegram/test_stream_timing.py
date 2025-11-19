@@ -4,10 +4,11 @@ Detailed timing test to verify streaming granularity.
 This test provides detailed timing information to verify that streaming
 captures output with the expected granularity (quarter-second intervals).
 """
-import time
-import pytest
 import sys
+import time
 from pathlib import Path
+
+import pytest
 
 # Add chat-service-base to path for imports
 # Path: services/telegram/tests/test_stream_timing.py -> services/telegram/tests -> services/telegram -> services -> chat-service-base

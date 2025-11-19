@@ -5,11 +5,11 @@ Sandbox Manager - Provides isolated execution environments for agents.
 import logging
 import os
 import resource
-import tempfile
 import shutil
-from pathlib import Path
-from typing import Optional, Dict, Any, List
+import tempfile
 from contextlib import contextmanager
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 

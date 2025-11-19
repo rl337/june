@@ -4,11 +4,13 @@ Planning Component
 Creates execution plans from user requests by breaking them down into steps.
 """
 import logging
-from typing import Optional, List, Dict, Any
-from essence.agents.reasoning import Plan, Step, ConversationContext
-from essence.agents.reasoning_cache import get_reasoning_cache, ReasoningCache
-from essence.chat.utils.tracing import get_tracer
+from typing import Any, Dict, List, Optional
+
 from opentelemetry import trace
+
+from essence.agents.reasoning import ConversationContext, Plan, Step
+from essence.agents.reasoning_cache import ReasoningCache, get_reasoning_cache
+from essence.chat.utils.tracing import get_tracer
 
 logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)

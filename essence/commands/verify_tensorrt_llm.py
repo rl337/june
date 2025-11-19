@@ -20,7 +20,7 @@ import json
 import logging
 import os
 import sys
-from typing import Dict, Any, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 try:
     import grpc

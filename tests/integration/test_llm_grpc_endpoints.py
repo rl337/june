@@ -11,31 +11,32 @@ Tests the Generate and Chat endpoints directly via gRPC to verify:
 These tests require a running LLM inference service (TensorRT-LLM on port 8000 by default,
 or legacy inference-api on port 50051) with Qwen3-30B-A3B model loaded.
 """
-import pytest
 import asyncio
-import os
-import grpc
-from typing import List, Optional
 import logging
+import os
+from typing import List, Optional
+
+import grpc
+import pytest
+from june_grpc_api.generated import llm_pb2_grpc
 
 # Import generated protobuf classes
 from june_grpc_api.generated.llm_pb2 import (
-    GenerationRequest,
-    GenerationResponse,
-    GenerationChunk,
-    ChatRequest,
-    ChatResponse,
     ChatChunk,
     ChatMessage,
-    GenerationParameters,
+    ChatRequest,
+    ChatResponse,
     Context,
-    ToolDefinition,
     FinishReason,
-    UsageStats,
+    GenerationChunk,
+    GenerationParameters,
+    GenerationRequest,
+    GenerationResponse,
     HealthRequest,
     HealthResponse,
+    ToolDefinition,
+    UsageStats,
 )
-from june_grpc_api.generated import llm_pb2_grpc
 
 # Setup logging
 logging.basicConfig(

@@ -1,27 +1,29 @@
 """Shared agent response handler for chat services."""
 import logging
-from pathlib import Path
 import os
-from typing import Optional, Iterator, Tuple, List, Dict, Any
+from pathlib import Path
+from typing import Any, Dict, Iterator, List, Optional, Tuple
+
+from opentelemetry import trace
+
+from essence.agents import (
+    AgenticReasoner,
+    ConversationContext,
+    Executor,
+    LLMClient,
+    Planner,
+    Reflector,
+    get_reasoning_cache,
+    should_use_agentic_flow,
+)
+from essence.chat.message_history import get_message_history
+from essence.chat.utils.tracing import get_tracer
 
 from .response import (
     call_chat_response_agent,
     format_agent_response,
     stream_chat_response_agent,
 )
-from essence.chat.utils.tracing import get_tracer
-from essence.chat.message_history import get_message_history
-from essence.agents import (
-    AgenticReasoner,
-    ConversationContext,
-    should_use_agentic_flow,
-    Planner,
-    Executor,
-    Reflector,
-    LLMClient,
-    get_reasoning_cache,
-)
-from opentelemetry import trace
 
 logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)

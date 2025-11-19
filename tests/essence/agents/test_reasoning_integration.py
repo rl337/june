@@ -7,25 +7,26 @@ with mocked LLM client. These tests verify that all components work together cor
 import pytest
 
 pytestmark = pytest.mark.integration
-from unittest.mock import Mock, MagicMock, patch
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
+from unittest.mock import MagicMock, Mock, patch
+
+from essence.agents.executor import Executor
+from essence.agents.llm_client import LLMClient
+from essence.agents.planner import Planner
 
 # Import actual components (these will be mocked where needed)
 from essence.agents.reasoning import (
     AgenticReasoner,
+    ConversationContext,
+    ExecutionResult,
+    Plan,
     ReasoningResult,
     ReasoningStep,
-    ConversationContext,
-    Plan,
-    Step,
-    ExecutionResult,
     ReflectionResult,
+    Step,
 )
-from essence.agents.planner import Planner
-from essence.agents.executor import Executor
-from essence.agents.reflector import Reflector
-from essence.agents.llm_client import LLMClient
 from essence.agents.reasoning_cache import ReasoningCache
+from essence.agents.reflector import Reflector
 
 
 class MockLLMClient:

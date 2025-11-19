@@ -2,36 +2,36 @@
 STT Service - Speech-to-Text with Whisper, VAD, and gRPC streaming.
 """
 import asyncio
+import base64
+import io
 import logging
 import os
-import io
-import base64
-import numpy as np
-import torch
-import torchaudio
-from typing import Dict, List, Optional, Any, AsyncGenerator
-from datetime import datetime
 import uuid
+from datetime import datetime
+from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import grpc
-from grpc import aio
-import nats
-import whisper
-import webrtcvad
-from prometheus_client import (
-    Counter,
-    Histogram,
-    Gauge,
-    generate_latest,
-    CollectorRegistry,
-    CONTENT_TYPE_LATEST,
-)
-from prometheus_client.exposition import start_http_server
 import librosa
+import nats
+import numpy as np
 import soundfile as sf
+import torch
+import torchaudio
+import webrtcvad
+import whisper
+from grpc import aio
 
 # Import generated protobuf classes from june_grpc_api package
 from june_grpc_api.generated import asr_pb2, asr_pb2_grpc
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    Counter,
+    Gauge,
+    Histogram,
+    generate_latest,
+)
+from prometheus_client.exposition import start_http_server
 
 # Import specific classes for convenience
 AudioChunk = asr_pb2.AudioChunk
@@ -43,7 +43,7 @@ WordInfo = asr_pb2.WordInfo
 HealthRequest = asr_pb2.HealthRequest
 HealthResponse = asr_pb2.HealthResponse
 
-from inference_core import config, setup_logging, Timer, HealthChecker, CircularBuffer
+from inference_core import CircularBuffer, HealthChecker, Timer, config, setup_logging
 
 # Initialize tracing early
 tracer = None
@@ -55,8 +55,9 @@ try:
     essence_path = Path(__file__).parent.parent.parent / "essence"
     if str(essence_path) not in sys.path:
         sys.path.insert(0, str(essence_path))
-    from essence.chat.utils.tracing import setup_tracing, get_tracer
     from opentelemetry import trace
+
+    from essence.chat.utils.tracing import get_tracer, setup_tracing
 
     setup_tracing(service_name="june-stt")
     tracer = get_tracer(__name__)
@@ -65,7 +66,7 @@ except ImportError:
 
 # Import rate limiting
 try:
-    from june_rate_limit import RateLimitInterceptor, RateLimitConfig
+    from june_rate_limit import RateLimitConfig, RateLimitInterceptor
 
     RATE_LIMIT_AVAILABLE = True
 except ImportError:
@@ -75,7 +76,7 @@ except ImportError:
 
 # Import input validation
 try:
-    from june_security import get_input_validator, InputValidationError
+    from june_security import InputValidationError, get_input_validator
 
     input_validator = get_input_validator()
     VALIDATION_AVAILABLE = True

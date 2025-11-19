@@ -4,11 +4,11 @@ Note: NATS is not available for MVP. This module is kept for optional queue proc
 but will fail gracefully if NATS is not available. Set USE_VOICE_QUEUE=false to disable.
 """
 import asyncio
+import base64
 import json
 import logging
 import os
-from typing import Optional, Dict, Any
-import base64
+from typing import Any, Dict, Optional
 
 # NATS removed for MVP - import will fail if package not available
 try:

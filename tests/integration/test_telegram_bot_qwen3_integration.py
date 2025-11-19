@@ -18,27 +18,30 @@ These tests require:
 - Running TTS service
 - Running Telegram bot service (or ability to test voice handler directly)
 """
-import pytest
 import asyncio
+import base64
+import logging
 import os
+import struct
 import sys
 import time
-import logging
+from pathlib import Path
+from typing import Any, Dict, Optional
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import grpc
 import httpx
 import numpy as np
-import struct
-import base64
-from pathlib import Path
-from typing import Optional, Dict, Any
-from unittest.mock import AsyncMock, MagicMock, patch
+import pytest
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "services" / "telegram"))
 
-from june_grpc_api import asr as asr_shim, tts as tts_shim, llm as llm_shim
+from june_grpc_api import asr as asr_shim
+from june_grpc_api import llm as llm_shim
+from june_grpc_api import tts as tts_shim
 
 # Setup logging
 logging.basicConfig(

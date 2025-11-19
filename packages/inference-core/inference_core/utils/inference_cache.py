@@ -6,9 +6,9 @@ import hashlib
 import json
 import logging
 import time
-from typing import Dict, Any, Optional, Tuple
-from dataclasses import dataclass
 from collections import OrderedDict
+from dataclasses import dataclass
+from typing import Any, Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

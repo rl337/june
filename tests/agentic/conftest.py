@@ -4,10 +4,11 @@ Pytest Configuration for Agentic Tests
 Provides shared fixtures and configuration for all agentic tests.
 """
 
-import pytest
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
+
+import pytest
 
 
 @pytest.fixture(scope="session")

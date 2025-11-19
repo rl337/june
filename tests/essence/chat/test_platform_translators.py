@@ -5,34 +5,35 @@ These tests verify that translators produce valid markdown for each platform
 and handle edge cases correctly.
 """
 
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from essence.chat.platform_translators import (
-    TelegramTranslator,
-    DiscordTranslator,
-    get_translator,
-)
-from essence.chat.platform_validators import TelegramValidator, DiscordValidator
 from essence.chat.human_interface import (
-    EscapedText,
-    Paragraph,
-    Heading,
-    ListWidget,
-    ListItem,
-    TableWidget,
-    TableRow,
-    TableCell,
-    CodeBlock,
     Blockquote,
+    CodeBlock,
+    EscapedText,
+    Heading,
     HorizontalRule,
     Link,
+    ListItem,
+    ListWidget,
+    Paragraph,
+    TableCell,
+    TableRow,
+    TableWidget,
 )
+from essence.chat.platform_translators import (
+    DiscordTranslator,
+    TelegramTranslator,
+    get_translator,
+)
+from essence.chat.platform_validators import DiscordValidator, TelegramValidator
 
 
 class TestTelegramTranslator:

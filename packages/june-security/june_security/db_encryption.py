@@ -5,9 +5,10 @@ Provides decorators and utilities for automatically encrypting/decrypting
 sensitive database fields.
 """
 
-from typing import Optional, Callable, Any
 from functools import wraps
-from .encryption import get_encryption_manager, EncryptionManager
+from typing import Any, Callable, Optional
+
+from .encryption import EncryptionManager, get_encryption_manager
 
 
 class DatabaseEncryption:

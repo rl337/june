@@ -1,7 +1,8 @@
-import grpc
-import logging
 import asyncio
+import logging
 from typing import Optional
+
+import grpc
 
 from ..generated import asr_pb2, asr_pb2_grpc
 

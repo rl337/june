@@ -17,19 +17,19 @@ The test imports `test_round_trip_gateway` which no longer exists, and all
 test modes reference the removed gateway service. To test the pipeline without
 gateway, use direct gRPC calls to STT, LLM, and TTS services.
 """
+import asyncio
+import json
+import logging
 import os
 import sys
-import json
-import asyncio
-import logging
-from pathlib import Path
-from typing import Dict, List, Optional, Any
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 # Add parent directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from shared.test_modes import TestMode, get_configuration, CONFIGURATIONS
+from shared.test_modes import CONFIGURATIONS, TestMode, get_configuration
 
 # Setup logging
 logging.basicConfig(

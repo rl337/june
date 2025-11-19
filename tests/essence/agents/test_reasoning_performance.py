@@ -12,24 +12,25 @@ Performance Metrics Measured:
 - Resource usage (memory, CPU)
 - Throughput under load
 """
-import pytest
-import time
 import statistics
-from typing import List, Dict, Any, Optional
-from dataclasses import dataclass, field, asdict
-from unittest.mock import Mock, MagicMock
+import time
+from dataclasses import asdict, dataclass, field
+from typing import Any, Dict, List, Optional
+from unittest.mock import MagicMock, Mock
 
+import pytest
+
+from essence.agents.decision import estimate_request_complexity, should_use_agentic_flow
+from essence.agents.executor import Executor
+from essence.agents.llm_client import LLMClient
+from essence.agents.planner import Planner
 from essence.agents.reasoning import (
     AgenticReasoner,
-    ReasoningResult,
     ConversationContext,
+    ReasoningResult,
 )
-from essence.agents.planner import Planner
-from essence.agents.executor import Executor
-from essence.agents.reflector import Reflector
-from essence.agents.llm_client import LLMClient
 from essence.agents.reasoning_cache import ReasoningCache
-from essence.agents.decision import should_use_agentic_flow, estimate_request_complexity
+from essence.agents.reflector import Reflector
 
 
 @dataclass

@@ -3,7 +3,6 @@ from typing import Optional
 
 from ..cli import Command
 
-
 logger = logging.getLogger(__name__)
 
 

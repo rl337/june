@@ -5,13 +5,14 @@ Provides encryption/decryption functionality for sensitive data at rest and in t
 Uses Fernet (symmetric encryption) for application-level encryption.
 """
 
-import os
 import base64
-from typing import Optional, Union, BinaryIO
+import os
+from typing import BinaryIO, Optional, Union
+
 from cryptography.fernet import Fernet
+from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from cryptography.hazmat.backends import default_backend
 
 
 class EncryptionManager:

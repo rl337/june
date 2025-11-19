@@ -4,11 +4,11 @@ Input Validation Module - Comprehensive input validation for all services.
 This module provides input validation functions that integrate with june-security
 to prevent injection attacks, validate file uploads, and sanitize user inputs.
 """
-import re
 import logging
-from typing import Any, Dict, List, Optional, Tuple, Union
-from pathlib import Path
 import mimetypes
+import re
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 # Try to import python-magic, but make it optional
 try:

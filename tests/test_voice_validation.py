@@ -4,22 +4,23 @@ Validation test suite for voice message quality and accuracy.
 Tests voice message round-trip accuracy, response quality, latency, and various audio qualities/lengths.
 This suite provides comprehensive validation metrics for the voice message pipeline.
 """
-import pytest
 import asyncio
+import base64
+import json
+import logging
 import os
+import struct
+import time
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
 import grpc
 import httpx
-import time
-import json
 import numpy as np
-import struct
-import base64
-from typing import List, Dict, Any, Optional, Tuple
-from pathlib import Path
-from datetime import datetime
-import logging
-
-from june_grpc_api import asr as asr_shim, tts as tts_shim
+import pytest
+from june_grpc_api import asr as asr_shim
+from june_grpc_api import tts as tts_shim
 
 # Setup logging
 logging.basicConfig(

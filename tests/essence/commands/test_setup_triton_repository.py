@@ -3,15 +3,16 @@ Unit tests for setup_triton_repository command.
 
 Tests TritonRepositoryManager and SetupTritonRepositoryCommand classes.
 """
-import pytest
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 from essence.commands.setup_triton_repository import (
-    TritonRepositoryManager,
     SetupTritonRepositoryCommand,
+    TritonRepositoryManager,
 )
 
 

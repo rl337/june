@@ -5,24 +5,25 @@ Each platform (Telegram, Discord, etc.) has different markdown syntax and limita
 These translators convert our structured widgets into safe, platform-specific markdown.
 """
 
-import re
 import logging
+import re
 from typing import List
+
 from .human_interface import (
+    Blockquote,
+    CodeBlock,
+    ContentType,
     ContentWidget,
     EscapedText,
-    Paragraph,
     Heading,
-    ListWidget,
-    ListItem,
-    TableWidget,
-    TableRow,
-    TableCell,
-    CodeBlock,
-    Blockquote,
     HorizontalRule,
     Link,
-    ContentType,
+    ListItem,
+    ListWidget,
+    Paragraph,
+    TableCell,
+    TableRow,
+    TableWidget,
 )
 
 logger = logging.getLogger(__name__)

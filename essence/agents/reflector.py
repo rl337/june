@@ -4,16 +4,18 @@ Reflection Component
 Evaluates execution results and determines if goals were achieved.
 """
 import logging
-from typing import Optional, List, Any
-from essence.agents.reasoning import (
-    Plan,
-    ExecutionResult,
-    ReflectionResult,
-    ConversationContext,
-)
-from essence.agents.reasoning_cache import get_reasoning_cache, ReasoningCache
-from essence.chat.utils.tracing import get_tracer
+from typing import Any, List, Optional
+
 from opentelemetry import trace
+
+from essence.agents.reasoning import (
+    ConversationContext,
+    ExecutionResult,
+    Plan,
+    ReflectionResult,
+)
+from essence.agents.reasoning_cache import ReasoningCache, get_reasoning_cache
+from essence.chat.utils.tracing import get_tracer
 
 logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)

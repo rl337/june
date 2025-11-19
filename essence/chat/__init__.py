@@ -9,44 +9,44 @@ This module provides:
 """
 
 from .human_interface import (
-    Turn,
-    Message,
+    Blockquote,
+    CodeBlock,
+    ContentType,
     ContentWidget,
     EscapedText,
-    Paragraph,
     Heading,
-    ListWidget,
-    ListItem,
-    TableWidget,
-    TableRow,
-    TableCell,
-    CodeBlock,
-    Blockquote,
     HorizontalRule,
     Link,
-    ContentType,
+    ListItem,
+    ListWidget,
+    Message,
+    Paragraph,
+    TableCell,
+    TableRow,
+    TableWidget,
+    Turn,
 )
 from .markdown_parser import MarkdownParser, parse_markdown
+from .message_builder import MessageBuilder, build_and_render
 from .platform_translators import (
+    DiscordTranslator,
     PlatformTranslator,
     TelegramTranslator,
-    DiscordTranslator,
     get_translator,
 )
-from .message_builder import MessageBuilder, build_and_render
 
 # Agent communication (optional import to avoid circular dependencies)
 try:
     from .agent_communication import (
-        send_message_to_user,
-        ask_for_clarification,
-        request_help,
-        report_progress,
-        ask_for_feedback,
-        CommunicationChannel,
         AgentCommunicationError,
-        ServiceRunningError,
         ChannelUnavailableError,
+        CommunicationChannel,
+        ServiceRunningError,
+        ask_for_clarification,
+        ask_for_feedback,
+        report_progress,
+        request_help,
+        send_message_to_user,
     )
 
     AGENT_COMMUNICATION_AVAILABLE = True

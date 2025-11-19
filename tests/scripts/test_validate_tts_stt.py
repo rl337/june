@@ -12,13 +12,14 @@ Tests:
 3. TTS Consistency: Same text → TTS multiple times (should produce similar audio)
 4. STT Robustness: Various text lengths and complexities
 """
-import os
-import sys
 import asyncio
 import logging
-import grpc
-from typing import List, Tuple
+import os
+import sys
 from pathlib import Path
+from typing import List, Tuple
+
+import grpc
 
 # Setup logging
 logging.basicConfig(
@@ -27,7 +28,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Import shim clients
-from june_grpc_api import tts as tts_shim, asr as asr_shim
+from june_grpc_api import asr as asr_shim
+from june_grpc_api import tts as tts_shim
 
 
 class TtsSttValidator:
@@ -71,9 +73,9 @@ class TtsSttValidator:
         sample_width: int = 2,
     ) -> bytes:
         """Convert raw PCM audio data to WAV format."""
+        import io
         import struct
         import wave
-        import io
 
         # Create WAV file in memory
         wav_buffer = io.BytesIO()
@@ -342,7 +344,7 @@ async def main():
 
     # Import test case generator
     sys.path.insert(0, os.path.dirname(__file__))
-    from test_case_generator import TestCaseGenerator, TestCase
+    from test_case_generator import TestCase, TestCaseGenerator
 
     # Detect Docker environment
     is_docker = os.path.exists("/.dockerenv") or os.getenv("DOCKER_CONTAINER") == "true"

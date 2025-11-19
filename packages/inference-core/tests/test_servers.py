@@ -1,15 +1,15 @@
 """Tests for gRPC server apps with mocked gRPC."""
-import pytest
-from unittest.mock import Mock, patch, MagicMock
-import grpc
+from unittest.mock import MagicMock, Mock, patch
 
+import grpc
+import pytest
+from inference_core.llm.passthrough_strategy import PassthroughLlmStrategy
+from inference_core.servers.llm_server import LlmGrpcApp, _LlmServicer
 from inference_core.servers.stt_server import SttGrpcApp, _SttServicer
 from inference_core.servers.tts_server import TtsGrpcApp, _TtsServicer
-from inference_core.servers.llm_server import LlmGrpcApp, _LlmServicer
 from inference_core.strategies import InferenceRequest, InferenceResponse
 from inference_core.stt.whisper_strategy import WhisperSttStrategy
 from inference_core.tts.espeak_strategy import EspeakTtsStrategy
-from inference_core.llm.passthrough_strategy import PassthroughLlmStrategy
 
 
 @pytest.fixture

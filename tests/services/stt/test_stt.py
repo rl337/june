@@ -1,11 +1,12 @@
 """
 Comprehensive test suite for STT service.
 """
-import pytest
 import asyncio
 import sys
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
 import numpy as np
-from unittest.mock import AsyncMock, MagicMock, patch, Mock
+import pytest
 
 # Mock torch and grpc before importing (may not be available in test environment)
 sys.modules["torch"] = MagicMock()

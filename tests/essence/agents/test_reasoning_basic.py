@@ -4,10 +4,11 @@ Basic Unit Tests for Agentic Reasoning Data Structures
 Tests the core data structures without requiring full dependency chain.
 These tests verify the basic functionality of reasoning components.
 """
-import pytest
 from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any
 from enum import Enum
+from typing import Any, Dict, List, Optional
+
+import pytest
 
 
 # Define data structures directly in test to avoid import issues

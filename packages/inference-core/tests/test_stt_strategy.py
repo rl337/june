@@ -1,12 +1,12 @@
 """Tests for STT strategies with mocked dependencies."""
-import pytest
-from unittest.mock import Mock, patch
 import io
-import numpy as np
+from unittest.mock import Mock, patch
 
-from inference_core.stt.whisper_strategy import WhisperSttStrategy
-from inference_core.stt.whisper_adapter import WhisperModelAdapter
+import numpy as np
+import pytest
 from inference_core.strategies import InferenceRequest, InferenceResponse
+from inference_core.stt.whisper_adapter import WhisperModelAdapter
+from inference_core.stt.whisper_strategy import WhisperSttStrategy
 
 
 class MockWhisperAdapter(WhisperModelAdapter):

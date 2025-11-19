@@ -5,24 +5,25 @@ This parser converts raw markdown text from LLMs into structured ContentWidget
 objects that can be safely rendered on different platforms.
 """
 
-import re
 import logging
+import re
 from typing import List, Optional
+
 from .human_interface import (
+    Blockquote,
+    CodeBlock,
+    ContentType,
     ContentWidget,
     EscapedText,
-    Paragraph,
     Heading,
-    ListWidget,
-    ListItem,
-    TableWidget,
-    TableRow,
-    TableCell,
-    CodeBlock,
-    Blockquote,
     HorizontalRule,
     Link,
-    ContentType,
+    ListItem,
+    ListWidget,
+    Paragraph,
+    TableCell,
+    TableRow,
+    TableWidget,
 )
 
 logger = logging.getLogger(__name__)

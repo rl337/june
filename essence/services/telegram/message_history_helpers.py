@@ -5,8 +5,9 @@ Provides wrapper functions that intercept message sending and store
 messages in history for debugging.
 """
 import logging
-from typing import Optional, Dict, Any
-from telegram import Update, Message
+from typing import Any, Dict, Optional
+
+from telegram import Message, Update
 from telegram.ext import ContextTypes
 
 from essence.chat.message_history import get_message_history

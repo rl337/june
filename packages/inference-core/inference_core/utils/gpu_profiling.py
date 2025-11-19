@@ -2,8 +2,8 @@
 GPU profiling utilities for monitoring GPU utilization and memory usage.
 """
 import logging
-from typing import Dict, Any, Optional
 import time
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 

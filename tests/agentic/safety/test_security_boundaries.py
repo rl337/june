@@ -5,9 +5,10 @@ Tests security boundaries and dangerous operation prevention.
 """
 
 import pytest
+
 from tests.agentic.simulation.mock_execution import (
-    MockExecutionEnvironment,
     ExecutionSimulator,
+    MockExecutionEnvironment,
 )
 
 

@@ -9,19 +9,20 @@ Tests cover:
 - Command handlers
 - Voice message processing flow
 """
-import pytest
 import asyncio
-import io
-import os
-import sys
-from unittest.mock import AsyncMock, MagicMock, patch, Mock
 
 # Fix import conflict: ensure we import from installed python-telegram-bot, not local telegram dir
 # The local services/telegram/__init__.py shadows the installed package when pytest runs from root
 # Strategy: Remove local telegram from module cache, import from installed package, then restore path
 import importlib
-import site
+import io
+import os
 import os.path
+import site
+import sys
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
+import pytest
 
 # Find site-packages directory with telegram (check both system and user)
 _site_packages = None
@@ -78,7 +79,7 @@ if _site_packages:
     sys.path.insert(0, _site_packages)
 
 # Now import telegram from installed package
-from telegram import Update, Message, Voice, File, User, Chat
+from telegram import Chat, File, Message, Update, User, Voice
 from telegram.ext import ContextTypes
 
 # Restore original sys.path and ensure essence/services/telegram is in path for local imports
@@ -214,17 +215,17 @@ if "opentelemetry" not in sys.modules or not hasattr(
     sys.modules["opentelemetry.instrumentation"] = MagicMock()
     sys.modules["opentelemetry.instrumentation.grpc"] = MagicMock()
 
-from essence.services.telegram.main import TelegramBotService
 from essence.services.telegram.audio_utils import (
     AudioValidationError,
     prepare_audio_for_stt,
 )
 from essence.services.telegram.handlers.commands import (
-    start_command,
     help_command,
+    start_command,
     status_command,
 )
 from essence.services.telegram.handlers.voice import handle_voice_message
+from essence.services.telegram.main import TelegramBotService
 
 
 # Test fixtures

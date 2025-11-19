@@ -9,8 +9,9 @@ never fails, even if imports or fixture definitions fail.
 """
 # Wrap entire module in try/except to ensure pytest collection never fails
 try:
-    import pytest
     import os
+
+    import pytest
 
     # Wrap import in try/except to ensure conftest.py can always be imported
     # This is critical for CI environments where pytest collection must not fail
@@ -52,8 +53,9 @@ try:
 
         # Check if grpc is available and not mocked
         try:
-            import grpc
             from unittest.mock import MagicMock
+
+            import grpc
 
             # Check if grpc is mocked (from conftest.py in other test modules)
             if isinstance(grpc, MagicMock) or not hasattr(grpc, "insecure_channel"):

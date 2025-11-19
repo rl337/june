@@ -5,10 +5,12 @@ Provides utilities for encrypting/decrypting files stored in MinIO.
 """
 
 import io
-from typing import Optional, BinaryIO
+from typing import BinaryIO, Optional
+
 from minio import Minio
 from minio.error import S3Error
-from .encryption import get_encryption_manager, EncryptionManager
+
+from .encryption import EncryptionManager, get_encryption_manager
 
 
 class MinIOEncryption:

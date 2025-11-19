@@ -1,10 +1,10 @@
 """Tests for SecurityValidator."""
 
-import pytest
 import tempfile
 from pathlib import Path
 
-from june_security import SecurityValidator, ValidationResult, OperationType
+import pytest
+from june_security import OperationType, SecurityValidator, ValidationResult
 
 
 class TestSecurityValidator:

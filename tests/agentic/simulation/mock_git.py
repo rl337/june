@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional
-from unittest.mock import Mock, MagicMock
+from unittest.mock import MagicMock, Mock
 
 
 class MockGit:

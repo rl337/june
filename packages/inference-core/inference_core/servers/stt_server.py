@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import os
-import grpc
 from concurrent import futures
 from typing import Optional
 
+import grpc
+from june_grpc_api.generated import asr_pb2, asr_pb2_grpc
+
+from ..config import config
 from ..strategies import SttStrategy
 from ..utils import setup_logging
-from ..config import config
-from june_grpc_api.generated import asr_pb2, asr_pb2_grpc
 
 
 class _SttServicer(asr_pb2_grpc.SpeechToTextServicer):

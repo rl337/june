@@ -5,19 +5,20 @@ Tests the extraction and accumulation logic to ensure messages are properly
 accumulated and streamed incrementally to Telegram.
 """
 import json
-import pytest
-from unittest.mock import Mock, patch, MagicMock
-from typing import Iterator, Tuple
 import sys
 from pathlib import Path
+from typing import Iterator, Tuple
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 # Add parent directories to path
 base_path = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(base_path / "services" / "chat-service-base"))
 
 from agent.response import (
-    stream_chat_response_agent,
     _extract_human_readable_from_json_line,
+    stream_chat_response_agent,
 )
 
 

@@ -1,13 +1,14 @@
 """Command handlers for Telegram bot."""
 import logging
+
 from telegram import Update
 from telegram.ext import ContextTypes
 
 from essence.services.telegram.conversation_storage import ConversationStorage
 from essence.services.telegram.language_preferences import (
+    DEFAULT_LANGUAGE,
     get_supported_languages,
     is_language_supported,
-    DEFAULT_LANGUAGE,
 )
 
 logger = logging.getLogger(__name__)
@@ -89,9 +90,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE, confi
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE, config):
     """Handle /status command - check and display service health status."""
     import asyncio
+
     import grpc
+    from dependencies.config import get_llm_address, get_stt_address, get_tts_address
     from dependencies.grpc_pool import get_grpc_pool
-    from dependencies.config import get_stt_address, get_tts_address, get_llm_address
 
     logger.info("Status command received, checking service health...")
 

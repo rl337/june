@@ -1,9 +1,10 @@
 """Unit tests for JSON accumulation logic in stream_chat_response_agent."""
 import json
-import pytest
-from unittest.mock import Mock, patch, MagicMock
-from essence.chat.agent.response import stream_chat_response_agent
+from unittest.mock import MagicMock, Mock, patch
 
+import pytest
+
+from essence.chat.agent.response import stream_chat_response_agent
 
 # Test cases: (name, input_lines, expected_outputs, expected_final_state)
 # input_lines: list of (line, is_final) tuples

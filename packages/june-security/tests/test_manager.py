@@ -1,10 +1,10 @@
 """Tests for SecurityManager."""
 
-import pytest
 import tempfile
 from pathlib import Path
 
-from june_security import SecurityManager, OperationType
+import pytest
+from june_security import OperationType, SecurityManager
 
 
 class TestSecurityManager:

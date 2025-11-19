@@ -5,11 +5,12 @@ Tests agent interaction with code execution environment.
 """
 
 import pytest
+
 from tests.agentic.simulation.mock_execution import (
-    MockExecutionEnvironment,
     ExecutionSimulator,
+    MockExecutionEnvironment,
 )
-from tests.agentic.simulation.mock_git import MockGit, GitSimulator
+from tests.agentic.simulation.mock_git import GitSimulator, MockGit
 
 
 class TestCodeExecutionIntegration:

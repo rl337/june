@@ -6,8 +6,9 @@ with proper granularity (quarter-second intervals).
 """
 import sys
 import time
-import pytest
 from pathlib import Path
+
+import pytest
 
 from essence.chat.utils.streaming_popen import streaming_popen_generator
 

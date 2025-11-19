@@ -13,11 +13,12 @@ Usage:
 """
 
 import argparse
+import logging
 import os
 import sys
-import logging
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
+
 import requests
 from huggingface_hub import hf_hub_download, snapshot_download
 

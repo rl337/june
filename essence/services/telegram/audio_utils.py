@@ -20,8 +20,8 @@ from pydub.exceptions import CouldntDecodeError
 
 # Optional imports for audio enhancement
 try:
-    import numpy as np
     import librosa
+    import numpy as np
 
     NUMPY_AVAILABLE = True
     LIBROSA_AVAILABLE = True

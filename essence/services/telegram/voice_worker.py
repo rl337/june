@@ -10,19 +10,19 @@ import os
 import sys
 from pathlib import Path
 
+# Setup logging
+from inference_core import config, setup_logging
+
+from essence.services.telegram.dependencies.config import (
+    get_metrics_storage,
+    get_service_config,
+    get_stt_address,
+)
+from essence.services.telegram.handlers.voice import handle_voice_message_from_queue
 from essence.services.telegram.voice_queue import (
     VoiceMessageQueue,
     create_worker_subscription,
 )
-from essence.services.telegram.handlers.voice import handle_voice_message_from_queue
-from essence.services.telegram.dependencies.config import (
-    get_service_config,
-    get_stt_address,
-    get_metrics_storage,
-)
-
-# Setup logging
-from inference_core import setup_logging, config
 
 setup_logging(config.monitoring.log_level, "telegram-worker")
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ async def process_voice_message(msg_data: dict):
         msg_data: Message data dict with voice_file_id, user_id, chat_id, audio_data, metadata
     """
     # Import here to avoid circular dependencies
-    from telegram import Update, Voice, Bot
+    from telegram import Bot, Update, Voice
     from telegram.ext import ContextTypes
 
     if not bot_application:
@@ -51,8 +51,9 @@ async def process_voice_message(msg_data: dict):
     )
 
     # Create a message-like object
-    from telegram import Message, User, Chat
     from datetime import datetime
+
+    from telegram import Chat, Message, User
 
     user = User(id=int(msg_data["user_id"]), is_bot=False, first_name="User")
 
@@ -109,8 +110,8 @@ async def main():
     logger.info(f"Connecting to NATS: {nats_url}")
 
     # Initialize Telegram bot application for sending messages
-    from telegram.ext import Application
     from dependencies.config import get_service_config
+    from telegram.ext import Application
 
     service_config = get_service_config()
     if not service_config.bot_token:

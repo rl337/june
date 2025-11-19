@@ -15,17 +15,17 @@ import argparse
 import json
 import logging
 import os
+import statistics
 import sys
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-import statistics
 
 try:
-    import torch
     import psutil
+    import torch
 
     DEPENDENCIES_AVAILABLE = True
 except ImportError as e:
@@ -33,9 +33,9 @@ except ImportError as e:
     IMPORT_ERROR = str(e)
 
 try:
+    from inference_core.config import config
     from inference_core.llm.qwen3_strategy import Qwen3LlmStrategy
     from inference_core.strategies import InferenceRequest
-    from inference_core.config import config
 
     INFERENCE_CORE_AVAILABLE = True
 except ImportError:

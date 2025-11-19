@@ -5,10 +5,10 @@ Provides programmatic access to message history with analysis capabilities
 for comparing expected vs actual message content and identifying rendering issues.
 """
 import logging
-from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, Tuple
 
-from essence.chat.message_history import get_message_history, MessageHistoryEntry
+from essence.chat.message_history import MessageHistoryEntry, get_message_history
 
 logger = logging.getLogger(__name__)
 

@@ -4,17 +4,20 @@ gRPC load test for STT, TTS, and Inference API services.
 This script uses the june-grpc-api package to test gRPC endpoints.
 """
 import asyncio
-import time
+import logging
 import random
 import statistics
-from typing import List, Dict, Any
-import logging
+import time
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Dict, List
+
 import grpc
 
 # Try to import june-grpc-api
 try:
-    from june_grpc_api import asr as asr_shim, tts as tts_shim, llm as llm_shim
+    from june_grpc_api import asr as asr_shim
+    from june_grpc_api import llm as llm_shim
+    from june_grpc_api import tts as tts_shim
 
     GRPC_API_AVAILABLE = True
 except ImportError:
