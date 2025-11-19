@@ -291,6 +291,81 @@ trtllm-build \\
     return template
 
 
+def generate_config_pbtxt(model_name: str, max_batch_size: int = 0, max_input_len: int = 131072) -> str:
+    """
+    Generate a config.pbtxt template for Triton Inference Server.
+    
+    Args:
+        model_name: Local model name (e.g., "qwen3-30b")
+        max_batch_size: Maximum batch size (0 for dynamic batching)
+        max_input_len: Maximum input sequence length
+    
+    Returns:
+        config.pbtxt content as string
+    """
+    config = f"""name: "{model_name}"
+platform: "tensorrt_llm"
+max_batch_size: {max_batch_size}
+
+input [
+  {{
+    name: "text_input"
+    data_type: TYPE_STRING
+    dims: [ -1 ]
+  }}
+]
+
+output [
+  {{
+    name: "text_output"
+    data_type: TYPE_STRING
+    dims: [ -1 ]
+  }}
+]
+
+instance_group [
+  {{
+    count: 1
+    kind: KIND_GPU
+  }}
+]
+
+parameters [
+  {{
+    key: "max_tokens"
+    value: {{
+      string_value: "2048"
+    }}
+  }},
+  {{
+    key: "temperature"
+    value: {{
+      string_value: "0.7"
+    }}
+  }},
+  {{
+    key: "top_p"
+    value: {{
+      string_value: "0.9"
+    }}
+  }},
+  {{
+    key: "top_k"
+    value: {{
+      string_value: "50"
+    }}
+  }},
+  {{
+    key: "max_input_len"
+    value: {{
+      string_value: "{max_input_len}"
+    }}
+  }}
+]
+"""
+    return config
+
+
 class CompileModelCommand(Command):
     """Command for validating model compilation prerequisites and providing guidance."""
     
@@ -331,6 +406,11 @@ class CompileModelCommand(Command):
             '--generate-template',
             action='store_true',
             help='Generate compilation command template'
+        )
+        self.parser.add_argument(
+            '--generate-config',
+            action='store_true',
+            help='Generate config.pbtxt template file'
         )
         self.parser.add_argument(
             '--json',
@@ -440,18 +520,54 @@ class CompileModelCommand(Command):
             else:
                 results['template'] = template
         
+        # Generate config.pbtxt
+        if self.args.generate_config:
+            config_content = generate_config_pbtxt(model_name)
+            config_path = Path(self.args.repository_path) / model_name / "1" / "config.pbtxt"
+            
+            if not self.args.json:
+                print("\n" + "="*70)
+                print("CONFIG.PBTXT TEMPLATE")
+                print("="*70)
+                print(config_content)
+                print("\n" + "="*70)
+                
+                # Ask if user wants to save it
+                if config_path.parent.exists():
+                    try:
+                        config_path.write_text(config_content)
+                        print(f"✅ Saved config.pbtxt to: {config_path}")
+                        print(f"\n📝 Next steps:")
+                        print(f"   1. Review and adjust config.pbtxt if needed")
+                        print(f"   2. Compile the model using TensorRT-LLM build tools")
+                        print(f"   3. Copy tokenizer files to the model directory")
+                        print(f"   4. Load the model: poetry run -m essence manage-tensorrt-llm --action load --model {model_name}")
+                    except Exception as e:
+                        print(f"⚠️  Could not save config.pbtxt to {config_path}: {e}")
+                        print("   Please save the config.pbtxt content manually to the model directory")
+                else:
+                    print(f"⚠️  Model directory does not exist: {config_path.parent}")
+                    print("   Please create the repository structure first:")
+                    print(f"   poetry run -m essence setup-triton-repository --action create --model {model_name}")
+                    print("\n   Then save the config.pbtxt content above to:")
+                    print(f"   {config_path}")
+            else:
+                results['config_pbtxt'] = config_content
+                results['config_path'] = str(config_path)
+        
         # Output JSON if requested
         if self.args.json:
             print(json.dumps(results, indent=2))
             sys.exit(0)
         
         # Default: show summary
-        if not self.args.check_prerequisites and not self.args.generate_template:
+        if not self.args.check_prerequisites and not self.args.generate_template and not self.args.generate_config:
             print("Model compilation helper for TensorRT-LLM")
             print(f"\nModel: {model_name}")
             print("\nUse --check-prerequisites to validate setup")
             print("Use --generate-template to get compilation command template")
+            print("Use --generate-config to generate config.pbtxt template")
             print("\nExample:")
-            print(f"  poetry run -m essence compile-model --model {model_name} --check-prerequisites --generate-template")
+            print(f"  poetry run -m essence compile-model --model {model_name} --check-prerequisites --generate-template --generate-config")
         
         sys.exit(0)
