@@ -152,11 +152,39 @@ class PipelineTestFramework:
         audio_data: bytes,
         user_id: str = "test_user",
         chat_id: str = "test_chat",
-        language: Optional[str] = None
+        language: Optional[str] = None,
+        check_services: bool = True
     ) -> PipelineMetrics:
-        """Run the complete pipeline: STT → LLM → TTS."""
+        """Run the complete pipeline: STT → LLM → TTS.
+        
+        Args:
+            audio_data: Raw PCM audio data (will be converted to WAV for real STT)
+            user_id: User ID for context
+            chat_id: Chat ID for context
+            language: Language code (e.g., 'en', 'es')
+            check_services: If True and use_real_services, check service availability first
+        
+        Returns:
+            PipelineMetrics with execution results and metrics
+        """
         start_time = time.time()
         self.metrics = PipelineMetrics()
+        
+        # Check service availability if using real services
+        if self.use_real_services and check_services:
+            import os
+            stt_address = os.getenv("STT_SERVICE_ADDRESS", "localhost:50052")
+            tts_address = os.getenv("TTS_SERVICE_ADDRESS", "localhost:50053")
+            llm_address = os.getenv("INFERENCE_API_URL", os.getenv("LLM_URL", "tensorrt-llm:8000")).replace("grpc://", "")
+            
+            stt_available = await self.check_service_available(stt_address, "STT")
+            tts_available = await self.check_service_available(tts_address, "TTS")
+            llm_available = await self.check_service_available(llm_address, "LLM")
+            
+            if not (stt_available and tts_available and llm_available):
+                self.metrics.errors.append("One or more services are not available")
+                self.metrics.warnings.append(f"STT: {stt_available}, TTS: {tts_available}, LLM: {llm_available}")
+                return self.metrics
         
         try:
             # Step 1: STT
@@ -211,29 +239,144 @@ class PipelineTestFramework:
             self.metrics.total_duration = time.time() - start_time
             return self.metrics
         
+        except ImportError as e:
+            # Handle missing dependencies gracefully
+            self.metrics.errors.append(f"Missing dependencies for real services: {str(e)}")
+            self.metrics.warnings.append("Install grpc and june_grpc_api packages to use real services")
+            self.metrics.total_duration = time.time() - start_time
+            return self.metrics
         except Exception as e:
             self.metrics.errors.append(f"Pipeline error: {str(e)}")
             self.metrics.total_duration = time.time() - start_time
             logger.error(f"Pipeline execution failed: {e}", exc_info=True)
             return self.metrics
     
+    def create_wav_file(self, audio_data: bytes, sample_rate: int = 16000) -> bytes:
+        """Create a WAV file from raw PCM audio data."""
+        import struct
+        num_samples = len(audio_data) // 2  # 16-bit = 2 bytes per sample
+        data_size = len(audio_data)
+        file_size = 36 + data_size
+        
+        wav = b'RIFF'
+        wav += struct.pack('<I', file_size)
+        wav += b'WAVE'
+        wav += b'fmt '
+        wav += struct.pack('<I', 16)  # fmt chunk size
+        wav += struct.pack('<HHIIHH', 1, 1, sample_rate, sample_rate * 2, 2, 16)  # PCM, mono, sample_rate
+        wav += b'data'
+        wav += struct.pack('<I', data_size)
+        wav += audio_data
+        
+        return wav
+    
+    async def check_service_available(self, address: str, service_type: str) -> bool:
+        """Check if a gRPC service is available."""
+        try:
+            import grpc
+        except ImportError:
+            logger.warning(f"grpc module not available - cannot check {service_type} service")
+            return False
+        
+        try:
+            async with grpc.aio.insecure_channel(address) as channel:
+                # Try to connect
+                await asyncio.wait_for(
+                    grpc.channel_ready_future(channel),
+                    timeout=2.0
+                )
+                logger.info(f"✓ {service_type} service reachable at {address}")
+                return True
+        except Exception as e:
+            logger.warning(f"✗ {service_type} service not reachable at {address}: {e}")
+            return False
+    
     async def _real_stt_recognize(self, audio_data: bytes, language: Optional[str] = None) -> str:
         """Use real STT service (requires gRPC)."""
-        # This would connect to real STT service
-        # For now, raise NotImplementedError
-        raise NotImplementedError("Real STT service not implemented in test framework")
+        import os
+        try:
+            import grpc
+            from june_grpc_api import asr as asr_shim
+        except ImportError as e:
+            raise ImportError(f"Required modules not available for real STT service: {e}")
+        
+        stt_address = os.getenv("STT_SERVICE_ADDRESS", "localhost:50052")
+        sample_rate = 16000
+        
+        # Convert raw audio to WAV format if needed
+        if not audio_data.startswith(b'RIFF'):
+            audio_data = self.create_wav_file(audio_data, sample_rate)
+        
+        try:
+            async with grpc.aio.insecure_channel(stt_address) as channel:
+                client = asr_shim.SpeechToTextClient(channel)
+                cfg = asr_shim.RecognitionConfig(
+                    language=language,
+                    interim_results=False
+                )
+                result = await client.recognize(
+                    audio_data,
+                    sample_rate=sample_rate,
+                    encoding="wav",
+                    config=cfg
+                )
+                return result.transcript or ""
+        except Exception as e:
+            logger.error(f"STT service error: {e}", exc_info=True)
+            raise
     
     async def _real_llm_chat(self, messages: List[Dict[str, str]]) -> str:
         """Use real LLM service (requires gRPC)."""
-        # This would connect to real LLM service
-        # For now, raise NotImplementedError
-        raise NotImplementedError("Real LLM service not implemented in test framework")
+        import os
+        try:
+            import grpc
+            from june_grpc_api import llm as llm_shim
+        except ImportError as e:
+            raise ImportError(f"Required modules not available for real LLM service: {e}")
+        
+        # Default: TensorRT-LLM (tensorrt-llm:8000), Legacy: inference-api (inference-api:50051)
+        llm_address = os.getenv("INFERENCE_API_URL", os.getenv("LLM_URL", "tensorrt-llm:8000")).replace("grpc://", "")
+        
+        try:
+            async with grpc.aio.insecure_channel(llm_address) as channel:
+                client = llm_shim.LLMClient(channel)
+                llm_response = ""
+                async for chunk in client.chat_stream(messages):
+                    llm_response += chunk
+                return llm_response
+        except Exception as e:
+            logger.error(f"LLM service error: {e}", exc_info=True)
+            raise
     
     async def _real_tts_synthesize(self, text: str, language: str = "en") -> bytes:
         """Use real TTS service (requires gRPC)."""
-        # This would connect to real TTS service
-        # For now, raise NotImplementedError
-        raise NotImplementedError("Real TTS service not implemented in test framework")
+        import os
+        try:
+            import grpc
+            from june_grpc_api import tts as tts_shim
+        except ImportError as e:
+            raise ImportError(f"Required modules not available for real TTS service: {e}")
+        
+        tts_address = os.getenv("TTS_SERVICE_ADDRESS", "localhost:50053")
+        
+        try:
+            async with grpc.aio.insecure_channel(tts_address) as channel:
+                client = tts_shim.TextToSpeechClient(channel)
+                cfg = tts_shim.SynthesisConfig(
+                    sample_rate=16000,
+                    speed=1.0,
+                    pitch=0.0
+                )
+                audio = await client.synthesize(
+                    text=text,
+                    voice_id="default",
+                    language=language,
+                    config=cfg
+                )
+                return audio
+        except Exception as e:
+            logger.error(f"TTS service error: {e}", exc_info=True)
+            raise
     
     def assert_pipeline_success(self, metrics: PipelineMetrics):
         """Assert that pipeline executed successfully."""
