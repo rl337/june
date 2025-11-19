@@ -3,8 +3,9 @@ groups:
     interval: 30s
     rules:
       # Service Down Alerts
+      # Note: gateway and orchestrator services were removed for MVP
       - alert: ServiceDown
-        expr: up{job=~"gateway|inference-api|stt|tts|telegram|orchestrator|todo-mcp-service"} == 0
+        expr: up{job=~"inference-api|stt|tts|telegram|todo-mcp-service"} == 0
         for: 1m
         labels:
           severity: critical
@@ -13,11 +14,10 @@ groups:
           description: "Service {{ $labels.job }} has been down for more than 1 minute."
 
       # High Error Rate Alerts
+      # Note: gateway service was removed for MVP
       - alert: HighErrorRate
         expr: |
           (
-            sum(rate(gateway_requests_total{status=~"5.."}[5m])) > 0.1
-            or
             sum(rate(inference_errors_total[5m])) > 0.1
             or
             sum(rate(stt_errors_total[5m])) > 0.1
@@ -62,11 +62,10 @@ groups:
           description: "GPU {{ $labels.gpu }} utilization is above 95% for more than 5 minutes."
 
       # Request Latency Alerts
+      # Note: gateway service was removed for MVP
       - alert: HighRequestLatency
         expr: |
           (
-            histogram_quantile(0.95, rate(gateway_request_duration_seconds_bucket[5m])) > 2
-            or
             histogram_quantile(0.95, rate(inference_request_duration_seconds_bucket[5m])) > 10
             or
             histogram_quantile(0.95, rate(stt_request_duration_seconds_bucket[5m])) > 30
@@ -106,43 +105,9 @@ groups:
           summary: "LLM low token generation rate"
           description: "LLM service token generation rate (p50) is below 10 tokens/second for more than 5 minutes."
 
-      - alert: GatewayHighRateLimitHits
-        expr: sum(rate(gateway_rate_limit_hits_total[5m])) > 10
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Gateway high rate limit hits"
-          description: "Gateway service is experiencing high rate limit hits (>10/sec) for more than 5 minutes."
-
-      # Database Performance Alerts
-      - alert: HighDatabaseQueryTime
-        expr: |
-          histogram_quantile(0.95, sum(rate(gateway_db_query_duration_seconds_bucket[5m])) by (le)) > 1
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High database query time detected"
-          description: "Database queries are taking longer than 1 second (p95) for more than 5 minutes."
-
-      - alert: HighSlowQueryRate
-        expr: sum(rate(gateway_db_slow_queries_total[5m])) > 5
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High slow query rate"
-          description: "More than 5 slow database queries (>1s) per second for more than 5 minutes."
-
-      - alert: DatabasePoolExhaustion
-        expr: gateway_db_pool_utilization > 0.9
-        for: 5m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Database connection pool near exhaustion"
-          description: "Database connection pool utilization is above 90% for more than 5 minutes."
+      # Note: Gateway and database alerts removed - gateway service and postgres were removed for MVP
+      # Rate limiting is now handled in-memory by telegram/discord services
+      # Database (postgres) was removed - services use in-memory storage
 
       # Cache Performance Alerts
       - alert: LowCacheHitRate
@@ -208,10 +173,10 @@ groups:
           description: "Queue {{ $labels.queue_name }} processing time (p95) is above 30 seconds for more than 5 minutes."
 
       # Service Resource Alerts
+      # Note: gateway service was removed for MVP
       - alert: ServiceHighMemoryUsage
         expr: |
           (
-            gateway_memory_usage_bytes > 2147483648 or
             inference_api_memory_usage_bytes > 4294967296 or
             stt_memory_usage_bytes > 2147483648 or
             tts_memory_usage_bytes > 2147483648
@@ -226,7 +191,6 @@ groups:
       - alert: ServiceHighCPUUsage
         expr: |
           (
-            gateway_cpu_usage_percent > 80 or
             inference_api_cpu_usage_percent > 90 or
             stt_cpu_usage_percent > 80 or
             tts_cpu_usage_percent > 80
@@ -239,14 +203,15 @@ groups:
           description: "One or more services are using excessive CPU (>80% for most services, >90% for inference-api) for more than 10 minutes."
 
       # Throughput Alerts
-      - alert: LowRequestThroughput
-        expr: sum(rate(gateway_requests_total[5m])) < 0.1
-        for: 15m
-        labels:
-          severity: info
-        annotations:
-          summary: "Low request throughput"
-          description: "Request throughput is below 0.1 requests/second for more than 15 minutes."
+      # Note: gateway service was removed for MVP - throughput monitoring can use telegram/discord service metrics
+      # - alert: LowRequestThroughput
+      #   expr: sum(rate(telegram_requests_total[5m])) < 0.1
+      #   for: 15m
+      #   labels:
+      #     severity: info
+      #   annotations:
+      #     summary: "Low request throughput"
+      #     description: "Request throughput is below 0.1 requests/second for more than 15 minutes."
 
   # Integration Test Alerts
   - name: integration_test_alerts

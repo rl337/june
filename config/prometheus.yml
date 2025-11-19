@@ -27,16 +27,8 @@ scrape_configs:
     scrape_interval: 15s
 
   # Application Services
-  - job_name: 'gateway'
-    static_configs:
-      - targets: ['gateway:8000']
-        labels:
-          service: 'gateway'
-          component: 'api'
-          tier: 'frontend'
-    metrics_path: '/metrics'
-    scrape_interval: 10s
-
+  # Note: gateway service was removed for MVP - services communicate directly via gRPC
+  # Note: inference-api service is deprecated (legacy profile only) - use TensorRT-LLM instead
   - job_name: 'inference-api'
     static_configs:
       - targets: ['inference-api:8001']
@@ -67,15 +59,7 @@ scrape_configs:
     metrics_path: '/metrics'
     scrape_interval: 10s
 
-  - job_name: 'orchestrator'
-    static_configs:
-      - targets: ['orchestrator:8005']
-        labels:
-          service: 'orchestrator'
-          component: 'orchestration'
-          tier: 'backend'
-    metrics_path: '/metrics'
-    scrape_interval: 10s
+  # Note: orchestrator service was removed for MVP
 
   - job_name: 'telegram'
     static_configs:
@@ -108,24 +92,7 @@ scrape_configs:
     scrape_interval: 10s
 
   # Infrastructure Services
-  - job_name: 'postgres-exporter'
-    static_configs:
-      - targets: ['postgres-exporter:9187']
-        labels:
-          service: 'postgres'
-          component: 'database'
-          tier: 'infrastructure'
-    scrape_interval: 30s
-
-  - job_name: 'nats'
-    static_configs:
-      - targets: ['nats:8222']
-        labels:
-          service: 'nats'
-          component: 'messaging'
-          tier: 'infrastructure'
-    metrics_path: '/metrics'
-    scrape_interval: 30s
+  # Note: postgres and nats services were removed for MVP (available in home_infra for other services)
 
 
 

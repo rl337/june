@@ -32,6 +32,7 @@ All major refactoring phases have been completed:
   - Updated tests/README.md to clarify inference-api deprecation status (added notes about legacy service, migration guide reference)
   - Updated docs/API/telegram.md to remove Gateway Admin API references (replaced with environment variable configuration, updated monitoring section to use direct service endpoints)
   - Fixed environment variable name inconsistency: Updated docs/API/telegram.md and essence/services/telegram/handlers/admin_commands.py to use `LLM_URL` instead of `LLM_SERVICE_URL` (consistent with codebase)
+  - Cleaned up Prometheus configuration: Removed references to removed services (gateway, orchestrator, postgres, nats) from config/prometheus.yml and config/prometheus-alerts.yml, updated alerts to reflect current architecture
 - ✅ **Service Refactoring (Phase 9.1):** All services refactored to minimal architecture
 - ✅ **Scripts Cleanup (Phase 11):** Converted reusable tools to commands, removed obsolete scripts
 - ✅ **Test Infrastructure (Phases 12-13):** Integration test service with REST API, Prometheus/Grafana monitoring
