@@ -89,11 +89,6 @@ except Exception:
     def pipeline_framework_real():
         """Fallback fixture - always skips."""
         pytest.skip("Pipeline test framework unavailable")
-
-
-
-
-def pytest_addoption(parser):
     """Add pytest command-line options."""
     parser.addoption(
         "--use-real-services",
