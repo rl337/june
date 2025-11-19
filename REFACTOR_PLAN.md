@@ -102,7 +102,6 @@ All major refactoring phases have been completed:
    - ✅ `essence/agents/dataset_loader.py` - Dataset loaders (HumanEval, MBPP)
    - ✅ `essence/commands/run_benchmarks.py` - Benchmark runner command
    - ✅ Sandbox isolation with full activity logging
-   - ✅ Efficiency metrics capture
    - ✅ Efficiency metrics capture (commands executed, time to solution, resource usage)
    - ✅ **Proper pass@k calculation:** Implemented support for multiple attempts per task with accurate pass@k calculation (pass@1, pass@5, pass@10, pass@100). Added `num_attempts_per_task` parameter to BenchmarkEvaluator and `--num-attempts` flag to run-benchmarks command.
 
