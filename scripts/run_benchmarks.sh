@@ -20,7 +20,8 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DATASET="${DATASET:-humaneval}"
 MAX_TASKS="${MAX_TASKS:-}"
 OUTPUT_DIR="${OUTPUT_DIR:-/tmp/benchmarks/results}"
-INFERENCE_API_URL="${INFERENCE_API_URL:-tensorrt-llm:8000}"  # TensorRT-LLM in home_infra/shared-network (default)
+# Support LLM_URL as primary, INFERENCE_API_URL as fallback (backward compatibility)
+LLM_URL="${LLM_URL:-${INFERENCE_API_URL:-tensorrt-llm:8000}}"  # TensorRT-LLM in home_infra/shared-network (default)
 MODEL_NAME="${MODEL_NAME:-Qwen/Qwen3-30B-A3B-Thinking-2507}"
 SANDBOX_IMAGE="${SANDBOX_IMAGE:-python:3.11-slim}"
 SANDBOX_MEMORY="${SANDBOX_MEMORY:-4g}"
@@ -45,8 +46,14 @@ while [[ $# -gt 0 ]]; do
             OUTPUT_DIR="$2"
             shift 2
             ;;
+        --llm-url)
+            LLM_URL="$2"
+            shift 2
+            ;;
         --inference-api-url)
-            INFERENCE_API_URL="$2"
+            # Deprecated: Use --llm-url instead. Kept for backward compatibility.
+            echo "Warning: --inference-api-url is deprecated. Use --llm-url instead." >&2
+            LLM_URL="$2"
             shift 2
             ;;
         --model-name)
@@ -88,7 +95,8 @@ while [[ $# -gt 0 ]]; do
             echo "  --dataset DATASET          Dataset to evaluate (humaneval, mbpp, all) [default: humaneval]"
             echo "  --max-tasks N              Maximum number of tasks to evaluate [default: all]"
             echo "  --output-dir DIR           Output directory for results [default: /tmp/benchmarks/results]"
-            echo "  --inference-api-url URL    gRPC endpoint for LLM inference [default: tensorrt-llm:8000 for TensorRT-LLM, can use inference-api:50051 for legacy service]"
+            echo "  --llm-url URL              gRPC endpoint for LLM inference [default: tensorrt-llm:8000 for TensorRT-LLM, can use inference-api:50051 for legacy service, nim-qwen3:8001 for NVIDIA NIM]"
+            echo "  --inference-api-url URL    (Deprecated) Use --llm-url instead. Kept for backward compatibility."
             echo "  --model-name NAME          Model name to evaluate [default: Qwen/Qwen3-30B-A3B-Thinking-2507]"
             echo "  --sandbox-image IMAGE      Docker base image for sandboxes [default: python:3.11-slim]"
             echo "  --sandbox-memory MEM       Maximum memory for sandboxes [default: 4g]"
@@ -112,7 +120,7 @@ done
 ARGS=(
     --dataset "$DATASET"
     --output-dir "$OUTPUT_DIR"
-    --inference-api-url "$INFERENCE_API_URL"
+    --llm-url "$LLM_URL"
     --model-name "$MODEL_NAME"
     --sandbox-image "$SANDBOX_IMAGE"
     --sandbox-memory "$SANDBOX_MEMORY"
@@ -142,7 +150,7 @@ else
     cd "$PROJECT_ROOT"
     
     # Check if using legacy inference-api (for backward compatibility)
-    if [[ "$INFERENCE_API_URL" == *"inference-api:50051"* ]]; then
+    if [[ "$LLM_URL" == *"inference-api:50051"* ]]; then
         echo "Using legacy inference-api service..."
         # Ensure inference-api is running (requires --profile legacy)
         if ! docker compose ps inference-api | grep -q "Up"; then
@@ -185,7 +193,8 @@ else
         -e DATASET="$DATASET" \
         -e MAX_TASKS="$MAX_TASKS" \
         -e OUTPUT_DIR="$OUTPUT_DIR" \
-        -e INFERENCE_API_URL="$INFERENCE_API_URL" \
+        -e LLM_URL="$LLM_URL" \
+        -e INFERENCE_API_URL="$LLM_URL" \
         -e MODEL_NAME="$MODEL_NAME" \
         -e SANDBOX_IMAGE="$SANDBOX_IMAGE" \
         -e SANDBOX_MEMORY="$SANDBOX_MEMORY" \
