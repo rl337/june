@@ -79,11 +79,17 @@ All major refactoring phases have been completed:
    - Support multiple models (load one at a time, unload before loading another)
    - Handle model switching gracefully (unload current, load new)
 
-3. **Migrate june services to use TensorRT-LLM:**
-   - Update telegram service to connect to TensorRT-LLM instead of inference-api
-   - Update discord service to connect to TensorRT-LLM instead of inference-api
-   - Update any other services that use inference-api
-   - Remove inference-api service from june docker-compose.yml
+3. **Migrate june services to use TensorRT-LLM:** ✅ COMPLETED (Code changes)
+   - ✅ Updated telegram service configuration to default to TensorRT-LLM (tensorrt-llm:8000)
+   - ✅ Updated discord service (uses same config via get_llm_address())
+   - ✅ Updated CodingAgent to default to TensorRT-LLM
+   - ✅ Updated BenchmarkEvaluator to default to TensorRT-LLM
+   - ✅ Updated coding-agent command to default to TensorRT-LLM
+   - ✅ Updated run-benchmarks command to default to TensorRT-LLM
+   - ✅ Updated check-environment to remove inference-api from required services
+   - ✅ Updated error messages and documentation to reference TensorRT-LLM
+   - ✅ All changes maintain backward compatibility via LLM_URL/INFERENCE_API_URL environment variables
+   - ⏳ **Remaining:** Remove inference-api service from june docker-compose.yml (waiting for TensorRT-LLM setup in home_infra)
 
 4. **Get Qwen3-30B-A3B-Thinking-2507 running:**
    - Load Qwen3 model into TensorRT-LLM container
