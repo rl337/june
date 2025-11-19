@@ -2,7 +2,7 @@
 
 ## Status: ✅ **CORE REFACTORING COMPLETE** → 🚀 **FORWARD DEVELOPMENT IN PROGRESS**
 
-**Last Updated:** 2025-11-18 (Phase 15.1: Enhanced TensorRT-LLM container configuration with Triton model repository path and command-line arguments)
+**Last Updated:** 2025-11-18 (Phase 15.4: Created setup-triton-repository command for model repository structure management)
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
@@ -156,8 +156,13 @@ All major refactoring phases have been completed:
    - ⏳ **Remaining:** Fully remove inference-api service from docker-compose.yml (waiting for TensorRT-LLM setup and verification in home_infra)
 
 4. **Get Qwen3-30B-A3B-Thinking-2507 running:** ⏳ TODO (requires TensorRT-LLM container setup from task 1, model loading API from task 2, and model compilation/preparation)
-   - **Model Repository Setup:**
-     - Create model repository directory structure: `/home/rlee/models/triton-repository/<model_name>/<version>/`
+   - **Model Repository Setup:** ✅ Helper command created
+     - ✅ Created `essence/commands/setup_triton_repository.py` command for repository management
+     - ✅ Supports creating model directory structure: `poetry run -m essence setup-triton-repository --action create --model <name>`
+     - ✅ Supports validating model structure: `poetry run -m essence setup-triton-repository --action validate --model <name>`
+     - ✅ Supports listing models in repository: `poetry run -m essence setup-triton-repository --action list`
+     - ✅ Creates README.md with instructions for each model directory
+     - ⏳ **Remaining:** Create actual model repository structure and place compiled files
      - Each model needs: compiled TensorRT-LLM engine files, config.pbtxt, tokenizer files
    - **Model Compilation:**
      - Compile Qwen3-30B-A3B-Thinking-2507 using TensorRT-LLM build tools
