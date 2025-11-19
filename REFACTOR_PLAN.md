@@ -199,6 +199,8 @@ All major refactoring phases have been completed:
      - Start service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3`
      - Verify service: `cd /home/rlee/dev/june && poetry run -m essence verify-nim --nim-host nim-qwen3 --http-port 8003 --grpc-port 8001`
    - ⏳ **Remaining:** Test gRPC connectivity with real NIM service once it's running
+     - **Operational Task:** Requires NIM service to be started in home_infra (needs NGC_API_KEY)
+     - **Steps:** 1) Start NIM service, 2) Verify with verify-nim command, 3) Test gRPC connectivity from june services, 4) Verify protocol compatibility
 
 5. **Implement message history debugging and agent communication:** ✅ COMPLETED (Code implementation)
    - **Goal:** Fix Telegram and Discord rendering issues and enable agents to communicate directly with the user
@@ -565,6 +567,13 @@ All major refactoring phases have been completed:
 
 ### Phase 18: Model Evaluation and Benchmarking ⏳ TODO
 
+**Operational Tasks:**
+- ⏳ Run model evaluation benchmarks on Qwen3-30B-A3B-Thinking-2507
+  - **Framework Status:** Ready (Phase 10 complete)
+  - **Requirements:** LLM service must be running (TensorRT-LLM or NIM)
+  - **Steps:** 1) Ensure LLM service is running, 2) Run benchmarks using run-benchmarks command, 3) Review results and analyze metrics, 4) Document findings
+  - **Note:** Can use --num-attempts parameter for accurate pass@k calculation
+
 **Goal:** Evaluate Qwen3 model performance on benchmark datasets.
 
 **Status:** Benchmark evaluation framework complete (Phase 10 ✅). Proper pass@k calculation implemented ✅. Documentation updated for TensorRT-LLM. Remaining tasks are operational (running evaluations, analyzing results).
@@ -778,4 +787,26 @@ All code changes, cleanup, and refactoring tasks have been completed:
 
 
 
+
+
+## Agent Monitor Alert - 2025-11-19 15:03:35
+
+**Status:** Agent appears to be stuck: 03:35] AGENT STUCK DETECTED: Agent appears to be in a loop (low pattern diversity)
+Unknown reason
+
+**Current Task:** 
+
+**Recommendations:**
+- If stuck on a specific task, consider breaking it into smaller subtasks
+- If encountering errors, check logs and fix the underlying issue
+- If no progress is being made, consider moving to a different task
+- If blocked by external dependencies, document the blocker and move on
+
+**Action:** Agent should review this alert and either:
+1. Continue with current task if progress is being made
+2. Break down the task into smaller steps
+3. Move to a different task if blocked
+4. Ask for help if truly stuck
+
+---
 
