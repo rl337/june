@@ -10,6 +10,8 @@ from typing import Optional
 from telegram import Message
 from telegram.error import TelegramError, TimedOut, NetworkError
 
+from essence.chat.message_history import get_message_history
+
 logger = logging.getLogger(__name__)
 
 # Telegram message length limit
@@ -109,6 +111,23 @@ async def stream_text_message(
         if current_text != text:
             try:
                 await message.edit_text(text)
+                # Track final message in history
+                try:
+                    user_id = str(message.chat.id) if message.chat else None
+                    chat_id = str(message.chat.id) if message.chat else None
+                    if user_id and chat_id:
+                        get_message_history().add_message(
+                            platform="telegram",
+                            user_id=user_id,
+                            chat_id=chat_id,
+                            message_content=text,
+                            message_type="text",
+                            message_id=str(message.message_id) if message else None,
+                            raw_text=text,
+                            rendering_metadata={"streamed": True, "final_update": True}
+                        )
+                except Exception as e:
+                    logger.debug(f"Failed to track final streamed message: {e}")
             except TelegramError as e:
                 logger.warning(f"Failed final update: {e}, but streaming completed")
         
@@ -197,6 +216,24 @@ async def stream_llm_response_to_telegram(
         
         try:
             await message.edit_text(final_text)
+            # Track final message in history
+            try:
+                user_id = str(message.chat.id) if message.chat else None
+                chat_id = str(message.chat.id) if message.chat else None
+                if user_id and chat_id:
+                    get_message_history().add_message(
+                        platform="telegram",
+                        user_id=user_id,
+                        chat_id=chat_id,
+                        message_content=final_text,
+                        message_type="text",
+                        message_id=str(message.message_id) if message else None,
+                        raw_text=accumulated_text,
+                        formatted_text=final_text,
+                        rendering_metadata={"streamed": True, "llm_response": True, "final_update": True}
+                    )
+            except Exception as e:
+                logger.debug(f"Failed to track final LLM streamed message: {e}")
         except TelegramError as e:
             logger.warning(f"Failed final update: {e}")
         

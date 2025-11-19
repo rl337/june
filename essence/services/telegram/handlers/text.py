@@ -11,6 +11,10 @@ from essence.chat.agent.handler import stream_agent_message
 from essence.services.telegram.conversation_storage import ConversationStorage
 from essence.chat.message_builder import MessageBuilder
 from essence.chat.utils.tracing import get_tracer
+from essence.services.telegram.message_history_helpers import (
+    reply_text_with_history,
+    edit_text_with_history
+)
 from opentelemetry import trace
 
 logger = logging.getLogger(__name__)
@@ -234,9 +238,20 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                             
                             if rendered_parts:
                                 # Replace status message with first part (or send as new if no status message)
+                                user_id = str(update.effective_user.id) if update.effective_user else None
+                                chat_id = str(update.effective_chat.id) if update.effective_chat else None
+                                
                                 if status_message:
                                     try:
-                                        await status_message.edit_text(rendered_parts[0], parse_mode="HTML")
+                                        await edit_text_with_history(
+                                            status_message,
+                                            rendered_parts[0],
+                                            parse_mode="HTML",
+                                            user_id=user_id,
+                                            chat_id=chat_id,
+                                            message_type="text",
+                                            rendering_metadata={"part": 1, "total_parts": len(rendered_parts)}
+                                        )
                                         logger.info(f"Replaced status with final message (first part: {len(rendered_parts[0])} chars)")
                                         render_span.set_attribute("message_sent", True)
                                     except Exception as edit_err:
@@ -246,17 +261,35 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                                             logger.debug(f"Final message unchanged, skipping edit")
                                         else:
                                             logger.warning(f"Failed to edit status message, sending as new: {edit_err}")
-                                            await update.message.reply_text(rendered_parts[0], parse_mode="HTML")
+                                            await reply_text_with_history(
+                                                update,
+                                                rendered_parts[0],
+                                                parse_mode="HTML",
+                                                message_type="text",
+                                                rendering_metadata={"part": 1, "total_parts": len(rendered_parts), "fallback": True}
+                                            )
                                 else:
                                     # No status message, send as new
-                                    await update.message.reply_text(rendered_parts[0], parse_mode="HTML")
+                                    await reply_text_with_history(
+                                        update,
+                                        rendered_parts[0],
+                                        parse_mode="HTML",
+                                        message_type="text",
+                                        rendering_metadata={"part": 1, "total_parts": len(rendered_parts)}
+                                    )
                                     logger.info(f"Sent final message (first part: {len(rendered_parts[0])} chars)")
                                     render_span.set_attribute("message_sent", True)
                                 
                                 # Send additional parts as new messages
                                 for i, part in enumerate(rendered_parts[1:], 1):
                                     logger.info(f"Sending additional part {i+1}/{len(rendered_parts)} (length: {len(part)})")
-                                    await update.message.reply_text(part, parse_mode="HTML")
+                                    await reply_text_with_history(
+                                        update,
+                                        part,
+                                        parse_mode="HTML",
+                                        message_type="text",
+                                        rendering_metadata={"part": i + 1, "total_parts": len(rendered_parts)}
+                                    )
                             
                             # Log the turn for debugging
                             try:

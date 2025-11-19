@@ -21,6 +21,10 @@ import time
 from inference_core import config, setup_logging
 from essence.chat.message_builder import MessageBuilder
 from essence.chat.agent.handler import process_agent_message, stream_agent_message
+from essence.services.discord.message_history_helpers import (
+    send_with_history,
+    edit_with_history
+)
 
 # Initialize tracing early
 try:
@@ -153,7 +157,12 @@ class DiscordBotService:
             
             # Step 1: Send "received request" immediately
             try:
-                status_message = await message.channel.send("✅ Received request")
+                status_message = await send_with_history(
+                    message.channel,
+                    "✅ Received request",
+                    user_id=str(user_id),
+                    message_type="status"
+                )
                 logger.info(f"Sent 'received request' to user {user_id}")
             except Exception as e:
                 logger.warning(f"Failed to send 'received request': {e}, continuing anyway")
@@ -162,7 +171,12 @@ class DiscordBotService:
             # Step 2: Update to "processing" when making agentic call
             if status_message:
                 try:
-                    await status_message.edit(content="🔄 Processing...")
+                    await edit_with_history(
+                        status_message,
+                        "🔄 Processing...",
+                        user_id=str(user_id),
+                        message_type="status"
+                    )
                     logger.info(f"Updated to 'processing' for user {user_id}")
                 except Exception as e:
                     logger.warning(f"Failed to update to 'processing': {e}")
@@ -206,7 +220,12 @@ class DiscordBotService:
                     if status_message:
                         dots = "." * min(chunk_count, 5)  # Max 5 dots
                         try:
-                            await status_message.edit(content=f"⚙️ Generating{dots}")
+                            await edit_with_history(
+                                status_message,
+                                f"⚙️ Generating{dots}",
+                                user_id=str(user_id),
+                                message_type="status"
+                            )
                         except Exception as e:
                             logger.debug(f"Failed to update generating status: {e}")
                 
@@ -223,7 +242,13 @@ class DiscordBotService:
                             # Replace status message with first part (or send as new if no status message)
                             if status_message:
                                 try:
-                                    await status_message.edit(content=rendered_parts[0])
+                                    await edit_with_history(
+                                        status_message,
+                                        rendered_parts[0],
+                                        user_id=str(user_id),
+                                        message_type="text",
+                                        rendering_metadata={"part": 1, "total_parts": len(rendered_parts)}
+                                    )
                                     logger.info(f"Replaced status with final message (first part: {len(rendered_parts[0])} chars)")
                                 except Exception as edit_err:
                                     # If edit fails, send as new message
@@ -232,16 +257,34 @@ class DiscordBotService:
                                         logger.debug(f"Final message unchanged, skipping edit")
                                     else:
                                         logger.warning(f"Failed to edit status message, sending as new: {edit_err}")
-                                        await message.channel.send(rendered_parts[0])
+                                        await send_with_history(
+                                            message.channel,
+                                            rendered_parts[0],
+                                            user_id=str(user_id),
+                                            message_type="text",
+                                            rendering_metadata={"part": 1, "total_parts": len(rendered_parts), "fallback": True}
+                                        )
                             else:
                                 # No status message, send as new
-                                await message.channel.send(rendered_parts[0])
+                                await send_with_history(
+                                    message.channel,
+                                    rendered_parts[0],
+                                    user_id=str(user_id),
+                                    message_type="text",
+                                    rendering_metadata={"part": 1, "total_parts": len(rendered_parts)}
+                                )
                                 logger.info(f"Sent final message (first part: {len(rendered_parts[0])} chars)")
                             
                             # Send additional parts as new messages
                             for i, part in enumerate(rendered_parts[1:], 1):
                                 logger.info(f"Sending additional part {i+1}/{len(rendered_parts)} (length: {len(part)})")
-                                await message.channel.send(part)
+                                await send_with_history(
+                                    message.channel,
+                                    part,
+                                    user_id=str(user_id),
+                                    message_type="text",
+                                    rendering_metadata={"part": i + 1, "total_parts": len(rendered_parts)}
+                                )
                         
                         # Log the turn for debugging
                         try:
