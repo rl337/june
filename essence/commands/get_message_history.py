@@ -10,7 +10,7 @@ import argparse
 import json
 import logging
 import sys
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from essence.chat.message_history import get_message_history
 from essence.chat.message_history_analysis import (
@@ -131,7 +131,7 @@ class GetMessageHistoryCommand(Command):
 
         # Handle comparison request
         if self.args.compare:
-            result = compare_expected_vs_actual(
+            result: Optional[Dict[str, Any]] = compare_expected_vs_actual(
                 self.args.compare,
                 user_id=self.args.user_id,
                 chat_id=self.args.chat_id,
