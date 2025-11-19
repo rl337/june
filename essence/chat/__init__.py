@@ -20,6 +20,23 @@ from .platform_translators import (
 )
 from .message_builder import MessageBuilder, build_and_render
 
+# Agent communication (optional import to avoid circular dependencies)
+try:
+    from .agent_communication import (
+        send_message_to_user,
+        ask_for_clarification,
+        request_help,
+        report_progress,
+        ask_for_feedback,
+        CommunicationChannel,
+        AgentCommunicationError,
+        ServiceRunningError,
+        ChannelUnavailableError
+    )
+    AGENT_COMMUNICATION_AVAILABLE = True
+except ImportError:
+    AGENT_COMMUNICATION_AVAILABLE = False
+
 __all__ = [
     # Core structures
     "Turn", "Message", "ContentWidget",
@@ -33,3 +50,17 @@ __all__ = [
     # Builder
     "MessageBuilder", "build_and_render",
 ]
+
+# Add agent communication exports if available
+if AGENT_COMMUNICATION_AVAILABLE:
+    __all__.extend([
+        "send_message_to_user",
+        "ask_for_clarification",
+        "request_help",
+        "report_progress",
+        "ask_for_feedback",
+        "CommunicationChannel",
+        "AgentCommunicationError",
+        "ServiceRunningError",
+        "ChannelUnavailableError",
+    ])

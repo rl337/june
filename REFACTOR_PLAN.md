@@ -173,28 +173,27 @@ All major refactoring phases have been completed:
    - ⏳ **Note:** Requires NGC API key for authentication (set `NGC_API_KEY` environment variable)
    - ⏳ **Remaining:** Verify NIM container starts correctly (use `verify-nim` command), test gRPC connectivity with real NIM service
 
-5. **Implement message history debugging and agent communication:** ⏳ NEW PRIORITY
+5. **Implement message history debugging and agent communication:** ✅ COMPLETED (Code implementation)
    - **Goal:** Fix Telegram and Discord rendering issues and enable agents to communicate directly with the user
    - **Tasks:**
      - ✅ Enhanced message history helpers with comprehensive rendering metadata (message length, split info, truncation, parse mode, etc.)
      - ✅ Added raw_text parameter to capture original LLM response before formatting
      - ✅ Updated text handlers to pass raw_llm_response for better debugging
-     - ⏳ Enhance `get_message_history()` command to support agent communication
-       - ⏳ Add ability for agents to query message history programmatically (not just CLI)
-       - ⏳ Add agent-to-user communication interface (agents can send messages to user)
-       - ⏳ Implement message validation against Telegram/Discord API requirements
-       - ⏳ Create analysis tools to compare expected vs actual message content
-     - ⏳ Implement agent communication capabilities
-       - ⏳ Enable agents to ask user for direction/clarification when stuck
-       - ⏳ Enable agents to request help when encountering blockers
-       - ⏳ Enable agents to report progress and ask for feedback
-       - ⏳ Create secure channel for agent-to-user communication (prefer Telegram, fallback to Discord)
-       - ⏳ **Priority:** Telegram is the preferred channel for agent communication, but both platforms should be supported
-       - ⏳ **CRITICAL:** When agent-to-user communication is active via Telegram, the Telegram service must be disabled to prevent race conditions
-         - ⏳ Both the looping agent and Telegram service would try to handle the same messages
-         - ⏳ Solution: Disable Telegram service (`docker compose stop telegram`) when agent communication is active
-         - ⏳ Alternative: Implement message routing to distinguish agent messages from user messages
-         - ⏳ For Discord: Same consideration applies if agent communication uses Discord
+     - ✅ Enhanced `get_message_history()` command to support agent communication
+       - ✅ Added ability for agents to query message history programmatically via `essence.chat.message_history_analysis` module
+       - ✅ Added agent-to-user communication interface (`essence.chat.agent_communication` module)
+       - ✅ Implemented message validation against Telegram/Discord API requirements (`validate_message_for_platform`)
+       - ✅ Created analysis tools to compare expected vs actual message content (`compare_expected_vs_actual`)
+     - ✅ Implemented agent communication capabilities
+       - ✅ Created `essence.chat.agent_communication` module with `send_message_to_user()` function
+       - ✅ Added helper functions: `ask_for_clarification()`, `request_help()`, `report_progress()`, `ask_for_feedback()`
+       - ✅ Implemented secure channel for agent-to-user communication (prefer Telegram, fallback to Discord)
+       - ✅ **Priority:** Telegram is the preferred channel for agent communication, but both platforms are supported
+       - ✅ **CRITICAL:** Service status checking implemented to prevent race conditions
+         - ✅ `check_service_running()` function checks if Telegram/Discord services are running
+         - ✅ `send_message_to_user()` raises `ServiceRunningError` if service is running (prevents race conditions)
+         - ✅ Solution: Disable Telegram service (`docker compose stop telegram`) when agent communication is active
+         - ✅ For Discord: Same consideration applies if agent communication uses Discord
      - ⏳ Fix rendering issues discovered through message history analysis
        - ⏳ Use `get_message_history()` to inspect what was actually sent
        - ⏳ Compare expected vs actual output
@@ -700,3 +699,25 @@ All code changes, cleanup, and refactoring tasks have been completed:
 - ✅ Model evaluation framework ready (Phase 18 - framework complete, operational tasks pending)
 
 **Code/Documentation Status:** All code and documentation work for TensorRT-LLM migration is complete. The project is ready for operational work (model compilation, loading, and verification). All tools, commands, and documentation are in place to support the migration.
+
+## Agent Monitor Alert - 2025-11-19 11:13:29
+
+**Status:** Agent appears to be stuck: 13:29] AGENT STUCK DETECTED: Agent appears to be in a loop (low pattern diversity)
+Unknown reason
+
+**Current Task:** 
+
+**Recommendations:**
+- If stuck on a specific task, consider breaking it into smaller subtasks
+- If encountering errors, check logs and fix the underlying issue
+- If no progress is being made, consider moving to a different task
+- If blocked by external dependencies, document the blocker and move on
+
+**Action:** Agent should review this alert and either:
+1. Continue with current task if progress is being made
+2. Break down the task into smaller steps
+3. Move to a different task if blocked
+4. Ask for help if truly stuck
+
+---
+
