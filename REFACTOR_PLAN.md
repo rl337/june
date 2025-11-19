@@ -187,6 +187,11 @@ All major refactoring phases have been completed:
        - ⏳ Enable agents to report progress and ask for feedback
        - ⏳ Create secure channel for agent-to-user communication (prefer Telegram, fallback to Discord)
        - ⏳ **Priority:** Telegram is the preferred channel for agent communication, but both platforms should be supported
+       - ⏳ **CRITICAL:** When agent-to-user communication is active via Telegram, the Telegram service must be disabled to prevent race conditions
+         - ⏳ Both the looping agent and Telegram service would try to handle the same messages
+         - ⏳ Solution: Disable Telegram service (`docker compose stop telegram`) when agent communication is active
+         - ⏳ Alternative: Implement message routing to distinguish agent messages from user messages
+         - ⏳ For Discord: Same consideration applies if agent communication uses Discord
      - ⏳ Fix rendering issues discovered through message history analysis
        - ⏳ Use `get_message_history()` to inspect what was actually sent
        - ⏳ Compare expected vs actual output
