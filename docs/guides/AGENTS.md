@@ -410,23 +410,41 @@ When committing changes across multiple files:
 
 ## 🏗️ Architecture Overview
 
-June Agent is a microservices-based interactive autonomous agent system optimized for NVIDIA DGX Spark with the following architecture:
+June is a minimal voice-to-voice AI agent system that processes voice messages through speech-to-text, LLM, and text-to-speech pipelines. It supports both **Telegram** and **Discord** platforms.
 
 ### Core Services
-- **Gateway Service** (Port 8000) - FastAPI + WebSocket ingress with auth, rate limiting
-- **Inference API** (Port 50051) - gRPC coordinator for LLM orchestration with RAG
-- **STT Service** (Port 50052) - Speech-to-Text with Whisper, VAD, gRPC streaming
-- **TTS Service** (Port 50053) - Text-to-Speech with FastSpeech2/HiFi-GAN streaming
-- **Webapp Service** (Port 3000) - React-based Telegram-like chat interface
+- **Telegram Service** - Receives voice messages from Telegram, orchestrates the pipeline
+- **Discord Service** - Receives voice messages from Discord, orchestrates the pipeline
+- **STT Service** (Port 50052) - Speech-to-Text conversion using Whisper
+- **TTS Service** (Port 50053) - Text-to-Speech conversion using FastSpeech2/espeak
+- **Inference API** (Port 50051) - LLM processing using Qwen3
 
-### Supporting Infrastructure
-- **PostgreSQL + pgvector** (Port 5432) - RAG storage and conversation memory
-- **MinIO** (Ports 9000/9001) - S3-compatible object storage
-- **NATS** (Port 4222) - Pub/sub messaging
-- **Prometheus** (Port 9090) - Metrics collection
-- **Grafana** (Port 3000) - Dashboards
-- **Loki** (Port 3100) - Log aggregation
-- **Jaeger** (Port 16686) - Distributed tracing
+### Architecture Flow
+```
+User → Telegram/Discord (Voice Message)
+  ↓
+Telegram/Discord Service
+  ↓
+STT Service → Transcript
+  ↓
+Inference API → Response Text
+  ↓
+TTS Service → Audio
+  ↓
+Telegram/Discord Service → User (Voice Response)
+```
+
+### Infrastructure
+
+**No Infrastructure Required for MVP:**
+- All services communicate via gRPC directly
+- Conversation storage: In-memory (in telegram/discord services)
+- Rate limiting: In-memory (in telegram/discord services)
+
+**Optional Infrastructure (from home_infra):**
+- **Jaeger** - Distributed tracing (OpenTelemetry) - available in shared-network
+- **Prometheus + Grafana** - Metrics collection and visualization - available in shared-network
+- **nginx** - Reverse proxy (replaces removed gateway service) - available in shared-network
 
 ## 🤖 Current Model Configuration
 
@@ -489,20 +507,16 @@ poetry run -m essence download-models --list
 ## 📁 Data Directory Structure
 
 **Primary Data Directory:** `/home/rlee/june_data`
-- **PostgreSQL:** `/home/rlee/june_data/postgres/` - Database files
-- **MinIO:** `/home/rlee/june_data/minio/` - Object storage
-- **NATS:** `/home/rlee/june_data/nats/data/` - Message broker data
-- **NATS JetStream:** `/home/rlee/june_data/nats/jets_stream/` - Stream storage
-- **Prometheus:** `/home/rlee/june_data/prometheus/` - Metrics data
-- **Grafana:** `/home/rlee/june_data/grafana/` - Dashboard configs
-- **Loki:** `/home/rlee/june_data/loki/` - Log aggregation
-- **Logs:** `/home/rlee/june_data/logs/` - Application logs
-- **Uploads:** `/home/rlee/june_data/uploads/` - User uploads
-- **Backups:** `/home/rlee/june_data/backups/` - System backups
+- **Models:** `/home/rlee/models` - Model cache (mounted to containers)
+- **Logs:** `/home/rlee/june_data/logs/` - Application logs (if using external logging)
+- **Prometheus:** `/home/rlee/june_data/prometheus/` - Metrics data (if using local Prometheus)
+- **Grafana:** `/home/rlee/june_data/grafana/` - Dashboard configs (if using local Grafana)
 
-**Environment Variable:** `JUNE_DATA_DIR=/home/rlee/june_data`
+**Note:** The project uses minimal data storage. Most infrastructure (Prometheus, Grafana, Jaeger) is available from home_infra via shared-network. Conversation storage and rate limiting are in-memory within the telegram/discord services.
 
-**Important:** This directory will grow very large over time and is excluded from git.
+**Environment Variable:** `JUNE_DATA_DIR=/home/rlee/june_data` (optional, for local infrastructure)
+
+**Important:** Model cache directory (`/home/rlee/models`) will grow large over time and is excluded from git.
 
 ## 📦 Model Artifacts and Test Data Management
 
@@ -514,7 +528,6 @@ All containers produce model artifacts (outputs, caches, generated content) that
 - **STT:** `/home/rlee/june_data/model_artifacts/stt/`
 - **TTS:** `/home/rlee/june_data/model_artifacts/tts/`
 - **Inference API:** `/home/rlee/june_data/model_artifacts/inference-api/`
-- **Gateway:** `/home/rlee/june_data/model_artifacts/gateway/`
 
 These directories are mounted into containers at `/app/model_artifacts/` and persist across container restarts.
 
@@ -532,19 +545,19 @@ Test runs create isolated test artifacts in timestamped directories:
 **Test Data Directory:** `/home/rlee/june_test_data/`
 - Individual test runs: `run_YYYYMMDD_HHMMSS/`
   - `input_audio/` - TTS-generated input audio
-  - `output_audio/` - Gateway response audio
+  - `output_audio/` - Service response audio
   - `transcripts/` - Text transcripts
   - `metadata/` - Test metadata JSON
   - `container_artifacts/` - Artifacts copied from containers after tests
 
 ### Test Orchestration
 
-The `tests/scripts/run_tests_with_artifacts.sh` script provides full test orchestration:
+Integration tests run via the integration test service (see `docs/guides/TESTING.md` for details):
 
-1. **Starts Fresh Containers** - Spins up a clean docker-compose environment
-2. **Runs Tests** - Executes Gateway round-trip tests
-3. **Collects Artifacts** - Copies model and test artifacts from containers
-4. **Shuts Down** - Tears down containers after completion
+1. **Integration Test Service** - REST API for managing test runs
+2. **Background Execution** - Tests run in background, results available via API
+3. **Artifact Collection** - Test artifacts collected and stored
+4. **Monitoring** - Test status available via Prometheus/Grafana (if configured)
 
 **Usage:**
 ```bash
@@ -619,20 +632,23 @@ dev/june/
 │   ├── asr.proto            # Speech-to-Text service
 │   ├── tts.proto            # Text-to-Speech service
 │   └── llm.proto            # LLM inference service
-├── services/                 # Microservices
-│   ├── gateway/             # FastAPI + WebSocket gateway
+├── services/                 # Service Dockerfiles and configuration
+│   ├── telegram/            # Telegram bot service
+│   ├── discord/             # Discord bot service
 │   ├── inference-api/       # LLM orchestration
 │   ├── stt/                 # Speech-to-Text
-│   ├── tts/                 # Text-to-Speech
-│   └── webapp/              # React chat interface
-├── shared/                   # Common utilities
-│   ├── config.py            # Configuration management
-│   ├── utils.py             # Shared utilities
-│   └── __init__.py
+│   └── tts/                 # Text-to-Speech
+├── essence/                  # All service code and shared utilities
+│   ├── services/             # Service implementations
+│   │   ├── telegram/        # Telegram service code
+│   │   ├── discord/         # Discord service code
+│   │   └── ...
+│   ├── chat/                # Shared chat/conversation utilities
+│   ├── commands/             # Reusable CLI commands
+│   └── agents/              # Agent implementations (coding agent, evaluator)
 ├── config/                   # Configuration files
-│   ├── postgres-init.sql     # Database schema
 │   ├── prometheus.yml        # Metrics config
-│   ├── loki-config.yml       # Logging config
+│   ├── prometheus-alerts.yml # Alert rules
 │   └── grafana/              # Dashboard configs
 ├── docs/                     # Comprehensive documentation
 │   ├── README.md            # Documentation index
@@ -817,10 +833,9 @@ Each service includes:
 - **Error Handling Tests:** Failure scenario coverage
 
 ### Service Communication
-- **Internal:** gRPC for service-to-service communication
-- **External:** REST API and WebSocket for client access
-- **Messaging:** NATS for pub/sub events
-- **Storage:** PostgreSQL for structured data, MinIO for objects
+- **Internal:** gRPC for service-to-service communication (direct service-to-service)
+- **External:** Telegram/Discord APIs for client access
+- **Storage:** In-memory conversation storage and rate limiting (no external storage required)
 
 ## 🚀 Deployment Commands
 
@@ -1021,11 +1036,11 @@ docker-compose up -d
 ### Individual Service Development
 ```bash
 # Build specific service
-cd services/gateway
-docker build -t june-gateway .
+cd services/telegram
+docker build -t june-telegram .
 
-# Run with live reload
-docker run -p 8000:8000 -v $(pwd):/app june-gateway
+# Run with live reload (for development)
+docker compose up telegram
 ```
 
 ### Health Checks
@@ -1034,14 +1049,16 @@ docker run -p 8000:8000 -v $(pwd):/app june-gateway
 ./run_checks.sh
 
 # Check specific service
-curl http://localhost:8000/health  # Gateway
-curl http://localhost:50051/health # Inference API (gRPC)
+curl http://localhost:8080/health  # Telegram service
+curl http://localhost:8081/health  # Discord service
+curl http://localhost:8001/health  # Inference API
 ```
 
 ## 🔍 Monitoring and Debugging
 
 ### Metrics Endpoints
-- Gateway: `http://localhost:8000/metrics`
+- Telegram: `http://localhost:8080/metrics`
+- Discord: `http://localhost:8081/metrics`
 - Inference API: `http://localhost:8001/metrics`
 - STT: `http://localhost:8002/metrics`
 - TTS: `http://localhost:8003/metrics`
@@ -1057,7 +1074,8 @@ curl http://localhost:50051/health # Inference API (gRPC)
 docker-compose logs -f
 
 # View specific service logs
-docker-compose logs -f gateway
+docker-compose logs -f telegram
+docker-compose logs -f discord
 docker-compose logs -f inference-api
 ```
 
@@ -1191,17 +1209,17 @@ June Agent implements comprehensive security measures. All agents working on the
 - Token expiration and rotation
 
 ### Network Security
-- Internal service communication over gRPC (TLS in production)
-- External access through Gateway only
-- CORS configuration for webapp (not `*` in production)
-- Security headers (CSP, HSTS, X-Frame-Options, etc.)
+- Internal service communication over gRPC (direct service-to-service)
+- External access through Telegram/Discord APIs only
+- Security headers in HTTP responses (if using nginx from home_infra)
+- No external web interface (removed webapp service)
 
 ### Data Protection
 - Environment variables for secrets (never commit secrets)
-- Secure storage of audio/text data
-- User session management
-- Encryption at rest (PostgreSQL, MinIO) - see Security Audit Report
-- Encryption in transit (TLS/HTTPS)
+- Secure storage of audio/text data (in-memory, ephemeral)
+- User session management (handled by Telegram/Discord platforms)
+- Encryption in transit (TLS/HTTPS for Telegram/Discord APIs)
+- No persistent storage required (conversations stored in-memory)
 
 ### Input Validation
 - Comprehensive input sanitization using june-security package
@@ -1242,10 +1260,10 @@ June Agent implements comprehensive security measures. All agents working on the
 - **Latency:** <500ms for simple requests
 
 ### Scaling Considerations
-- **Horizontal:** Stateless services can be scaled
-- **Vertical:** GPU memory limits model size
-- **Database:** PostgreSQL can be sharded
-- **Storage:** MinIO can be clustered
+- **Horizontal:** Stateless services can be scaled (telegram, discord, stt, tts)
+- **Vertical:** GPU memory limits model size (inference-api)
+- **Storage:** In-memory storage scales with service instances (no external database)
+- **Load Balancing:** Multiple telegram/discord instances can handle more users
 
 ## 🎯 Future Development Areas
 
@@ -1258,9 +1276,9 @@ June Agent implements comprehensive security measures. All agents working on the
 
 ### Architecture Improvements
 - **Kubernetes Deployment:** Production orchestration
-- **Service Mesh:** Advanced networking
-- **Caching Layer:** Redis for performance
-- **Load Balancing:** Multiple gateway instances
+- **Service Mesh:** Advanced networking (if needed)
+- **Persistent Storage:** Optional PostgreSQL for conversation history (if needed)
+- **Load Balancing:** Multiple telegram/discord instances for high availability
 
 ## 🚨 Troubleshooting Guide
 
@@ -1274,17 +1292,18 @@ June Agent implements comprehensive security measures. All agents working on the
 **Service Connection Errors:**
 - Verify docker-compose network configuration
 - Check service health endpoints
-- Review NATS connectivity
+- Verify gRPC connectivity between services
 
 **Model Loading Failures:**
 - Verify Hugging Face token
 - Check internet connectivity
 - Clear model cache if corrupted
+- Verify GPU availability (CPU fallback forbidden for large models)
 
-**WebSocket Connection Issues:**
-- Check Gateway service status
-- Verify authentication tokens
-- Review browser console for errors
+**Telegram/Discord Bot Issues:**
+- Verify bot tokens are set correctly
+- Check service logs for API errors
+- Verify network connectivity to Telegram/Discord APIs
 
 ### Recovery Procedures
 1. **Full System Restart:** `docker-compose down && docker-compose up -d`
