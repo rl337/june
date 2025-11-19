@@ -23,8 +23,11 @@ poetry run -m essence <command-name> [arguments]
 - `download-models` - Download models for June Agent
 - `monitor-gpu` - Monitor GPU metrics and export to Prometheus
 - `review-sandbox` - Review sandbox snapshots from benchmark evaluations
-- `verify-qwen3` - Verify Qwen3 quantization settings and model performance
+- `verify-qwen3` - Verify Qwen3 quantization settings and model performance (legacy inference-api)
 - `benchmark-qwen3` - Benchmark Qwen3-30B-A3B model performance
+- `verify-tensorrt-llm` - Verify TensorRT-LLM setup and migration readiness
+- `manage-tensorrt-llm` - Manage TensorRT-LLM models (load/unload/list/status)
+- `setup-triton-repository` - Setup and validate Triton Inference Server model repository structure
 
 ## Creating a New Command
 

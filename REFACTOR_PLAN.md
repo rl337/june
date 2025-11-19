@@ -2,7 +2,7 @@
 
 ## Status: ✅ **CORE REFACTORING COMPLETE** → 🚀 **FORWARD DEVELOPMENT IN PROGRESS**
 
-**Last Updated:** 2025-11-18 (Phase 15.3: Created verify-tensorrt-llm command for migration verification)
+**Last Updated:** 2025-11-18 (Phase 15.3: Documented verify-tensorrt-llm command in guides)
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
@@ -168,6 +168,8 @@ All major refactoring phases have been completed:
    - ✅ Updated tests/integration/test_voice_message_integration.py to default to TensorRT-LLM
    - ✅ Updated essence/commands/inference_api_service.py docstrings to mark service as deprecated/legacy
    - ✅ Created `essence/commands/verify_tensorrt_llm.py` command for migration verification
+   - ✅ Updated docs/guides/TENSORRT_LLM_SETUP.md to document verify-tensorrt-llm command
+   - ✅ Updated docs/guides/COMMANDS.md to include verify-tensorrt-llm, manage-tensorrt-llm, and setup-triton-repository commands
    - ⏳ **Remaining:** Fully remove inference-api service from docker-compose.yml (waiting for TensorRT-LLM setup and verification in home_infra)
      - Use `poetry run -m essence verify-tensorrt-llm` to check migration readiness before removal
 
