@@ -141,7 +141,7 @@ All major refactoring phases have been completed:
    - ✅ Updated README.md to reference TensorRT-LLM setup and usage
    - ⏳ **Remaining:** Fully remove inference-api service from docker-compose.yml (waiting for TensorRT-LLM setup and verification in home_infra)
 
-4. **Get Qwen3-30B-A3B-Thinking-2507 running:** ⏳ BLOCKED (requires TensorRT-LLM container setup first)
+4. **Get Qwen3-30B-A3B-Thinking-2507 running:** ⏳ TODO (requires TensorRT-LLM container setup from task 1 and model loading API from task 2)
    - Load Qwen3 model into TensorRT-LLM container
    - Verify GPU usage (must use GPU, CPU fallback FORBIDDEN)
    - Test model inference via gRPC interface
