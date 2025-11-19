@@ -18,7 +18,6 @@ jobs:
     - name: Install dependencies
       run: |
         pip install poetry
-        poetry config virtualenvs.create false
         poetry install --no-interaction --no-ansi
     - name: Run tests
       run: |
