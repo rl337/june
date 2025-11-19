@@ -348,6 +348,58 @@ When ready to use the Qwen3 model and coding agent, follow these steps:
    - ✅ How to view test logs (COMPLETED - documented in docs/guides/TESTING.md with GET /tests/logs endpoint and usage examples)
    - ✅ How to set up periodic test runs (COMPLETED - added comprehensive documentation to docs/guides/TESTING.md with examples for cron, systemd timers, Docker containers, Python scripts, and best practices)
 
+### Phase 14: Message History Debugging ⏳ TODO
+
+**Goal:** Add message history tracking to debug Telegram and Discord rendering problems by providing direct access to what messages were actually sent.
+
+**Problem:** Currently difficult to debug rendering issues because we can't see what was actually sent to users. Need visibility into the exact message content, formatting, and metadata.
+
+**Solution:** Implement `get_message_history()` method that captures and stores all sent messages, allowing agents and tests to inspect what was actually rendered.
+
+**Tasks:**
+1. **Create message history storage:**
+   - Create `essence/services/telegram/message_history.py` - In-memory storage for Telegram messages
+   - Create `essence/services/discord/message_history.py` - In-memory storage for Discord messages
+   - Or create shared `essence/chat/message_history.py` if code can be shared
+   - Store message metadata:
+     - Timestamp
+     - Recipient (user_id, chat_id/channel_id)
+     - Message content (raw text, formatted text, markdown)
+     - Message type (text, voice, error, status)
+     - Platform (telegram/discord)
+     - Message ID (if available)
+     - Rendering metadata (truncation, formatting applied, etc.)
+
+2. **Intercept message sending:**
+   - Wrap `bot.send_message()` calls in Telegram handlers
+   - Wrap `channel.send()` calls in Discord handlers
+   - Wrap `stream_text_message()` in `telegram_utils.py`
+   - Capture message content before sending to store exact payload
+   - Store in message history after successful send
+
+3. **Create access methods:**
+   - Create `essence/commands/get_message_history.py` - CLI command to retrieve message history
+     - Support filtering by user_id, chat_id, time range, message type
+     - Support limiting results
+     - Format output for readability (JSON or formatted text)
+   - Add admin endpoint (optional): `/admin/message-history?user_id=<id>&limit=10`
+   - Provide direct function access for tests: `get_message_history(user_id, limit=10)`
+
+4. **Testing and documentation:**
+   - Add unit tests for message history storage
+   - Add integration tests to verify messages are captured
+   - Document usage in debugging guide
+   - Add examples for agents and tests
+
+**Benefits:**
+- Direct visibility into what was actually rendered/sent
+- Compare expected vs actual output for debugging
+- Debug formatting/markdown issues
+- Test verification of message content
+- Track message flow over time for debugging
+
+**Best Practice:** Use in-memory storage (consistent with other MVP storage), but design interface to allow future migration to persistent storage if needed.
+
 ## Essential Services
 
 ### Services (KEEP)
@@ -417,11 +469,15 @@ When ready to use the Qwen3 model and coding agent, follow these steps:
 ## Next Steps
 
 1. **Ongoing:** Maintain minimal architecture and follow established best practices
-2. **When ready to use the system:**
+2. **Phase 14: Message History Debugging** ⏳ TODO
+   - Implement message history tracking for Telegram and Discord
+   - Add `get_message_history()` command for debugging rendering issues
+   - See Phase 14 section above for detailed tasks
+3. **When ready to use the system:**
    - Follow Phase 10 operational guide for model download and service startup
    - Run integration tests via integration test service
    - Perform end-to-end testing and verification
-3. **Future enhancements (optional):**
+4. **Future enhancements (optional):**
    - Consider persistent storage for test results (currently in-memory)
    - Add test result export functionality
    - Enhance Grafana dashboards with additional visualizations
