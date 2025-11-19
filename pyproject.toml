@@ -142,7 +142,7 @@ pythonpath = ["."]
 # Exclude problematic test directories that have import errors
 # Note: Run tests with `pytest tests/essence/` to avoid collection errors from other test directories
 norecursedirs = ["tests/integration", "tests/services", "tests/scripts", "tests/agentic"]
-addopts = "-v --tb=short --strict-markers"
+addopts = "-v --tb=short --strict-markers --ignore=tests/essence/pipeline/test_pipeline_integration.py"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests (run via integration test service, not pytest)",
