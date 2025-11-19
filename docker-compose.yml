@@ -46,12 +46,17 @@ services:
     - -c
     - 'echo ''CLI Tools container ready. Use: docker exec -it june-cli-tools bash''
       && tail -f /dev/null'
+  # NOTE: inference-api service is being replaced by TensorRT-LLM (in home_infra/shared-network)
+  # This service will be removed once TensorRT-LLM is set up and verified working.
+  # For now, kept for backward compatibility during migration.
   inference-api:
     build:
       context: .
       dockerfile: ./services/inference-api/Dockerfile
     container_name: june-inference-api
     restart: unless-stopped
+    profiles:
+      - legacy  # Use profile to disable by default - set LLM_URL=grpc://inference-api:50051 to use
     ports:
     - 50051:50051
     environment:
@@ -214,7 +219,7 @@ services:
     - LOG_LEVEL=${LOG_LEVEL:-INFO}
     - STT_URL=grpc://stt:50052
     - TTS_URL=grpc://tts:50053
-    - LLM_URL=grpc://inference-api:50051
+    - LLM_URL=grpc://tensorrt-llm:8000
     - ENABLE_TRACING=${ENABLE_TRACING:-true}
     - JAEGER_ENDPOINT=http://common-jaeger:14268/api/traces
     - JAEGER_AGENT_HOST=common-jaeger
@@ -222,7 +227,7 @@ services:
     depends_on:
     - stt
     - tts
-    - inference-api
+    # Note: TensorRT-LLM is in home_infra (shared-network), not june docker-compose.yml
     healthcheck:
       test:
       - CMD
@@ -279,7 +284,7 @@ services:
     - LOG_LEVEL=${LOG_LEVEL:-INFO}
     - STT_URL=grpc://stt:50052
     - TTS_URL=grpc://tts:50053
-    - LLM_URL=grpc://inference-api:50051
+    - LLM_URL=grpc://tensorrt-llm:8000
     - ENABLE_TRACING=${ENABLE_TRACING:-true}
     - JAEGER_ENDPOINT=http://common-jaeger:14268/api/traces
     - JAEGER_AGENT_HOST=common-jaeger
@@ -287,7 +292,7 @@ services:
     depends_on:
     - stt
     - tts
-    - inference-api
+    # Note: TensorRT-LLM is in home_infra (shared-network), not june docker-compose.yml
     volumes:
     - ${AGENTICNESS_DIR:-/home/rlee/dev/agenticness}:/app/agenticness:ro
     - ${HOME}/.local/share/cursor-agent/versions/2025.11.06-8fe8a63:/usr/local/bin/cursor-tools:ro
