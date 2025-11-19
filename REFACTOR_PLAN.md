@@ -2,7 +2,7 @@
 
 ## Status: ✅ **CORE REFACTORING COMPLETE** → 🚀 **FORWARD DEVELOPMENT IN PROGRESS**
 
-**Last Updated:** 2025-11-18 (Phase 15.3: Updated june services to use TensorRT-LLM defaults - code migration complete, waiting for TensorRT-LLM setup in home_infra)
+**Last Updated:** 2025-11-18 (Phase 15.3: Code migration complete - all june services updated to use TensorRT-LLM defaults. Waiting for TensorRT-LLM container setup in home_infra to proceed with remaining Phase 15 tasks)
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
@@ -66,14 +66,16 @@ All major refactoring phases have been completed:
 
 **Goal:** Replace `inference-api` service with TensorRT-LLM container for optimized GPU inference.
 
+**Current Status:** Code migration complete (Task 3 ✅). Remaining tasks (1, 2, 4) require external setup in `home_infra` project and are blocked until TensorRT-LLM container is configured and running.
+
 **Tasks:**
-1. **Set up TensorRT-LLM container in home_infra:**
+1. **Set up TensorRT-LLM container in home_infra:** ⏳ BLOCKED (requires work in home_infra project)
    - Add TensorRT-LLM service to `home_infra/docker-compose.yml`
    - Configure it to connect to shared-network
    - Set up GPU access and resource limits
    - Configure model storage and cache directories
 
-2. **Implement model loading/unloading:**
+2. **Implement model loading/unloading:** ⏳ BLOCKED (requires TensorRT-LLM container setup first)
    - Create API/interface for loading models into TensorRT-LLM
    - Create API/interface for unloading models
    - Support multiple models (load one at a time, unload before loading another)
@@ -96,7 +98,7 @@ All major refactoring phases have been completed:
    - ✅ Updated README.md to reference TensorRT-LLM setup and usage
    - ⏳ **Remaining:** Fully remove inference-api service from docker-compose.yml (waiting for TensorRT-LLM setup and verification in home_infra)
 
-4. **Get Qwen3-30B-A3B-Thinking-2507 running:**
+4. **Get Qwen3-30B-A3B-Thinking-2507 running:** ⏳ BLOCKED (requires TensorRT-LLM container setup first)
    - Load Qwen3 model into TensorRT-LLM container
    - Verify GPU usage (must use GPU, CPU fallback FORBIDDEN)
    - Test model inference via gRPC interface
