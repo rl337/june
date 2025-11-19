@@ -13,7 +13,7 @@ Verifies:
 - Response times are reasonable
 
 These tests require:
-- Running inference-api service with Qwen3-30B-A3B model loaded
+- Running LLM inference service (TensorRT-LLM on port 8000 by default, or legacy inference-api on port 50051) with Qwen3-30B-A3B model loaded
 - Running STT service
 - Running TTS service
 - Running Telegram bot service (or ability to test voice handler directly)
@@ -48,7 +48,8 @@ logger = logging.getLogger(__name__)
 GATEWAY_URL = os.getenv("GATEWAY_URL", "http://localhost:8000")
 STT_ADDRESS = os.getenv("STT_SERVICE_ADDRESS", "localhost:50052")
 TTS_ADDRESS = os.getenv("TTS_SERVICE_ADDRESS", "localhost:50053")
-INFERENCE_ADDRESS = os.getenv("INFERENCE_API_URL", "localhost:50051").replace("grpc://", "")
+# Default: TensorRT-LLM (tensorrt-llm:8000), Legacy: inference-api (inference-api:50051)
+INFERENCE_ADDRESS = os.getenv("INFERENCE_API_URL", os.getenv("LLM_URL", "tensorrt-llm:8000")).replace("grpc://", "")
 TELEGRAM_SERVICE_URL = os.getenv("TELEGRAM_SERVICE_URL", "http://localhost:8080")
 SAMPLE_RATE = 16000
 
@@ -109,7 +110,7 @@ async def check_service_health(address: str, service_type: str) -> bool:
 
 
 async def check_inference_api_health(address: str) -> tuple[bool, Optional[str]]:
-    """Check inference API health and return model name."""
+    """Check LLM inference service (TensorRT-LLM or inference-api) health and return model name."""
     try:
         async with grpc.aio.insecure_channel(address) as channel:
             stub = llm_shim.LLMInferenceStub(channel)
@@ -123,14 +124,15 @@ async def check_inference_api_health(address: str) -> tuple[bool, Optional[str]]
             
             if response.healthy:
                 model_name = response.model_name if hasattr(response, 'model_name') else None
-                logger.info(f"✓ Inference API service is healthy at {address}")
+                service_name = "TensorRT-LLM" if "tensorrt-llm" in address or "8000" in address else "Inference API"
+                logger.info(f"✓ {service_name} service is healthy at {address}")
                 logger.info(f"  Model: {model_name}")
                 return True, model_name
             else:
-                logger.warning(f"⚠ Inference API service at {address} is unhealthy")
+                logger.warning(f"⚠ LLM inference service at {address} is unhealthy")
                 return False, None
     except Exception as e:
-        logger.warning(f"✗ Inference API service not reachable at {address}: {e}")
+        logger.warning(f"✗ LLM inference service not reachable at {address}: {e}")
         return False, None
 
 
@@ -190,7 +192,8 @@ async def services_available():
         logger.warning("Make sure all services are running:")
         logger.warning("  - STT service on port 50052")
         logger.warning("  - TTS service on port 50053")
-        logger.warning("  - Inference API on port 50051")
+        logger.warning("  - TensorRT-LLM (default): tensorrt-llm:8000 in home_infra/shared-network")
+        logger.warning("  - Legacy Inference API: inference-api:50051 (requires --profile legacy)")
         logger.warning("  - Gateway on port 8000")
     
     if not qwen3_verified:

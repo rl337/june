@@ -2,9 +2,9 @@
 Integration tests for voice message flow with real services.
 
 Tests the complete end-to-end voice message flow:
-- Audio ? STT ? Transcript ? LLM ? TTS ? Audio Response
+- Audio → STT → Transcript → LLM → TTS → Audio Response
 
-Uses real services (STT, TTS, Inference API) - not mocks.
+Uses real services (STT, TTS, TensorRT-LLM or Inference API) - not mocks.
 Tests error scenarios and concurrent requests.
 """
 import pytest
@@ -29,7 +29,8 @@ logger = logging.getLogger(__name__)
 GATEWAY_URL = os.getenv("GATEWAY_URL", "http://localhost:8000")
 STT_ADDRESS = os.getenv("STT_SERVICE_ADDRESS", "localhost:50052")
 TTS_ADDRESS = os.getenv("TTS_SERVICE_ADDRESS", "localhost:50053")
-INFERENCE_ADDRESS = os.getenv("INFERENCE_API_URL", "localhost:50051").replace("grpc://", "")
+# Default: TensorRT-LLM (tensorrt-llm:8000), Legacy: inference-api (inference-api:50051)
+INFERENCE_ADDRESS = os.getenv("INFERENCE_API_URL", os.getenv("LLM_URL", "tensorrt-llm:8000")).replace("grpc://", "")
 SAMPLE_RATE = 16000
 
 
@@ -107,7 +108,8 @@ async def services_available():
     
     stt_available = await check_service_health(STT_ADDRESS, "STT")
     tts_available = await check_service_health(TTS_ADDRESS, "TTS")
-    inference_available = await check_service_health(INFERENCE_ADDRESS, "Inference API")
+    service_name = "TensorRT-LLM" if "tensorrt-llm" in INFERENCE_ADDRESS or "8000" in INFERENCE_ADDRESS else "Inference API"
+    inference_available = await check_service_health(INFERENCE_ADDRESS, service_name)
     gateway_available = await check_gateway_health(GATEWAY_URL)
     
     all_available = stt_available and tts_available and inference_available and gateway_available
@@ -117,7 +119,8 @@ async def services_available():
         logger.warning("Make sure all services are running:")
         logger.warning("  - STT service on port 50052")
         logger.warning("  - TTS service on port 50053")
-        logger.warning("  - Inference API on port 50051")
+        logger.warning("  - TensorRT-LLM (default): tensorrt-llm:8000 in home_infra/shared-network")
+        logger.warning("  - Legacy Inference API: inference-api:50051 (requires --profile legacy)")
         logger.warning("  - Gateway on port 8000")
     
     return {

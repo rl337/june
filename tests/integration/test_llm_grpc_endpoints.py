@@ -8,7 +8,8 @@ Tests the Generate and Chat endpoints directly via gRPC to verify:
 - Error handling works for invalid requests
 - Response quality is acceptable
 
-These tests require a running inference-api service with Qwen3-30B-A3B model loaded.
+These tests require a running LLM inference service (TensorRT-LLM on port 8000 by default,
+or legacy inference-api on port 50051) with Qwen3-30B-A3B model loaded.
 """
 import pytest
 import asyncio
@@ -31,11 +32,12 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # Service address (can be overridden via environment variable)
-INFERENCE_ADDRESS = os.getenv("INFERENCE_API_URL", "localhost:50051").replace("grpc://", "")
+# Default: TensorRT-LLM (tensorrt-llm:8000), Legacy: inference-api (inference-api:50051)
+INFERENCE_ADDRESS = os.getenv("INFERENCE_API_URL", os.getenv("LLM_URL", "tensorrt-llm:8000")).replace("grpc://", "")
 
 
 async def check_service_health(address: str) -> bool:
-    """Check if the inference API service is reachable and healthy."""
+    """Check if the LLM inference service (TensorRT-LLM or inference-api) is reachable and healthy."""
     try:
         async with grpc.aio.insecure_channel(address) as channel:
             stub = llm_pb2_grpc.LLMInferenceStub(channel)
@@ -45,28 +47,32 @@ async def check_service_health(address: str) -> bool:
                 timeout=5.0
             )
             if response.healthy:
-                logger.info(f"✓ Inference API service is healthy at {address}")
+                service_name = "TensorRT-LLM" if "tensorrt-llm" in address or "8000" in address else "Inference API"
+                logger.info(f"✓ {service_name} service is healthy at {address}")
                 logger.info(f"  Model: {response.model_name}")
                 logger.info(f"  Max context length: {response.max_context_length}")
                 return True
             else:
-                logger.warning(f"⚠ Inference API service at {address} is unhealthy")
+                logger.warning(f"⚠ LLM inference service at {address} is unhealthy")
                 return False
     except Exception as e:
-        logger.warning(f"✗ Inference API service not reachable at {address}: {e}")
+        logger.warning(f"✗ LLM inference service not reachable at {address}: {e}")
         return False
 
 
 @pytest.fixture(scope="session")
 async def service_available():
-    """Check if the inference API service is available."""
-    logger.info("Checking inference API service availability...")
+    """Check if the LLM inference service (TensorRT-LLM or inference-api) is available."""
+    logger.info("Checking LLM inference service availability...")
     is_available = await check_service_health(INFERENCE_ADDRESS)
     
     if not is_available:
-        logger.warning("⚠ Inference API service is not available. Tests may fail.")
-        logger.warning("Make sure the inference-api service is running:")
-        logger.warning(f"  - Service should be running on {INFERENCE_ADDRESS}")
+        service_name = "TensorRT-LLM" if "tensorrt-llm" in INFERENCE_ADDRESS or "8000" in INFERENCE_ADDRESS else "Inference API"
+        logger.warning(f"⚠ {service_name} service is not available. Tests may fail.")
+        logger.warning(f"Make sure the LLM inference service is running:")
+        logger.warning(f"  - TensorRT-LLM (default): tensorrt-llm:8000 in home_infra/shared-network")
+        logger.warning(f"  - Legacy inference-api: inference-api:50051 (requires --profile legacy)")
+        logger.warning(f"  - Current address: {INFERENCE_ADDRESS}")
         logger.warning("  - Qwen3-30B-A3B model should be loaded")
     
     return is_available
