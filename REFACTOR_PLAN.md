@@ -2,7 +2,7 @@
 
 ## Status: ✅ **CORE REFACTORING COMPLETE** → 🚀 **FORWARD DEVELOPMENT IN PROGRESS**
 
-**Last Updated:** 2025-11-19 (Fixed GitHub Actions CI - Use boolean constant instead of lambda for skipif)
+**Last Updated:** 2025-11-19 (Fixed GitHub Actions CI - Removed skipif decorators, moved skip logic to fixture)
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
@@ -256,6 +256,7 @@ All major refactoring phases have been completed:
    - ✅ Wrapped skipif condition in function (run #297) - Created `_should_skip_integration_test()` function to safely evaluate skip condition and prevent NameError/AttributeError during pytest collection
    - ✅ Used lambda for skipif condition (run #299) - Changed from function call to lambda `_skip_integration_condition` to defer evaluation until runtime, preventing pytest collection-time errors
    - ✅ Use boolean constant for skipif (run #301) - Changed from lambda to pre-evaluated boolean `_SKIP_INTEGRATION_TESTS` to avoid any callable evaluation issues in pytest's skipif decorator
+   - ✅ Removed skipif decorators, moved skip logic to fixture (run #303) - Removed skipif decorators from test functions and moved skip logic to `pipeline_framework_real` fixture to avoid pytest collection-time evaluation issues. Fixture now checks CI environment and grpc availability before returning framework instance.
    - ✅ Total: 161 tests passing (153 existing + 8 pipeline tests, 3 integration tests excluded from CI via marker)
 
 2. **Test STT → LLM → TTS flow:** ⏳ TODO (framework ready, requires real services)
