@@ -13,6 +13,7 @@ from essence.agents.reasoning import (
     ExecutionResult,
     Plan,
     ReflectionResult,
+    Step,
 )
 from essence.agents.reasoning_cache import ReasoningCache, get_reasoning_cache
 from essence.chat.utils.tracing import get_tracer
@@ -156,9 +157,10 @@ class Reflector:
 
             # Generate plan adjustments if needed
             plan_adjustments = None
-            if not goal_achieved and should_continue:
-                # TODO: Generate plan adjustments from LLM reflection
-                pass
+            if not goal_achieved and should_continue and self.llm_client:
+                plan_adjustments = self._generate_plan_adjustments(
+                    plan, reflection_text, issues_found, original_request, span
+                )
 
             span.set_attribute("llm_reflection_used", True)
             span.set_attribute("reflection_text_length", len(reflection_text))
@@ -367,6 +369,131 @@ class Reflector:
 
         # Default: goal achieved if no failures
         return len(failed_results) == 0
+
+    def _generate_plan_adjustments(
+        self,
+        plan: Optional[Plan],
+        reflection_text: str,
+        issues_found: List[str],
+        original_request: str,
+        span: trace.Span,
+    ) -> Optional[Plan]:
+        """
+        Generate plan adjustments from LLM reflection.
+
+        Creates a new plan that addresses the issues found during reflection.
+        """
+        if not plan or not self.llm_client:
+            return None
+
+        try:
+            # Prepare context for plan adjustment
+            plan_summary = str(plan) if plan else "No previous plan"
+            issues_summary = (
+                "\n".join(f"- {issue}" for issue in issues_found)
+                if issues_found
+                else "No specific issues identified"
+            )
+
+            # Use LLM to generate an adjusted plan
+            # We'll use the plan method but with adjusted context
+            analysis = f"""Previous plan that didn't fully achieve the goal:
+{plan_summary}
+
+Issues encountered:
+{issues_summary}
+
+Reflection:
+{reflection_text}
+
+Please create an adjusted plan that addresses these issues and better achieves the original goal: {original_request}"""
+
+            available_tools = plan.required_tools if plan else []
+
+            adjusted_plan_text = self.llm_client.plan(
+                user_request=original_request,
+                analysis=analysis,
+                available_tools=available_tools,
+            )
+
+            # Parse the adjusted plan text into Steps
+            steps = self._parse_plan_text(adjusted_plan_text, available_tools)
+
+            if not steps:
+                logger.warning("Failed to parse adjusted plan from LLM response")
+                return None
+
+            # Create adjusted plan
+            adjusted_plan = Plan(
+                steps=steps,
+                estimated_complexity=plan.estimated_complexity if plan else "moderate",
+                success_criteria=plan.success_criteria if plan else [],
+                required_tools=available_tools,
+            )
+
+            span.set_attribute("plan_adjustments_generated", True)
+            span.set_attribute("adjusted_plan_steps", len(steps))
+            logger.info(f"Generated adjusted plan with {len(steps)} steps")
+
+            return adjusted_plan
+
+        except Exception as e:
+            logger.error(f"Error generating plan adjustments: {e}", exc_info=True)
+            span.record_exception(e)
+            return None
+
+    def _parse_plan_text(
+        self, plan_text: str, available_tools: List[str]
+    ) -> List[Step]:
+        """Parse LLM-generated plan text into Step objects."""
+        import re
+
+        steps = []
+        step_id = 1
+
+        # Try to extract numbered steps from plan text
+        # Pattern: "1. Step description" or "Step 1: description"
+        step_patterns = [
+            r"^\s*(\d+)\.\s+(.+?)(?=\n\s*\d+\.|\n\n|$)",
+            r"Step\s+(\d+):\s+(.+?)(?=\n\s*Step\s+\d+:|$)",
+        ]
+
+        for pattern in step_patterns:
+            matches = re.finditer(pattern, plan_text, re.MULTILINE | re.DOTALL)
+            for match in matches:
+                step_num = int(match.group(1))
+                description = match.group(2).strip()
+
+                # Try to identify tool from description
+                tool_name = None
+                tool_args = None
+                for tool in available_tools:
+                    if tool.lower() in description.lower():
+                        tool_name = tool
+                        break
+
+                steps.append(
+                    Step(
+                        step_id=step_id,
+                        description=description,
+                        tool_name=tool_name,
+                        tool_args=tool_args,
+                    )
+                )
+                step_id += 1
+
+        # If no steps found, create a single step from the plan text
+        if not steps:
+            steps.append(
+                Step(
+                    step_id=1,
+                    description=plan_text[:200] + "..."
+                    if len(plan_text) > 200
+                    else plan_text,
+                )
+            )
+
+        return steps
 
     def _suggest_plan_adjustments(
         self,
