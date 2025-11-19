@@ -94,7 +94,9 @@ class TaskResult:
     files_created: int = 0
     files_modified: int = 0
     commands_executed: int = 0
-    attempt_number: Optional[int] = None  # Which attempt this is (1-indexed, None for single attempt)
+    attempt_number: Optional[
+        int
+    ] = None  # Which attempt this is (1-indexed, None for single attempt)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -193,7 +195,7 @@ class BenchmarkEvaluator:
             network_disabled: Whether to disable network access in sandboxes
             max_iterations: Maximum agent iterations per task
             timeout_seconds: Maximum time per task in seconds
-            num_attempts_per_task: Number of attempts to make per task (default: 1). 
+            num_attempts_per_task: Number of attempts to make per task (default: 1).
                                  For proper pass@k calculation, set to k (e.g., 5 for pass@5).
                                  Each attempt uses different random seeds/sampling parameters.
         """
@@ -609,14 +611,19 @@ if __name__ == "__main__":
                     result = self.evaluate_task(
                         task,
                         save_sandbox_snapshot=(output_dir is not None),
-                        attempt_number=attempt if self.num_attempts_per_task > 1 else None,
+                        attempt_number=attempt
+                        if self.num_attempts_per_task > 1
+                        else None,
                     )
                     task_results.append(result)
 
                     # Save intermediate results
                     if output_dir:
                         if self.num_attempts_per_task > 1:
-                            result_file = output_dir / f"{task.task_id}_attempt{attempt}_result.json"
+                            result_file = (
+                                output_dir
+                                / f"{task.task_id}_attempt{attempt}_result.json"
+                            )
                         else:
                             result_file = output_dir / f"{task.task_id}_result.json"
                         with open(result_file, "w") as f:
@@ -643,58 +650,74 @@ if __name__ == "__main__":
             raise ValueError("No results to generate report from")
 
         dataset = results[0].dataset
-        
+
         # Determine if we have multiple attempts per task
         has_multiple_attempts = any(r.attempt_number is not None for r in results)
-        
+
         if has_multiple_attempts:
             # Group results by task_id and sort by attempt_number
             results_by_task: Dict[str, List[TaskResult]] = defaultdict(list)
             for result in results:
                 results_by_task[result.task_id].append(result)
-            
+
             # Sort attempts by attempt_number for each task
             for task_id in results_by_task:
                 results_by_task[task_id].sort(key=lambda r: r.attempt_number or 0)
-            
+
             total_tasks = len(results_by_task)
-            
+
             # For pass@k calculation: count tasks where at least one of the first k attempts passed
             # pass@k = (# of tasks with at least one passing attempt in first k attempts) / total_tasks
             tasks_with_passing_attempt: Dict[int, int] = defaultdict(int)  # k -> count
-            
+
             for task_id, task_results in results_by_task.items():
                 num_attempts = len(task_results)
-                
+
                 # For each k value, check if at least one of the first k attempts passed
                 for k in [1, 5, 10, 100]:
                     # Get first k attempts (or all if k > num_attempts)
-                    attempts_to_check = task_results[:min(k, num_attempts)]
+                    attempts_to_check = task_results[: min(k, num_attempts)]
                     # Check if at least one of these attempts passed
                     if any(r.passed_tests for r in attempts_to_check):
                         tasks_with_passing_attempt[k] += 1
-            
+
             # Calculate pass@k
             pass_at_k = {}
             for k in [1, 5, 10, 100]:
                 if k <= self.num_attempts_per_task:
                     # We have enough attempts to calculate pass@k accurately
-                    pass_at_k[k] = tasks_with_passing_attempt[k] / total_tasks if total_tasks > 0 else 0.0
+                    pass_at_k[k] = (
+                        tasks_with_passing_attempt[k] / total_tasks
+                        if total_tasks > 0
+                        else 0.0
+                    )
                 else:
                     # For k > num_attempts_per_task, use the best available estimate
                     # (all tasks with at least one passing attempt in all attempts)
                     max_available_k = min(k, self.num_attempts_per_task)
-                    pass_at_k[k] = tasks_with_passing_attempt.get(max_available_k, 0) / total_tasks if total_tasks > 0 else 0.0
-            
+                    pass_at_k[k] = (
+                        tasks_with_passing_attempt.get(max_available_k, 0) / total_tasks
+                        if total_tasks > 0
+                        else 0.0
+                    )
+
             # Calculate other metrics (use first attempt or aggregate)
-            successful_tasks = sum(1 for task_results in results_by_task.values() if any(r.success for r in task_results))
-            passed_tests = sum(1 for task_results in results_by_task.values() if any(r.passed_tests for r in task_results))
+            successful_tasks = sum(
+                1
+                for task_results in results_by_task.values()
+                if any(r.success for r in task_results)
+            )
+            passed_tests = sum(
+                1
+                for task_results in results_by_task.values()
+                if any(r.passed_tests for r in task_results)
+            )
         else:
             # Single attempt per task (original behavior)
             total_tasks = len(results)
             successful_tasks = sum(1 for r in results if r.success)
             passed_tests = sum(1 for r in results if r.passed_tests)
-            
+
             # Calculate pass@k (only pass@1 is accurate for single attempts)
             pass_at_1 = passed_tests / total_tasks if total_tasks > 0 else 0.0
             pass_at_k = {

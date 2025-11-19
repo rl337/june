@@ -154,8 +154,8 @@ class RunBenchmarksCommand(Command):
             type=int,
             default=int(os.getenv("BENCHMARK_NUM_ATTEMPTS", "1")),
             help="Number of attempts per task for pass@k calculation (default: 1). "
-                 "Set to k (e.g., 5) to calculate pass@k accurately. "
-                 "Each attempt uses different random seeds/sampling parameters.",
+            "Set to k (e.g., 5) to calculate pass@k accurately. "
+            "Each attempt uses different random seeds/sampling parameters.",
         )
 
     def init(self) -> None:
