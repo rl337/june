@@ -112,7 +112,7 @@ All major refactoring phases have been completed:
 - ✅ **Task 1:** TensorRT-LLM container setup complete in home_infra
 - ✅ **Task 2:** Model loading/unloading API implemented (`manage-tensorrt-llm` command)
 - ✅ **Task 3:** Code/documentation migration complete (all services, tests, docs updated to use TensorRT-LLM)
-- ⏳ **Task 4:** Model compilation and loading (operational work - requires TensorRT-LLM build tools)
+- ⏳ **Task 4:** Model compilation and loading (BLOCKED - requires TensorRT-LLM build tools on x86_64 or NVIDIA NGC access)
 
 **Migration Status:** All code and documentation changes are complete. The june project is fully migrated to use TensorRT-LLM as the default LLM service. The legacy `inference-api` service remains in docker-compose.yml with a `legacy` profile for backward compatibility, but can be removed once TensorRT-LLM is verified operational (use `verify-tensorrt-llm` command).
 
@@ -193,7 +193,13 @@ All major refactoring phases have been completed:
    - ⏳ **Remaining:** Fully remove inference-api service from docker-compose.yml (waiting for TensorRT-LLM setup and verification in home_infra)
      - Use `poetry run -m essence verify-tensorrt-llm` to check migration readiness before removal
 
-4. **Get Qwen3-30B-A3B-Thinking-2507 running:** ⏳ TODO (requires TensorRT-LLM container setup from task 1, model loading API from task 2, and model compilation/preparation)
+4. **Get Qwen3-30B-A3B-Thinking-2507 running:** ⏳ IN PROGRESS
+   - **Model Downloads:** ✅ COMPLETED
+     - ✅ Whisper (STT): `openai/whisper-large-v3` downloaded to `/home/rlee/models/models--openai--whisper-large-v3/`
+     - ✅ TTS: `facebook/fastspeech2-en-ljspeech` downloaded to `/home/rlee/models/models--facebook--fastspeech2-en-ljspeech/`
+     - ✅ Qwen3-30B-A3B-Thinking-2507: Already downloaded to `/home/rlee/models/models--Qwen--Qwen3-30B-A3B-Thinking-2507/`
+     - ✅ Created `model-tools` container (`Dockerfile.model-tools`) with Whisper, TTS, and HuggingFace tools
+     - ✅ Container available via: `docker compose up -d model-tools` (profile: tools)
    - **Model Repository Setup:** ✅ COMPLETED
      - ✅ Created `essence/commands/setup_triton_repository.py` command for repository management
      - ✅ Supports creating model directory structure: `poetry run python -m essence setup-triton-repository --action create --model <name>`
@@ -203,13 +209,27 @@ All major refactoring phases have been completed:
      - ✅ Created actual model repository structure at `/home/rlee/models/triton-repository/qwen3-30b/1/`
      - ✅ Created README.md with compilation and loading instructions
      - ✅ Comprehensive unit tests (27 tests covering all repository operations)
-     - ⏳ **Remaining:** Place compiled files (TensorRT-LLM engine files, config.pbtxt, tokenizer files)
-     - Each model needs: compiled TensorRT-LLM engine files, config.pbtxt, tokenizer files
+   - **Model Preparation:** ✅ PARTIALLY COMPLETED
+     - ✅ `config.pbtxt` generated and saved to `/home/rlee/models/triton-repository/qwen3-30b/1/config.pbtxt`
+     - ✅ Tokenizer files copied: `tokenizer.json`, `tokenizer_config.json`, `merges.txt` to repository directory
+     - ⏳ **Remaining:** TensorRT-LLM engine compilation (requires TensorRT-LLM build container)
    - **Model Compilation Helper:** ✅ COMPLETED
      - ✅ Created `essence/commands/compile_model.py` command for compilation guidance
      - ✅ Validates prerequisites (GPU availability, repository structure, build tools)
      - ✅ Checks if model is already compiled
      - ✅ Generates compilation command templates with proper options
+     - ✅ Generates `config.pbtxt` template files
+     - ✅ Generates tokenizer file copy commands
+     - ✅ Checks model readiness (validates all required files are present)
+     - ✅ Comprehensive unit tests (22 tests)
+   - **TensorRT-LLM Compilation:** ⏳ BLOCKED
+     - ❌ TensorRT-LLM pip package not available for ARM64 (aarch64) architecture
+     - ❌ NVIDIA TensorRT-LLM build container requires NVIDIA NGC account and x86_64 architecture
+     - ⏳ **Options:**
+       1. Use NVIDIA NGC TensorRT-LLM container on x86_64 system (requires account setup)
+       2. Build TensorRT-LLM from source (complex, requires CUDA toolkit, TensorRT, etc.)
+       3. Use pre-compiled models if available
+     - ⏳ **Current Status:** Model repository structure ready, config.pbtxt ready, tokenizer files ready. Waiting for TensorRT-LLM engine compilation.
      - ✅ Generates config.pbtxt template files with TensorRT-LLM configuration
      - ✅ Automatically saves config.pbtxt to model directory if repository exists
      - ✅ Generates tokenizer file copy commands (checks HuggingFace model directory, provides copy commands)
