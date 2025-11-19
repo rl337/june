@@ -124,13 +124,25 @@ You are working on refactoring the june project. Your task is to:
 
 1. **Read REFACTOR_PLAN.md** - Read the entire refactoring plan to understand the current state and what needs to be done.
 
-2. **Pick an unfinished task** - Look for tasks marked with ⏳ TODO in the REFACTOR_PLAN.md. Choose one that:
+2. **Check for GitHub Actions failures FIRST** - Before picking a new task:
+   - Check the GitHub Actions page: https://github.com/rl337/june/actions
+   - Look for any failed workflow runs (status: failed, red X icon)
+   - If failures are found:
+     - Click on the failed workflow run to view details
+     - Read the error logs to identify the specific failure
+     - Fix the issue causing the failure
+     - Commit and push the fix
+     - Verify the fix by checking if a new workflow run passes
+   - **Priority:** Fixing GitHub Actions failures takes precedence over new tasks
+   - Only proceed to pick a new task if there are no active failures
+
+3. **Pick an unfinished task** - If no GitHub Actions failures, look for tasks marked with ⏳ TODO in the REFACTOR_PLAN.md. Choose one that:
    - Is clearly defined and actionable
    - You have enough context to complete
    - Will make meaningful progress toward the refactoring goals
    - Is appropriate for a single iteration (not too large)
 
-3. **Perform the task** - Complete the selected task. This may involve:
+4. **Perform the task** - Complete the selected task. This may involve:
    - Removing code dependencies on removed services
    - Implementing tracing or metrics
    - Cleaning up code
@@ -141,14 +153,14 @@ You are working on refactoring the june project. Your task is to:
    - **Setting up benchmark evaluation with sandboxes (Phase 10.5) - NEW PRIORITY**
    - Any other task from the plan
 
-4. **Update REFACTOR_PLAN.md** - After completing the task:
+5. **Update REFACTOR_PLAN.md** - After completing the task:
    - Mark the completed task(s) as ✅ COMPLETED
    - Add a brief summary of what was done
    - If you discovered new tasks or issues, add them to the appropriate section with ⏳ TODO
    - If you found that a task needs to be broken down further, update the plan accordingly
    - Document any important discoveries or decisions made
 
-5. **Document discoveries** - If during your work you discover:
+6. **Document discoveries** - If during your work you discover:
    - New tasks that need to be done
    - Issues or blockers
    - Better approaches or alternatives
@@ -280,10 +292,11 @@ You are working on refactoring the june project. Your task is to:
 - Focus on actual refactoring work, not documentation maintenance of commit counts
 
 **Priority Order:**
-1. Phase 10.1-10.2: Qwen3 model setup on GPU (if not yet done)
-2. Phase 10.4: Coding agent development (if model is ready)
-3. Phase 10.5: Benchmark evaluation setup (if coding agent is ready)
-4. Other phases from the plan
+1. **CRITICAL - GitHub Actions failures** - Fix any failed workflow runs first (check https://github.com/rl337/june/actions)
+2. Phase 10.1-10.2: Qwen3 model setup on GPU (if not yet done)
+3. Phase 10.4: Coding agent development (if model is ready)
+4. Phase 10.5: Benchmark evaluation setup (if coding agent is ready)
+5. Other phases from the plan
 
 **Reference Documents:**
 - REFACTOR_PLAN.md - Main refactoring plan with all phases
