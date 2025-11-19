@@ -120,7 +120,7 @@ Edit `load_tests/config/load_test_config.yaml` to customize:
 - CPU usage
 - Memory usage
 - GPU utilization
-- Database connection pool usage
+- gRPC connection pool usage (for service-to-service communication)
 
 ## Acceptance Criteria
 
@@ -202,9 +202,9 @@ pip install -e packages/june-grpc-api
 
 Based on load test results:
 
-1. **High Latency**: Optimize database queries, add caching, increase connection pools
-2. **High Error Rate**: Scale services, increase resource limits, optimize code
-3. **Low Throughput**: Horizontal scaling, connection pooling, caching strategy
+1. **High Latency**: Optimize gRPC calls, add caching, increase gRPC connection pools, optimize LLM inference (TensorRT-LLM)
+2. **High Error Rate**: Scale services, increase resource limits, optimize code, check GPU availability for LLM
+3. **Low Throughput**: Horizontal scaling, gRPC connection pooling, caching strategy, optimize model inference settings
 
 ## Contributing
 

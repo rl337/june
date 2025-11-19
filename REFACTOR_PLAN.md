@@ -460,7 +460,7 @@ All major refactoring phases have been completed:
    - ⏳ Measure latency for each stage (STT, LLM, TTS)
    - ⏳ Identify bottlenecks
    - ⏳ Optimize where possible
-   - ✅ Updated load_tests/README.md to reflect current architecture (marked Gateway tests as obsolete, emphasized gRPC testing)
+   - ✅ Updated load_tests/README.md to reflect current architecture (marked Gateway tests as obsolete, emphasized gRPC testing, removed database references, updated performance tuning guidance for gRPC and LLM optimization)
 
 ### Phase 17: Agentic Flow Implementation ✅ COMPLETED (Code complete, operational testing pending)
 
