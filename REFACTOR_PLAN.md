@@ -107,7 +107,13 @@ All major refactoring phases have been completed:
 
 **Goal:** Replace `inference-api` service with TensorRT-LLM container for optimized GPU inference.
 
-**Current Status:** Code migration complete (Task 3 ✅). TensorRT-LLM container setup complete (Task 1 ✅). Model loading/unloading API implemented (Task 2 ✅). Remaining task (4) requires model compilation and actual model loading.
+**Current Status:** 
+- ✅ **Task 1:** TensorRT-LLM container setup complete in home_infra
+- ✅ **Task 2:** Model loading/unloading API implemented (`manage-tensorrt-llm` command)
+- ✅ **Task 3:** Code/documentation migration complete (all services, tests, docs updated to use TensorRT-LLM)
+- ⏳ **Task 4:** Model compilation and loading (operational work - requires TensorRT-LLM build tools)
+
+**Migration Status:** All code and documentation changes are complete. The june project is fully migrated to use TensorRT-LLM as the default LLM service. The legacy `inference-api` service remains in docker-compose.yml with a `legacy` profile for backward compatibility, but can be removed once TensorRT-LLM is verified operational (use `verify-tensorrt-llm` command).
 
 **IMPORTANT:** The agent CAN and SHOULD work on the `home_infra` project at `/home/rlee/dev/home_infra` to complete these tasks. This is NOT external work - it's part of the june project infrastructure. The agent has full access to modify `home_infra/docker-compose.yml` and related configuration files.
 
