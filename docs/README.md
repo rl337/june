@@ -23,7 +23,7 @@ This documentation is organized by audience and purpose to help you find what yo
 - **[Agentic Capabilities](architecture/AGENTIC_CAPABILITIES.md)** - Comprehensive documentation for June's agentic capabilities system, enabling autonomous AI agents to discover, plan, execute, and verify tasks
 
 ### For API Users
-- **[API Documentation](API/)** - Complete API docs for LLM Inference (TensorRT-LLM gRPC, default), STT/TTS services (gRPC), Telegram Bot API, and TODO MCP Service with examples
+- **[API Documentation](API/)** - Complete API docs for LLM Inference (TensorRT-LLM gRPC, default), STT/TTS services (gRPC), Telegram Bot API, Discord Bot API, and TODO MCP Service with examples
 
 ## 🗂️ Documentation Structure
 
@@ -36,6 +36,7 @@ docs/
 │   ├── stt.md                  # STT Service gRPC
 │   ├── tts.md                  # TTS Service gRPC
 │   ├── telegram.md             # Telegram Bot API
+│   ├── discord.md              # Discord Bot API
 │   └── todo-mcp.md             # TODO MCP Service API
 ├── guides/                      # User and developer guides
 │   ├── USER_GUIDE.md           # User-facing documentation
@@ -94,7 +95,8 @@ docs/
 ### APIs
 - [Inference API](API/inference.md) - LLM gRPC service
 - [STT/TTS APIs](API/) - Speech services
-- [Telegram Bot API](API/telegram.md) - Bot integration
+- [Telegram Bot API](API/telegram.md) - Telegram bot integration
+- [Discord Bot API](API/discord.md) - Discord bot integration
 
 ## 🔍 Finding Documentation
 
