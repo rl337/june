@@ -64,16 +64,6 @@ try:
             pytest.skip("Skipping integration test (grpc unavailable)")
         
         return _safe_get_pipeline_framework(use_real_services=True)
-    
-    
-    def pytest_addoption(parser):
-        """Add pytest command-line options."""
-        parser.addoption(
-            "--use-real-services",
-            action="store_true",
-            default=False,
-            help="Use real services instead of mocks (requires services to be running)"
-        )
 
 except Exception:
     # If ANYTHING fails in this module, define minimal fixtures that always skip
@@ -89,3 +79,18 @@ except Exception:
     def pipeline_framework_real():
         """Fallback fixture - always skips."""
         pytest.skip("Pipeline test framework unavailable")
+
+
+def pytest_addoption(parser):
+    """Add pytest command-line options."""
+    # Define at module level (not inside try/except) to ensure pytest can find it
+    try:
+        parser.addoption(
+            "--use-real-services",
+            action="store_true",
+            default=False,
+            help="Use real services instead of mocks (requires services to be running)"
+        )
+    except Exception:
+        # If parser is invalid, ignore - this hook is optional
+        pass
