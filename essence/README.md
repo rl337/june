@@ -4,12 +4,15 @@ Essence is June's core reusable codebase that powers all services. This module c
 
 ## Structure
 
-- `essence.chat` - Chat service functionality (Telegram, Discord, etc.)
+- `essence.chat` - Chat service functionality (Telegram, Discord, message handling, platform translators, etc.)
+- `essence.agents` - Agent components (coding agent, evaluator, planner, executor, reflector, reasoning, etc.)
+- `essence.commands` - Command pattern implementations (service commands, utility commands, etc.)
+- `essence.services` - Service-specific code (telegram, discord, integration test, shared utilities)
 - `essence.audio` - Audio processing (STT, TTS, audio utilities)
-- `essence.agent` - Agent execution and management
 - `essence.storage` - Data storage and persistence
 - `essence.utils` - Utility functions
 - `essence.config` - Configuration management
+- `essence.command` - Command pattern base classes and utilities
 
 ## Installation
 
