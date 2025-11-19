@@ -16,10 +16,10 @@ from typing import Optional
 
 try:
     from prometheus_client import start_http_server, Gauge, CollectorRegistry
-except ImportError as e:
-    print(f"Error importing dependencies: {e}")
-    print("Make sure prometheus-client is installed")
-    sys.exit(1)
+    PROMETHEUS_AVAILABLE = True
+except ImportError:
+    PROMETHEUS_AVAILABLE = False
+    # Don't exit here - let the command handle it gracefully
 
 try:
     import pynvml
@@ -115,6 +115,9 @@ class MonitorGpuCommand(Command):
         if not NVML_AVAILABLE:
             logger.warning("pynvml not available. GPU monitoring will be limited.")
             raise RuntimeError("pynvml not available. Install with: pip install pynvml")
+        
+        if not PROMETHEUS_AVAILABLE:
+            raise RuntimeError("prometheus-client not available. Install with: pip install prometheus-client")
         
         # Setup signal handlers for graceful shutdown
         self.setup_signal_handlers()
