@@ -12,7 +12,7 @@ The benchmark evaluation system provides:
 
 ## Prerequisites
 
-1. **Qwen3 model loaded** - The inference-api service must be running with Qwen3-30B-A3B-Thinking-2507 loaded
+1. **Qwen3 model loaded** - TensorRT-LLM service must be running in home_infra with Qwen3-30B-A3B-Thinking-2507 loaded (or legacy inference-api service)
 2. **Docker** - For sandbox container creation
 3. **Docker Compose** - For orchestrating services
 4. **Sufficient resources**:
@@ -23,13 +23,29 @@ The benchmark evaluation system provides:
 
 ## Quick Start
 
-### 1. Start Inference API
+### 1. Start TensorRT-LLM Service (Recommended)
 
-First, ensure the inference-api service is running with the Qwen3 model loaded:
+Ensure TensorRT-LLM is running in home_infra with the Qwen3 model loaded:
 
 ```bash
-# Start inference-api service
-docker compose up -d inference-api
+# Start TensorRT-LLM service (in home_infra)
+cd /home/rlee/dev/home_infra
+docker compose up -d tensorrt-llm
+
+# Check if model is loaded
+poetry run -m essence manage-tensorrt-llm --action status --model qwen3-30b
+
+# Verify TensorRT-LLM is accessible
+poetry run -m essence verify-tensorrt-llm
+```
+
+**Alternative: Legacy Inference API**
+
+If using the legacy inference-api service:
+
+```bash
+# Start inference-api service (legacy)
+docker compose --profile legacy up -d inference-api
 
 # Check if model is loaded (wait for "Model loaded successfully" in logs)
 docker compose logs -f inference-api
@@ -66,11 +82,11 @@ poetry run python scripts/review_sandbox.py /tmp/benchmarks/results humaneval_0
 The `run_benchmarks.sh` script supports various configuration options:
 
 ```bash
-./scripts/run_benchmarks.sh \
+poetry run -m essence run-benchmarks \
   --dataset humaneval \          # Dataset: humaneval, mbpp, or all
   --max-tasks 10 \               # Limit number of tasks (default: all)
   --output-dir /path/to/results \ # Output directory
-  --inference-api-url inference-api:50051 \  # gRPC endpoint
+  --inference-api-url tensorrt-llm:8000 \  # gRPC endpoint (default: tensorrt-llm:8000 for TensorRT-LLM)
   --model-name Qwen/Qwen3-30B-A3B-Thinking-2507 \  # Model name
   --sandbox-image python:3.11-slim \  # Sandbox base image
   --sandbox-memory 4g \          # Max memory per sandbox
@@ -80,6 +96,8 @@ The `run_benchmarks.sh` script supports various configuration options:
   --enable-network                # Enable network access in sandboxes
 ```
 
+**Note:** The default `--inference-api-url` is `tensorrt-llm:8000` for TensorRT-LLM. Use `inference-api:50051` for the legacy service.
+
 ### Environment Variables
 
 You can also set these via environment variables:
@@ -88,7 +106,7 @@ You can also set these via environment variables:
 export DATASET=humaneval
 export MAX_TASKS=10
 export OUTPUT_DIR=/tmp/my_benchmarks
-export INFERENCE_API_URL=inference-api:50051
+export INFERENCE_API_URL=tensorrt-llm:8000  # Default: tensorrt-llm:8000 (use inference-api:50051 for legacy)
 export MODEL_NAME="Qwen/Qwen3-30B-A3B-Thinking-2507"
 export SANDBOX_IMAGE=python:3.11-slim
 export SANDBOX_MEMORY=4g
@@ -97,7 +115,7 @@ export TIMEOUT=300
 export MAX_ITERATIONS=10
 export ENABLE_NETWORK=false
 
-./scripts/run_benchmarks.sh
+poetry run -m essence run-benchmarks
 ```
 
 ## Supported Datasets
@@ -218,9 +236,28 @@ The review tool shows:
 
 ## Troubleshooting
 
-### Inference API Not Ready
+### TensorRT-LLM Not Ready
 
-If you see errors about inference-api not being available:
+If you see errors about TensorRT-LLM not being available:
+
+```bash
+# Check if TensorRT-LLM is running (in home_infra)
+cd /home/rlee/dev/home_infra
+docker compose ps tensorrt-llm
+
+# Check model status
+poetry run -m essence manage-tensorrt-llm --action status --model qwen3-30b
+
+# Verify TensorRT-LLM setup
+poetry run -m essence verify-tensorrt-llm
+
+# Check logs
+docker compose logs tensorrt-llm | grep -i "model\|error"
+```
+
+**Legacy Inference API:**
+
+If using the legacy inference-api service:
 
 ```bash
 # Check if inference-api is running
@@ -279,13 +316,17 @@ nvidia-smi
 
 ### Running in Container
 
-If you're already in a container, the script detects this and runs directly:
+Run benchmarks in the cli-tools container:
 
 ```bash
-# Inside cli-tools container
+# Run benchmarks in cli-tools container
+docker compose run --rm cli-tools \
+  poetry run -m essence run-benchmarks --dataset humaneval --max-tasks 10
+
+# Or enter container interactively
 docker compose exec cli-tools bash
 cd /workspace
-poetry run python scripts/run_benchmarks.py --dataset humaneval --max-tasks 10
+poetry run -m essence run-benchmarks --dataset humaneval --max-tasks 10
 ```
 
 ### Custom Sandbox Image
