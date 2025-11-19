@@ -268,6 +268,15 @@ You are working on refactoring the june project. Your task is to:
 - After committing, check if there are unpushed commits and push them upstream
 - DO NOT leave uncommitted changes - always commit your work before moving to the next task
 
+**CRITICAL - DO NOT UPDATE COMMIT COUNTS:**
+- **DO NOT automatically update commit counts in REFACTOR_PLAN.md** - The commit count (e.g., "85 commits ahead of origin/main") is informational only and does not need to be kept in sync
+- **DO NOT create commits solely to update commit counts** - This creates an infinite loop where each commit increments the count, requiring another update
+- Only update commit counts if:
+  1. You are explicitly documenting a major milestone or release
+  2. The commit count is significantly outdated (e.g., more than 100 commits off)
+  3. You are asked to do so in a specific task
+- Focus on actual refactoring work, not documentation maintenance of commit counts
+
 **Priority Order:**
 1. Phase 10.1-10.2: Qwen3 model setup on GPU (if not yet done)
 2. Phase 10.4: Coding agent development (if model is ready)
