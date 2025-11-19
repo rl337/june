@@ -10,9 +10,14 @@ import pytest
 import os
 
 # Skip entire file in CI - this prevents pytest from even collecting these tests
-# This is more reliable than relying on marker exclusion alone
+# Wrap in try/except to ensure module can always be imported safely
+try:
+    _is_ci = os.getenv('CI') == 'true'
+except Exception:
+    _is_ci = False  # Safe default: don't skip if we can't determine CI status
+
 pytestmark = pytest.mark.skipif(
-    os.getenv('CI') == 'true',
+    _is_ci,
     reason="Integration tests skipped in CI environment"
 )
 
