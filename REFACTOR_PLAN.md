@@ -156,7 +156,7 @@ All major refactoring phases have been completed:
    - ✅ Model switching: Can unload current model and load new one (one at a time)
    - ⏳ **Note:** Models must be compiled/prepared and placed in Triton's model repository before they can be loaded. This API handles loading/unloading operations only. Model compilation/preparation is a separate step (see Task 4).
 
-4. **Set up NVIDIA NIM container in home_infra:** ⏳ IN PROGRESS
+4. **Set up NVIDIA NIM container in home_infra:** ✅ COMPLETED (Code/documentation complete, operational setup pending)
    - ✅ Added NIM service (`nim-qwen3`) to `home_infra/docker-compose.yml`
    - ✅ Configured it to connect to shared-network
    - ✅ Set up GPU access and resource limits (device 0, GPU capabilities)
@@ -171,9 +171,10 @@ All major refactoring phases have been completed:
    - ✅ Added NIM as LLM option in configuration (can be set via LLM_URL=grpc://nim-qwen3:8001)
    - ✅ Verified `verify-nim` command works correctly (properly detects when service is not running)
    - ✅ Added `verify-nim` command documentation to `docs/guides/COMMANDS.md` (command options and usage)
-   - ⏳ **Note:** NIM image name may need verification (currently using `nvcr.io/nvstaging/nim_qwen3_30b_instruct:latest`)
+   - ✅ Created comprehensive NIM setup guide: `docs/guides/NIM_SETUP.md` (includes instructions for finding correct image name from NGC catalog, setup steps, troubleshooting)
    - ⏳ **Operational Task:** Start NIM service (requires `NGC_API_KEY` environment variable to be set in home_infra):
      - Set `NGC_API_KEY` in home_infra environment (or `.env` file)
+     - Verify image name in NGC catalog (see `docs/guides/NIM_SETUP.md` for instructions)
      - Start service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3`
      - Verify service: `cd /home/rlee/dev/june && poetry run -m essence verify-nim --nim-host nim-qwen3 --http-port 8003 --grpc-port 8001`
    - ⏳ **Remaining:** Test gRPC connectivity with real NIM service once it's running

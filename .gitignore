@@ -205,7 +205,7 @@ services/webapp/.env.development.local
 services/webapp/.env.test.local
 services/webapp/.env.production.local
 
-# Ignore ALL-CAPS markdown except README.md, AGENTS.md, TODO.md, COMMANDS.md, TESTING.md, MONITORING.md, and MESSAGE_FORMAT_REQUIREMENTS.md
+# Ignore ALL-CAPS markdown except README.md, AGENTS.md, TODO.md, COMMANDS.md, TESTING.md, MONITORING.md, MESSAGE_FORMAT_REQUIREMENTS.md, and NIM_SETUP.md
 [A-Z]*.md
 !README.md
 !AGENTS.md
@@ -214,3 +214,4 @@ services/webapp/.env.production.local
 !TESTING.md
 !MONITORING.md
 !MESSAGE_FORMAT_REQUIREMENTS.md
+!NIM_SETUP.md
