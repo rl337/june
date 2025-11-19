@@ -17,6 +17,7 @@ This documentation is organized by audience and purpose to help you find what yo
 
 ### For Operators
 - **[Deployment Guides](guides/DEPLOYMENT.md)** - Local development, production, cloud deployments (AWS/GCP/Azure), single/multi-node setups, configuration, SSL/TLS, backup/recovery, and monitoring
+- **[TensorRT-LLM Setup Guide](guides/TENSORRT_LLM_SETUP.md)** - TensorRT-LLM migration, model repository setup, model compilation, and management
 - **[Architecture Documentation](architecture/ARCHITECTURE.md)** - System architecture, service architecture, data flow diagrams, infrastructure components, network architecture, security, scalability, and design decisions
 - **[Agentic Capabilities](architecture/AGENTIC_CAPABILITIES.md)** - Comprehensive documentation for June's agentic capabilities system, enabling autonomous AI agents to discover, plan, execute, and verify tasks
 
@@ -43,6 +44,7 @@ docs/
 │   ├── TROUBLESHOOTING.md      # Troubleshooting guide
 │   ├── AGENTS.md               # Agent development guide
 │   ├── AUDIO_TESTING.md        # Audio services testing
+│   ├── TENSORRT_LLM_SETUP.md   # TensorRT-LLM setup and migration guide
 │   └── FIXES_APPLIED.md        # Fixes and improvements log
 └── architecture/                # Architecture documentation
     ├── ARCHITECTURE.md          # System architecture overview
@@ -82,6 +84,7 @@ docs/
 
 ### Operations
 - [Deployment](guides/DEPLOYMENT.md) - Deployment procedures
+- [TensorRT-LLM Setup](guides/TENSORRT_LLM_SETUP.md) - TensorRT-LLM migration and setup
 - [Troubleshooting](guides/TROUBLESHOOTING.md) - Common issues and solutions
 - [Monitoring](../README.md#-monitoring) - Metrics and observability
 

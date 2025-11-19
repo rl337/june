@@ -2,7 +2,7 @@
 
 ## Status: ✅ **CORE REFACTORING COMPLETE** → 🚀 **FORWARD DEVELOPMENT IN PROGRESS**
 
-**Last Updated:** 2025-11-18 (Phase 15.4: Created setup-triton-repository command for model repository structure management)
+**Last Updated:** 2025-11-18 (Phase 15.3: Created comprehensive TensorRT-LLM setup documentation guide)
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
@@ -153,6 +153,7 @@ All major refactoring phases have been completed:
    - ✅ Added legacy profile to inference-api service to disable by default
    - ✅ Updated AGENTS.md to reflect TensorRT-LLM as current implementation
    - ✅ Updated README.md to reference TensorRT-LLM setup and usage
+   - ✅ Created comprehensive TensorRT-LLM setup guide: `docs/guides/TENSORRT_LLM_SETUP.md`
    - ⏳ **Remaining:** Fully remove inference-api service from docker-compose.yml (waiting for TensorRT-LLM setup and verification in home_infra)
 
 4. **Get Qwen3-30B-A3B-Thinking-2507 running:** ⏳ TODO (requires TensorRT-LLM container setup from task 1, model loading API from task 2, and model compilation/preparation)
