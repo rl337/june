@@ -68,6 +68,18 @@ All major refactoring phases have been completed:
 
 **Current Status:** Code migration complete (Task 3 ✅). Remaining tasks (1, 2, 4) require external setup in `home_infra` project and are blocked until TensorRT-LLM container is configured and running.
 
+**Blocking Situation:** All remaining Phase 15 tasks require work in the external `home_infra` project:
+- Task 1: Requires adding TensorRT-LLM service to `home_infra/docker-compose.yml` and configuring shared-network connectivity
+- Task 2: Requires TensorRT-LLM container to be running first
+- Task 4: Requires TensorRT-LLM container to be running and model loading API implemented
+
+**Next Steps (External):**
+1. Set up TensorRT-LLM container in `home_infra` project
+2. Configure shared-network connectivity
+3. Implement model loading/unloading API
+4. Verify TensorRT-LLM is accessible from june services
+5. Once verified, proceed with Phase 15.3 remaining work (remove inference-api from docker-compose.yml)
+
 **Tasks:**
 1. **Set up TensorRT-LLM container in home_infra:** ⏳ BLOCKED (requires work in home_infra project)
    - Add TensorRT-LLM service to `home_infra/docker-compose.yml`
