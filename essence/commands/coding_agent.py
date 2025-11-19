@@ -94,8 +94,8 @@ class CodingAgentCommand(Command):
         )
         parser.add_argument(
             "--inference-api-url",
-            default=os.getenv("INFERENCE_API_URL", "localhost:50051"),
-            help="gRPC endpoint for inference API (default: localhost:50051)",
+            default=os.getenv("INFERENCE_API_URL", "tensorrt-llm:8000"),
+            help="gRPC endpoint for LLM inference service (default: tensorrt-llm:8000 for TensorRT-LLM, can use localhost:50051 for local testing)",
         )
         parser.add_argument(
             "--model-name",
@@ -203,12 +203,12 @@ class CodingAgentCommand(Command):
         except grpc.RpcError as e:
             logger.error(f"gRPC error executing task: {e}", exc_info=True)
             print(f"\n❌ gRPC Error: {e.code()} - {e.details()}")
-            print("💡 Tip: Check that the inference-api service is running and accessible")
+            print("💡 Tip: Check that the LLM inference service (TensorRT-LLM) is running and accessible")
             sys.exit(1)
         except ConnectionError as e:
             logger.error(f"Connection error executing task: {e}", exc_info=True)
             print(f"\n❌ Connection Error: {e}")
-            print(f"💡 Tip: Verify that inference-api is running at {self.args.inference_api_url}")
+            print(f"💡 Tip: Verify that the LLM inference service is running at {self.args.inference_api_url}")
             sys.exit(1)
         except Exception as e:
             logger.error(f"Error executing task: {e}", exc_info=True)
@@ -267,11 +267,11 @@ class CodingAgentCommand(Command):
                 except grpc.RpcError as e:
                     logger.error(f"gRPC error executing task: {e}", exc_info=True)
                     print(f"\n❌ gRPC Error: {e.code()} - {e.details()}")
-                    print("💡 Tip: Check that the inference-api service is running and accessible")
+                    print("💡 Tip: Check that the LLM inference service (TensorRT-LLM) is running and accessible")
                 except ConnectionError as e:
                     logger.error(f"Connection error executing task: {e}", exc_info=True)
                     print(f"\n❌ Connection Error: {e}")
-                    print(f"💡 Tip: Verify that inference-api is running at {self.args.inference_api_url}")
+                    print(f"💡 Tip: Verify that the LLM inference service is running at {self.args.inference_api_url}")
                 except Exception as e:
                     logger.error(f"Error executing task: {e}", exc_info=True)
                     print(f"\n❌ Error: {e}")

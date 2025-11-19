@@ -105,8 +105,8 @@ class RunBenchmarksCommand(Command):
         )
         parser.add_argument(
             "--inference-api-url",
-            default=os.getenv("INFERENCE_API_URL", "inference-api:50051"),
-            help="gRPC endpoint for inference API (default: inference-api:50051)",
+            default=os.getenv("INFERENCE_API_URL", "tensorrt-llm:8000"),
+            help="gRPC endpoint for LLM inference service (default: tensorrt-llm:8000 for TensorRT-LLM, can use inference-api:50051 for legacy service)",
         )
         parser.add_argument(
             "--model-name",

@@ -167,13 +167,14 @@ def check_docker_compose_file() -> Tuple[bool, str]:
         return False, "docker-compose.yml not found in current directory"
     
     # Check if required services are defined
+    # Note: TensorRT-LLM is expected to be in home_infra (shared-network), not june docker-compose.yml
     try:
         content = compose_file.read_text()
-        required_services = ["inference-api", "cli-tools"]
+        required_services = ["cli-tools"]  # inference-api removed - using TensorRT-LLM from home_infra
         missing_services = [s for s in required_services if f"{s}:" not in content]
         if missing_services:
             return False, f"Required services missing in docker-compose.yml: {missing_services}"
-        return True, f"docker-compose.yml found with required services"
+        return True, f"docker-compose.yml found with required services (TensorRT-LLM expected in home_infra)"
     except Exception as e:
         return False, f"Error reading docker-compose.yml: {e}"
 

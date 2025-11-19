@@ -40,7 +40,7 @@ class CodingAgent:
     
     def __init__(
         self,
-        inference_api_url: str = "localhost:50051",
+        inference_api_url: str = "tensorrt-llm:8000",
         model_name: str = "Qwen/Qwen3-30B-A3B-Thinking-2507",
         max_context_length: int = 131072,
         temperature: float = 0.7,
@@ -50,7 +50,8 @@ class CodingAgent:
         Initialize the coding agent.
         
         Args:
-            inference_api_url: gRPC endpoint for inference API (e.g., "localhost:50051" or "inference-api:50051")
+            inference_api_url: gRPC endpoint for LLM inference service (default: "tensorrt-llm:8000" for TensorRT-LLM).
+                              Can use "localhost:50051" for local testing or "inference-api:50051" for legacy service.
             model_name: Name of the model to use
             max_context_length: Maximum context length for the model
             temperature: Sampling temperature
@@ -72,11 +73,11 @@ class CodingAgent:
         self._initialize_tools()
         
     def _ensure_connection(self) -> None:
-        """Ensure gRPC connection to inference API is established."""
+        """Ensure gRPC connection to LLM inference service is established."""
         if self._channel is None or self._stub is None:
             self._channel = grpc.insecure_channel(self.inference_api_url)
             self._stub = llm_pb2_grpc.LLMInferenceStub(self._channel)
-            logger.info(f"Connected to inference API at {self.inference_api_url}")
+            logger.info(f"Connected to LLM inference service at {self.inference_api_url}")
     
     def _create_chat_message(self, role: str, content: str) -> ChatMessage:
         """Create a ChatMessage protobuf object."""

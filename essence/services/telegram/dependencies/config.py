@@ -43,8 +43,13 @@ def get_llm_address() -> str:
     
     Returns:
         LLM service address as a string (host:port format)
+        
+    Note:
+        Defaults to TensorRT-LLM service (tensorrt-llm:8000) for optimized GPU inference.
+        Can be overridden via LLM_URL environment variable.
+        Legacy inference-api service (inference-api:50051) can be used by setting LLM_URL.
     """
-    return os.getenv("LLM_URL", "inference-api:50051").replace("grpc://", "")
+    return os.getenv("LLM_URL", "tensorrt-llm:8000").replace("grpc://", "")
 
 
 def get_metrics_storage() -> Any:

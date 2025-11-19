@@ -159,7 +159,7 @@ class BenchmarkEvaluator:
     
     def __init__(
         self,
-        inference_api_url: str = "inference-api:50051",
+        inference_api_url: str = "tensorrt-llm:8000",
         model_name: str = "Qwen/Qwen3-30B-A3B-Thinking-2507",
         sandbox_base_image: str = "python:3.11-slim",
         sandbox_workspace_base: Optional[Path] = None,
@@ -173,7 +173,8 @@ class BenchmarkEvaluator:
         Initialize the evaluator.
         
         Args:
-            inference_api_url: gRPC endpoint for inference API
+            inference_api_url: gRPC endpoint for LLM inference service (default: "tensorrt-llm:8000" for TensorRT-LLM).
+                              Can use "inference-api:50051" for legacy service.
             model_name: Name of the model to evaluate
             sandbox_base_image: Docker base image for sandboxes
             sandbox_workspace_base: Base directory for sandbox workspaces (defaults to /tmp/benchmarks)
