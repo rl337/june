@@ -89,7 +89,10 @@ All major refactoring phases have been completed:
    - ✅ Updated check-environment to remove inference-api from required services
    - ✅ Updated error messages and documentation to reference TensorRT-LLM
    - ✅ All changes maintain backward compatibility via LLM_URL/INFERENCE_API_URL environment variables
-   - ⏳ **Remaining:** Remove inference-api service from june docker-compose.yml (waiting for TensorRT-LLM setup in home_infra)
+   - ✅ Updated docker-compose.yml: Changed LLM_URL to tensorrt-llm:8000 for telegram and discord services
+   - ✅ Removed inference-api from depends_on (TensorRT-LLM will be in home_infra/shared-network)
+   - ✅ Added legacy profile to inference-api service to disable by default
+   - ⏳ **Remaining:** Fully remove inference-api service from docker-compose.yml (waiting for TensorRT-LLM setup and verification in home_infra)
 
 4. **Get Qwen3-30B-A3B-Thinking-2507 running:**
    - Load Qwen3 model into TensorRT-LLM container
