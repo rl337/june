@@ -2,7 +2,7 @@
 
 ## Status: ✅ **CORE REFACTORING COMPLETE** → 🚀 **FORWARD DEVELOPMENT IN PROGRESS**
 
-**Last Updated:** 2025-11-18 (Phase 15.3: Updated inference_api_service.py to mark as deprecated/legacy)
+**Last Updated:** 2025-11-18 (Phase 15.3: Created verify-tensorrt-llm command for migration verification)
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
@@ -167,7 +167,9 @@ All major refactoring phases have been completed:
    - ✅ Updated tests/integration/test_telegram_bot_qwen3_integration.py to default to TensorRT-LLM
    - ✅ Updated tests/integration/test_voice_message_integration.py to default to TensorRT-LLM
    - ✅ Updated essence/commands/inference_api_service.py docstrings to mark service as deprecated/legacy
+   - ✅ Created `essence/commands/verify_tensorrt_llm.py` command for migration verification
    - ⏳ **Remaining:** Fully remove inference-api service from docker-compose.yml (waiting for TensorRT-LLM setup and verification in home_infra)
+     - Use `poetry run -m essence verify-tensorrt-llm` to check migration readiness before removal
 
 4. **Get Qwen3-30B-A3B-Thinking-2507 running:** ⏳ TODO (requires TensorRT-LLM container setup from task 1, model loading API from task 2, and model compilation/preparation)
    - **Model Repository Setup:** ✅ Helper command created
