@@ -33,7 +33,8 @@ All major refactoring phases have been completed:
 - ✅ **Qwen3 Setup and Coding Agent (Phase 10):** Model download infrastructure, coding agent with tool calling, benchmark evaluation framework with sandbox isolation (see QWEN3_SETUP_PLAN.md for details)
 
 **Verification:**
-- ✅ All 112 unit tests passing (`pytest tests/essence/`)
+- ✅ All 244 unit tests passing (`pytest tests/essence/ -m "not integration"`)
+- ✅ Comprehensive test coverage for TensorRT-LLM integration commands (100 tests total)
 - ✅ No linting errors
 - ✅ Clean git working tree
 - ✅ Minimal architecture achieved
@@ -147,6 +148,7 @@ All major refactoring phases have been completed:
    - ✅ Supports listing available models via GET `/v2/repository/index`
    - ✅ Supports checking model status via GET `/v2/models/{model_name}/ready`
    - ✅ CLI interface: `poetry run -m essence manage-tensorrt-llm --action {load|unload|list|status} --model <name>`
+   - ✅ Comprehensive unit tests (28 tests covering all operations and error handling)
    - ✅ Uses httpx for HTTP client (already in dependencies)
    - ✅ Proper error handling for timeouts, connection errors, and API errors
    - ✅ Model switching: Can unload current model and load new one (one at a time)
@@ -182,6 +184,7 @@ All major refactoring phases have been completed:
    - ✅ Updated tests/integration/test_voice_message_integration.py to default to TensorRT-LLM
    - ✅ Updated essence/commands/inference_api_service.py docstrings to mark service as deprecated/legacy
    - ✅ Created `essence/commands/verify_tensorrt_llm.py` command for migration verification
+   - ✅ Comprehensive unit tests (23 tests covering all verification functions and command operations)
    - ✅ Updated docs/guides/TENSORRT_LLM_SETUP.md to document verify-tensorrt-llm command
    - ✅ Updated docs/guides/COMMANDS.md to include verify-tensorrt-llm, manage-tensorrt-llm, and setup-triton-repository commands
    - ✅ Updated docs/API/README.md to remove Gateway API references (service was removed for MVP)
@@ -199,6 +202,7 @@ All major refactoring phases have been completed:
      - ✅ Creates README.md with instructions for each model directory
      - ✅ Created actual model repository structure at `/home/rlee/models/triton-repository/qwen3-30b/1/`
      - ✅ Created README.md with compilation and loading instructions
+     - ✅ Comprehensive unit tests (27 tests covering all repository operations)
      - ⏳ **Remaining:** Place compiled files (TensorRT-LLM engine files, config.pbtxt, tokenizer files)
      - Each model needs: compiled TensorRT-LLM engine files, config.pbtxt, tokenizer files
    - **Model Compilation Helper:** ✅ COMPLETED
@@ -211,6 +215,7 @@ All major refactoring phases have been completed:
      - ✅ Generates tokenizer file copy commands (checks HuggingFace model directory, provides copy commands)
      - ✅ Model readiness check (validates all required files are present and valid before loading)
      - ✅ Provides step-by-step guidance for compilation process
+     - ✅ Comprehensive unit tests (22 tests covering all validation functions, template generation, and file checking)
      - ✅ Usage: `poetry run -m essence compile-model --model <name> --check-prerequisites --generate-template --generate-config --generate-tokenizer-commands`
      - ✅ Usage (after compilation): `poetry run -m essence compile-model --model <name> --check-readiness`
    - **Model Compilation (Operational):**
