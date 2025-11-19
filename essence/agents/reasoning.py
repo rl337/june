@@ -157,6 +157,7 @@ class AgenticReasoner:
         cache: Optional[ReasoningCache] = None,
         enable_cache: bool = True,
         enable_early_termination: bool = True,
+        enable_agent_communication: bool = False,  # Enable agent-to-user communication
     ):
         """
         Initialize the agentic reasoner.
@@ -175,6 +176,7 @@ class AgenticReasoner:
             cache: Reasoning cache instance (optional, uses global cache if None)
             enable_cache: Whether to enable caching
             enable_early_termination: Whether to enable early termination for simple requests
+            enable_agent_communication: Whether to enable agent-to-user communication during reasoning
         """
         self.planner = planner
         self.executor = executor
@@ -189,6 +191,7 @@ class AgenticReasoner:
         self.cache = cache or (get_reasoning_cache() if enable_cache else None)
         self.enable_cache = enable_cache
         self.enable_early_termination = enable_early_termination
+        self.enable_agent_communication = enable_agent_communication
 
     def reason(
         self,
@@ -716,3 +719,182 @@ class AgenticReasoner:
                 iterations=0,
                 total_time=0.0,
             )
+
+    def _send_agent_message(
+        self,
+        context: ConversationContext,
+        message: str,
+        message_type: str = "text",
+    ) -> bool:
+        """
+        Send a message to the user via agent communication interface.
+
+        This is a helper method that wraps the agent communication interface,
+        making it easy for the reasoning system to communicate with users.
+
+        Args:
+            context: Conversation context with user_id and chat_id
+            message: Message text to send
+            message_type: Type of message ("text", "error", "status", "clarification", "help_request", "progress")
+
+        Returns:
+            True if message was sent successfully, False otherwise
+        """
+        if not self.enable_agent_communication:
+            return False
+
+        if not context.user_id or not context.chat_id:
+            logger.debug(
+                "Cannot send agent message: user_id or chat_id not set in context"
+            )
+            return False
+
+        try:
+            from essence.chat.agent_communication import (
+                CommunicationChannel,
+                send_message_to_user,
+            )
+
+            result = send_message_to_user(
+                user_id=str(context.user_id),
+                chat_id=str(context.chat_id),
+                message=message,
+                platform=CommunicationChannel.AUTO,
+                message_type=message_type,
+                require_service_stopped=False,  # Don't require service stopped for optional communication
+            )
+
+            if result.get("success"):
+                logger.info(
+                    f"Agent message sent to user {context.user_id}: {message_type}"
+                )
+                return True
+            else:
+                logger.warning(
+                    f"Failed to send agent message: {result.get('error', 'Unknown error')}"
+                )
+                return False
+
+        except Exception as e:
+            logger.warning(f"Error sending agent message: {e}")
+            return False
+
+    def _ask_for_clarification(
+        self,
+        context: ConversationContext,
+        question: str,
+        context_info: Optional[str] = None,
+    ) -> bool:
+        """
+        Ask user for clarification during reasoning.
+
+        Args:
+            context: Conversation context
+            question: Question to ask the user
+            context_info: Optional context about what needs clarification
+
+        Returns:
+            True if message was sent successfully, False otherwise
+        """
+        if not self.enable_agent_communication:
+            return False
+
+        try:
+            from essence.chat.agent_communication import (
+                CommunicationChannel,
+                ask_for_clarification,
+            )
+
+            result = ask_for_clarification(
+                user_id=str(context.user_id) if context.user_id else "",
+                chat_id=str(context.chat_id) if context.chat_id else "",
+                question=question,
+                context=context_info,
+                platform=CommunicationChannel.AUTO,
+            )
+
+            return result.get("success", False)
+
+        except Exception as e:
+            logger.warning(f"Error asking for clarification: {e}")
+            return False
+
+    def _request_help(
+        self,
+        context: ConversationContext,
+        issue: str,
+        blocker_description: Optional[str] = None,
+    ) -> bool:
+        """
+        Request help from user when agent encounters a blocker.
+
+        Args:
+            context: Conversation context
+            issue: Description of the issue/blocker
+            blocker_description: Optional detailed description
+
+        Returns:
+            True if message was sent successfully, False otherwise
+        """
+        if not self.enable_agent_communication:
+            return False
+
+        try:
+            from essence.chat.agent_communication import (
+                CommunicationChannel,
+                request_help,
+            )
+
+            result = request_help(
+                user_id=str(context.user_id) if context.user_id else "",
+                chat_id=str(context.chat_id) if context.chat_id else "",
+                issue=issue,
+                blocker_description=blocker_description,
+                platform=CommunicationChannel.AUTO,
+            )
+
+            return result.get("success", False)
+
+        except Exception as e:
+            logger.warning(f"Error requesting help: {e}")
+            return False
+
+    def _report_progress(
+        self,
+        context: ConversationContext,
+        progress_message: str,
+        completion_percentage: Optional[int] = None,
+    ) -> bool:
+        """
+        Report progress on a task to the user.
+
+        Args:
+            context: Conversation context
+            progress_message: Progress update message
+            completion_percentage: Optional completion percentage (0-100)
+
+        Returns:
+            True if message was sent successfully, False otherwise
+        """
+        if not self.enable_agent_communication:
+            return False
+
+        try:
+            from essence.chat.agent_communication import (
+                CommunicationChannel,
+                report_progress,
+            )
+
+            result = report_progress(
+                user_id=str(context.user_id) if context.user_id else "",
+                chat_id=str(context.chat_id) if context.chat_id else "",
+                progress_message=progress_message,
+                completion_percentage=completion_percentage,
+                platform=CommunicationChannel.AUTO,
+            )
+
+            return result.get("success", False)
+
+        except Exception as e:
+            logger.warning(f"Error reporting progress: {e}")
+            return False
