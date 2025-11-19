@@ -169,9 +169,13 @@ All major refactoring phases have been completed:
    - ✅ Added comprehensive unit tests for verify-nim command (30 tests covering all verification functions and command class)
    - ✅ Updated june services to support NIM endpoint (updated config.py, docker-compose.yml, documentation)
    - ✅ Added NIM as LLM option in configuration (can be set via LLM_URL=grpc://nim-qwen3:8001)
+   - ✅ Verified `verify-nim` command works correctly (properly detects when service is not running)
    - ⏳ **Note:** NIM image name may need verification (currently using `nvcr.io/nvstaging/nim_qwen3_30b_instruct:latest`)
-   - ⏳ **Note:** Requires NGC API key for authentication (set `NGC_API_KEY` environment variable)
-   - ⏳ **Remaining:** Verify NIM container starts correctly (use `verify-nim` command), test gRPC connectivity with real NIM service
+   - ⏳ **Operational Task:** Start NIM service (requires `NGC_API_KEY` environment variable to be set in home_infra):
+     - Set `NGC_API_KEY` in home_infra environment (or `.env` file)
+     - Start service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3`
+     - Verify service: `cd /home/rlee/dev/june && poetry run -m essence verify-nim --nim-host nim-qwen3 --http-port 8003 --grpc-port 8001`
+   - ⏳ **Remaining:** Test gRPC connectivity with real NIM service once it's running
 
 5. **Implement message history debugging and agent communication:** ✅ COMPLETED (Code implementation)
    - **Goal:** Fix Telegram and Discord rendering issues and enable agents to communicate directly with the user
