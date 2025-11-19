@@ -68,7 +68,7 @@ def record_grpc_call(
     method: str,
     duration: float,
     status_code: str = "ok"
-):
+) -> None:
     """
     Record a gRPC call metric manually.
     
