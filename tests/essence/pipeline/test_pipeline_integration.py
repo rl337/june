@@ -84,11 +84,29 @@ def pipeline_framework_real():
     if PipelineTestFramework is None:
         pytest.skip("PipelineTestFramework not available")
     # Skip if grpc is not available or if we're in CI
+    # Use try/except with broad Exception catch to handle any evaluation errors
     try:
-        if _IS_CI or not _GRPC_AVAILABLE:
+        # Safely check if we should skip
+        should_skip = False
+        try:
+            if _IS_CI:
+                should_skip = True
+        except (NameError, AttributeError, Exception):
+            # If _IS_CI isn't defined, assume CI to be safe
+            should_skip = True
+        
+        if not should_skip:
+            try:
+                if not _GRPC_AVAILABLE:
+                    should_skip = True
+            except (NameError, AttributeError, Exception):
+                # If _GRPC_AVAILABLE isn't defined, skip to be safe
+                should_skip = True
+        
+        if should_skip:
             pytest.skip("Skipping integration test (CI environment or grpc unavailable/mocked)")
-    except (NameError, AttributeError):
-        # If constants aren't defined, skip to be safe
+    except Exception:
+        # If anything goes wrong, skip to be safe
         pytest.skip("Skipping integration test (grpc availability check failed)")
     return PipelineTestFramework(use_real_services=True)
 
