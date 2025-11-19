@@ -71,6 +71,16 @@ scrape_configs:
     metrics_path: '/metrics'
     scrape_interval: 10s
 
+  - job_name: 'discord'
+    static_configs:
+      - targets: ['discord:8081']
+        labels:
+          service: 'discord'
+          component: 'bot'
+          tier: 'frontend'
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
   - job_name: 'integration-test'
     static_configs:
       - targets: ['integration-test:8082']

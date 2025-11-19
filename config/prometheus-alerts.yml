@@ -5,7 +5,7 @@ groups:
       # Service Down Alerts
       # Note: gateway and orchestrator services were removed for MVP
       - alert: ServiceDown
-        expr: up{job=~"inference-api|stt|tts|telegram|todo-mcp-service"} == 0
+        expr: up{job=~"inference-api|stt|tts|telegram|discord|todo-mcp-service"} == 0
         for: 1m
         labels:
           severity: critical
@@ -25,6 +25,8 @@ groups:
             sum(rate(tts_errors_total[5m])) > 0.1
             or
             sum(rate(telegram_errors_total[5m])) > 0.1
+            or
+            sum(rate(discord_errors_total[5m])) > 0.1
           )
         for: 5m
         labels:
