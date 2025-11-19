@@ -2,7 +2,7 @@
 
 ## Status: ✅ **CORE REFACTORING COMPLETE** → 🚀 **FORWARD DEVELOPMENT IN PROGRESS**
 
-**Last Updated:** 2025-11-19 (Fixed GitHub Actions CI - Skip integration tests in CI environment)
+**Last Updated:** 2025-11-19 (Fixed GitHub Actions CI - Combined skipif conditions into single function)
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
@@ -249,6 +249,7 @@ All major refactoring phases have been completed:
    - ✅ Enhanced grpc availability check to use module-level constant (run #278) - Changed from function call to constant evaluated at import time to avoid pytest collection issues
    - ✅ Made MagicMock import safer (run #280) - Added try/except around MagicMock import and additional exception handling in grpc availability check
    - ✅ Simplified CI skip logic (run #282) - Skip integration tests in CI environment (CI=true) to avoid collection issues, check grpc availability locally
+   - ✅ Combined skipif conditions (run #285) - Use single `_should_skip_integration_test()` function that checks CI first, then grpc availability, avoiding multiple decorator evaluation issues
    - ✅ Total: 162 tests passing (153 existing + 9 pipeline tests)
 
 2. **Test STT → LLM → TTS flow:** ⏳ TODO (framework ready, requires real services)
