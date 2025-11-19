@@ -1,60 +1,261 @@
-# June Refactoring Plan
+# June Development Plan
 
-## Status: ✅ **CORE REFACTORING COMPLETE**
+## Status: ✅ **CORE REFACTORING COMPLETE** → 🚀 **FORWARD DEVELOPMENT IN PROGRESS**
 
-**Last Updated:** 2025-11-18 (Verified: 2025-11-18 - All code refactoring complete, Phase 14 Message History Debugging completed including admin endpoint, documentation accuracy fixes, code quality improvements)
+**Last Updated:** 2025-11-18
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
-**🎉 REFACTORING COMPLETE:** All major refactoring phases have been completed. The project has been successfully pared down to bare essentials for the voice message → STT → LLM → TTS → voice response round trip.
-
-**✅ Verification (2025-11-18):**
-- Verified all 112 unit tests pass successfully (100 existing + 12 new from Phase 14)
-- Verified no linting errors in essence package
-- Verified git status is clean (only session tracking file modified, which is in .gitignore)
-- Confirmed all code-related refactoring is complete
-- Note: Commit count is informational only - do not update automatically (see agent loop script guidelines)
-
-**✅ Final Status Verification (2025-11-18):**
-- All 112 unit tests passing (verified with `pytest tests/essence/`) - 100 existing + 12 new from Phase 14
-- No linting errors in essence package (verified with `read_lints`)
-- All code-related refactoring phases complete (Phases 1-13)
-- All TODO items in codebase are documented limitations (pass@k calculation)
-- No actionable code tasks remaining - only operational/runtime tasks require running system
-- Project is ready for operational use when GPU and model resources are available
-
-**✅ Phase 10 Coding Agent Command:** The coding-agent CLI command has been implemented (`essence/commands/coding_agent.py`), providing both single-task and interactive modes for using the coding agent. This completes the Phase 10 implementation infrastructure. 
-
-**✅ All code-related work is complete:**
-- All service dependencies removed
-- All code references cleaned up
-- All obsolete files marked appropriately
-- All documentation updated
-- All unit tests passing (112/112) - 100 existing + 12 new from Phase 14
-- Minimal architecture achieved
-
-**✅ Final Verification (2025-11-18):**
-- Verified all 112 unit tests pass successfully (100 existing + 12 new from Phase 14)
-- Verified no linting errors in essence package
-- Verified all documentation is up-to-date and accurate
-- Verified operational guides are complete and clear
-- Confirmed project is ready for operational use
-
-**📋 Remaining work:** Only operational/runtime tasks remain (model download, service startup, integration testing) - these are documented in Phase 10 operational guide and can be done when ready to use the system.
-
-See "Refactoring Status Summary" section below for complete details.
-
 ## Goal
-Pare down the june project to bare essentials for the **voice message → STT → LLM → TTS → voice response** round trip, supporting both **Telegram** and **Discord** platforms.
 
-**Extended Goal:** Get Qwen3-30B-A3B-Thinking-2507 running on **GPU** in containers (CPU loading is FORBIDDEN - see Critical Requirements) and develop a capable locally-run coding agent for evaluation on public benchmark datasets. **All operations must be containerized** - no host system pollution.
+Build a complete **voice message → STT → LLM → TTS → voice response** system with **agentic LLM reasoning** before responding, supporting both **Telegram** and **Discord** platforms.
 
-## Core Principles (Established from Completed Work)
+**Extended Goal:** 
+- Get Qwen3-30B-A3B-Thinking-2507 running on **GPU** via **TensorRT-LLM** (CPU loading is FORBIDDEN)
+- Develop agentic flow that performs reasoning/planning before responding to users
+- Evaluate model performance on benchmark datasets
+- All operations must be containerized - no host system pollution
+
+## Completed Work Summary
+
+### ✅ Core Refactoring (Phases 1-14) - COMPLETE
+
+All major refactoring phases have been completed:
+
+- ✅ **Service Removal and Cleanup (Phases 1-3):** Removed non-essential services, cleaned up dependencies
+- ✅ **Observability (Phases 4-5):** OpenTelemetry tracing, Prometheus metrics implemented
+- ✅ **Package Simplification (Phase 6):** Removed unused packages, migrated to Poetry in-place installation
+- ✅ **Documentation Cleanup (Phase 7):** Updated all documentation to reflect current architecture
+- ✅ **Service Refactoring (Phase 9.1):** All services refactored to minimal architecture
+- ✅ **Scripts Cleanup (Phase 11):** Converted reusable tools to commands, removed obsolete scripts
+- ✅ **Test Infrastructure (Phases 12-13):** Integration test service with REST API, Prometheus/Grafana monitoring
+- ✅ **Message History Debugging (Phase 14):** Implemented `get_message_history()` for Telegram/Discord debugging
+
+**Verification:**
+- ✅ All 112 unit tests passing (`pytest tests/essence/`)
+- ✅ No linting errors
+- ✅ Clean git working tree
+- ✅ Minimal architecture achieved
+- ✅ All code-related refactoring complete
+
+**Best Practices Established:**
+- Minimal architecture - only essential services
+- Container-first development - no host system pollution
+- Command pattern for reusable tools
+- Unit tests with mocked dependencies
+- Integration tests via test service (background)
+- OpenTelemetry tracing and Prometheus metrics
+
+## Current Architecture
+
+### Essential Services
+1. **telegram** - Receives voice messages from Telegram, orchestrates the pipeline
+2. **discord** - Receives voice messages from Discord, orchestrates the pipeline
+3. **stt** - Speech-to-text conversion (Whisper)
+4. **tts** - Text-to-speech conversion (FastSpeech2/espeak)
+5. ~~**inference-api**~~ → **TensorRT-LLM** (migration in progress)
+
+### Infrastructure
+- **LLM Inference:** Migrating from `inference-api` service to **TensorRT-LLM container** (from home_infra shared-network)
+- **From home_infra (shared-network):** nginx, jaeger, prometheus, grafana (available)
+- All services communicate via gRPC directly
+
+## Next Development Priorities
+
+### Phase 15: TensorRT-LLM Integration ⏳ IN PROGRESS
+
+**Goal:** Replace `inference-api` service with TensorRT-LLM container for optimized GPU inference.
+
+**Tasks:**
+1. **Set up TensorRT-LLM container in home_infra:**
+   - Add TensorRT-LLM service to `home_infra/docker-compose.yml`
+   - Configure it to connect to shared-network
+   - Set up GPU access and resource limits
+   - Configure model storage and cache directories
+
+2. **Implement model loading/unloading:**
+   - Create API/interface for loading models into TensorRT-LLM
+   - Create API/interface for unloading models
+   - Support multiple models (load one at a time, unload before loading another)
+   - Handle model switching gracefully (unload current, load new)
+
+3. **Migrate june services to use TensorRT-LLM:**
+   - Update telegram service to connect to TensorRT-LLM instead of inference-api
+   - Update discord service to connect to TensorRT-LLM instead of inference-api
+   - Update any other services that use inference-api
+   - Remove inference-api service from june docker-compose.yml
+
+4. **Get Qwen3-30B-A3B-Thinking-2507 running:**
+   - Load Qwen3 model into TensorRT-LLM container
+   - Verify GPU usage (must use GPU, CPU fallback FORBIDDEN)
+   - Test model inference via gRPC interface
+   - Verify quantization and memory usage
+
+**Critical Requirements:**
+- **GPU-only loading:** Large models (30B+) must NEVER load on CPU
+- **Fail fast:** TensorRT-LLM must fail if GPU is not available, not attempt CPU loading
+- **GPU verification:** Verify GPU availability before model loading
+- **Model switching:** Support loading/unloading models dynamically
+
+### Phase 16: End-to-End Pipeline Testing ⏳ TODO
+
+**Goal:** Verify complete voice message → STT → LLM → TTS → voice response flow works end-to-end.
+
+**Tasks:**
+1. **Test STT → LLM → TTS flow:**
+   - Send voice message via Telegram
+   - Verify STT converts to text correctly
+   - Verify LLM (Qwen3 via TensorRT-LLM) processes text
+   - Verify TTS converts response to audio
+   - Verify audio is sent back to user
+
+2. **Test Discord integration:**
+   - Repeat above flow for Discord
+   - Verify platform-specific handling works correctly
+
+3. **Debug rendering issues:**
+   - Use `get_message_history()` to inspect what was actually sent
+   - Compare expected vs actual output
+   - Fix any formatting/markdown issues
+   - Verify message history works for both Telegram and Discord
+
+4. **Performance testing:**
+   - Measure latency for each stage (STT, LLM, TTS)
+   - Identify bottlenecks
+   - Optimize where possible
+
+### Phase 17: Agentic Flow Implementation ⏳ TODO
+
+**Goal:** Implement agentic reasoning/planning before responding to users (not just one-off LLM calls).
+
+**Tasks:**
+1. **Design agentic flow architecture:**
+   - Define reasoning loop (think → plan → execute → reflect)
+   - Determine when to use agentic flow vs direct response
+   - Design conversation context management
+
+2. **Implement reasoning loop:**
+   - Create agentic reasoning service/component
+   - Implement planning phase (break down user request into steps)
+   - Implement execution phase (carry out plan)
+   - Implement reflection phase (evaluate results, adjust if needed)
+
+3. **Integrate with LLM (Qwen3 via TensorRT-LLM):**
+   - Use Qwen3 for reasoning/planning
+   - Use Qwen3 for execution (code generation, problem solving)
+   - Use Qwen3 for reflection (evaluating results)
+
+4. **Test agentic flow:**
+   - Test with simple tasks first
+   - Gradually increase complexity
+   - Verify reasoning improves response quality
+   - Measure performance impact
+
+5. **Optimize for latency:**
+   - Balance reasoning depth vs response time
+   - Implement timeout mechanisms
+   - Cache common reasoning patterns if applicable
+
+### Phase 18: Model Evaluation and Benchmarking ⏳ TODO
+
+**Goal:** Evaluate Qwen3 model performance on benchmark datasets.
+
+**Tasks:**
+1. **Set up benchmark evaluation:**
+   - Integrate benchmark datasets (HumanEval, MBPP, SWE-bench, CodeXGLUE)
+   - Create evaluation framework
+   - Set up sandbox execution environment (containers/chroots)
+
+2. **Run evaluations:**
+   - Execute benchmarks with Qwen3 model
+   - Collect results (correctness, efficiency, solution quality)
+   - Compare against baseline/other models if available
+
+3. **Analyze results:**
+   - Identify model strengths and weaknesses
+   - Document findings
+   - Use insights to improve agentic flow
+
+4. **Iterate and improve:**
+   - Adjust agentic flow based on evaluation results
+   - Test different reasoning strategies
+   - Measure improvement over iterations
+
+## Critical Requirements
+
+### GPU-Only Model Loading (MANDATORY)
+
+**CRITICAL:** Large models (30B+ parameters) must **NEVER** be loaded on CPU. Loading a 30B model on CPU consumes 100GB+ of system memory and will cause system instability.
+
+**Requirements:**
+1. **All large models must use GPU** - Models like Qwen3-30B-A3B-Thinking-2507 must load on GPU with quantization (4-bit or 8-bit)
+2. **TensorRT-LLM handles GPU loading** - TensorRT-LLM container must be configured for GPU-only operation
+3. **CPU fallback is FORBIDDEN for large models** - TensorRT-LLM must fail if GPU is not available, not attempt CPU loading
+4. **GPU compatibility must be verified before model loading** - TensorRT-LLM should verify GPU availability before starting
+5. **Consult external sources for GPU setup** - If GPU is not working:
+   - Check TensorRT-LLM documentation for GPU requirements and setup
+   - Review NVIDIA documentation for compute capability support
+   - Check container GPU access (nvidia-docker, GPU passthrough)
+   - Review model quantization and optimization options
+
+## Operational Guide
+
+### When Ready to Use the System
+
+1. **Set up TensorRT-LLM container:**
+   ```bash
+   cd /home/rlee/dev/home_infra
+   # Add tensorrt-llm service configuration to docker-compose.yml
+   docker compose up -d tensorrt-llm
+   ```
+
+2. **Load Qwen3 model:**
+   ```bash
+   # Use TensorRT-LLM API to load Qwen3-30B-A3B-Thinking-2507
+   # (API/interface to be implemented in Phase 15)
+   ```
+
+3. **Start june services:**
+   ```bash
+   cd /home/rlee/dev/june
+   docker compose up -d telegram discord stt tts
+   ```
+
+4. **Test end-to-end flow:**
+   ```bash
+   # Send voice message via Telegram/Discord
+   # Verify complete pipeline works
+   ```
+
+5. **Debug with message history:**
+   ```bash
+   # Get message history to debug rendering issues
+   poetry run -m essence get-message-history --user-id <id> --limit 10
+   ```
+
+6. **Test agentic flow:**
+   ```bash
+   # Test agentic reasoning with coding tasks
+   poetry run -m essence coding-agent --interactive
+   ```
+
+7. **Run benchmark evaluations:**
+   ```bash
+   # Run benchmark evaluations
+   poetry run -m essence run-benchmarks --dataset humaneval --max-tasks 10
+   ```
+
+**Prerequisites:**
+- NVIDIA GPU with 20GB+ VRAM (for Qwen3-30B with quantization)
+- NVIDIA Container Toolkit installed and configured
+- Docker with GPU support enabled
+- TensorRT-LLM container set up in home_infra
+
+## Architecture Principles
 
 ### Minimal Architecture
-- **Essential services only:** telegram, discord, stt, tts, inference-api
-- **LLM inference:** inference-api service (current implementation) - provides gRPC interface for LLM inference
-- **Optional future migration:** TensorRT-LLM container (from home_infra shared-network) - can replace inference-api for optimized GPU inference (see Phase 10 operational guide)
+- **Essential services only:** telegram, discord, stt, tts, TensorRT-LLM (via home_infra)
+- **LLM inference:** TensorRT-LLM container (from home_infra shared-network) - optimized GPU inference
 - **No external dependencies:** All services communicate via gRPC directly
 - **In-memory alternatives:** Conversation storage and rate limiting use in-memory implementations
 - **Container-first:** All operations run in Docker containers - no host system pollution
@@ -78,589 +279,66 @@ Pare down the june project to bare essentials for the **voice message → STT �
 - **OpenTelemetry tracing:** Implemented across all services
 - **Prometheus metrics:** Implemented and exposed
 - **Health checks:** All services have health check endpoints
-
-## Completed Work Summary
-
-### Phase 1-3: Service Removal and Cleanup ✅
-- Removed non-essential services: gateway, postgres, minio, redis, nats, orchestrator, webapp
-- Removed all code dependencies on removed services
-- Cleaned up service directories
-- **Best Practice:** Keep architecture minimal - only essential services for core functionality
-
-### Phase 4-5: Observability ✅
-- Implemented OpenTelemetry tracing across all services
-- Implemented Prometheus metrics and exposed endpoints
-- **Best Practice:** Always add tracing and metrics to new services
-
-### Phase 6: Package Simplification ✅
-- Removed unused packages (june-agent-state, june-agent-tools, june-cache, june-mcp-client, june-metrics)
-- Migrated from wheel builds to Poetry in-place installation
-- **Best Practice:** Only keep packages that are actively used; use editable installs for development
-
-### Phase 7: Documentation Cleanup ✅
-- Simplified README.md to reflect minimal architecture
-- Removed references to removed services
-- ✅ Fixed documentation inconsistencies: Updated `docs/guides/AGENTS.md` to reference `REFACTOR_PLAN.md` instead of outdated `TODO.md` as the source of truth
-- ✅ **COMPLETED:** Updated `AGENTS.md` to reflect TensorRT-LLM container architecture - removed inference-api service references and updated to show TensorRT-LLM container from home_infra shared-network for LLM inference
-- ✅ Improved benchmark evaluation documentation: Updated `README.md` to show both script wrapper and direct command options for running benchmarks, providing users with clear choices
-- ✅ Improved coding agent documentation: Updated `README.md` to show both CLI command and Python API options for using the coding agent, matching the pattern used for benchmark evaluation
-- ✅ Updated `docs/README.md` last updated date to 2025-11-18
-- ✅ Marked PostgreSQL optimization docs as obsolete: Added obsolete warnings to `docs/database_optimization_summary.md` and `docs/query_optimization_guide.md` (PostgreSQL removed for MVP)
-- ✅ **COMPLETED:** Updated `docs/guides/AGENTS.md` Architecture Overview section to reflect current minimal architecture - removed references to Gateway, Webapp, PostgreSQL, MinIO, and NATS services; updated to show Telegram/Discord services, in-memory storage, and current infrastructure setup
-- ✅ **COMPLETED:** Removed outdated "Database connectivity" reference from `docs/guides/AGENTS.md` run_checks.sh validation list (PostgreSQL service removed)
-- ✅ Fixed CPU fallback documentation inconsistency in README.md - Corrected misleading statement that CPU fallback is allowed for large models (30B+). Updated to reflect Critical Requirements that CPU fallback is FORBIDDEN for large models and service will fail to start if GPU is not available
-- ✅ Added pre-flight environment check step to README.md Quick Setup section - Added step 0 recommending users run `poetry run -m essence check-environment` before attempting model downloads. This helps catch configuration issues early and aligns README.md with the operational guide in REFACTOR_PLAN.md
-- ✅ Updated commit count accuracy: Fixed commit count discrepancy in REFACTOR_PLAN.md (updated from 243 to 244, then to 245 to match git status after commits)
-- ✅ **COMPLETED:** Fixed documentation inconsistency regarding LLM inference - Clarified that inference-api is the current implementation (included in june project) and TensorRT-LLM is an optional future migration path. Updated REFACTOR_PLAN.md and AGENTS.md to accurately reflect current architecture vs. future migration options.
-- ✅ **COMPLETED & VERIFIED:** Fixed GitHub Actions CI workflow failures - Removed unnecessary Playwright browser installation step, explicitly run `pytest tests/essence/` to match local test execution. Initially configured Poetry to disable virtualenv creation, but this caused PEP 668 externally-managed-environment errors with Python 3.12. Multiple attempts using various Poetry installation methods (snok/install-poetry, pipx, official installer, abatilo/actions-poetry) failed. Final fix: Use `pip install --break-system-packages poetry` with environment variables `POETRY_VIRTUALENVS_CREATE: "true"` and `POETRY_VIRTUALENVS_IN_PROJECT: "true"` for `poetry install --no-root`. This configuration succeeded in run #218. Run #219 failed with abatilo/actions-poetry@v3, so reverted to successful method in run #220. **Verified:** Runs #220 and #221 both completed successfully, confirming the fix works reliably.
-- **Best Practice:** Keep documentation minimal and aligned with actual architecture. Maintain commit count accuracy in REFACTOR_PLAN.md to reflect current git status. Note: Each commit that updates the count increments it further, which is expected maintenance behavior.
-
-### Phase 9.1: Service Refactoring ✅
-- All services refactored to use Command pattern
-- All services work without external dependencies
-- ✅ Core service commands enhanced with comprehensive docstrings (`essence/commands/telegram_service.py`, `discord_service.py`, `stt_service.py`, `tts_service.py`)
-  - ✅ Enhanced docstrings for all class methods with comprehensive documentation
-- ✅ Utility commands enhanced with comprehensive docstrings (`essence/commands/integration_test_service.py`, `review_sandbox.py`, `monitor_gpu.py`)
-  - ✅ Enhanced docstrings for all class methods with comprehensive documentation
-- **Best Practice:** All services must follow Command pattern and work independently
-
-### Phase 10: Qwen3 Setup and Coding Agent ✅
-- Qwen3-30B model setup on GPU in containers
-- Coding agent interface with tool calling
-- Benchmark evaluation framework with sandbox isolation
-- **Best Practice:** All model operations must be containerized; use sandboxes for benchmark isolation
-
-**Implementation Status:**
-- ✅ Model download infrastructure complete (`essence/commands/download_models.py`)
-- ✅ Model loading with duplicate load prevention implemented
-- ✅ GPU-only loading for large models (30B+) with CPU fallback prevention
-- ✅ Coding agent implemented (`essence/agents/coding_agent.py`)
-- ✅ Coding agent command implemented (`essence/commands/coding_agent.py`) - CLI interface for interactive and single-task execution
-  - ✅ Enhanced interactive mode with help command ('help' or '?') and improved user guidance
-  - ✅ Enhanced error handling with specific exception types (gRPC errors, connection errors) and actionable error messages
-  - ✅ Enhanced docstrings for all class methods with comprehensive documentation
-- ✅ Benchmark evaluator implemented (`essence/agents/evaluator.py`)
-  - ✅ Enhanced error handling and validation in `_run_tests` method with input validation and better exception handling
-  - ✅ Enhanced docstrings for BenchmarkTask and TaskResult dataclasses with comprehensive attribute documentation
-- ✅ Benchmark evaluation command implemented (`essence/commands/run_benchmarks.py`) - CLI interface for running benchmark evaluations
-  - ✅ Enhanced docstrings for all class methods with comprehensive documentation
-- ✅ Model download command implemented (`essence/commands/download_models.py`) - CLI interface for downloading authorized models
-  - ✅ Enhanced docstrings for all class methods with comprehensive documentation
-  - ✅ Fail-fast validation for HUGGINGFACE_TOKEN when downloading gated models (prevents wasted time on failed downloads)
-- ✅ Dataset generation command implemented (`essence/commands/generate_alice_dataset.py`) - CLI interface for generating Alice dataset
-  - ✅ Enhanced docstrings for all class methods with comprehensive documentation
-- ✅ Sandbox isolation implemented (`essence/agents/sandbox.py`)
-  - ✅ Enhanced docstrings for SandboxMetrics and CommandLog dataclasses with comprehensive attribute documentation
-- ✅ Verification tools implemented (`essence/commands/verify_qwen3.py`, `benchmark_qwen3.py`)
-  - ✅ Enhanced docstrings for all class methods with comprehensive documentation
-- ✅ Pre-flight environment check command implemented (`essence/commands/check_environment.py`) - Validates environment readiness before operational tasks
-  - ✅ Checks Docker, docker compose, GPU, NVIDIA Container Toolkit, HUGGINGFACE_TOKEN, model cache directory, docker-compose.yml, and Docker network
-  - ✅ Provides clear feedback on what's ready and what needs configuration
-  - ✅ Helps catch configuration issues early before attempting model downloads or service startup
-- ✅ Code quality improvements: Added return type annotations to all `get_db_connection()` functions
-  - ✅ Added return type annotations to `get_db_connection()` in `cost_tracking.py`, `admin_auth.py`, and `conversation_storage.py`
-  - ✅ Enhanced docstrings with `Raises` sections for better error documentation
-  - ✅ Improved type safety and code clarity across database connection functions
-- ✅ Code quality improvements: Added return type annotations to additional utility functions
-  - ✅ Added return type annotation (-> None) to `save_report` in `benchmark_qwen3.py`
-  - ✅ Added return type annotation (-> Optional[str]) to `find_agenticness_directory` in `handler.py`
-  - ✅ Added return type annotations to all functions in `config.py` (get_service_config, get_stt_address, get_tts_address, get_llm_address, get_metrics_storage)
-  - ✅ Enhanced docstrings with Args and Returns sections for better documentation
-- ✅ Code quality improvements: Added return type annotations to command methods
-  - ✅ Added return type annotation (-> None) to `list_authorized_models` in `download_models.py`
-  - ✅ Added return type annotation (-> None) to `get_cache_status` in `download_models.py`
-  - ✅ Added return type annotation (-> None) to `reset_peak_stats` in `benchmark_qwen3.py`
-  - ✅ Enhanced docstrings with detailed descriptions for better documentation
-- ✅ Code quality improvements: Added return type annotation to gRPC metrics utility
-  - ✅ Added return type annotation (-> None) to `record_grpc_call` in `grpc_metrics.py`
-  - ✅ Improves type safety and code clarity for gRPC instrumentation utilities
-- ✅ File modification tracking implemented in benchmark evaluator - tracks files created and modified during task execution
-- ✅ Language auto-detection support implemented in Telegram voice handler - STT service now receives None for auto-detection when language preference is not set
-- ⚠️ **Known limitation:** pass@k calculation (for k > 1) currently uses pass@1 as placeholder - proper implementation would require running each task multiple times (future enhancement)
-  - TODO comments in `essence/agents/evaluator.py` (lines 541-543) document this limitation
-  - Comprehensive documentation added explaining what pass@k measures, why multiple attempts are needed, and what would be required for proper implementation
-  - This is intentional and documented - not a bug or incomplete feature
-- ⏳ **Operational tasks:** Model download, service startup, and testing can be done when ready to use (requires running system with GPU)
-
-**Operational Guide (When Ready to Use):**
-
-When ready to use the Qwen3 model and coding agent, follow these steps:
-
-0. **Pre-flight environment check (recommended):**
-   ```bash
-   # Validate environment readiness before proceeding
-   poetry run -m essence check-environment
-   ```
-   **Note:** This checks Docker, GPU, NVIDIA Container Toolkit, HUGGINGFACE_TOKEN, and other prerequisites. Fix any issues before proceeding.
-
-1. **Start inference-api service (current implementation):**
-   ```bash
-   # Start the inference-api service with Qwen3 model
-   docker compose up -d inference-api
-   
-   # Check logs for model loading
-   docker compose logs -f inference-api
-   ```
-   **Note:** This requires a GPU with 20GB+ VRAM. The inference-api service will load Qwen3-30B-A3B-Thinking-2507 model with quantization automatically.
-
-2. **Verify inference-api service is running:**
-   ```bash
-   # Check container status
-   docker compose ps inference-api
-   
-   # Check health endpoint
-   curl http://localhost:8001/health
-   ```
-
-3. **Optional: Migrate to TensorRT-LLM container (future optimization):**
-   ```bash
-   # Add TensorRT-LLM container to home_infra docker-compose.yml
-   # Configure it to load Qwen3-30B-A3B-Thinking-2507 model
-   # Connect it to shared-network so june services can access it
-   cd /home/rlee/dev/home_infra
-   # Add tensorrt-llm service configuration
-   docker compose up -d tensorrt-llm
-   
-   # Update june services to connect to TensorRT-LLM instead of inference-api
-   # Update service configuration to use tensorrt-llm:8000 (or appropriate port)
-   ```
-   **Note:** TensorRT-LLM provides optimized GPU inference but requires additional setup. inference-api is the current working implementation.
-
-4. **Test the coding agent:**
-   ```bash
-   # Use the coding agent command
-   poetry run -m essence coding-agent --help
-   
-   # Run a single task
-   poetry run -m essence coding-agent --task "Write a Python function to calculate factorial"
-   
-   # Run in interactive mode
-   poetry run -m essence coding-agent --interactive
-   ```
-
-5. **Run benchmark evaluation:**
-   ```bash
-   # Run benchmark evaluation with sandbox isolation
-   poetry run -m essence benchmark-qwen3 --help
-   
-   # Run benchmark evaluations
-   poetry run -m essence run-benchmarks --dataset humaneval --max-tasks 10
-   ```
-
-**Prerequisites:**
-- NVIDIA GPU with 20GB+ VRAM (for Qwen3-30B with quantization)
-- NVIDIA Container Toolkit installed and configured
-- Docker with GPU support enabled
-
-**See also:** `README.md` (Qwen3 Setup section) and `QWEN3_SETUP_PLAN.md` for detailed setup instructions.
-
-### Phase 11: Scripts Directory Cleanup and Command Migration ✅
-- All reusable Python tools converted to commands
-- All test utilities moved to tests/scripts/
-- All obsolete scripts removed
-- Documentation updated
-- **Best Practice:** Keep scripts/ minimal - only infrastructure/automation scripts; use commands for reusable tools
-
-### Phase 12: Test Infrastructure and Integration Test Service ✅
-- Created integration test service with REST API
-- Migrated existing integration tests to work with test service
-- Comprehensive testing documentation
-- **Best Practice:** Integration tests run in background via test service; use REST API for management
-
-### Phase 13: Running and Checking Integration Test Runs ✅
-- Deployed integration test service to docker-compose.yml
-- Set up Prometheus metrics and alerting
-- Created Grafana dashboard for test monitoring
-- Comprehensive workflow documentation
-- **Best Practice:** Monitor test runs via Prometheus/Grafana; set up alerts for failures
-
-## Critical Requirements
-
-### GPU-Only Model Loading (MANDATORY)
-
-**CRITICAL:** Large models (30B+ parameters) must **NEVER** be loaded on CPU. Loading a 30B model on CPU consumes 100GB+ of system memory and will cause system instability.
-
-**Requirements:**
-1. **All large models must use GPU** - Models like Qwen3-30B-A3B-Thinking-2507 must load on GPU with quantization (4-bit or 8-bit)
-2. **Current implementation: inference-api service** - The inference-api service handles GPU loading and quantization automatically - CPU fallback is prevented for large models (30B+)
-3. **Optional future: TensorRT-LLM container** - TensorRT-LLM can replace inference-api for optimized GPU inference (see Phase 10 operational guide)
-4. **CPU fallback is FORBIDDEN for large models** - Both inference-api and TensorRT-LLM must be configured to fail if GPU is not available, not attempt CPU loading
-5. **GPU compatibility must be verified before model loading** - Both inference-api and TensorRT-LLM should verify GPU availability before starting
-6. **Consult external sources for GPU setup** - If GPU is not working:
-   - Check inference-api service logs for GPU compatibility issues
-   - Review NVIDIA documentation for compute capability support
-   - Check container GPU access (nvidia-docker, GPU passthrough)
-   - Review model quantization and optimization options
-   - For TensorRT-LLM: Check TensorRT-LLM documentation for GPU requirements and setup
-
-**Current Issue:**
-- ~~Qwen3-30B model is falling back to CPU due to GPU compute capability mismatch (sm_121 not supported by PyTorch 2.5.1)~~
-- ~~This causes 100GB+ memory usage and system instability~~
-- ✅ **FIXED:** CPU fallback is now prevented for large models (30B+) - service fails fast with clear error message
-
-**Implementation:**
-- ✅ **Current: inference-api service** - Handles GPU loading and quantization; CPU fallback prevented for large models (30B+)
-- ✅ inference-api service is configured to fail if GPU is not available (not attempt CPU loading)
-- ✅ inference-api service verifies GPU availability before starting
-- ✅ Services connect to inference-api service via gRPC (inference-api:50051)
-- ✅ Clear error messages if inference-api service is not available or GPU is not compatible
-- ⏳ **Optional future: TensorRT-LLM container** - Can replace inference-api for optimized GPU inference (requires setup in home_infra)
-
-## Current Priorities
-
-### Phase 12: Test Infrastructure and Integration Test Service ✅ COMPLETED
-
-**Goal:** Establish proper test infrastructure with unit tests (mocked) and integration tests (background service).
-
-**Status:** All requirements met and tasks completed.
-
-**Tasks:**
-1. **Create integration test service:**
-   - ✅ Design REST API for test management (COMPLETED - REST API with endpoints for starting tests, checking status, retrieving results, viewing logs, listing runs, cancelling runs)
-   - ✅ Implement test runner that executes tests in background (COMPLETED - uses subprocess to run pytest in background, captures output line-by-line)
-   - ✅ Implement result storage and retrieval (COMPLETED - in-memory storage with TestRun dataclass, stores status, output, logs, exit codes)
-   - ✅ Add health check endpoint (COMPLETED - /health endpoint with Prometheus metrics)
-
-2. **Migrate existing integration tests:**
-   - ✅ Identify current integration tests (COMPLETED - identified 4 test files: 3 active, 1 obsolete. Created tests/integration/README.md documenting all tests, their dependencies, and status)
-   - ✅ Ensure they can run in background (COMPLETED - all tests are pytest-based and can run in background. Integration test service runs them via subprocess)
-   - ✅ Update to use test service API (COMPLETED - tests work as-is via pytest. Integration test service runs them via `poetry run pytest` and provides REST API for management. No code changes needed to tests)
-
-3. **Documentation:**
-   - ✅ Document how to run unit tests (pytest) (COMPLETED - created docs/guides/TESTING.md with comprehensive testing guide including unit test requirements, examples, best practices, and troubleshooting)
-   - ✅ Document how to start integration test service (COMPLETED - added comprehensive documentation to docs/guides/TESTING.md including command usage, environment variables, and service endpoints)
-   - ✅ Document how to check integration test results (COMPLETED - added REST API reference with examples for checking status, retrieving results, viewing logs, listing runs, and cancelling tests)
-   - ✅ Document test service REST API (COMPLETED - added complete REST API reference with all 8 endpoints, request/response examples, status values, and usage examples in bash and Python)
-
-### Phase 13: Running and Checking Integration Test Runs ✅ COMPLETED
-
-**Goal:** Establish workflow for running and monitoring integration tests.
-
-**Tasks:**
-1. **Test service deployment:**
-   - ✅ Add test service to docker-compose.yml (COMPLETED - added integration-test service with Dockerfile, health checks, port 8082, log volume mount, and network configuration)
-   - ✅ Configure test service to run integration tests (COMPLETED - service runs via `poetry run python -m essence integration-test-service` which executes pytest in background via subprocess)
-   - ✅ Set up log aggregation for test service (COMPLETED - logs mounted to `/var/log/june/integration-test:/logs` volume, service writes logs to stdout/stderr which are captured by Docker)
-
-2. **Monitoring and alerting:**
-   - ✅ Set up alerts for test failures (COMPLETED - added 5 Prometheus alert rules in config/prometheus-alerts.yml: service down, test failures, high failure rate, long duration, service unhealthy)
-   - ✅ Dashboard for test run status (COMPLETED - created Grafana dashboard JSON in config/grafana/integration-test-dashboard.json with 6 panels: active test runs, success rate, service health, test runs by status, test duration, failure rate)
-   - ✅ Integration with existing monitoring (Prometheus/Grafana) (COMPLETED - added Prometheus scrape config for integration-test service, added test-specific metrics (integration_test_runs_total, integration_test_run_duration_seconds, integration_test_runs_active), created comprehensive monitoring guide in docs/guides/MONITORING.md)
-
-3. **Workflow documentation:**
-   - ✅ How to start integration test service (COMPLETED - documented in docs/guides/TESTING.md with command usage, environment variables, and service endpoints)
-   - ✅ How to trigger test runs (COMPLETED - documented in docs/guides/TESTING.md with REST API examples and usage workflows)
-   - ✅ How to check test results via REST API (COMPLETED - documented in docs/guides/TESTING.md with complete REST API reference including status, results, and logs endpoints)
-   - ✅ How to view test logs (COMPLETED - documented in docs/guides/TESTING.md with GET /tests/logs endpoint and usage examples)
-   - ✅ How to set up periodic test runs (COMPLETED - added comprehensive documentation to docs/guides/TESTING.md with examples for cron, systemd timers, Docker containers, Python scripts, and best practices)
-
-### Phase 14: Message History Debugging ✅ COMPLETED
-
-**Goal:** Add message history tracking to debug Telegram and Discord rendering problems by providing direct access to what messages were actually sent.
-
-**Problem:** Currently difficult to debug rendering issues because we can't see what was actually sent to users. Need visibility into the exact message content, formatting, and metadata.
-
-**Solution:** Implement `get_message_history()` method that captures and stores all sent messages, allowing agents and tests to inspect what was actually rendered.
-
-**Tasks:**
-1. **Create message history storage:** ✅ COMPLETED
-   - ✅ Created shared `essence/chat/message_history.py` - In-memory storage for both Telegram and Discord messages
-   - ✅ Implemented `MessageHistory` class with efficient indexing by user_id and chat_id
-   - ✅ Stores message metadata:
-     - Timestamp
-     - Recipient (user_id, chat_id/channel_id)
-     - Message content (raw text, formatted text, markdown)
-     - Message type (text, voice, error, status)
-     - Platform (telegram/discord)
-     - Message ID (if available)
-     - Rendering metadata (truncation, formatting applied, etc.)
-
-2. **Intercept message sending:** ✅ COMPLETED
-   - ✅ Created `essence/services/telegram/message_history_helpers.py` with wrapper functions
-   - ✅ Created `essence/services/discord/message_history_helpers.py` with wrapper functions
-   - ✅ Updated `essence/services/telegram/telegram_utils.py` to track streamed messages
-   - ✅ Updated `essence/services/telegram/handlers/text.py` to use helper functions for main message sending
-   - ✅ Updated `essence/services/discord/main.py` to use helper functions for message sending
-   - ✅ Messages are captured and stored in history after successful send
-
-3. **Create access methods:** ✅ COMPLETED
-   - ✅ Created `essence/commands/get_message_history.py` - CLI command to retrieve message history
-     - Supports filtering by user_id, chat_id, platform, message_type
-     - Supports limiting results
-     - Output format: text (formatted) or JSON
-     - Statistics command (`--stats`) for overview
-   - ✅ Provides direct function access: `get_message_history()` singleton
-   - ✅ Admin endpoint implemented: Added `/admin_message_history` Telegram command for admins to query message history
-     - Supports filtering by user_id, chat_id, platform, message_type
-     - Supports limiting results (1-50, default: 10)
-     - Statistics mode (`--stats`) for overview
-     - Formats output for Telegram (HTML) with proper message splitting for long results
-     - All admin actions logged for audit purposes
-
-4. **Testing and documentation:** ✅ COMPLETED
-   - ✅ Added comprehensive unit tests (`tests/essence/chat/test_message_history.py`) - 12 tests, all passing
-   - ✅ Tests cover: adding messages, filtering, eviction, statistics, singleton behavior
-   - ✅ All 112 unit tests passing (100 existing + 12 new)
-
-**Benefits:**
-- Direct visibility into what was actually rendered/sent
-- Compare expected vs actual output for debugging
-- Debug formatting/markdown issues
-- Test verification of message content
-- Track message flow over time for debugging
-
-**Best Practice:** Use in-memory storage (consistent with other MVP storage), but design interface to allow future migration to persistent storage if needed.
-
-**Usage:**
-
-**CLI Command:**
-```bash
-# Get last 10 messages for a user
-poetry run -m essence get-message-history --user-id 12345 --limit 10
-
-# Get all messages for a chat/channel
-poetry run -m essence get-message-history --chat-id 67890
-
-# Get only error messages
-poetry run -m essence get-message-history --message-type error
-
-# Get messages in JSON format
-poetry run -m essence get-message-history --user-id 12345 --format json
-
-# Get statistics
-poetry run -m essence get-message-history --stats
-```
-
-**Telegram Admin Command:**
-```
-# Get last 10 messages for a user
-/admin_message_history --user-id 12345 --limit 10
-
-# Get error messages from Telegram
-/admin_message_history --platform telegram --type error
-
-# Get statistics
-/admin_message_history --stats
-
-# See help
-/admin_help
-```
-
-## Essential Services
-
-### Services (KEEP)
-1. **telegram** - Receives voice messages from Telegram, orchestrates the pipeline
-2. **discord** - Receives voice messages from Discord, orchestrates the pipeline (shares code with telegram)
-3. **stt** - Speech-to-text conversion (Whisper)
-4. **tts** - Text-to-speech conversion (FastSpeech2/espeak)
-5. **inference-api** - LLM inference service (provides gRPC interface for Qwen3 and other models)
-
-### Infrastructure
-- **Current LLM inference:** inference-api service (included in june project)
-- **Optional future migration:** TensorRT-LLM container (from home_infra shared-network) - can replace inference-api for optimized GPU inference (see Phase 10 operational guide)
-- **From home_infra (shared-network):** 
-  - nginx, jaeger, prometheus, grafana (available but not required)
-- All services communicate via gRPC directly
-
-## Architecture
-
-### Service Directory Structure
-- **`services/<service_name>/`** = Dockerfiles, service-specific configuration, build setup
-- **`essence/services/<service_name>/`** = Actual service implementation code
-- Services import and use the `essence` package for their code
-- Clean separation: Docker/configuration vs. code
-
-### Shared Code Architecture
-- **Telegram and Discord share code** via `essence/chat/` module:
-  - `essence/chat/agent/handler.py` - Shared agent message processing
-  - `essence/chat/message_builder.py` - Shared message building utilities
-  - `essence/chat/storage/conversation.py` - Shared conversation storage
-  - Platform-specific handlers in `essence/services/telegram/` and `essence/services/discord/`
-
-### Command Pattern
-- All services implement `essence.commands.Command` interface
-- Run via: `python -m essence <service-name>`
-- Commands are discovered via reflection in `essence/commands/__init__.py`
-
-## Testing Strategy
-
-### Unit Tests
-- **Location:** `tests/`
-- **Runner:** pytest
-- **Requirements:**
-  - All external services/libraries must be mocked
-  - Fast execution (< 1 minute for full suite)
-  - No dependencies on running services
-  - All tests runnable via `pytest tests/`
-
-### Integration Tests
-- **Location:** `tests/integration/` (or similar)
-- **Runner:** Integration test service (background)
-- **Requirements:**
-  - Run in background (not waited on)
-  - Check end-to-end functionality with real services
-  - Results available via REST API or logs
-  - Can be checked periodically
-
-### Test Service
-- **Purpose:** Run integration tests in background and provide results via API
-- **Interface:** REST API for test management
-- **Features:**
-  - Start test runs
-  - Check test status
-  - Retrieve results
-  - View logs
-  - Test run history
+- **Message history:** Debug rendering issues with `get_message_history()`
 
 ## Next Steps
 
-1. **Ongoing:** Maintain minimal architecture and follow established best practices
-2. **Phase 14: Message History Debugging** ✅ COMPLETED
-   - ✅ Implemented message history tracking for Telegram and Discord
-   - ✅ Added `get_message_history()` command for debugging rendering issues
-   - See Phase 14 section above for implementation details
-3. **When ready to use the system:**
-   - Follow Phase 10 operational guide for model download and service startup
-   - Run integration tests via integration test service
-   - Perform end-to-end testing and verification
-4. **Future enhancements (optional):**
-   - Consider persistent storage for test results (currently in-memory)
-   - Add test result export functionality
-   - Enhance Grafana dashboards with additional visualizations
-   - Set up automated test runs on code changes (CI/CD integration)
-   - Fix dependencies for `tests/services/` tests if integration testing is needed
+1. **Phase 15: TensorRT-LLM Integration** ⏳ IN PROGRESS
+   - Set up TensorRT-LLM container in home_infra
+   - Implement model loading/unloading
+   - Migrate june services to use TensorRT-LLM
+   - Get Qwen3 model running
+
+2. **Phase 16: End-to-End Pipeline Testing** ⏳ TODO
+   - Test complete voice → STT → LLM → TTS → voice flow
+   - Debug rendering issues with message history
+   - Performance testing and optimization
+
+3. **Phase 17: Agentic Flow Implementation** ⏳ TODO
+   - Design and implement reasoning loop
+   - Integrate with Qwen3 via TensorRT-LLM
+   - Test and optimize for latency
+
+4. **Phase 18: Model Evaluation and Benchmarking** ⏳ TODO
+   - Set up benchmark evaluation framework
+   - Run evaluations on Qwen3
+   - Analyze results and iterate
+
+## Known Issues
+
+### Test Infrastructure
+- ✅ Core test infrastructure complete
+- ✅ All 112 unit tests in `tests/essence/` passing
+- ⚠️ Some integration/service tests may need updates for TensorRT-LLM migration
+
+### Pre-existing Test Failures
+- ✅ All tests now passing (112/112)
 
 ## Refactoring Status Summary
 
-**Overall Status:** ✅ **CORE REFACTORING COMPLETE**
-
-All major refactoring phases have been completed:
-- ✅ Service removal and cleanup (Phases 1-3)
-- ✅ Observability implementation (Phases 4-5)
-- ✅ Package simplification (Phase 6)
-- ✅ Documentation cleanup (Phase 7)
-- ✅ Service refactoring (Phase 9.1)
-- ✅ Qwen3 setup and coding agent (Phase 10)
-- ✅ Scripts cleanup and command migration (Phase 11)
-- ✅ Test infrastructure (Phases 12-13)
+**Overall Status:** ✅ **CORE REFACTORING COMPLETE** → 🚀 **FORWARD DEVELOPMENT IN PROGRESS**
 
 **Code Refactoring Status:** ✅ **ALL CODE-RELATED REFACTORING COMPLETE**
 
 All code changes, cleanup, and refactoring tasks have been completed:
 - ✅ All removed service dependencies eliminated from code
-- ✅ All gateway references cleaned up (code, tests, scripts, documentation)
+- ✅ All gateway references cleaned up
 - ✅ All obsolete test files and scripts marked appropriately
 - ✅ All code references updated to reflect current architecture
-- ✅ All unit tests passing (112/112 in tests/essence/) - 100 existing + 12 new from Phase 14
+- ✅ All unit tests passing (112/112 in tests/essence/)
 - ✅ Minimal architecture achieved with only essential services
 
-**Remaining Work (All Optional):**
-- ⏳ **Operational tasks (Phase 10):** Model download, service startup, and testing - can be done when ready to use (requires running system)
-- ✅ **COMPLETED:** Fixed dependencies for `tests/services/` tests - All main test files for active services (telegram, discord, stt, tts) can now be collected successfully when run individually. Some collection issues may occur when running the entire suite together due to import conflicts, but individual test files work correctly.
-- ⏳ **Optional:** End-to-end testing and verification (Phase 8, 9.2-9.4) - requires running system
-
-**⚠️ IMPORTANT:** All code-related refactoring tasks are complete. The remaining tasks marked with ⏳ are **operational/runtime tasks** that require:
-- A running system with GPU support (for model operations)
-- Active services (for integration testing)
-- Manual execution (model download, service startup)
-
-**No actionable code tasks remain** - all code changes, cleanup, and refactoring have been completed. The project is ready for operational use when GPU and model resources are available.
-
-**Note:** All remaining tasks are operational/runtime tasks that require a running system. No further code changes are needed for the core refactoring goals.
+**Current Development Focus:**
+- 🚀 **Phase 15:** TensorRT-LLM Integration (IN PROGRESS)
+- ⏳ **Phase 16:** End-to-End Pipeline Testing (TODO)
+- ⏳ **Phase 17:** Agentic Flow Implementation (TODO)
+- ⏳ **Phase 18:** Model Evaluation and Benchmarking (TODO)
 
 **Current State:**
 - ✅ All essential services refactored and working
-- ✅ All unit tests passing (112/112 in tests/essence/) - 100 existing + 12 new from Phase 14
+- ✅ All unit tests passing (112/112 in tests/essence/)
 - ✅ Minimal architecture achieved
-- ✅ All code dependencies on removed services eliminated
-- ✅ Documentation updated to reflect current state
-- ✅ All obsolete test files and scripts marked appropriately
-- ✅ All code references updated to reflect current architecture
-- ✅ Operational guide documented for Phase 10 tasks
-- ✅ Next steps guidance provided for when ready to use the system
-
-**Refactoring Summary:**
-The june project has been successfully refactored from a complex microservices architecture to a minimal, essential-only system. All code-related work is complete, and the project is ready for operational use when needed. The remaining work consists only of operational/runtime tasks (model download, service startup, integration testing) that require a running system and are fully documented in the plan.
-
-## Known Issues
-
-### Test Infrastructure Issues
-
-**Status:** ✅ COMPLETED - Core test infrastructure cleanup done
-
-**Issue:** Many tests in `tests/services/`, `tests/integration/`, and `tests/scripts/` have import errors due to missing dependencies (`grpc`, `june_grpc_api`, etc.). These tests cannot be collected or run directly via pytest.
-
-**Current State:**
-- ✅ `tests/essence/` tests (100 tests) - All passing
-- ⚠️ `tests/integration/` tests (4 tests) - Import errors (should run via integration test service, not pytest - this is expected)
-- ⚠️ `tests/services/` tests (20+ tests) - Import errors (for active services: telegram, discord, stt, tts - may need dependencies or updates)
-- ⚠️ `tests/scripts/` tests (6 tests) - Import errors (e2e/integration tests - documented, excluded from pytest)
-
-**Solution (COMPLETED):**
-- ✅ Updated pytest configuration to only collect tests from `tests/essence/` by default
-- ✅ Added `norecursedirs` to exclude problematic test directories (integration, services, scripts, agentic)
-- ✅ Verified all 112 tests in `tests/essence/` pass successfully (100 existing + 12 new from Phase 14)
-- ✅ **COMPLETED:** Removed outdated service tests for removed services (gateway, orchestrator, june-agent)
-- ✅ **COMPLETED:** Documented script tests status in `tests/scripts/README.md` (these are e2e/integration tests excluded from pytest)
-- ✅ **COMPLETED:** All unit tests in `tests/essence/` continue to pass (112/112) - 100 existing + 12 new from Phase 14
-
-**Remaining Work (Optional/Future):**
-- ✅ **COMPLETED:** Fixed opentelemetry import errors in `tests/services/telegram/` and `tests/services/discord/` tests by adding opentelemetry mocking to conftest.py and test files before importing from essence modules. Tests can now be collected successfully.
-- ✅ **COMPLETED:** Fixed import path issues in `tests/services/stt/` tests by:
-  - Correcting `_project_root` calculation (needed 4 levels up, not 3)
-  - Adding comprehensive module mocking (whisper, webrtcvad, nats, librosa, soundfile, prometheus_client, inference_core, opentelemetry, june_rate_limit, june_security, june_grpc_api)
-  - Creating proper mock structure for `june_grpc_api.generated` with required protobuf classes
-  - Fixed syntax error in `services/stt/main.py` (incorrect indentation of `finally` block)
-  - Tests can now be collected successfully (36 tests)
-- ✅ **COMPLETED:** Fixed dependencies for remaining `tests/services/` tests (tts) by:
-  - Correcting `_project_root` calculation (needed 4 levels up, not 3)
-  - Adding comprehensive module mocking (prometheus_client, inference_core, opentelemetry, june_rate_limit, june_grpc_api, and service-specific dependencies)
-  - Creating proper mock structures for `june_grpc_api.generated` with required protobuf classes
-  - Creating fallback mock classes for services that don't export expected classes (TTSService)
-  - Tests can now be collected successfully (tts: 33 tests)
-
-**Note:** These TODO items are also listed in the "Refactoring Status Summary" section above. All remaining work is optional and does not block core functionality.
-
-**Completed Cleanup Tasks:**
-- ✅ **COMPLETED:** Removed leftover gateway references from essence module (essence/gateway/, essence/README.md, essence/__init__.py, essence/pyproject.toml)
-- ✅ **COMPLETED:** Archived gateway API documentation (docs/API/gateway.md → gateway.md.obsolete)
-- ✅ **COMPLETED:** Updated docs/README.md to remove gateway API references (removed "Gateway API guide" and "webapp guide", added "Discord bot guide")
-- ✅ **COMPLETED:** Removed obsolete backup file (REFACTOR_PLAN.md.20251118)
-- ✅ **COMPLETED:** Marked `test_e2e_text_passthrough.py` as obsolete (depends on removed gateway service, kept for reference only)
-- ✅ **COMPLETED:** Marked `test_pipeline_modes.py` as obsolete (depends on removed gateway service, imports non-existent `test_round_trip_gateway` module, kept for reference only)
-- ✅ **COMPLETED:** Marked `penetration_test.py` as obsolete (tests removed gateway service, could be updated to test remaining services if needed)
-- ✅ **COMPLETED:** Marked `diagnose_test_failures.sh` as obsolete (references removed gateway service, could be updated for remaining services)
-- ✅ **COMPLETED:** Marked `run_tests_with_artifacts.sh` as obsolete (orchestrates gateway tests, could be updated for remaining services)
-- ✅ **COMPLETED:** Cleaned up code references to removed services (updated comments in telegram handlers to reflect in-memory storage)
-- ✅ **COMPLETED:** Updated TODO.md to mark all tasks as complete and added note that it's outdated (all Telegram bot tasks were already completed, REFACTOR_PLAN.md is the authoritative source)
-- ⚠️ **PARTIAL:** `services/gateway/` directory contains a test cache file owned by root - cannot remove without sudo (can be safely ignored as it's just a cache file)
-
-**Note:** Script tests in `tests/scripts/` are e2e/integration tests that require running services and dependencies. They are excluded from pytest collection and should be run manually or via the integration test service. Some tests reference removed services (gateway) and may need updates in the future.
-
-**Note:** Integration tests should be run via the integration test service (see Phase 12-13), not directly via pytest. The pytest configuration now skips integration tests by default.
-
-### Pre-existing Test Failures
-
-**Status:** ✅ COMPLETED - All tests now passing
-
-**Issue:** Previously had 1 test failure in `tests/essence/chat/agent/test_response_accumulation.py`:
-- `test_json_accumulation_logic[multiple_assistant_chunks]` - Expected 4 outputs, got 2. Expected: [("Hello", False, "assistant"), ("Hello world", False, "assistant"), ("Hello world!", False, "assistant"), ("", True, None)]. Got: [("Hello", False, "assistant"), ("", True, None)]
-
-**Progress:** Fixed all 6 previously failing tests:
-- ✅ `test_json_accumulation_logic[complete_json_single_assistant]` - Now passing
-- ✅ `test_json_accumulation_logic[complete_json_with_result]` - Now passing
-- ✅ `test_json_accumulation_logic[shell_output_skipped]` - Now passing
-- ✅ `test_json_accumulation_logic[very_long_result_message]` - Now passing
-- ✅ `test_json_accumulation_logic[no_json_lines_only_shell]` - Now passing (fixed error message handling)
-- ✅ `test_json_accumulation_logic[multiple_assistant_chunks]` - Now passing (fixed text extraction and fragment detection)
-
-**Root Cause:** Two issues were identified:
-1. **Text extraction was stripping leading spaces:** The `_extract_human_readable_from_json_line` function was using `.strip()` which removed leading spaces from continuation chunks like " world", making them appear as fragments.
-2. **Single-character punctuation was being filtered out:** The extraction function required `len(text_stripped) >= 5`, which filtered out single-character punctuation like "!" that should be allowed as continuation chunks.
-
-**Solution:**
-1. **Preserved leading/trailing spaces in text extraction:** Modified `_extract_human_readable_from_json_line` to preserve spaces in the returned text (only strip for length checks and filtering), allowing space-prefixed continuation chunks to be detected correctly.
-2. **Allowed single-character punctuation:** Added check for single-character punctuation (`!`, `?`, `.`, `,`, `:`, `;`) in the extraction function, allowing these to pass the length check.
-3. **Improved fragment detection:** Enhanced fragment detection logic to better identify continuation chunks, including space-prefixed chunks and single-character punctuation.
-
-**Impact:** All tests (12/12) are now passing. The response accumulation logic correctly handles all intermediate states when chunks arrive quickly.
+- ✅ Message history debugging implemented
+- 🚀 Migrating from inference-api to TensorRT-LLM
+- ⏳ Implementing agentic flow for better responses
+- ⏳ Setting up model evaluation framework
