@@ -7,8 +7,10 @@ This document provides comprehensive documentation for running and maintaining t
 The June test suite covers:
 - **Unit Tests** - Individual component testing
 - **Integration Tests** - Service interaction testing
-- **Service Tests** - Platform-specific service tests (Telegram, Discord, STT, TTS, Inference API)
+- **Service Tests** - Platform-specific service tests (Telegram, Discord, STT, TTS, Inference API (legacy))
 - **Agentic Tests** - Agent capabilities testing (see `tests/agentic/README.md` for details)
+
+**Note:** Inference API service tests are for the legacy `inference-api` service, which is deprecated. The project now uses TensorRT-LLM (default) or NVIDIA NIM for LLM inference. See `docs/guides/TENSORRT_LLM_SETUP.md` for migration details.
 
 ## Test Structure
 
@@ -22,7 +24,7 @@ tests/
 │   ├── discord/        # Discord service tests
 │   ├── stt/            # STT service tests
 │   ├── tts/            # TTS service tests
-│   └── inference-api/  # Inference API service tests
+│   └── inference-api/  # Legacy Inference API service tests (deprecated)
 ├── agentic/            # Agentic capabilities tests (see tests/agentic/README.md)
 └── data/               # Test data files (JSON fixtures)
 ```
@@ -73,7 +75,7 @@ poetry run pytest tests/services/stt/ -v
 # TTS service tests
 poetry run pytest tests/services/tts/ -v
 
-# Inference API service tests
+# Legacy Inference API service tests (deprecated - use TensorRT-LLM instead)
 poetry run pytest tests/services/inference-api/ -v
 ```
 
