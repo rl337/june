@@ -2,7 +2,7 @@
 import logging
 from pathlib import Path
 import os
-from typing import Optional, Iterator, Tuple
+from typing import Optional, Iterator, Tuple, List, Dict, Any
 
 from .response import (
     call_chat_response_agent,
@@ -10,10 +10,157 @@ from .response import (
     stream_chat_response_agent
 )
 from essence.chat.utils.tracing import get_tracer
+from essence.chat.message_history import get_message_history
+from essence.agents import (
+    AgenticReasoner,
+    ConversationContext,
+    should_use_agentic_flow,
+    Planner,
+    Executor,
+    Reflector,
+    LLMClient,
+    get_reasoning_cache,
+)
 from opentelemetry import trace
 
 logger = logging.getLogger(__name__)
 tracer = get_tracer(__name__)
+
+# Global agentic reasoner instance (lazy initialization)
+_agentic_reasoner: Optional[AgenticReasoner] = None
+
+
+def _get_agentic_reasoner() -> Optional[AgenticReasoner]:
+    """
+    Get or create the global agentic reasoner instance.
+    
+    Returns:
+        AgenticReasoner instance, or None if LLM is not available
+    """
+    global _agentic_reasoner
+    
+    if _agentic_reasoner is None:
+        try:
+            # Initialize LLM client (will fail gracefully if TensorRT-LLM is not available)
+            llm_client = LLMClient()
+            
+            # Initialize components
+            cache = get_reasoning_cache()
+            planner = Planner(llm_client=llm_client, enable_cache=True, cache=cache)
+            executor = Executor(available_tools={})  # No tools for chat handler (coding agent has tools)
+            reflector = Reflector(llm_client=llm_client, enable_cache=True, cache=cache)
+            
+            # Create reasoner
+            _agentic_reasoner = AgenticReasoner(
+                planner=planner,
+                executor=executor,
+                reflector=reflector,
+                llm_client=llm_client,
+                enable_cache=True,
+                cache=cache,
+                enable_early_termination=True,
+            )
+            
+            logger.info("Agentic reasoner initialized successfully")
+        except Exception as e:
+            logger.warning(f"Failed to initialize agentic reasoner: {e}. Will use direct flow only.")
+            return None
+    
+    return _agentic_reasoner
+
+
+def _build_conversation_context(
+    user_id: Optional[int],
+    chat_id: Optional[int],
+    platform: str,
+    user_message: str,
+) -> ConversationContext:
+    """
+    Build a ConversationContext from user/chat IDs and message history.
+    
+    Args:
+        user_id: User ID
+        chat_id: Chat ID
+        platform: Platform name
+        user_message: Current user message
+        
+    Returns:
+        ConversationContext instance
+    """
+    context = ConversationContext(
+        user_id=str(user_id) if user_id else None,
+        chat_id=str(chat_id) if chat_id else None,
+    )
+    
+    # Get message history if available
+    try:
+        message_history = get_message_history()
+        if user_id and chat_id:
+            # Get recent messages for this conversation
+            recent_messages = message_history.get_messages(
+                user_id=str(user_id),
+                chat_id=str(chat_id),
+                platform=platform,
+                limit=10  # Last 10 messages for context
+            )
+            
+            # Convert to conversation history format
+            context.message_history = [
+                {
+                    "role": "user" if msg.message_type == "text" else "assistant",
+                    "content": msg.message_content,
+                    "timestamp": msg.timestamp.isoformat(),
+                }
+                for msg in reversed(recent_messages)  # Oldest first
+            ]
+    except Exception as e:
+        logger.debug(f"Could not retrieve message history: {e}")
+        # Continue without history
+    
+    return context
+
+
+def _format_agentic_response(result) -> Dict[str, Any]:
+    """
+    Format an agentic reasoning result for chat response.
+    
+    Args:
+        result: ReasoningResult from agentic reasoner
+        
+    Returns:
+        Dictionary compatible with chat response format
+    """
+    if result.success:
+        return {
+            "success": True,
+            "message": result.final_response or "I've processed your request.",
+            "raw_response": {
+                "type": "agentic_reasoning",
+                "iterations": result.iterations,
+                "total_time": result.total_time,
+                "plan": str(result.plan) if result.plan else None,
+                "execution_results": [
+                    {
+                        "step_id": r.step_id,
+                        "success": r.success,
+                        "output": r.output,
+                        "error": r.error,
+                    }
+                    for r in result.execution_results
+                ] if result.execution_results else [],
+                "reflection": {
+                    "goal_achieved": result.reflection.goal_achieved if result.reflection else None,
+                    "confidence": result.reflection.confidence if result.reflection else None,
+                    "issues": result.reflection.issues_found if result.reflection else [],
+                } if result.reflection else None,
+            }
+        }
+    else:
+        return {
+            "success": False,
+            "error": result.error or "Unknown error in agentic reasoning",
+            "message": result.final_response or "❌ I encountered an error processing your request. Please try again.",
+        }
 
 
 def find_agenticness_directory(script_name: str = "telegram_response_agent.sh") -> Optional[str]:
@@ -95,6 +242,72 @@ def process_agent_message(
             span.set_attribute("chat_id", str(chat_id) if chat_id else "unknown")
             span.set_attribute("message_length", len(user_message) if user_message else 0)
             span.set_attribute("agent_script_name", agent_script_name)
+            
+            # Build conversation context
+            context = _build_conversation_context(user_id, chat_id, platform, user_message)
+            
+            # Get message history for decision logic
+            message_history = context.message_history or []
+            
+            # Decision logic: determine if we should use agentic flow
+            use_agentic_flow = False
+            reasoner = _get_agentic_reasoner()
+            
+            if reasoner:
+                try:
+                    use_agentic_flow = should_use_agentic_flow(
+                        user_message=user_message,
+                        message_history=message_history,
+                        available_tools=None,  # No tools available in chat handler
+                    )
+                    span.set_attribute("agentic_flow_available", True)
+                    span.set_attribute("use_agentic_flow", use_agentic_flow)
+                except Exception as e:
+                    logger.warning(f"Error in decision logic: {e}. Falling back to direct flow.")
+                    use_agentic_flow = False
+            
+            # Use agentic flow if decision logic says so
+            if use_agentic_flow and reasoner:
+                try:
+                    span.set_attribute("flow_type", "agentic")
+                    logger.info(f"Using agentic reasoning flow for user {user_id}, chat {chat_id}")
+                    
+                    with tracer.start_as_current_span("agentic.reason") as reason_span:
+                        reasoning_result = reasoner.reason(
+                            user_message=user_message,
+                            context=context,
+                            available_tools=None,  # No tools in chat handler
+                        )
+                        reason_span.set_attribute("iterations", reasoning_result.iterations)
+                        reason_span.set_attribute("total_time", reasoning_result.total_time)
+                        reason_span.set_attribute("success", reasoning_result.success)
+                    
+                    # Format agentic response
+                    response_data = _format_agentic_response(reasoning_result)
+                    formatted_message = response_data.get("message", "I've processed your request.")
+                    
+                    # Truncate if needed
+                    if len(formatted_message) > max_message_length:
+                        formatted_message = formatted_message[:max_message_length-10] + "\n\n... (message truncated)"
+                        span.set_attribute("truncated", True)
+                    
+                    span.set_attribute("response_length", len(formatted_message))
+                    span.set_status(trace.Status(trace.StatusCode.OK))
+                    
+                    return {
+                        "success": response_data.get("success", True),
+                        "message": formatted_message,
+                        "raw_response": response_data.get("raw_response", {}),
+                        "error": response_data.get("error"),
+                    }
+                except Exception as e:
+                    logger.error(f"Error in agentic reasoning flow: {e}. Falling back to direct flow.", exc_info=True)
+                    span.record_exception(e)
+                    # Fall through to direct flow
+            
+            # Direct flow (existing implementation)
+            span.set_attribute("flow_type", "direct")
+            logger.debug(f"Using direct response flow for user {user_id}, chat {chat_id}")
             
             # Find agenticness directory
             agenticness_dir = find_agenticness_directory(agent_script_name)
