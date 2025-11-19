@@ -47,7 +47,7 @@ All major refactoring phases have been completed:
 - ✅ **Qwen3 Setup and Coding Agent (Phase 10):** Model download infrastructure, coding agent with tool calling, benchmark evaluation framework with sandbox isolation (see QWEN3_SETUP_PLAN.md for details)
 
 **Verification:**
-- ✅ All 244 unit tests passing (`pytest tests/essence/ -m "not integration"`)
+- ✅ All unit tests passing (341 passed, 1 skipped, 17 deselected in tests/essence/ - comprehensive coverage including agentic reasoning, pipeline, message history, and TensorRT-LLM integration tests)
 - ✅ Comprehensive test coverage for TensorRT-LLM integration commands (100 tests total)
 - ✅ No linting errors
 - ✅ Clean git working tree
@@ -741,7 +741,7 @@ All code changes, cleanup, and refactoring tasks have been completed:
 - ✅ All gateway references cleaned up
 - ✅ All obsolete test files and scripts marked appropriately
 - ✅ All code references updated to reflect current architecture
-- ✅ All unit tests passing (196/196 in tests/essence/ - 112 existing + 41 agentic reasoning + 8 pipeline + 35 message history/agent communication tests, 1 skipped)
+- ✅ All unit tests passing (341 passed, 1 skipped, 17 deselected in tests/essence/ - comprehensive coverage including agentic reasoning, pipeline, message history, and TensorRT-LLM integration tests)
 - ✅ Minimal architecture achieved with only essential services
 
 **Current Development Focus:**
@@ -752,7 +752,7 @@ All code changes, cleanup, and refactoring tasks have been completed:
 
 **Current State:**
 - ✅ All essential services refactored and working
-- ✅ All unit tests passing (196/196 in tests/essence/ - 112 existing + 41 agentic reasoning + 8 pipeline + 35 message history/agent communication tests, 1 skipped)
+- ✅ All unit tests passing (341 passed, 1 skipped, 17 deselected in tests/essence/ - comprehensive coverage including agentic reasoning, pipeline, message history, and TensorRT-LLM integration tests)
 - ✅ Minimal architecture achieved
 - ✅ Message history debugging implemented
 - ✅ TensorRT-LLM migration (code/documentation) complete - all services default to TensorRT-LLM, all documentation updated
