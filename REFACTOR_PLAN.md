@@ -593,7 +593,7 @@ The june project has been successfully refactored from a complex microservices a
 **Solution (COMPLETED):**
 - ✅ Updated pytest configuration to only collect tests from `tests/essence/` by default
 - ✅ Added `norecursedirs` to exclude problematic test directories (integration, services, scripts, agentic)
-- ✅ Verified all 100 tests in `tests/essence/` pass successfully
+- ✅ Verified all 112 tests in `tests/essence/` pass successfully (100 existing + 12 new from Phase 14)
 - ✅ **COMPLETED:** Removed outdated service tests for removed services (gateway, orchestrator, june-agent)
 - ✅ **COMPLETED:** Documented script tests status in `tests/scripts/README.md` (these are e2e/integration tests excluded from pytest)
 - ✅ **COMPLETED:** All unit tests in `tests/essence/` continue to pass (112/112) - 100 existing + 12 new from Phase 14
