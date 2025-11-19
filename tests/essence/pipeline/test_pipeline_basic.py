@@ -5,7 +5,7 @@ Tests the complete voice message pipeline flow with mocked services.
 """
 import pytest
 import asyncio
-from tests.essence.pipeline.test_pipeline_framework import (
+from .test_pipeline_framework import (
     PipelineTestFramework,
     MockSTTResponse,
     MockLLMResponse,

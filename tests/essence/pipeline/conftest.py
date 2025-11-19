@@ -16,7 +16,7 @@ try:
     # This is critical for CI environments where pytest collection must not fail
     PipelineTestFramework = None
     try:
-        from tests.essence.pipeline.test_pipeline_framework import PipelineTestFramework
+        from .test_pipeline_framework import PipelineTestFramework
     except Exception:
         # If import fails for any reason, set to None - fixtures will skip
         PipelineTestFramework = None
