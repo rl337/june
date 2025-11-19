@@ -172,6 +172,36 @@ All major refactoring phases have been completed:
    - ⏳ **Note:** Requires NGC API key for authentication (set `NGC_API_KEY` environment variable)
    - ⏳ **Remaining:** Verify NIM container starts correctly (use `verify-nim` command), test gRPC connectivity with real NIM service
 
+5. **Implement message history debugging and agent communication:** ⏳ NEW PRIORITY
+   - **Goal:** Fix Telegram and Discord rendering issues and enable agents to communicate directly with the user
+   - **Tasks:**
+     - ⏳ Enhance `get_message_history()` command to support agent communication
+       - ⏳ Add ability for agents to query message history programmatically (not just CLI)
+       - ⏳ Add agent-to-user communication interface (agents can send messages to user)
+       - ⏳ Implement message validation against Telegram/Discord API requirements
+       - ⏳ Create analysis tools to compare expected vs actual message content
+     - ⏳ Implement agent communication capabilities
+       - ⏳ Enable agents to ask user for direction/clarification when stuck
+       - ⏳ Enable agents to request help when encountering blockers
+       - ⏳ Enable agents to report progress and ask for feedback
+       - ⏳ Create secure channel for agent-to-user communication (via Telegram/Discord)
+     - ⏳ Fix rendering issues discovered through message history analysis
+       - ⏳ Use `get_message_history()` to inspect what was actually sent
+       - ⏳ Compare expected vs actual output
+       - ⏳ Fix any formatting/markdown issues
+       - ⏳ Document Telegram message format requirements and limitations
+       - ⏳ Document Discord message format requirements and limitations
+     - ⏳ Verify message history works for both Telegram and Discord
+       - ⏳ Test message history retrieval for both platforms
+       - ⏳ Test agent communication interface for both platforms
+       - ⏳ Verify message validation works correctly
+   - **Use Cases:**
+     - Agents can query: "What messages did I send to user X in the last hour?"
+     - Agents can analyze: "What format did Telegram actually accept for message Y?"
+     - Agents can communicate: "I need clarification on requirement Z" (sent directly to user)
+     - Agents can ask: "I'm blocked on task X, can you help?" (sent directly to user)
+     - Debugging: Compare what we tried to send vs what was actually sent
+
 3. **Migrate june services to use TensorRT-LLM:** ✅ COMPLETED (Code changes)
    - ✅ Updated telegram service configuration to default to TensorRT-LLM (tensorrt-llm:8000)
    - ✅ Updated discord service (uses same config via get_llm_address())
