@@ -28,6 +28,7 @@ poetry run -m essence <command-name> [arguments]
 - `verify-tensorrt-llm` - Verify TensorRT-LLM setup and migration readiness
 - `manage-tensorrt-llm` - Manage TensorRT-LLM models (load/unload/list/status)
 - `setup-triton-repository` - Setup and validate Triton Inference Server model repository structure
+- `compile-model` - Validate prerequisites and provide guidance for TensorRT-LLM model compilation
 
 ## Creating a New Command
 
