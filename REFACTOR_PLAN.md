@@ -39,6 +39,7 @@ All major refactoring phases have been completed:
 - ✅ **Cleanup:** Removed temporary backup file (REFACTOR_PLAN.md.backup.20251119_150335) from repository.
 - ✅ **Status Verification:** Verified current project state - all tests passing (341 passed, 1 skipped, 17 deselected), GitHub Actions successful, codebase consistent (inference-api correctly documented as legacy), no actionable code tasks remaining. Project ready for operational work.
 - ✅ **Agentic Reasoning Enhancement:** Implemented dependency checking in executor for step dependencies. Steps with unsatisfied dependencies now fail with clear error messages. Added comprehensive tests for dependency checking (both satisfied and missing dependencies). This completes the TODO in executor.py for dependency validation.
+- ✅ **Plan Adjustments from Reflection:** Implemented plan adjustments generation from LLM reflection. When goal is not achieved and should_continue is True, the reflector now uses the LLM to generate an adjusted plan that addresses the issues found. Added _generate_plan_adjustments and _parse_plan_text methods. This completes the TODO in reflector.py for generating plan adjustments from LLM reflection.
 - ✅ **Documentation Updates:** 
   - Updated essence/README.md to reflect current module structure (added essence.agents, essence.commands, essence.services, essence.command modules)
   - Updated tests/README.md to clarify inference-api deprecation status (added notes about legacy service, migration guide reference)
