@@ -94,8 +94,9 @@ def print_command_logs(command_logs: List[Dict[str, Any]]) -> None:
             print(f"    Stdout:")
             for line in lines:
                 print(f"      {line}")
-            if len(stdout.split("\n")) > 5:
-                print(f"      ... ({len(stdout.split('\n')) - 5} more lines)")
+            stdout_lines = stdout.split("\n")
+            if len(stdout_lines) > 5:
+                print(f"      ... ({len(stdout_lines) - 5} more lines)")
 
         stderr = log.get("stderr", "")
         if stderr:
