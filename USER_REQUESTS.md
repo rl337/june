@@ -19,5 +19,38 @@ Each entry follows this structure:
 
 ## Communication Log
 
+
+## [2025-11-20 08:31:03] Text
+- **User:** (user_id: 39833618)
+- **Platform:** Telegram
+- **Type:** Text
+- **Content:** 🧪 Test message from agent! This is a verification that I can send DMs via Telegram.
+
+- **Message ID:** 339
+- **Chat ID:** 39833618
+- **Status:** Pending
+
+
+## [2025-11-20 08:31:32] Text
+- **User:** (user_id: 39833618)
+- **Platform:** Telegram
+- **Type:** Text
+- **Content:** 🧪 Test message from agent! This is a verification that I can send DMs via Telegram.
+
+- **Message ID:** 340
+- **Chat ID:** 39833618
+- **Status:** Pending
+
+
+## [2025-11-20 08:31:33] Text
+- **User:** (user_id: 610005136655384597)
+- **Platform:** Discord
+- **Type:** Text
+- **Content:** 🧪 Test message from agent! This is a verification that I can send DMs via Discord.
+
+- **Message ID:** 1441103684959469598
+- **Chat ID:** 1438620553765458063
+- **Status:** Pending
+
 <!-- Messages will be synced here automatically -->
 
