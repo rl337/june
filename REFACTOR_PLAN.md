@@ -56,7 +56,8 @@
     - ✅ **STT/TTS NIMs configured:** Added to home_infra/docker-compose.yml following nim-qwen3 pattern
       - ✅ **nim-stt service:** Configured with image `nvcr.io/nim/riva/riva-asr:latest` (gRPC port 8002, HTTP port 8004)
       - ✅ **nim-tts service:** Configured with image `nvcr.io/nim/riva/riva-tts:latest` (gRPC port 8005, HTTP port 8006)
-      - ⚠️ **Note:** Image paths confirmed, but ARM64 compatibility needs verification (marked as unknown in list-nims)
+      - ⚠️ **Note:** Image paths are placeholders (using `:latest` tag), ARM64 compatibility needs verification (marked as unknown in list-nims)
+      - ⚠️ **NGC API issue:** Catalog queries returning 401 Unauthorized - authentication method may need adjustment (2025-11-20 15:42)
       - ✅ **Helper script created:** `scripts/generate_nim_compose_snippet.sh` - Generates docker-compose.yml service snippets for Riva NIMs
       - ✅ **Deployment guide created:** `docs/guides/RIVA_NIM_DEPLOYMENT.md` - Complete step-by-step workflow for deploying Riva ASR/TTS NIMs
       - ⏳ **Next:** Verify ARM64 compatibility by testing deployment or checking NGC catalog
