@@ -51,6 +51,7 @@ Reusable tools have been migrated to commands. Use these instead of scripts:
 - `setup_nim_operational.sh` - Operational workflow for Phase 15 (NVIDIA NIM setup)
 - `setup_phase19_operational.sh` - Operational workflow for Phase 19 (Direct Agent-User Communication)
 - `verify_nim_compatibility.sh` - Helper script for Phase 19 NIM ARM64/DGX Spark compatibility verification
+- `generate_nim_compose_snippet.sh` - Generates docker-compose.yml service snippets for Riva ASR/TTS NIMs
 - `run_benchmarks_operational.sh` - Operational workflow for Phase 18 (Model evaluation and benchmarking)
 - `run_performance_tests_operational.sh` - Operational workflow for Phase 16 Task 5 (Performance testing)
 
