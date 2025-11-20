@@ -21,7 +21,34 @@ DATA_DIR_OVERRIDE = os.getenv("USER_MESSAGES_DATA_DIR")
 if DATA_DIR_OVERRIDE:
     DATA_DIR = Path(DATA_DIR_OVERRIDE)
 else:
-    DATA_DIR = Path("/var/data")
+    # Auto-detect: if /var/data/USER_MESSAGES.md exists, we're in a container
+    # Otherwise, use host path
+    default_container_path = Path("/var/data")
+    june_data_dir = os.getenv("JUNE_DATA_DIR", "/home/rlee/june_data")
+    default_host_path = Path(f"{june_data_dir}/var-data")
+    
+    # Check if we're in a container by checking if /var/data/USER_MESSAGES.md exists
+    # or if /var/data exists and is a mount point (typical in containers)
+    container_file = default_container_path / "USER_MESSAGES.md"
+    if container_file.exists():
+        # File exists in container path, we're in a container
+        DATA_DIR = default_container_path
+    elif default_container_path.exists() and default_container_path.is_dir():
+        # Directory exists but file doesn't - could be container or host
+        # Check if it's a mount point (more likely in containers)
+        # For now, prefer host path if JUNE_DATA_DIR is set
+        if june_data_dir != "/home/rlee/june_data" or default_host_path.exists():
+            # JUNE_DATA_DIR is customized or host path exists, use host path
+            DATA_DIR = default_host_path
+            logger.debug(f"Using host path (JUNE_DATA_DIR set or host path exists): {DATA_DIR}")
+        else:
+            # Default to container path
+            DATA_DIR = default_container_path
+    else:
+        # Running on host, use host path
+        DATA_DIR = default_host_path
+        logger.debug(f"Running on host, using host path: {DATA_DIR}")
+
 # Try to create directory, but handle permission errors gracefully
 # (TTS service doesn't need this directory, so it's OK if creation fails)
 try:
