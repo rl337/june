@@ -350,7 +350,7 @@ def main():
 
     if not dataset_file.exists():
         logger.error(f"Dataset file not found: {dataset_file}")
-        logger.info("Please run: poetry run -m essence generate-alice-dataset")
+        logger.info("Please run: poetry run python -m essence generate-alice-dataset")
         return 1
 
     # Load dataset

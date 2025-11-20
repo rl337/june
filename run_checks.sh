@@ -363,7 +363,7 @@ check_gateway_round_trip() {
     if [ ! -f "$dataset_file" ]; then
         print_warning "Alice dataset not found. Generating dataset..."
         if command -v python3 &> /dev/null; then
-            if poetry run -m essence generate-alice-dataset 2>/dev/null; then
+            if poetry run python -m essence generate-alice-dataset 2>/dev/null; then
                 print_success "Alice dataset generated"
             else
                 print_warning "Failed to generate dataset. Skipping Gateway round-trip test."
@@ -483,7 +483,7 @@ check_model_cache() {
     
     if [ ! -d "$model_cache_dir" ]; then
         print_error "Model cache directory not found: $model_cache_dir"
-        print_info "Run: poetry run -m essence download-models --all"
+        print_info "Run: poetry run python -m essence download-models --all"
         return 1
     fi
     
@@ -495,7 +495,7 @@ check_model_cache() {
         
         # Check cache status using the command
         print_info "Checking model cache status..."
-        poetry run -m essence download-models --status > /dev/null 2>&1
+        poetry run python -m essence download-models --status > /dev/null 2>&1
         if [ $? -eq 0 ]; then
             print_success "Model cache status check passed"
         else
