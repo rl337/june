@@ -57,10 +57,10 @@ echo ""
 if [ "$SKIP_CHECK" = false ]; then
     echo "Step 1: Pre-flight environment check..."
     echo "----------------------------------------"
-    if ! poetry run -m essence check-environment; then
+    if ! poetry run python -m essence check-environment; then
         echo ""
         echo "❌ Environment check failed. Please fix the issues above before proceeding."
-        echo "   Run: poetry run -m essence check-environment --verbose"
+        echo "   Run: poetry run python -m essence check-environment --verbose"
         exit 1
     fi
     echo ""
@@ -73,7 +73,7 @@ fi
 if [ "$SKIP_DOWNLOAD" = false ]; then
     echo "Step 2: Checking model download status..."
     echo "----------------------------------------"
-    if poetry run -m essence download-models --status | grep -q "Qwen/Qwen3-30B-A3B-Thinking-2507.*✅"; then
+    if poetry run python -m essence download-models --status 2>&1 | grep "Qwen/Qwen3-30B-A3B-Thinking-2507" | grep -q "✓ CACHED"; then
         echo "✅ Model already downloaded"
         echo ""
     else
@@ -89,7 +89,7 @@ if [ "$SKIP_DOWNLOAD" = false ]; then
         
         echo "Downloading model in container..."
         docker compose run --rm cli-tools \
-            poetry run -m essence download-models --model Qwen/Qwen3-30B-A3B-Thinking-2507
+            poetry run python -m essence download-models --model Qwen/Qwen3-30B-A3B-Thinking-2507
         
         echo ""
         echo "✅ Model download complete"
@@ -113,7 +113,7 @@ if [ "$USE_LEGACY" = true ]; then
     echo "  docker compose logs -f inference-api"
     echo ""
     echo "Verify service is running:"
-    echo "  poetry run -m essence verify-qwen3 --inference-api-url inference-api:50051"
+    echo "  poetry run python -m essence verify-qwen3 --inference-api-url inference-api:50051"
     SERVICE_URL="inference-api:50051"
 else
     echo "Using TensorRT-LLM service (default)..."
@@ -124,10 +124,10 @@ else
     echo "  docker compose up -d tensorrt-llm"
     echo ""
     echo "Verify TensorRT-LLM is accessible:"
-    echo "  poetry run -m essence verify-tensorrt-llm"
+    echo "  poetry run python -m essence verify-tensorrt-llm"
     echo ""
     echo "If model needs to be loaded:"
-    echo "  poetry run -m essence manage-tensorrt-llm --action load --model qwen3-30b"
+    echo "  poetry run python -m essence manage-tensorrt-llm --action load --model qwen3-30b"
     SERVICE_URL="tensorrt-llm:8000"
 fi
 echo ""
@@ -138,17 +138,17 @@ echo "----------------------------------------"
 echo "After starting the service, verify it's working:"
 echo ""
 if [ "$USE_LEGACY" = true ]; then
-    echo "  poetry run -m essence verify-qwen3 --inference-api-url $SERVICE_URL"
+    echo "  poetry run python -m essence verify-qwen3 --inference-api-url $SERVICE_URL"
 else
-    echo "  poetry run -m essence verify-tensorrt-llm"
-    echo "  poetry run -m essence manage-tensorrt-llm --action status --model qwen3-30b"
+    echo "  poetry run python -m essence verify-tensorrt-llm"
+    echo "  poetry run python -m essence manage-tensorrt-llm --action status --model qwen3-30b"
 fi
 echo ""
 echo "Check GPU utilization:"
 echo "  nvidia-smi"
 echo ""
 echo "Test inference:"
-echo "  poetry run -m essence coding-agent --task 'Hello, world!' --llm-url $SERVICE_URL"
+    echo "  poetry run python -m essence coding-agent --task 'Hello, world!' --llm-url $SERVICE_URL"
 echo ""
 
 echo "=========================================="
