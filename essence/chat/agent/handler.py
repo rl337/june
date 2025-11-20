@@ -2,7 +2,7 @@
 import logging
 import os
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, Iterator, Optional, Tuple
 
 from opentelemetry import trace
 
@@ -373,7 +373,10 @@ def process_agent_message(
                 return {
                     "success": False,
                     "error": "Agent system not properly configured",
-                    "message": "⚠️ I'm unable to process your message right now. The agent system is not properly configured.",
+                    "message": (
+                        "⚠️ I'm unable to process your message right now. "
+                        "The agent system is not properly configured."
+                    ),
                 }
 
             span.set_attribute("agent_available", True)

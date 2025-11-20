@@ -14,12 +14,12 @@ from collections import defaultdict
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from opentelemetry import trace
 
 from essence.agents.coding_agent import CodingAgent
-from essence.agents.sandbox import CommandLog, Sandbox, SandboxMetrics
+from essence.agents.sandbox import Sandbox, SandboxMetrics
 from essence.chat.utils.tracing import get_tracer
 
 logger = logging.getLogger(__name__)
@@ -293,7 +293,7 @@ class BenchmarkEvaluator:
                     span.set_attribute("agent_iteration", agent_iterations)
 
                     # Send task to agent
-                    response_chunks = list(
+                    list(
                         agent.send_coding_task(
                             task_description=task_prompt,
                             context={"iteration": iteration + 1},

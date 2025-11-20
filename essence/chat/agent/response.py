@@ -2,10 +2,8 @@
 import json
 import logging
 import os
-import queue
 import subprocess
 import sys
-import threading
 import time
 from pathlib import Path
 from typing import Any, Dict, Iterator, Optional, Tuple
@@ -14,7 +12,7 @@ from typing import Any, Dict, Iterator, Optional, Tuple
 essence_path = Path(__file__).parent.parent.parent.parent / "essence"
 sys.path.insert(0, str(essence_path))
 
-from essence.chat.utils.streaming_popen import streaming_popen_generator
+from essence.chat.utils.streaming_popen import streaming_popen_generator  # noqa: E402
 
 # Import tracing utilities
 try:
@@ -286,7 +284,7 @@ def call_chat_response_agent(
             finally:
                 try:
                     os.close(master_fd)
-                except:
+                except Exception:
                     pass
 
         if result.returncode != 0:
@@ -470,7 +468,8 @@ def stream_chat_response_agent(
         Tuples of (message_text, is_final, message_type) where:
         - message_text: Human-readable text to send to the chat platform
         - is_final: True if this is the final message, False for intermediate messages
-        - message_type: "assistant" for incremental assistant chunks, "result" for final result message, None for other types
+        - message_type: "assistant" for incremental assistant chunks,
+          "result" for final result message, None for other types
     """
     # Parse agent mode from message prefix (e.g., !architect, !normal)
     cleaned_message, agent_mode = parse_agent_mode_from_message(user_message)
@@ -654,7 +653,8 @@ def stream_chat_response_agent(
                                         },
                                     )
                                 logger.debug(
-                                    f"Skipping incomplete JSON buffer on final line: {len(incomplete_json_buffer)} chars"
+                                    f"Skipping incomplete JSON buffer on final line: "
+                                    f"{len(incomplete_json_buffer)} chars"
                                 )
                                 incomplete_json_buffer = ""
                                 # Don't continue - let final line logic handle it
@@ -741,7 +741,7 @@ def stream_chat_response_agent(
                             json_line_count += 1
                             last_json_line_time = current_time
                             logger.debug(
-                                f"Successfully parsed incomplete JSON on final line"
+                                "Successfully parsed incomplete JSON on final line"
                             )
                             if span:
                                 span.add_event(
@@ -851,11 +851,13 @@ def stream_chat_response_agent(
 
                         # Store result message for final yield (don't yield it now - yield at final line)
                         accumulated_message = message
-                        message_updated = False  # Don't yield result message now - yield it at final line with is_final=True
+                        # Don't yield result message now - yield it at final line with is_final=True
+                        message_updated = False
                         # Clear pending messages since we'll yield the result at final line
                         pending_messages = []
                         logger.info(
-                            f"Received authoritative result message: {len(message)} chars, previous accumulated: {len(old_accumulated)} chars"
+                            f"Received authoritative result message: {len(message)} chars, "
+                            f"previous accumulated: {len(old_accumulated)} chars"
                         )
 
                         # Validate that our chunk appending worked correctly (for debugging)
@@ -868,30 +870,35 @@ def stream_chat_response_agent(
                             if appended_normalized != result_normalized:
                                 logger.warning(
                                     f"⚠️ Chunk appending mismatch: "
-                                    f"appended={len(old_accumulated)} chars, result={len(message)} chars. "
+                                    f"appended={len(old_accumulated)} chars, "
+                                    f"result={len(message)} chars. "
                                     f"Using result as authoritative."
                                 )
                             else:
                                 logger.info(
-                                    f"✅ Chunk appending validated: appended chunks match result ({len(old_accumulated)} chars)"
+                                    f"✅ Chunk appending validated: appended chunks match result "
+                                    f"({len(old_accumulated)} chars)"
                                 )
                     else:
                         # Assistant message: check if it's a delta chunk or full accumulated
                         logger.info(
-                            f"Extracted assistant chunk: length={len(message)}, preview={message[:100]}..."
+                            f"Extracted assistant chunk: length={len(message)}, "
+                            f"preview={message[:100]}..."
                         )
                         if accumulated_message:
                             # If this chunk contains the accumulated message, it's the full accumulated - replace
                             if accumulated_message in message:
                                 logger.info(
-                                    f"Assistant chunk contains accumulated - replacing: {len(accumulated_message)} -> {len(message)} chars"
+                                    f"Assistant chunk contains accumulated - replacing: "
+                                    f"{len(accumulated_message)} -> {len(message)} chars"
                                 )
                                 accumulated_message = message
                                 message_updated = True
                             elif message in accumulated_message:
                                 # This chunk is a prefix/substring of what we already have - skip it (duplicate/restart)
                                 logger.debug(
-                                    f"Skipping duplicate/restart chunk: {len(message)} chars (already have {len(accumulated_message)} chars)"
+                                    f"Skipping duplicate/restart chunk: {len(message)} chars "
+                                    f"(already have {len(accumulated_message)} chars)"
                                 )
                                 message_updated = False
                             elif len(message) > len(

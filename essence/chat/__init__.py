@@ -37,7 +37,7 @@ from .platform_translators import (
 
 # Agent communication (optional import to avoid circular dependencies)
 try:
-    from .agent_communication import (
+    from .agent_communication import (  # noqa: F401
         AgentCommunicationError,
         ChannelUnavailableError,
         CommunicationChannel,

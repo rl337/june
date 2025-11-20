@@ -295,7 +295,7 @@ class Planner:
         for pattern in step_patterns:
             matches = re.finditer(pattern, plan_text, re.MULTILINE | re.DOTALL)
             for match in matches:
-                step_num = int(match.group(1))
+                int(match.group(1))  # step_num - parsed but not used
                 description = match.group(2).strip()
 
                 # Try to identify tool from description

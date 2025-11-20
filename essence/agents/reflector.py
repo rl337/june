@@ -9,7 +9,6 @@ from typing import Any, List, Optional
 from opentelemetry import trace
 
 from essence.agents.reasoning import (
-    ConversationContext,
     ExecutionResult,
     Plan,
     ReflectionResult,
@@ -461,7 +460,7 @@ Please create an adjusted plan that addresses these issues and better achieves t
         for pattern in step_patterns:
             matches = re.finditer(pattern, plan_text, re.MULTILINE | re.DOTALL)
             for match in matches:
-                step_num = int(match.group(1))
+                int(match.group(1))  # step_num - parsed but not used
                 description = match.group(2).strip()
 
                 # Try to identify tool from description

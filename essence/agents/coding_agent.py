@@ -7,19 +7,16 @@ All operations run in containers - no host system pollution.
 """
 import json
 import logging
-import os
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Optional
 
 import grpc
 from june_grpc_api import llm_pb2_grpc
 from june_grpc_api.llm_pb2 import (
-    ChatChunk,
     ChatMessage,
     ChatRequest,
     Context,
-    FunctionCall,
     GenerationParameters,
     ToolCall,
     ToolDefinition,
@@ -226,7 +223,10 @@ class CodingAgent:
         self._available_tools = [
             ToolDefinition(
                 name="read_file",
-                description="Read the contents of a file. Use this to examine code files, configuration files, or any text files.",
+                description=(
+                    "Read the contents of a file. Use this to examine code files, "
+                    "configuration files, or any text files."
+                ),
                 parameters_schema=json.dumps(
                     {
                         "type": "object",
@@ -269,7 +269,10 @@ class CodingAgent:
                         "properties": {
                             "directory": {
                                 "type": "string",
-                                "description": "Directory path to list (relative to workspace root, defaults to workspace root)",
+                                "description": (
+                                    "Directory path to list "
+                                    "(relative to workspace root, defaults to workspace root)"
+                                ),
                             }
                         },
                         "required": [],
@@ -278,7 +281,10 @@ class CodingAgent:
             ),
             ToolDefinition(
                 name="execute_command",
-                description="Execute a shell command in the workspace. Use this to run scripts, tests, or any shell commands. Commands run in the workspace directory.",
+                description=(
+                    "Execute a shell command in the workspace. Use this to run scripts, "
+                    "tests, or any shell commands. Commands run in the workspace directory."
+                ),
                 parameters_schema=json.dumps(
                     {
                         "type": "object",
@@ -289,7 +295,10 @@ class CodingAgent:
                             },
                             "working_directory": {
                                 "type": "string",
-                                "description": "Working directory for the command (relative to workspace root, defaults to workspace root)",
+                                "description": (
+                                    "Working directory for the command "
+                                    "(relative to workspace root, defaults to workspace root)"
+                                ),
                             },
                         },
                         "required": ["command"],
@@ -298,14 +307,19 @@ class CodingAgent:
             ),
             ToolDefinition(
                 name="read_directory",
-                description="Get detailed information about files and subdirectories in a directory.",
+                description=(
+                    "Get detailed information about files and subdirectories in a directory."
+                ),
                 parameters_schema=json.dumps(
                     {
                         "type": "object",
                         "properties": {
                             "directory": {
                                 "type": "string",
-                                "description": "Directory path (relative to workspace root, defaults to workspace root)",
+                                "description": (
+                                    "Directory path "
+                                    "(relative to workspace root, defaults to workspace root)"
+                                ),
                             }
                         },
                         "required": [],

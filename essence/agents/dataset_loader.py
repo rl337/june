@@ -8,9 +8,8 @@ import json
 import logging
 import tempfile
 import urllib.request
-import zipfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from essence.agents.evaluator import BenchmarkTask
 

@@ -10,7 +10,6 @@ from typing import Any, Dict, Iterator, List, Optional
 import grpc
 from june_grpc_api import llm_pb2_grpc
 from june_grpc_api.llm_pb2 import (
-    ChatChunk,
     ChatMessage,
     ChatRequest,
     Context,

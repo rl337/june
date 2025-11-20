@@ -242,7 +242,10 @@ class AgenticReasoner:
                         span.set_attribute("timeout_time", state.total_time)
                         return ReasoningResult(
                             success=False,
-                            final_response="I'm sorry, but this request is taking too long to process. Please try simplifying your request or breaking it into smaller parts.",
+                            final_response=(
+                                "I'm sorry, but this request is taking too long to process. "
+                                "Please try simplifying your request or breaking it into smaller parts."
+                            ),
                             iterations=state.iteration,
                             total_time=state.total_time,
                             error=f"Total timeout exceeded ({self.total_timeout}s)",
