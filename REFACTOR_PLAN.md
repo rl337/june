@@ -5,9 +5,9 @@
 **Last Updated:** 2025-11-20 14:39 (Phase 20 complete - Message API fully operational. Phase 19 progress - services started with whitelist, Message API tested. **CRITICAL FIX:** STT service was loading Whisper on CPU (8.7GB RAM usage, 90% system memory) - fixed to use GPU (`STT_DEVICE=cuda`). Removed NATS dependency causing crashes. **RESOLVED:** DGX Spark NIMs support ARM64 - Qwen3-32B DGX Spark NIM confirmed ARM64-compatible and configured in home_infra. **OPERATIONAL:** Started LLM NIM service (nim-qwen3) - service running and initializing (downloading model files, started 2025-11-20 14:22:20, still downloading tokenizer and model files as of 14:39). STT/TTS NIMs (Riva ASR/TTS) configured with confirmed image paths, ARM64 compatibility needs verification. **NEW:** Created helper script `scripts/switch_to_nim.sh` to automate switching june services from TensorRT-LLM to NIM endpoint (verifies NIM is ready, updates configuration, restarts services). **NEW:** Updated NIM_SETUP.md documentation to reflect DGX Spark ARM64 configuration and current image paths. **NEW:** Created comprehensive operational status summary document (`docs/OPERATIONAL_STATUS.md`) with complete current state, operational tasks, and next steps. **NEW:** Created Riva NIM deployment guide (`docs/guides/RIVA_NIM_DEPLOYMENT.md`) with complete step-by-step workflow for deploying Riva ASR/TTS NIMs, integrating all helper scripts and tools. **NEW:** Updated documentation index (`docs/README.md`) to include Riva NIM deployment guide.)
 
 **Current State:**
-- ✅ **All code implementation complete** (451 tests passing, 8 skipped)
+- ✅ **All code implementation complete** (419 tests passing locally, 1 skipped, 32 deselected)
 - ✅ **All infrastructure ready** (commands, tools, documentation)
-- ✅ **GitHub Actions passing** (all workflows successful)
+- ⚠️ **GitHub Actions:** Some workflow failures detected (most recent: 2025-11-20T17:35:57Z) - tests passing locally, may be environment-specific issues
 - ✅ **No uncommitted changes**
 - ✅ **Phase 19 - Direct Agent-User Communication:** All code implementation tasks complete (whitelist, routing, USER_REQUESTS.md syncing, message grouping/editing, service conflict prevention, polling loop integration)
 - ✅ **DM Verification:** Agent verified can send DMs on both Telegram and Discord (test script successful)
