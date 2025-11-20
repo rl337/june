@@ -673,8 +673,32 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
                 # Extract just the model name part (e.g., "openai/whisper-large-v3" -> "large-v3")
                 model_name = model_name.split("/")[-1].replace("whisper-", "")
             
+            # Check CUDA availability and adjust device if needed
+            import torch
+            actual_device = self.device
+            if self.device.startswith("cuda") and not torch.cuda.is_available():
+                logger.warning(
+                    f"CUDA device '{self.device}' requested but CUDA is not available. "
+                    "Falling back to CPU. This may cause performance issues."
+                )
+                actual_device = "cpu"
+            elif self.device.startswith("cuda"):
+                # Verify CUDA device is accessible
+                try:
+                    device_index = int(self.device.split(":")[-1]) if ":" in self.device else 0
+                    if device_index >= torch.cuda.device_count():
+                        logger.warning(
+                            f"CUDA device '{self.device}' not available (only {torch.cuda.device_count()} devices). "
+                            "Falling back to CPU."
+                        )
+                        actual_device = "cpu"
+                except (ValueError, IndexError):
+                    logger.warning(f"Invalid CUDA device format '{self.device}'. Falling back to CPU.")
+                    actual_device = "cpu"
+            
+            logger.info(f"Loading Whisper model on device: {actual_device}")
             self.whisper_model = whisper.load_model(
-                model_name, device=self.device
+                model_name, device=actual_device
             )
 
             # Initialize VAD if enabled
