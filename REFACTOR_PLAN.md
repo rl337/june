@@ -28,13 +28,14 @@
   - 🚨 **Phase 19: Deploy NIMs and enable Telegram/Discord communication** (HIGH PRIORITY - NOW UNBLOCKED)
     - ✅ NIM access resolved - nim-qwen3 downloaded successfully
     - ✅ LLM NIM (nim-qwen3) configured in home_infra/docker-compose.yml
+    - ✅ **Tool Available:** `list-nims` command exists to discover available NIM containers - use `poetry run python -m essence list-nims --dgx-spark-only --filter stt` or `--filter tts` to find SparkStation-compatible models for STT/TTS evaluation
     - ⏳ **Operational:** Start LLM NIM service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3` (requires NGC_API_KEY)
     - ⚠️ **BLOCKER:** NIM containers are AMD64-only, but host is ARM64. NIMs won't run on ARM64 architecture. Need ARM64-compatible NIMs or use TensorRT-LLM instead.
-     - ⏳ **Research:** Check NGC catalog for STT NIM container availability (https://catalog.ngc.nvidia.com/ → Containers → NIM → search "whisper" or "stt")
+     - ⏳ **Research:** Check NGC catalog for STT NIM container availability (https://catalog.ngc.nvidia.com/ → Containers → NIM → search "whisper" or "stt") - **OR use `list-nims --filter stt --dgx-spark-only` command**
        - ✅ **Found:** Riva ASR NIM available (Parakeet ASR-CTC-1.1B-EnUS) - different model than Whisper but same function
        - ⚠️ **ARM64 support unclear** - needs verification in NGC catalog
        - ⏳ **Action:** Verify Riva ASR NIM ARM64/DGX Spark compatibility and exact image path
-     - ⏳ **Research:** Check NGC catalog for TTS NIM container availability (https://catalog.ngc.nvidia.com/ → Containers → NIM → search "tts" or "speech")
+     - ⏳ **Research:** Check NGC catalog for TTS NIM container availability (https://catalog.ngc.nvidia.com/ → Containers → NIM → search "tts" or "speech") - **OR use `list-nims --filter tts --dgx-spark-only` command**
        - ✅ **Found:** Riva TTS NIM available (Magpie TTS Multilingual, FastPitch-HiFiGAN-EN) - different models than FastSpeech2 but same function
        - ⚠️ **ARM64 support unclear** - needs verification in NGC catalog
        - ⏳ **Action:** Verify Riva TTS NIM ARM64/DGX Spark compatibility and exact image path
@@ -317,6 +318,7 @@ All major refactoring phases have been completed:
 The agent can help with steps 2-3 once the user provides the required information (NGC_API_KEY, Telegram user ID).
 
 1. **Deploy NIMs for inference:** ⏳ IN PROGRESS (HIGH PRIORITY - Agent should work on this)
+   - ✅ **Tool Available:** `list-nims` command exists - use `poetry run python -m essence list-nims --dgx-spark-only --filter {llm|stt|tts}` to discover SparkStation-compatible NIM models for evaluation
    - **Why:** NIMs provide GPU-optimized inference for LLM, TTS, and STT. Hardware is designed for this.
    - **Current Status (2025-11-20):**
      - ✅ NIM access resolved - NGC API token updated with correct permissions
