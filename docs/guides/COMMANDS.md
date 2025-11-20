@@ -50,6 +50,16 @@ poetry run python -m essence <command-name> [arguments]
   - `--validate TEXT` - Validate message text for platform (requires --platform)
   - `--stats` - Show statistics instead of messages
   - `--format FORMAT` - Output format (text, json)
+- `read-user-requests` - Read pending user requests from USER_REQUESTS.md (Phase 19)
+  - Lists all pending requests from whitelisted users
+  - Used by looping agent to check for new user requests
+- `poll-user-responses` - Poll for user responses to agent messages (Phase 19)
+  - `--timeout-hours HOURS` - Hours to wait before marking a request as timed out (default: 24)
+  - Checks for agent messages waiting for user responses
+  - Automatically updates status to "Responded" or "Timeout"
+- `check-service-status` - Check if Telegram/Discord services are running (Phase 19)
+  - Verifies services are stopped before using agent communication
+  - Prevents race conditions between services and agent communication
 
 ## Creating a New Command
 

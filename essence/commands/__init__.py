@@ -13,6 +13,7 @@ Commands are discovered via reflection - they must be:
 # Import command modules so they're available for reflection
 from . import benchmark_qwen3  # noqa: F401
 from . import check_environment  # noqa: F401
+from . import check_service_status  # noqa: F401
 from . import coding_agent  # noqa: F401
 from . import compile_model  # noqa: F401
 from . import discord_service  # noqa: F401
@@ -23,6 +24,8 @@ from . import inference_api_service  # noqa: F401
 from . import integration_test_service  # noqa: F401
 from . import manage_tensorrt_llm  # noqa: F401
 from . import monitor_gpu  # noqa: F401
+from . import poll_user_responses  # noqa: F401
+from . import read_user_requests  # noqa: F401
 from . import review_sandbox  # noqa: F401
 from . import run_benchmarks  # noqa: F401
 from . import setup_triton_repository  # noqa: F401
@@ -49,10 +52,13 @@ __all__ = [
     "integration_test_service",
     "coding_agent",
     "check_environment",
+    "check_service_status",
     "get_message_history",
     "manage_tensorrt_llm",
     "setup_triton_repository",
     "verify_tensorrt_llm",
     "verify_nim",
     "compile_model",
+    "read_user_requests",
+    "poll_user_responses",
 ]
