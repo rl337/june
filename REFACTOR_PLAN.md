@@ -249,20 +249,26 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - **Why:** NIMs provide GPU-optimized inference for TTS, STT, and agent efforts. Hardware is designed for this.
    - **Current Status (2025-11-20):**
      - ✅ NIM service configured in `home_infra/docker-compose.yml` (nim-qwen3 service exists)
-     - ❌ **BLOCKER:** `NGC_API_KEY` environment variable not set (required for pulling NIM images from NGC)
-     - ❌ NIM service not running (cannot start without NGC_API_KEY)
+     - ✅ `NGC_API_KEY` environment variable is set in `/home/rlee/dev/home_infra/.env`
+     - ✅ Docker logged in to NGC registry (`nvcr.io`) successfully
+     - ❌ **BLOCKER:** Image name verification needed - Docker pull fails with "Access Denied" for `nvcr.io/nvidia/nim_qwen3_30b_instruct:latest`
+     - ❌ NIM service not running (cannot start due to image pull failure)
    - **Steps:**
-     - ✅ Checked if `NGC_API_KEY` is set in home_infra environment → **NOT SET**
-     - ⏳ **BLOCKER:** User needs to set `NGC_API_KEY` in `/home/rlee/dev/home_infra/.env` file:
-       - Get API key from: https://catalog.ngc.nvidia.com/ → Profile → API Keys → Generate API Key
-       - Add to `.env`: `NGC_API_KEY=your-api-key-here`
-     - ⏳ Start NIM service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3` (blocked on NGC_API_KEY)
+     - ✅ Checked if `NGC_API_KEY` is set in home_infra environment → **SET** (found in `.env` file)
+     - ✅ Logged Docker into NGC registry using NGC_API_KEY → **SUCCESS**
+     - ⏳ **BLOCKER:** Image name needs verification - current image `nvcr.io/nvidia/nim_qwen3_30b_instruct:latest` may be incorrect
+       - Documentation suggests verifying image name in NGC catalog: https://catalog.ngc.nvidia.com/
+       - Search for "qwen3" or "qwen" in Containers → NIM section
+       - May need to use staging image: `nvcr.io/nvstaging/nim_qwen3_30b_instruct:latest`
+       - Or may need different image name format entirely
+       - See `docs/guides/NIM_SETUP.md` for detailed verification steps
+     - ⏳ Start NIM service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3` (blocked on image name verification)
      - ⏳ Verify NIM is running: `docker compose ps nim-qwen3` (blocked on service start)
      - ⏳ Verify NIM connectivity: `cd /home/rlee/dev/june && poetry run python -m essence verify-nim --nim-host nim-qwen3 --http-port 8003 --grpc-port 8001` (blocked on service start)
      - ⏳ Update june services to use NIM endpoint (set `LLM_URL=grpc://nim-qwen3:8001` in docker-compose.yml or .env) (blocked on service verification)
    - **Helper Script:** `scripts/setup_nim_operational.sh` - Orchestrates NIM deployment
    - **Note:** This is operational work (starting Docker services), not code changes. Code is already complete.
-   - **Action Required:** User must set `NGC_API_KEY` in `/home/rlee/dev/home_infra/.env` before NIM service can be started.
+   - **Action Required:** Verify correct NIM image name in NGC catalog and update `home_infra/docker-compose.yml` if needed. NGC_API_KEY is set and Docker is authenticated, but image name may be incorrect.
 
 2. **Configure whitelisted users and enable Telegram/Discord communication:** ⏳ IN PROGRESS (HIGH PRIORITY - Agent working on this)
    - **Why:** This enables direct communication between the user and the looping agent via Telegram/Discord. Code is complete, just needs operational setup.
