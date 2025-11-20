@@ -933,19 +933,21 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - ✅ Implemented PATCH /messages/{message_id} - Append to message (supports PREPEND:/REPLACE:)
    - ✅ Verified agent can send DMs on both Telegram and Discord (test script successful)
 
-2. **Create command to run Message API service:** ⏳ TODO (HIGH PRIORITY)
-   - Create `essence/commands/message_api_service.py` command
-   - Register command in `essence/commands/__init__.py`
-   - Command should start FastAPI service on configurable port (default: 8082)
-   - Add health check endpoint verification
-   - Test command works: `poetry run python -m essence message-api-service`
+2. **Create command to run Message API service:** ✅ COMPLETED (2025-11-20)
+   - ✅ Created `essence/commands/message_api_service.py` command
+   - ✅ Registered command in `essence/commands/__init__.py`
+   - ✅ Command starts FastAPI service on configurable port (default: 8082)
+   - ✅ Health check endpoint verified working
+   - ✅ Tested command: `poetry run python -m essence message-api-service` works correctly
 
-3. **Add Message API service to docker-compose.yml:** ⏳ TODO (HIGH PRIORITY)
-   - Add `message-api` service to docker-compose.yml
-   - Configure port mapping (8082:8082)
-   - Set environment variables (MESSAGE_API_PORT, MESSAGE_API_HOST)
-   - Add to june_network
-   - Test service starts: `docker compose up -d message-api`
+3. **Add Message API service to docker-compose.yml:** ✅ COMPLETED (2025-11-20)
+   - ✅ Added `message-api` service to docker-compose.yml
+   - ✅ Configured port mapping (8082:8082)
+   - ✅ Set environment variables (MESSAGE_API_PORT, MESSAGE_API_HOST, bot tokens, whitelist)
+   - ✅ Added to june_network and shared-network
+   - ✅ Created Dockerfile at `services/message-api/Dockerfile`
+   - ✅ Moved integration-test to port 8084 to free up 8082 for message-api
+   - ⏳ **NEXT:** Test service starts: `docker compose up -d message-api`
 
 4. **Update agent code to use API instead of direct calls:** ⏳ TODO (HIGH PRIORITY)
    - Replace `essence.chat.agent_communication.send_message_to_user()` calls with HTTP API calls
