@@ -160,7 +160,9 @@ def main():
         help="Output directory for reports",
     )
     parser.add_argument(
-        "--host", type=str, help="Override Gateway host (OBSOLETE - Gateway service was removed, only used for obsolete REST/WebSocket tests)"
+        "--host",
+        type=str,
+        help="Override Gateway host (OBSOLETE - Gateway service was removed, only used for obsolete REST/WebSocket tests)",
     )
 
     args = parser.parse_args()
@@ -197,7 +199,9 @@ def main():
 
     # Run REST tests (OBSOLETE - Gateway service was removed)
     if args.test_type in ["rest", "all"]:
-        logger.warning("⚠️  REST tests are obsolete - Gateway service was removed. Tests may fail.")
+        logger.warning(
+            "⚠️  REST tests are obsolete - Gateway service was removed. Tests may fail."
+        )
         locust_file = Path(__file__).parent / "locust" / "gateway_rest.py"
         if locust_file.exists():
             success = run_locust_test(
@@ -214,7 +218,9 @@ def main():
 
     # Run WebSocket tests (OBSOLETE - Gateway service was removed)
     if args.test_type in ["websocket", "all"]:
-        logger.warning("⚠️  WebSocket tests are obsolete - Gateway service was removed. Tests may fail.")
+        logger.warning(
+            "⚠️  WebSocket tests are obsolete - Gateway service was removed. Tests may fail."
+        )
         locust_file = Path(__file__).parent / "locust" / "gateway_websocket.py"
         if locust_file.exists():
             success = run_locust_test(
