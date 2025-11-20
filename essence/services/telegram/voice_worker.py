@@ -110,7 +110,7 @@ async def main():
     logger.info(f"Connecting to NATS: {nats_url}")
 
     # Initialize Telegram bot application for sending messages
-    from dependencies.config import get_service_config
+    from essence.services.telegram.dependencies.config import get_service_config
     from telegram.ext import Application
 
     service_config = get_service_config()

@@ -205,7 +205,7 @@ def get_grpc_pool() -> GrpcConnectionPool:
     if _pool is None:
         import os
 
-        from dependencies.config import (
+        from essence.services.telegram.dependencies.config import (
             get_llm_address,
             get_stt_address,
             get_tts_address,
