@@ -21,6 +21,7 @@
 # The script also runs periodic polling for user responses in the background:
 # - Polls for user responses to agent messages (default: every 2 minutes)
 # - Checks for pending user requests from USER_REQUESTS.md
+# - Processes NEW messages from USER_MESSAGES.md (Phase 21)
 # - Polling interval can be configured via USER_POLLING_INTERVAL_SECONDS environment variable
 # - Polling can be disabled by setting ENABLE_USER_POLLING=0
 
@@ -143,6 +144,14 @@ poll_user_responses() {
             log_file_only "Pending requests check completed"
         else
             log_file_only "Pending requests check encountered an error (non-fatal, will retry)"
+        fi
+        
+        # Process NEW messages from USER_MESSAGES.md (Phase 21)
+        log_file_only "Processing NEW messages from USER_MESSAGES.md..."
+        if cd "$PROJECT_ROOT" && poetry run python -m essence process-user-messages >> "$LOG_FILE" 2>&1; then
+            log_file_only "User messages processing completed"
+        else
+            log_file_only "User messages processing encountered an error (non-fatal, will retry)"
         fi
     done
     

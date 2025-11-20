@@ -1067,11 +1067,11 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - ✅ Registered command in `essence/commands/__init__.py`
    - ✅ Command can be run: `poetry run python -m essence process-user-messages`
 
-2. **Integrate command into looping agent script:** ⏳ TODO
-   - Add periodic call to `process-user-messages` command in `scripts/refactor_agent_loop.sh`
-   - Can run in background polling loop (similar to existing user response polling)
-   - Configure polling interval (default: every 2 minutes)
-   - Handle command failures gracefully
+2. **Integrate command into looping agent script:** ✅ COMPLETED
+   - ✅ Added periodic call to `process-user-messages` command in `scripts/refactor_agent_loop.sh`
+   - ✅ Integrated into existing user response polling loop (runs every 2 minutes, configurable via USER_POLLING_INTERVAL_SECONDS)
+   - ✅ Handles command failures gracefully (non-fatal errors, will retry on next polling cycle)
+   - ✅ Command runs in background polling loop alongside `poll-user-responses` and `read-user-requests`
 
 4. **Test complete round trip:** ⏳ TODO
    - Owner sends message via Telegram/Discord
