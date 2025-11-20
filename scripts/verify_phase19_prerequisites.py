@@ -29,7 +29,7 @@ sys.path.insert(0, str(project_root))
 JUNE_DATA_DIR = os.getenv("JUNE_DATA_DIR", "/home/rlee/june_data")
 DATA_DIR = Path(os.getenv("USER_MESSAGES_DATA_DIR", f"{JUNE_DATA_DIR}/var-data"))
 USER_MESSAGES_FILE = DATA_DIR / "USER_MESSAGES.md"
-MESSAGE_API_URL = os.getenv("MESSAGE_API_URL", "http://localhost:8082")
+MESSAGE_API_URL = os.getenv("MESSAGE_API_URL", "http://localhost:8083")
 TELEGRAM_HEALTH_URL = "http://localhost:8080/health"
 DISCORD_HEALTH_URL = "http://localhost:8081/health"
 
