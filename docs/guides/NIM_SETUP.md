@@ -32,49 +32,44 @@ NVIDIA NIM (NVIDIA Inference Microservice) provides pre-built, optimized contain
 
 ## Finding the Correct NIM Image Name
 
-**IMPORTANT:** The NIM image name in `home_infra/docker-compose.yml` may need verification. Follow these steps to find the correct image name:
+**IMPORTANT:** For DGX Spark (ARM64) systems, use DGX Spark-specific NIM containers that support ARM64 architecture.
 
-### Step 1: Access NGC Catalog
+### Current Configuration (DGX Spark)
+
+The current configuration uses the DGX Spark-specific NIM container:
+- **Image:** `nvcr.io/nim/qwen/qwen3-32b-dgx-spark:1.0.0`
+- **Architecture:** ARM64-compatible (DGX Spark)
+- **Model:** Qwen3-32B Instruct
+- **Catalog:** https://catalog.ngc.nvidia.com/orgs/nim/teams/qwen/containers/qwen3-32b-dgx-spark
+
+### Finding NIM Images
+
+**Option 1: Use list-nims command (Recommended)**
+```bash
+poetry run python -m essence list-nims --dgx-spark-only --filter llm
+```
+
+**Option 2: Access NGC Catalog**
 
 1. Go to https://catalog.ngc.nvidia.com/
 2. Sign in with your NVIDIA account
-3. Navigate to **Containers** → **NIM** (or search for "NIM")
+3. Navigate to **Containers** → **NIM**
+4. Search for "qwen3" or "dgx-spark"
+5. Look for containers with "dgx-spark" in the name for ARM64 compatibility
 
-### Step 2: Find Qwen3 NIM Container
+### Image Name Format
 
-1. Search for "qwen3" or "qwen" in the NGC catalog
-2. Look for containers with names like:
-   - `nim_qwen3_30b_instruct`
-   - `nim-qwen3-30b-instruct`
-   - `qwen3-30b-instruct-nim`
-3. Check the container details for:
-   - Model size (should match 30B)
-   - Architecture (should match A3B or your target architecture)
-   - Instruction format (should match your use case)
-
-### Step 3: Verify Image Name Format
-
-NIM container images typically follow this format:
+NIM container images follow this format:
 ```
-nvcr.io/nvidia/<container-name>:<tag>
+nvcr.io/nim/<team>/<model-name>:<tag>
 ```
 
-**Common formats:**
-- Production: `nvcr.io/nvidia/nim_qwen3_30b_instruct:latest`
-- Staging: `nvcr.io/nvstaging/nim_qwen3_30b_instruct:latest` (may be used during development)
-- Versioned: `nvcr.io/nvidia/nim_qwen3_30b_instruct:24.10` (specific version)
+**DGX Spark NIMs:**
+- Qwen3-32B: `nvcr.io/nim/qwen/qwen3-32b-dgx-spark:1.0.0`
+- Llama-3.1-8B: `nvcr.io/nim/llama/llama-3.1-8b-instruct-dgx-spark:latest`
+- Nemotron-Nano-9B: `nvcr.io/nim/nemotron/nemotron-nano-9b-v2-dgx-spark:latest`
 
-**Note:** The current configuration uses `nvcr.io/nvstaging/nim_qwen3_30b_instruct:latest`. Verify this is correct or update to the production image name from the NGC catalog.
-
-### Step 4: Update docker-compose.yml
-
-Once you've found the correct image name, update `home_infra/docker-compose.yml`:
-
-```yaml
-nim-qwen3:
-  image: nvcr.io/nvidia/nim_qwen3_30b_instruct:latest  # Update with correct image name
-  # ... rest of configuration
-```
+**Note:** Standard NIM containers (without "dgx-spark") are AMD64-only and won't work on ARM64 systems like DGX Spark.
 
 ## Infrastructure Setup
 
@@ -84,7 +79,7 @@ The NIM container is configured in `/home/rlee/dev/home_infra/docker-compose.yml
 
 ```yaml
 nim-qwen3:
-  image: nvcr.io/nvstaging/nim_qwen3_30b_instruct:latest  # Verify this is correct
+  image: nvcr.io/nim/qwen/qwen3-32b-dgx-spark:1.0.0  # DGX Spark ARM64-compatible
   container_name: common-nim-qwen3
   restart: unless-stopped
   expose:
@@ -222,8 +217,8 @@ services:
 2. **Check image name:**
    ```bash
    # Try to pull the image manually
-   docker pull nvcr.io/nvstaging/nim_qwen3_30b_instruct:latest
-   # If this fails, the image name may be incorrect - check NGC catalog
+   docker pull nvcr.io/nim/qwen/qwen3-32b-dgx-spark:1.0.0
+   # If this fails, the image name may be incorrect - check NGC catalog or use list-nims command
    ```
 
 3. **Check GPU availability:**
@@ -254,7 +249,7 @@ If image pull fails:
 - Try pulling with explicit authentication:
   ```bash
   echo $NGC_API_KEY | docker login nvcr.io -u '$oauthtoken' --password-stdin
-  docker pull nvcr.io/nvstaging/nim_qwen3_30b_instruct:latest
+  docker pull nvcr.io/nim/qwen/qwen3-32b-dgx-spark:1.0.0
   ```
 
 ### gRPC Connection Errors
@@ -310,6 +305,7 @@ If health checks fail:
 
 ## Notes
 
-- **Image Name Verification:** The image name `nvcr.io/nvstaging/nim_qwen3_30b_instruct:latest` in `home_infra/docker-compose.yml` should be verified against the NGC catalog before deployment. Staging images (`nvstaging`) may be used during development, but production should use `nvcr.io/nvidia/...` images.
+- **Image Name:** The current configuration uses `nvcr.io/nim/qwen/qwen3-32b-dgx-spark:1.0.0` which is the DGX Spark ARM64-compatible version. For other architectures, use standard NIM containers (without "dgx-spark" suffix).
 - **NGC API Key:** Required for pulling NIM containers. Store securely and don't commit to version control.
-- **Model Loading:** Large models (30B+) may take 2-5 minutes to load. Health checks account for this with `start_period: 120s`.
+- **Model Loading:** Large models (32B+) may take 5-10 minutes to download and load on first startup. Health checks account for this with `start_period: 120s`. Subsequent starts are faster as model files are cached.
+- **ARM64 Compatibility:** DGX Spark NIMs are specifically built for ARM64 architecture. Standard NIM containers are AMD64-only and won't work on ARM64 systems.
