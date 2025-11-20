@@ -167,12 +167,14 @@ All major refactoring phases have been completed:
    - ⏳ Handle long delays: User may not respond for hours/days
    - ⏳ Implement message state tracking (pending, responded, timeout) - status tracking already implemented
 
-6. **Service conflict prevention:** ⏳ TODO
-   - ⏳ **CRITICAL:** When direct agent communication is active via Telegram, the Telegram service MUST be disabled to prevent race conditions
-   - ⏳ **CRITICAL:** When direct agent communication is active via Discord, the Discord service MUST be disabled to prevent race conditions
-   - ⏳ Implement service status checking before enabling direct communication
-   - ⏳ Provide clear error messages if services are running when agent tries to communicate
-   - ⏳ Document service management workflow (stop service → enable agent communication → start service when done)
+6. **Service conflict prevention:** ✅ COMPLETED
+   - ✅ **CRITICAL:** When direct agent communication is active via Telegram, the Telegram service MUST be disabled to prevent race conditions
+   - ✅ **CRITICAL:** When direct agent communication is active via Discord, the Discord service MUST be disabled to prevent race conditions
+   - ✅ Implemented service status checking before enabling direct communication (`verify_service_stopped_for_platform()`)
+   - ✅ Enhanced error messages with clear instructions when services are running
+   - ✅ Created `check-service-status` command for checking service status before agent communication
+   - ✅ Documented service management workflow in function docstrings and command output
+   - ✅ Service status checking integrated into `send_message_to_user()` with `require_service_stopped` parameter
 
 **Implementation Details:**
 - **User Whitelist:** Environment variables `TELEGRAM_WHITELISTED_USERS` and `DISCORD_WHITELISTED_USERS` (comma-separated user IDs)

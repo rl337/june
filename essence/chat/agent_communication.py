@@ -80,6 +80,37 @@ def check_discord_service_running() -> bool:
     return check_service_running("discord")
 
 
+def verify_service_stopped_for_platform(
+    platform: CommunicationChannel,
+) -> tuple[bool, Optional[str]]:
+    """
+    Verify that the service for the given platform is stopped.
+
+    Args:
+        platform: Platform to check
+
+    Returns:
+        Tuple of (is_stopped, error_message):
+        - is_stopped: True if service is stopped, False if running
+        - error_message: Error message if service is running, None if stopped
+    """
+    if platform == CommunicationChannel.TELEGRAM:
+        if check_telegram_service_running():
+            return (
+                False,
+                "Telegram service is running. Disable it before using agent communication "
+                "to prevent race conditions. Run: docker compose stop telegram",
+            )
+    elif platform == CommunicationChannel.DISCORD:
+        if check_discord_service_running():
+            return (
+                False,
+                "Discord service is running. Disable it before using agent communication "
+                "to prevent race conditions. Run: docker compose stop discord",
+            )
+    return True, None
+
+
 def send_message_to_user(
     user_id: str,
     chat_id: str,
@@ -93,6 +124,16 @@ def send_message_to_user(
 
     This is a high-level interface that handles platform selection, service
     status checking, and message validation.
+
+    **CRITICAL:** When using agent communication, the corresponding service
+    (Telegram or Discord) MUST be stopped to prevent race conditions. This
+    function will raise ServiceRunningError if the service is running and
+    require_service_stopped=True.
+
+    **Workflow:**
+    1. Stop service: `docker compose stop telegram` (or `discord`)
+    2. Use agent communication (send messages, read requests)
+    3. Restart service when done: `docker compose start telegram` (or `discord`)
 
     Args:
         user_id: User ID to send message to
@@ -127,20 +168,16 @@ def send_message_to_user(
                 "or not configured. Disable services before using agent communication."
             )
 
-    # Check service status
+    # Check service status before sending
+    if require_service_stopped:
+        is_stopped, error_message = verify_service_stopped_for_platform(platform)
+        if not is_stopped:
+            raise ServiceRunningError(error_message)
+
+    # Send message
     if platform == CommunicationChannel.TELEGRAM:
-        if require_service_stopped and check_telegram_service_running():
-            raise ServiceRunningError(
-                "Telegram service is running. Disable it before using agent communication "
-                "to prevent race conditions. Run: docker compose stop telegram"
-            )
         return _send_telegram_message(user_id, chat_id, message, message_type)
     elif platform == CommunicationChannel.DISCORD:
-        if require_service_stopped and check_discord_service_running():
-            raise ServiceRunningError(
-                "Discord service is running. Disable it before using agent communication "
-                "to prevent race conditions. Run: docker compose stop discord"
-            )
         return _send_discord_message(user_id, chat_id, message, message_type)
     else:
         raise ValueError(f"Invalid platform: {platform}")
