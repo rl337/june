@@ -215,3 +215,4 @@ services/webapp/.env.production.local
 !MONITORING.md
 !MESSAGE_FORMAT_REQUIREMENTS.md
 !NIM_SETUP.md
+!USER_REQUESTS.md
