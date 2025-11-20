@@ -20,6 +20,7 @@ This documentation is organized by audience and purpose to help you find what yo
 - **[Deployment Guides](guides/DEPLOYMENT.md)** - Local development, production, cloud deployments (AWS/GCP/Azure), single/multi-node setups, configuration, SSL/TLS, backup/recovery, and monitoring
 - **[TensorRT-LLM Setup Guide](guides/TENSORRT_LLM_SETUP.md)** - TensorRT-LLM migration, model repository setup, model compilation, and management
 - **[NIM Setup Guide](guides/NIM_SETUP.md)** - NVIDIA NIM (NVIDIA Inference Microservice) setup, image name verification, NGC API key configuration, and troubleshooting
+- **[Riva NIM Deployment Guide](guides/RIVA_NIM_DEPLOYMENT.md)** - Complete step-by-step workflow for deploying Riva ASR/TTS NIM containers, integrating helper scripts and tools
 - **[Agent Communication Guide](guides/AGENT_COMMUNICATION.md)** - Direct agent-to-user communication system for whitelisted users, service conflict prevention, message syncing, and polling
 - **[Architecture Documentation](architecture/ARCHITECTURE.md)** - System architecture, service architecture, data flow diagrams, infrastructure components, network architecture, security, scalability, and design decisions
 - **[Agentic Capabilities](architecture/AGENTIC_CAPABILITIES.md)** - Comprehensive documentation for June's agentic capabilities system, enabling autonomous AI agents to discover, plan, execute, and verify tasks
@@ -50,6 +51,7 @@ docs/
 │   ├── AUDIO_TESTING.md        # Audio services testing
 │   ├── TENSORRT_LLM_SETUP.md   # TensorRT-LLM setup and migration guide
 │   ├── NIM_SETUP.md            # NVIDIA NIM setup guide
+│   ├── RIVA_NIM_DEPLOYMENT.md  # Riva ASR/TTS NIM deployment guide
 │   ├── AGENT_COMMUNICATION.md  # Direct agent-to-user communication guide
 │   └── FIXES_APPLIED.md        # Fixes and improvements log
 └── architecture/                # Architecture documentation
@@ -92,6 +94,7 @@ docs/
 - [Deployment](guides/DEPLOYMENT.md) - Deployment procedures
 - [TensorRT-LLM Setup](guides/TENSORRT_LLM_SETUP.md) - TensorRT-LLM migration and setup
 - [NIM Setup](guides/NIM_SETUP.md) - NVIDIA NIM setup and configuration
+- [Riva NIM Deployment](guides/RIVA_NIM_DEPLOYMENT.md) - Complete workflow for deploying Riva ASR/TTS NIMs
 - [Agent Communication](guides/AGENT_COMMUNICATION.md) - Direct agent-to-user communication system
 - [Troubleshooting](guides/TROUBLESHOOTING.md) - Common issues and solutions
 - [Monitoring](../README.md#-monitoring) - Metrics and observability
