@@ -9,7 +9,7 @@
 - ✅ **All infrastructure ready** (commands, tools, documentation)
 - ✅ **GitHub Actions passing** (all workflows successful)
 - ✅ **No uncommitted changes**
-- ✅ **Phase 19 - Direct Agent-User Communication:** All code implementation tasks complete (whitelist, routing, USER_REQUESTS.md syncing, message grouping/editing, service conflict prevention, polling utility)
+- ⏳ **Phase 19 - Direct Agent-User Communication:** Code implementation complete, polling loop integration in agent script pending
 - ⏳ **Remaining work is operational** (requires services to be running):
   - Phase 10.1-10.2: Model download and service startup (requires HUGGINGFACE_TOKEN, model download time)
   - Phase 15: NIM gRPC connectivity testing (requires NIM service running in home_infra with NGC_API_KEY)
@@ -138,12 +138,12 @@ All major refactoring phases have been completed:
 
 **Goal:** Establish direct communication channel between the looping agent and whitelisted end users via Telegram/Discord, replacing the current agentic flow in these services.
 
-**Status:** ✅ COMPLETED - All code implementation tasks complete. All 6 tasks fully implemented:
+**Status:** ⏳ MOSTLY COMPLETED - Code implementation complete, polling loop integration pending
 1. ✅ Whitelisted user communication
 2. ✅ Replace agentic flow with direct communication
 3. ✅ Sync messages to USER_REQUESTS.md
 4. ✅ Message grouping and editing
-5. ✅ Periodic message polling (utility implemented, polling loop can be added to looping agent script)
+5. ⏳ Periodic message polling (utility implemented, polling loop integration in agent script pending)
 6. ✅ Service conflict prevention
 
 **Tasks:**
@@ -182,7 +182,7 @@ All major refactoring phases have been completed:
    - ✅ Automatic message splitting if grouped message exceeds platform limits
    - ✅ Platform-specific formatting (HTML for Telegram, Markdown for Discord)
 
-5. **Periodic message polling:** ✅ COMPLETED (Utility implemented, polling loop can be added to looping agent script)
+5. **Periodic message polling:** ⏳ MOSTLY COMPLETED (Utility implemented, polling loop integration pending)
    - ✅ Created `poll-user-responses` command for checking user responses to agent messages
    - ✅ Implemented `check_for_user_responses()` function that:
      - Checks for agent messages (clarification, help_request, feedback_request) waiting for user responses
@@ -195,7 +195,12 @@ All major refactoring phases have been completed:
    - ✅ Process responses: Automatically updates USER_REQUESTS.md via `update_message_status()`
    - ✅ Handle long delays: Timeout mechanism handles hours/days delays (configurable via --timeout-hours)
    - ✅ Message state tracking: Status tracking implemented (pending, responded, timeout)
-   - ⏳ **Note:** The actual polling loop should be implemented in the looping agent script, but the utility function is ready to use
+   - ⏳ **TODO:** Integrate polling loop into `scripts/refactor_agent_loop.sh`:
+     - Add periodic call to `poll-user-responses` command (every 30 seconds to 5 minutes, configurable)
+     - Check for pending user requests from USER_REQUESTS.md using `read-user-requests` command
+     - Process user responses when detected
+     - Continue agent work while polling in background
+     - This enables the agent to respond to user messages even when the user doesn't respond immediately
 
 6. **Service conflict prevention:** ✅ COMPLETED
    - ✅ **CRITICAL:** When direct agent communication is active via Telegram, the Telegram service MUST be disabled to prevent race conditions
