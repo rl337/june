@@ -173,7 +173,7 @@ services:
       - CMD
       - python
       - -c
-      - import grpc; grpc.insecure_channel('localhost:50052').check_connectivity_state(True)
+      - import grpc; channel = grpc.insecure_channel('localhost:50052'); grpc.channel_ready_future(channel).result(timeout=5)
       interval: 30s
       timeout: 10s
       retries: 3
@@ -217,7 +217,7 @@ services:
       - CMD
       - python
       - -c
-      - import grpc; grpc.insecure_channel('localhost:50053').check_connectivity_state(True)
+      - import grpc; channel = grpc.insecure_channel('localhost:50053'); grpc.channel_ready_future(channel).result(timeout=5)
       interval: 30s
       timeout: 10s
       retries: 3
