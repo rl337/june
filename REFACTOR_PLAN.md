@@ -1071,7 +1071,10 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - ✅ Convenience functions for backward compatibility
    - ✅ Updated `essence/agents/reasoning.py` to use API (replaced direct calls in _send_agent_message, _ask_for_clarification, _request_help, _report_progress)
    - ✅ Updated `scripts/refactor_agent_loop.sh` documentation to use Message API
-   - ⏳ **NEXT:** Test agent can send messages via API (requires message-api service running)
+   - ✅ **COMPLETED:** Test agent can send messages via API → Verified agent can successfully call Message API (2025-11-20 15:55)
+     - ✅ Created test script `scripts/test_agent_message_api.py` to verify agent message sending
+     - ✅ Test confirms Message API integration works correctly (API receives requests and attempts to send to Telegram/Discord)
+     - ✅ Test handles expected errors (invalid test user ID rejection from Telegram/Discord)
 
 5. **Test API endpoints:** ✅ COMPLETED (2025-11-20)
    - ✅ Created test script `scripts/test_message_api.py` for comprehensive API testing
