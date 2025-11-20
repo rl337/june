@@ -126,27 +126,29 @@ All major refactoring phases have been completed:
 
 **Goal:** Establish direct communication channel between the looping agent and whitelisted end users via Telegram/Discord, replacing the current agentic flow in these services.
 
-**Status:** ⏳ NEW PRIORITY - Immediate implementation required
+**Status:** ⏳ IN PROGRESS - Core functionality implemented, remaining tasks are operational enhancements
 
 **Tasks:**
-1. **Establish whitelisted user communication:** ⏳ TODO
-   - ⏳ Create user whitelist configuration (environment variables or config file)
-   - ⏳ Implement user whitelist checking in Telegram/Discord services
-   - ⏳ Only whitelisted users can communicate directly with the looping agent
-   - ⏳ Non-whitelisted users continue to use the existing agentic flow
+1. **Establish whitelisted user communication:** ✅ COMPLETED
+   - ✅ Created user whitelist configuration (environment variables `TELEGRAM_WHITELISTED_USERS` and `DISCORD_WHITELISTED_USERS`)
+   - ✅ Implemented user whitelist checking in Telegram/Discord services (`essence/chat/user_requests_sync.py`)
+   - ✅ Only whitelisted users can communicate directly with the looping agent
+   - ✅ Non-whitelisted users continue to use the existing agentic flow
 
-2. **Replace agentic flow with direct communication:** ⏳ TODO
-   - ⏳ Modify Telegram service to route whitelisted user messages directly to looping agent
-   - ⏳ Modify Discord service to route whitelisted user messages directly to looping agent
-   - ⏳ Disable current agentic flow for whitelisted users
-   - ⏳ Implement message routing logic to distinguish agent communication from regular bot responses
+2. **Replace agentic flow with direct communication:** ✅ COMPLETED
+   - ✅ Modified Telegram service to route whitelisted user messages directly to looping agent (skips agentic flow, syncs to USER_REQUESTS.md)
+   - ✅ Modified Discord service to route whitelisted user messages directly to looping agent (skips agentic flow, syncs to USER_REQUESTS.md)
+   - ✅ Disabled current agentic flow for whitelisted users (returns early after syncing)
+   - ✅ Implemented message routing logic (whitelist check before agentic flow)
 
-3. **Sync messages to USER_REQUESTS.md:** ⏳ TODO
-   - ⏳ Create `USER_REQUESTS.md` file to track all user-agent communication
-   - ⏳ Implement message syncing: All messages exchanged between whitelisted users and the looping agent are synced to USER_REQUESTS.md
-   - ⏳ Format: Timestamp, user_id, platform, message_type (request/response), content
-   - ⏳ Update USER_REQUESTS.md in real-time as messages are exchanged
-   - ⏳ Include message metadata (message_id, chat_id, timestamp, platform)
+3. **Sync messages to USER_REQUESTS.md:** ✅ COMPLETED
+   - ✅ Created `USER_REQUESTS.md` file template (already existed, now properly initialized)
+   - ✅ Implemented message syncing: All messages exchanged between whitelisted users and the looping agent are synced to USER_REQUESTS.md
+   - ✅ Format: Timestamp, user_id, platform, message_type (request/response), content
+   - ✅ Update USER_REQUESTS.md in real-time as messages are exchanged (via `sync_message_to_user_requests()`)
+   - ✅ Include message metadata (message_id, chat_id, timestamp, platform, username)
+   - ✅ Agent responses synced automatically via `agent_communication.py` when user is whitelisted
+   - ✅ Created `read-user-requests` command for looping agent to read pending requests
 
 4. **Message grouping and editing:** ⏳ TODO
    - ⏳ Group multiple requests into a single message when possible
@@ -157,13 +159,13 @@ All major refactoring phases have been completed:
      - Message length (group if total length is reasonable)
      - Message type (group similar types together)
 
-5. **Periodic message polling:** ⏳ TODO
+5. **Periodic message polling:** ⏳ TODO (Operational - can be implemented in looping agent script)
    - ⏳ Implement periodic polling to check for user responses
    - ⏳ Poll interval: Configurable (default: 30 seconds to 5 minutes)
-   - ⏳ Check for new messages from whitelisted users
-   - ⏳ Process responses and update USER_REQUESTS.md
+   - ⏳ Check for new messages from whitelisted users (use `read-user-requests` command)
+   - ⏳ Process responses and update USER_REQUESTS.md (use `update_message_status()`)
    - ⏳ Handle long delays: User may not respond for hours/days
-   - ⏳ Implement message state tracking (pending, responded, timeout)
+   - ⏳ Implement message state tracking (pending, responded, timeout) - status tracking already implemented
 
 6. **Service conflict prevention:** ⏳ TODO
    - ⏳ **CRITICAL:** When direct agent communication is active via Telegram, the Telegram service MUST be disabled to prevent race conditions

@@ -125,6 +125,51 @@ async def handle_text_message(
 
             span.set_attribute("authorized", True)
 
+            # Check if user is whitelisted for direct agent communication
+            from essence.chat.user_requests_sync import is_user_whitelisted, sync_message_to_user_requests
+
+            is_whitelisted = is_user_whitelisted(str(user_id), "telegram")
+            span.set_attribute("whitelisted", is_whitelisted)
+
+            if is_whitelisted:
+                # Whitelisted user: Sync to USER_REQUESTS.md and skip agentic flow
+                # The looping agent will read from USER_REQUESTS.md and process the request
+                logger.info(
+                    f"Whitelisted user {user_id} - syncing to USER_REQUESTS.md and skipping agentic flow"
+                )
+
+                # Get username if available
+                username = None
+                try:
+                    if update.effective_user.username:
+                        username = f"@{update.effective_user.username}"
+                except Exception:
+                    pass
+
+                # Sync user request to USER_REQUESTS.md
+                sync_message_to_user_requests(
+                    user_id=str(user_id),
+                    chat_id=str(chat_id),
+                    platform="telegram",
+                    message_type="Request",
+                    content=user_message,
+                    message_id=str(update.message.message_id),
+                    status="Pending",
+                    username=username,
+                )
+
+                # Send acknowledgment to user
+                try:
+                    await update.message.reply_text(
+                        "✅ Request received and queued for processing by the looping agent. "
+                        "You will receive a response when the agent processes your request."
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to send acknowledgment to whitelisted user: {e}")
+
+                span.set_status(trace.Status(trace.StatusCode.OK))
+                return  # Skip agentic flow for whitelisted users
+
             logger.info(
                 f"Received text message from user {user_id} in chat {chat_id}: {user_message[:100]}"
             )

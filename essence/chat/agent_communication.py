@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional
 
 from essence.chat.message_history import get_message_history
 from essence.chat.message_history_analysis import validate_message_for_platform
+from essence.chat.user_requests_sync import sync_message_to_user_requests
 
 logger = logging.getLogger(__name__)
 
@@ -223,6 +224,37 @@ def _send_telegram_message(
                 except Exception as e:
                     logger.warning(f"Failed to store message in history: {e}")
 
+                # Sync to USER_REQUESTS.md if user is whitelisted
+                try:
+                    from essence.chat.user_requests_sync import is_user_whitelisted
+                    if is_user_whitelisted(user_id, "telegram"):
+                        # Try to get username from message history
+                        username = None
+                        try:
+                            history = get_message_history()
+                            user_messages = history.get_messages(
+                                platform="telegram",
+                                user_id=user_id,
+                                limit=1
+                            )
+                            if user_messages:
+                                username = user_messages[0].get("username")
+                        except Exception:
+                            pass
+
+                        sync_message_to_user_requests(
+                            user_id=user_id,
+                            chat_id=chat_id,
+                            platform="telegram",
+                            message_type=message_type.replace("_", " ").title(),
+                            content=message,
+                            message_id=message_id,
+                            status="Responded" if message_type in ["response", "progress"] else "Pending",
+                            username=username,
+                        )
+                except Exception as e:
+                    logger.warning(f"Failed to sync message to USER_REQUESTS.md: {e}")
+
                 return {
                     "success": True,
                     "platform": "telegram",
@@ -305,6 +337,37 @@ def _send_discord_message(
             )
         except Exception as e:
             logger.warning(f"Failed to store message in history: {e}")
+
+        # Sync to USER_REQUESTS.md if user is whitelisted
+        try:
+            from essence.chat.user_requests_sync import is_user_whitelisted
+            if is_user_whitelisted(user_id, "discord"):
+                # Try to get username from message history
+                username = None
+                try:
+                    history = get_message_history()
+                    user_messages = history.get_messages(
+                        platform="discord",
+                        user_id=user_id,
+                        limit=1
+                    )
+                    if user_messages:
+                        username = user_messages[0].get("username")
+                except Exception:
+                    pass
+
+                sync_message_to_user_requests(
+                    user_id=user_id,
+                    chat_id=chat_id,
+                    platform="discord",
+                    message_type=message_type.replace("_", " ").title(),
+                    content=message,
+                    message_id=message_id,
+                    status="Responded" if message_type in ["response", "progress"] else "Pending",
+                    username=username,
+                )
+        except Exception as e:
+            logger.warning(f"Failed to sync message to USER_REQUESTS.md: {e}")
 
         return {
             "success": True,

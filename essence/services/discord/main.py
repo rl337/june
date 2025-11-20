@@ -150,6 +150,52 @@ class DiscordBotService:
             user_id = message.author.id
             channel_id = message.channel.id
 
+            # Check if user is whitelisted for direct agent communication
+            from essence.chat.user_requests_sync import is_user_whitelisted, sync_message_to_user_requests
+
+            is_whitelisted = is_user_whitelisted(str(user_id), "discord")
+
+            if is_whitelisted:
+                # Whitelisted user: Sync to USER_REQUESTS.md and skip agentic flow
+                # The looping agent will read from USER_REQUESTS.md and process the request
+                logger.info(
+                    f"Whitelisted user {user_id} - syncing to USER_REQUESTS.md and skipping agentic flow"
+                )
+
+                # Get username if available
+                username = None
+                try:
+                    if message.author.name:
+                        username = message.author.name
+                except Exception:
+                    pass
+
+                # Sync user request to USER_REQUESTS.md
+                sync_message_to_user_requests(
+                    user_id=str(user_id),
+                    chat_id=str(channel_id),
+                    platform="discord",
+                    message_type="Request",
+                    content=message.content,
+                    message_id=str(message.id),
+                    status="Pending",
+                    username=username,
+                )
+
+                # Send acknowledgment to user
+                try:
+                    await send_with_history(
+                        message.channel,
+                        "✅ Request received and queued for processing by the looping agent. "
+                        "You will receive a response when the agent processes your request.",
+                        user_id=str(user_id),
+                        message_type="status",
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to send acknowledgment to whitelisted user: {e}")
+
+                return  # Skip agentic flow for whitelisted users
+
             logger.info(
                 f"Received message from user {user_id} in channel {channel_id}: {message.content[:100]}"
             )
