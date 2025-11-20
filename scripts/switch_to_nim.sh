@@ -121,7 +121,7 @@ else
     
     echo "Updating LLM_URL in $DOCKER_COMPOSE_FILE..."
     
-    # Update telegram service
+    # Update all services (telegram and discord) that use LLM_URL
     if [[ "$OSTYPE" == "darwin"* ]]; then
         # macOS
         sed -i '' "s|LLM_URL=grpc://tensorrt-llm:8000|LLM_URL=$NIM_ENDPOINT|g" "$DOCKER_COMPOSE_FILE"
