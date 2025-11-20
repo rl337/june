@@ -84,7 +84,9 @@ class ModeTester:
 
         if not dataset_file.exists():
             logger.error(f"Dataset file not found: {dataset_file}")
-            logger.info("Please run: poetry run python -m essence generate-alice-dataset")
+            logger.info(
+                "Please run: poetry run python -m essence generate-alice-dataset"
+            )
             return {
                 "mode": "stt_tts_roundtrip",
                 "status": "failed",
