@@ -2,7 +2,7 @@
 
 ## Status: ✅ **ALL CODE WORK COMPLETE** → ⏳ **OPERATIONAL TASKS REMAINING**
 
-**Last Updated:** 2025-11-20 (Phase 20 complete - Message API fully operational. Phase 19 progress - services started with whitelist, Message API tested. NIM blocker identified - AMD64-only containers won't run on ARM64 host.)
+**Last Updated:** 2025-11-20 (Phase 20 complete - Message API fully operational. Phase 19 progress - services started with whitelist, Message API tested. **CRITICAL FIX:** STT service was loading Whisper on CPU (8.7GB RAM usage, 90% system memory) - fixed to use GPU (`STT_DEVICE=cuda`). Removed NATS dependency causing crashes. **DISCOVERY:** DGX Spark-specific NIMs exist and support ARM64 - Qwen3-32B DGX Spark NIM configured in home_infra, STT/TTS NIMs added with placeholder paths.)
 
 **Current State:**
 - ✅ **All code implementation complete** (451 tests passing, 8 skipped)
@@ -302,14 +302,16 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - **Why:** NIMs provide GPU-optimized inference for LLM, TTS, and STT. Hardware is designed for this.
    - **Current Status (2025-11-20):**
      - ✅ NIM access resolved - NGC API token updated with correct permissions
-     - ✅ `nim-qwen3` NIM successfully downloaded (`nvcr.io/nim/qwen/qwen3-32b:1.0.0`)
-     - ✅ NIM service configured in `home_infra/docker-compose.yml` (nim-qwen3 service exists)
+     - ✅ **DISCOVERY:** DGX Spark-specific NIMs exist and support ARM64 architecture!
+     - ✅ Qwen3-32B NIM for DGX Spark available: `nvcr.io/nim/qwen/qwen3-32b-dgx-spark:1.0.0`
+     - ✅ NIM service updated in `home_infra/docker-compose.yml` to use DGX Spark version
+     - ✅ STT and TTS NIM services added to `home_infra/docker-compose.yml` (Riva ASR/TTS, image paths need verification)
      - ✅ `NGC_API_KEY` environment variable is set in `/home/rlee/dev/home_infra/.env`
      - ✅ Docker logged in to NGC registry (`nvcr.io`) successfully
-     - ✅ Image path verified: `nvcr.io/nim/qwen/qwen3-32b:1.0.0`
-     - ❌ **BLOCKER:** NIM models are AMD64-only, system is ARM64 (aarch64) - architecture incompatibility
-     - ❌ NIM service disabled in docker-compose.yml (cannot run on ARM64 system)
-     - ⏳ **NEXT:** Deploy STT and TTS NIMs (now that access is resolved)
+     - ✅ **CRITICAL FIX:** STT service was loading Whisper on CPU (8.7GB RAM usage) - fixed to use GPU (`STT_DEVICE=cuda`)
+     - ✅ **CRITICAL FIX:** Removed NATS dependency from STT service (was causing crashes and restarts)
+     - ⏳ **NEXT:** Verify DGX Spark NIM image paths in NGC catalog
+     - ⏳ **NEXT:** Verify Riva ASR/TTS NIM image paths for DGX Spark compatibility
      - ⏳ Start NIM services and verify connectivity
    - **Steps:**
      - ✅ Checked if `NGC_API_KEY` is set in home_infra environment → **SET**

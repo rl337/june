@@ -43,7 +43,9 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 # Run the STT service via essence command system
 ENV STT_MODEL_NAME=base.en
-ENV STT_DEVICE=cpu
+# Use GPU for Whisper model (cuda) - CRITICAL: Never use CPU for large models
+# If GPU not available, service will fail (preferred over CPU memory exhaustion)
+ENV STT_DEVICE=cuda
 CMD ["poetry", "run", "python", "-m", "essence", "stt"]
 
 

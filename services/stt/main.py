@@ -12,7 +12,8 @@ from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import grpc
 import librosa
-import nats
+# NATS removed - services communicate via gRPC directly
+# import nats
 import numpy as np
 import soundfile as sf
 import torch
@@ -133,7 +134,8 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
     def __init__(self):
         self.whisper_model = None
         self.vad = None
-        self.nats_client = None
+        # NATS removed - services communicate via gRPC directly
+        # self.nats_client = None
         self.health_checker = HealthChecker()
         self.audio_buffer = CircularBuffer(1000)
         self.device = config.stt.device
@@ -141,7 +143,8 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
 
         # Add health checks
         self.health_checker.add_check("model", self._check_model_health)
-        self.health_checker.add_check("nats", self._check_nats_health)
+        # NATS removed - services communicate via gRPC directly
+        # self.health_checker.add_check("nats", self._check_nats_health)
 
     async def RecognizeStream(
         self,
@@ -683,27 +686,24 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
 
     async def _connect_services(self):
         """Connect to external services."""
-        try:
-            # Connect to NATS
-            self.nats_client = await nats.connect(config.nats.url)
-            logger.info("Connected to NATS")
-
-        except Exception as e:
-            logger.error(f"Failed to connect to services: {e}")
-            raise
+        # NATS removed - services communicate via gRPC directly
+        # No external service connections needed
+        logger.info("STT service ready (no external service connections required)")
 
     async def _check_model_health(self) -> bool:
         """Check if Whisper model is loaded and ready."""
         return self.whisper_model is not None
 
-    async def _check_nats_health(self) -> bool:
-        """Check NATS connection health."""
-        return self.nats_client is not None and self.nats_client.is_connected
+    # NATS removed - services communicate via gRPC directly
+    # async def _check_nats_health(self) -> bool:
+    #     """Check NATS connection health."""
+    #     return self.nats_client is not None and self.nats_client.is_connected
 
     async def disconnect_services(self):
         """Disconnect from external services."""
-        if self.nats_client:
-            await self.nats_client.close()
+        # NATS removed - services communicate via gRPC directly
+        # No cleanup needed
+        pass
 
 
 # Global service instance
