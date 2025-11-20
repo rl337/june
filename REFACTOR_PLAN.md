@@ -66,14 +66,15 @@
     - ✅ **Fixed:** Made `inference_core` import more resilient by catching `AttributeError` (for scipy/numpy issues like `_ARRAY_API not found`) in addition to `ImportError`. This prevents `TtsGrpcApp` from being set to `None` due to scipy/numpy compatibility issues.
     - ✅ **Fixed:** Added better error handling in TTS service `main()` to provide clear error messages when `TtsGrpcApp` is None, explaining that a container rebuild is needed.
     - ⏳ **Action Required:** Rebuild TTS container to apply scipy/numpy compatibility fixes: `docker compose build tts`
-      - **Status:** Build in progress (PID: 1055129) - started at 2025-11-20 12:41 with Rust environment fix applied. Currently building sudachipy (previously failing package).
-      - **Previous Build:** Build started in background (PID: 1048304) at 2025-11-20 12:38 - failed with "Failed to build sudachipy" error
-      - **Fix Applied:** Updated Dockerfile line 51 to source Rust environment (`. $HOME/.cargo/env`) before pip install TTS, allowing sudachipy to build successfully
-      - **Current Progress:** Build log shows sudachipy wheel building started (line 93.74) - fix appears to be working
-      - **Previous Status:** Previous build attempt completed (image timestamp: 2 hours ago), but container still using old image
-      - **Issue:** Container needs rebuild with latest code changes (lazy TTS import, resilient inference_core import, fixed cleanup method, Rust environment fix)
-      - **Current Error:** Container logs show `AttributeError: 'TTSServiceCommand' object has no attribute 'service'` in cleanup method - this is because the container is using old code that still has `if hasattr(self.service, "cleanup"):` on line 107. The repository code is fixed (line 107 now has comment instead of accessing self.service).
-      - **Note:** Build may take >30 minutes due to TTS package installation slowness. Running in background to avoid timeout.
+      - **Status:** Previous build completed successfully (image: adb0b22eb27e, created 2025-11-20 12:43:23), but container still failing due to import error. Need rebuild with inference-core import fix.
+      - **Previous Build:** Build completed successfully at 2025-11-20 12:43:23 with Rust environment fix applied (sudachipy built successfully)
+      - **Current Issue:** Container logs show `cannot import name 'setup_logging' from 'inference_core.utils'` - this is because the build was done before the import fix was applied
+      - **Fix Applied (Rust):** Updated Dockerfile line 51 to source Rust environment (`. $HOME/.cargo/env`) before pip install TTS, allowing sudachipy to build successfully
+      - **Fix Applied (Import):** Fixed inference-core server imports: Changed `from ..utils import setup_logging` to `from .. import setup_logging` in llm_server.py, stt_server.py, and tts_server.py (committed: 16e4780)
+      - **Issue:** Container needs rebuild with latest code changes (lazy TTS import, resilient inference_core import, fixed cleanup method, Rust environment fix, inference-core import fix)
+      - **Current Error:** Container logs show `cannot import name 'setup_logging' from 'inference_core.utils'` - this causes `TtsGrpcApp` to be `None`, which triggers the "scipy/numpy compatibility issue" error message
+      - **Note:** Build may take >30 minutes due to TTS package installation slowness. Should be run in background to avoid timeout.
+      - **Next Step:** Rebuild container with import fix: `nohup docker compose build tts > /tmp/tts_build.log 2>&1 &`
       - **Check Build Status:** `ps aux | grep "docker compose build tts"` or `tail -f /tmp/tts_build.log`
       - **Workaround:** The code fixes are complete and correct. The container rebuild is an operational task that may require manual intervention or a different build approach (e.g., multi-stage build, pre-built wheels, or running build with extended timeout).
     - ✅ Services status: telegram (unhealthy - STT/TTS connection timeouts), discord (healthy), message-api (healthy), stt (loading model), tts (restarting - essence import error)
