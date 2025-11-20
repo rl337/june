@@ -42,14 +42,15 @@ RUN pip install -e /tmp/inference-core[audio]
 
 ## shared module removed; use inference_core instead
 
-# Copy service code (only specific files, not the entire directory)
-# This ensures we don't overwrite essence/ or other files
-COPY services/tts/main.py ./
-COPY services/tts/model_artifacts ./model_artifacts
+# Copy service code to a subdirectory to avoid any conflicts
+RUN mkdir -p /app/services/tts
+COPY services/tts/main.py /app/services/tts/main.py
+COPY services/tts/model_artifacts /app/services/tts/model_artifacts
 
-# Ensure pyproject.toml and essence are still present after copying service code
-COPY pyproject.toml poetry.lock ./
-COPY essence ./essence
+# Re-copy pyproject.toml and essence to ensure they're definitely present
+# (they should be from earlier, but this ensures they're there after all COPY operations)
+COPY pyproject.toml poetry.lock /app/
+COPY essence /app/essence
 
 # Ensure permissions and switch back
 RUN chown -R june:june /app
@@ -63,9 +64,8 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD python -c "import grpc; grpc.insecure_channel('localhost:50053').check_connectivity_state(True)" || exit 1
 
 # Run the TTS service via essence command system
-# Use python directly since dependencies are installed and PYTHONPATH is set
-# PYTHONPATH="/app:/app/shared" ensures essence module can be imported
+# Use poetry run to ensure proper Python environment and path setup
 WORKDIR /app
-CMD ["python", "-m", "essence", "tts"]
+CMD ["poetry", "run", "python", "-m", "essence", "tts"]
 
 

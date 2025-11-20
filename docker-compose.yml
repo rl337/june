@@ -210,7 +210,7 @@ services:
     volumes:
     - ${MODEL_CACHE_DIR:-/home/rlee/models}:/models
     - ${JUNE_DATA_DIR:-/home/rlee/june_data}/model_artifacts/tts:/app/model_artifacts
-    - ./services/tts:/app
+    - ./services/tts:/app/services/tts
     - /var/log/june/tts:/logs
     healthcheck:
       test:

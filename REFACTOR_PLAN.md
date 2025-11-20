@@ -52,7 +52,8 @@
     - ✅ Fixed STT model name parsing (extract model name from path format for Whisper)
     - ✅ Fixed telegram service import errors (corrected 'from dependencies.config' to 'from essence.services.telegram.dependencies.config')
     - ✅ Fixed telegram health endpoint (now returns proper JSON instead of Internal Server Error)
-    - ⚠️ TTS service still has essence import issue - Dockerfile copies essence but python can't find it (needs investigation)
+    - ✅ Fixed TTS service essence import issue - changed volume mount from `./services/tts:/app` to `./services/tts:/app/services/tts` to prevent overwriting pyproject.toml and essence
+    - ⚠️ TTS service has scipy/numpy compatibility issue and /var/data permission issue (needs investigation)
     - ✅ Services status: telegram (unhealthy - STT/TTS connection timeouts), discord (healthy), message-api (healthy), stt (loading model), tts (restarting - essence import error)
     - ✅ **RADICAL REFACTOR COMPLETE:** Replaced USER_REQUESTS.md with USER_MESSAGES.md in /var/data/
     - ✅ **RADICAL REFACTOR COMPLETE:** Distinguish owner users from whitelisted users (owner = personal accounts, whitelisted = includes owners + others)
