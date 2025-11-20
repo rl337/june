@@ -127,6 +127,38 @@ class ListNIMsCommand(Command):
                 "description": "NVIDIA Nemotron Nano 9B v2 NIM for DGX Spark (ARM64 compatible)",
                 "catalog_url": "https://catalog.ngc.nvidia.com/orgs/nim/teams/nemotron/containers/nemotron-nano-9b-v2-dgx-spark",
             },
+            # Riva ASR NIM (STT) - ARM64/DGX Spark compatibility needs verification
+            {
+                "name": "Riva-ASR-Parakeet",
+                "image": "nvcr.io/nim/riva/riva-asr:latest",  # Placeholder - needs verification
+                "type": "stt",
+                "dgx_spark": None,  # Unknown - needs verification
+                "size": None,
+                "description": "Riva ASR NIM with Parakeet ASR-CTC-1.1B-EnUS (ARM64 support unclear - needs verification)",
+                "catalog_url": "https://catalog.ngc.nvidia.com/orgs/nim/teams/riva/containers/riva-asr",
+                "note": "⚠️ Image path and ARM64 compatibility need verification via NGC catalog",
+            },
+            # Riva TTS NIM - ARM64/DGX Spark compatibility needs verification
+            {
+                "name": "Riva-TTS-Magpie",
+                "image": "nvcr.io/nim/riva/riva-tts:latest",  # Placeholder - needs verification
+                "type": "tts",
+                "dgx_spark": None,  # Unknown - needs verification
+                "size": None,
+                "description": "Riva TTS NIM with Magpie TTS Multilingual (ARM64 support unclear - needs verification)",
+                "catalog_url": "https://catalog.ngc.nvidia.com/orgs/nim/teams/riva/containers/riva-tts",
+                "note": "⚠️ Image path and ARM64 compatibility need verification via NGC catalog",
+            },
+            {
+                "name": "Riva-TTS-FastPitch",
+                "image": "nvcr.io/nim/riva/riva-tts:latest",  # Placeholder - needs verification
+                "type": "tts",
+                "dgx_spark": None,  # Unknown - needs verification
+                "size": None,
+                "description": "Riva TTS NIM with FastPitch-HiFiGAN-EN (ARM64 support unclear - needs verification)",
+                "catalog_url": "https://catalog.ngc.nvidia.com/orgs/nim/teams/riva/containers/riva-tts",
+                "note": "⚠️ Image path and ARM64 compatibility need verification via NGC catalog",
+            },
         ]
 
         # Try to query Docker registry for nvcr.io/nim images
@@ -283,8 +315,12 @@ class ListNIMsCommand(Command):
                 continue
 
             # Filter by DGX Spark compatibility
-            if self.args.dgx_spark_only and not nim.get("dgx_spark", False):
-                continue
+            # Note: None means unknown (needs verification) - include in results but mark clearly
+            if self.args.dgx_spark_only:
+                dgx_spark = nim.get("dgx_spark")
+                if dgx_spark is False:  # Explicitly False - exclude
+                    continue
+                # Include True and None (unknown) - None will be marked in output
 
             # Get image size if requested
             if self.args.include_sizes:
@@ -393,10 +429,18 @@ class ListNIMsCommand(Command):
         for nim in nims:
             name = nim.get("name", "Unknown")[:33]
             model_type = nim.get("type", "unknown")
-            dgx_spark = "✅ Yes" if nim.get("dgx_spark") else "❌ No"
+            dgx_spark_val = nim.get("dgx_spark")
+            if dgx_spark_val is True:
+                dgx_spark = "✅ Yes"
+            elif dgx_spark_val is False:
+                dgx_spark = "❌ No"
+            else:
+                dgx_spark = "⚠️ Unknown"  # Needs verification
             size = nim.get("size", "Unknown") or "Unknown"
             status = nim.get("status", "available")
             description = nim.get("description", "")[:38]
+            if nim.get("note"):
+                description = f"{description} ({nim.get('note')})"[:38]
 
             print(f"{name:<35} {model_type:<8} {dgx_spark:<12} {size:<15} {status:<10} {description:<40}")
 
@@ -417,10 +461,18 @@ class ListNIMsCommand(Command):
         for nim in nims:
             name = nim.get("name", "Unknown")
             model_type = nim.get("type", "unknown")
-            dgx_spark = "✅" if nim.get("dgx_spark") else "❌"
+            dgx_spark_val = nim.get("dgx_spark")
+            if dgx_spark_val is True:
+                dgx_spark = "✅"
+            elif dgx_spark_val is False:
+                dgx_spark = "❌"
+            else:
+                dgx_spark = "⚠️ Unknown"  # Needs verification
             size = nim.get("size", "Unknown") or "Unknown"
             status = nim.get("status", "available")
             description = nim.get("description", "")
+            if nim.get("note"):
+                description = f"{description} ({nim.get('note')})"
             catalog_url = nim.get("catalog_url", "")
             catalog_link = f"[View]({catalog_url})" if catalog_url else ""
 

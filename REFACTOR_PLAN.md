@@ -37,7 +37,8 @@
        - ⚠️ **ARM64 support unclear** - needs verification in NGC catalog
        - ⏳ **Action:** Verify Riva ASR NIM ARM64/DGX Spark compatibility and exact image path
        - ✅ **Helper script created:** `scripts/verify_nim_compatibility.sh` - Automated script to check NIM compatibility and provide guidance
-       - Usage: `./scripts/verify_nim_compatibility.sh [--stt-only] [--tts-only]`
+       - ✅ **Improved list-nims command:** Added Riva ASR NIM to known NIMs list (marked as unknown compatibility, needs verification)
+       - Usage: `./scripts/verify_nim_compatibility.sh [--stt-only] [--tts-only]` or `poetry run python -m essence list-nims --filter stt --dgx-spark-only`
        - Requires NGC_API_KEY for full functionality (queries NGC catalog via list-nims command)
      - ⏳ **Research:** Check NGC catalog for TTS NIM container availability (https://catalog.ngc.nvidia.com/ → Containers → NIM → search "tts" or "speech") - **OR use `list-nims --filter tts --dgx-spark-only` command**
        - ✅ **Found:** Riva TTS NIM available (Magpie TTS Multilingual, FastPitch-HiFiGAN-EN) - different models than FastSpeech2 but same function
