@@ -962,12 +962,14 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - ✅ Verified GET /health endpoint works correctly
    - ✅ Verified GET /messages endpoint works (returns empty list when no messages, supports filters)
    - ✅ Verified API service starts and responds correctly
+   - ✅ Fixed f-string syntax error in review_sandbox.py that was preventing command discovery
+   - ✅ Rebuilt message-api container with fix
    - ⏳ Test POST /messages to send message (requires bot tokens - will work in docker-compose)
    - ⏳ Test PUT /messages/{message_id} to edit message (requires message_id from send)
    - ⏳ Test PATCH /messages/{message_id} to append to message (requires message_id from send)
    - ⏳ Verify messages appear in Telegram/Discord (end-to-end test)
    - ⏳ Verify message history is updated correctly
-   - ⏳ **NOTE:** Port 8082 conflict - integration-test or another service using it. Docker-compose will handle this. For manual testing, use port 8085.
+   - ⏳ **NOTE:** Port 8082 conflict - switchboard service (agenticness) was using it. Need to ensure it's stopped before starting message-api. For manual testing, use port 8085.
    - ⏳ **NOTE:** Full send/edit/append testing requires bot tokens (TELEGRAM_BOT_TOKEN, DISCORD_BOT_TOKEN) which are configured in docker-compose.yml. API structure verified working.
 
 6. **Update agent loop to use API:** ✅ COMPLETED (2025-11-20)
