@@ -1102,6 +1102,7 @@ The agent can help with steps 2-3 once the user provides the required informatio
         - Command: `cat /var/data/USER_MESSAGES.md | grep -A 10 "RESPONDED"`
    - **Current behavior:** Command sends placeholder response (no LLM yet). Response format: "✅ I received your message: '[content]...' I'm currently processing it. When inference engines are running, I'll generate a proper response using the LLM."
    - **Manual test command:** `poetry run python -m essence process-user-messages` (can be run manually to test without looping agent)
+   - ✅ **Fixed:** Command now uses correct Message API port (8083) via MESSAGE_API_URL env var or default
 
 **Implementation Notes:**
 - Command uses `essence.chat.user_messages_sync.read_user_messages()` for reading (with file locking)
