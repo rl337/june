@@ -500,15 +500,48 @@ Please create an adjusted plan that addresses these issues and better achieves t
         plan: Optional[Plan],
         failed_results: List[ExecutionResult],
     ) -> Optional[Plan]:
-        """Suggest adjustments to the plan based on failures."""
+        """
+        Suggest adjustments to the plan based on failures.
+
+        This is a fallback method used when LLM is not available.
+        Creates a simple adjusted plan that retries failed steps.
+        """
         if not plan or not failed_results:
             return None
 
-        # Simple adjustment: retry failed steps
-        # TODO: Implement more sophisticated plan adjustments
+        # Simple adjustment: create a new plan that retries failed steps
+        # Extract failed step IDs
+        failed_step_ids = {result.step_id for result in failed_results}
 
-        # For now, return None (no adjustments)
-        # In a real system, this would create a new plan that addresses the failures
+        # Find the corresponding steps in the original plan
+        steps_to_retry = [
+            step for step in plan.steps if step.step_id in failed_step_ids
+        ]
+
+        if not steps_to_retry:
+            return None
+
+        # Create adjusted plan with retry steps
+        # Re-number the steps starting from 1
+        adjusted_steps = []
+        for idx, step in enumerate(steps_to_retry, start=1):
+            adjusted_steps.append(
+                Step(
+                    step_id=idx,
+                    description=f"Retry: {step.description}",
+                    tool_name=step.tool_name,
+                    tool_args=step.tool_args,
+                    dependencies=step.dependencies,  # Preserve dependencies
+                )
+            )
+
+        if adjusted_steps:
+            from essence.agents.reasoning import Plan
+
+            adjusted_plan = Plan(steps=adjusted_steps)
+            logger.info(f"Created adjusted plan with {len(adjusted_steps)} retry steps")
+            return adjusted_plan
+
         return None
 
     def _generate_response(

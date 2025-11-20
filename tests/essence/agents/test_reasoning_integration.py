@@ -438,6 +438,57 @@ class TestErrorHandling:
         assert result.success is True  # Executor processes as general instruction
         assert result.output is not None
 
+    def test_reflector_suggest_plan_adjustments(self, reflector, conversation_context):
+        """Test that reflector can suggest plan adjustments for failed steps."""
+        from essence.agents.reasoning import ExecutionResult, Plan, Step
+
+        # Create a plan with multiple steps
+        plan = Plan(
+            steps=[
+                Step(step_id=1, description="Step 1", tool_name="read_file"),
+                Step(step_id=2, description="Step 2", tool_name="write_file"),
+                Step(step_id=3, description="Step 3", tool_name="read_file"),
+            ]
+        )
+
+        # Create execution results with some failures
+        failed_results = [
+            ExecutionResult(
+                step_id=2, success=False, error="Write failed", tool_used="write_file"
+            ),
+            ExecutionResult(
+                step_id=3, success=False, error="Read failed", tool_used="read_file"
+            ),
+        ]
+
+        # Test _suggest_plan_adjustments
+        adjusted_plan = reflector._suggest_plan_adjustments(plan, failed_results)
+
+        # Should create a plan with retry steps for failed steps
+        assert adjusted_plan is not None
+        assert len(adjusted_plan.steps) == 2  # Two failed steps
+        assert adjusted_plan.steps[0].step_id == 1
+        assert adjusted_plan.steps[0].description.startswith("Retry:")
+        assert "Step 2" in adjusted_plan.steps[0].description
+        assert adjusted_plan.steps[0].tool_name == "write_file"
+        assert adjusted_plan.steps[1].step_id == 2
+        assert adjusted_plan.steps[1].tool_name == "read_file"
+
+    def test_reflector_suggest_plan_adjustments_no_failures(self, reflector):
+        """Test that _suggest_plan_adjustments returns None when no failures."""
+        from essence.agents.reasoning import Plan, Step
+
+        plan = Plan(
+            steps=[
+                Step(step_id=1, description="Step 1", tool_name="read_file"),
+            ]
+        )
+
+        # No failed results
+        adjusted_plan = reflector._suggest_plan_adjustments(plan, [])
+
+        assert adjusted_plan is None
+
     def test_timeout_handling(self, reasoner, conversation_context):
         """Test that timeouts are handled correctly."""
         # Create reasoner with very short timeout
