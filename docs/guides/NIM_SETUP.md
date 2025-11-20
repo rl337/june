@@ -160,19 +160,19 @@ Use the `verify-nim` command to check NIM setup:
 
 ```bash
 # Basic verification
-poetry run -m essence verify-nim
+poetry run python -m essence verify-nim
 
 # With custom host/ports
-poetry run -m essence verify-nim \
+poetry run python -m essence verify-nim \
   --nim-host nim-qwen3 \
   --http-port 8003 \
   --grpc-port 8001
 
 # Check gRPC protocol compatibility
-poetry run -m essence verify-nim --check-protocol
+poetry run python -m essence verify-nim --check-protocol
 
 # JSON output
-poetry run -m essence verify-nim --json
+poetry run python -m essence verify-nim --json
 ```
 
 **Expected output:**
@@ -288,7 +288,7 @@ If health checks fail:
 
 1. **Verify NIM setup:**
    ```bash
-   poetry run -m essence verify-nim
+   poetry run python -m essence verify-nim
    ```
 
 2. **Test with June services:**
@@ -306,7 +306,7 @@ If health checks fail:
 - **NGC Catalog:** https://catalog.ngc.nvidia.com/
 - **NIM Documentation:** Check NGC catalog for container-specific documentation
 - **TensorRT-LLM Setup:** See `docs/guides/TENSORRT_LLM_SETUP.md` for comparison
-- **Verify Command:** `poetry run -m essence verify-nim --help`
+- **Verify Command:** `poetry run python -m essence verify-nim --help`
 
 ## Notes
 

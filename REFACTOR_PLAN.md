@@ -42,7 +42,7 @@ All major refactoring phases have been completed:
 - ✅ **Package Simplification (Phase 6):** Removed unused packages, migrated to Poetry in-place installation
 - ✅ **Documentation Cleanup (Phase 7):** Updated all documentation to reflect current architecture
 - ✅ **Command Documentation:** Added `run-benchmarks` and `get-message-history` commands to docs/guides/COMMANDS.md
-- ✅ **Benchmark Evaluation Documentation:** Updated docs/guides/QWEN3_BENCHMARK_EVALUATION.md to use command pattern consistently (prefer `poetry run -m essence run-benchmarks` over script wrapper), fixed `--inference-api-url` to `--llm-url` to match actual command arguments, added note about NVIDIA NIM support
+- ✅ **Benchmark Evaluation Documentation:** Updated docs/guides/QWEN3_BENCHMARK_EVALUATION.md to use command pattern consistently (prefer `poetry run python -m essence run-benchmarks` over script wrapper), fixed `--inference-api-url` to `--llm-url` to match actual command arguments, added note about NVIDIA NIM support
 - ✅ **REFACTOR_PLAN.md Cleanup:** Removed outdated agent monitor alerts from November 19th that were no longer relevant, cleaned up trailing blank lines
 - ✅ **Documentation Consistency:** Fixed Phase 18 documentation inconsistency in "Next Steps" section (framework is already complete from Phase 10, not a TODO item)
 - ✅ **Test Count Updates:** Updated test counts in REFACTOR_PLAN.md to reflect current test suite (341 passed, 1 skipped, 17 deselected) - corrected outdated counts from 244 and 196
@@ -66,6 +66,7 @@ All major refactoring phases have been completed:
 - ✅ **TensorRT-LLM Health Check Fix:** Fixed health check endpoint in home_infra/docker-compose.yml from `/health` to `/v2/health/ready` (correct Triton Inference Server endpoint). This allows Docker to properly monitor the TensorRT-LLM service health status. Service is now running but models need to be compiled/loaded before it becomes fully ready.
 - ✅ **Improved Error Messages:** Enhanced TensorRT-LLM manager error messages to provide helpful guidance when DNS resolution fails (e.g., when running from host instead of Docker network). Added `_format_connection_error()` helper function that detects DNS resolution failures and provides actionable options (run from container, use IP/hostname override, check service status).
 - ✅ **Operational Script Fix:** Fixed `scripts/setup_qwen3_operational.sh` to use correct command syntax (`poetry run python -m essence` instead of `poetry run -m essence`) and corrected grep pattern to match actual status output format (`✓ CACHED`). This improves reliability of model download status checking in the operational workflow.
+- ✅ **Documentation Command Syntax Fix:** Fixed all documentation files to use correct command syntax (`poetry run python -m essence` instead of `poetry run -m essence`). Updated docs/guides/COMMANDS.md, MESSAGE_FORMAT_REQUIREMENTS.md, NIM_SETUP.md, AGENTS.md, and REFACTOR_PLAN.md. The format `poetry run -m essence` does not work - correct format is `poetry run python -m essence`. Improves documentation accuracy and prevents user confusion.
 - ✅ **Documentation Updates:** 
   - Updated essence/README.md to reflect current module structure (added essence.agents, essence.commands, essence.services, essence.command modules)
   - Updated tests/README.md to clarify inference-api deprecation status (added notes about legacy service, migration guide reference)
@@ -151,7 +152,7 @@ All major refactoring phases have been completed:
    - ✅ `essence/commands/check_environment.py` - Pre-flight environment validation
 
 **Operational Tasks (When Ready to Use):**
-- ⏳ Model download (if not already done): `docker compose run --rm cli-tools poetry run -m essence download-models --model Qwen/Qwen3-30B-A3B-Thinking-2507`
+- ⏳ Model download (if not already done): `docker compose run --rm cli-tools poetry run python -m essence download-models --model Qwen/Qwen3-30B-A3B-Thinking-2507`
 - ⏳ Service startup: `docker compose up -d inference-api` (or TensorRT-LLM once Phase 15 is complete)
 - ⏳ Testing & validation: Test model loading, GPU utilization, coding agent, benchmark evaluations
 - ✅ **Operational Workflow Script:** Created `scripts/setup_qwen3_operational.sh` to orchestrate Phase 10.1-10.2 operational tasks. Script performs pre-flight checks, model download status verification, service startup guidance, and verification steps. Supports `--skip-check`, `--skip-download`, and `--use-legacy` options. Makes operational tasks easier to execute.
@@ -202,7 +203,7 @@ All major refactoring phases have been completed:
    - ✅ Supports unloading models via HTTP POST `/v2/repository/models/{model_name}/unload`
    - ✅ Supports listing available models via GET `/v2/repository/index`
    - ✅ Supports checking model status via GET `/v2/models/{model_name}/ready`
-   - ✅ CLI interface: `poetry run -m essence manage-tensorrt-llm --action {load|unload|list|status} --model <name>`
+   - ✅ CLI interface: `poetry run python -m essence manage-tensorrt-llm --action {load|unload|list|status} --model <name>`
    - ✅ Comprehensive unit tests (28 tests covering all operations and error handling)
    - ✅ Uses httpx for HTTP client (already in dependencies)
    - ✅ Proper error handling for timeouts, connection errors, and API errors
@@ -231,7 +232,7 @@ All major refactoring phases have been completed:
      - Or manually: Set `NGC_API_KEY` in home_infra environment (or `.env` file)
      - Verify image name in NGC catalog (see `docs/guides/NIM_SETUP.md` for instructions)
      - Start service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3`
-     - Verify service: `cd /home/rlee/dev/june && poetry run -m essence verify-nim --nim-host nim-qwen3 --http-port 8003 --grpc-port 8001`
+     - Verify service: `cd /home/rlee/dev/june && poetry run python -m essence verify-nim --nim-host nim-qwen3 --http-port 8003 --grpc-port 8001`
    - ⏳ **Remaining:** Test gRPC connectivity with real NIM service once it's running
      - **Operational Task:** Requires NIM service to be started in home_infra (needs NGC_API_KEY)
      - **Steps:** 1) Start NIM service, 2) Verify with verify-nim command, 3) Test gRPC connectivity from june services, 4) Verify protocol compatibility
@@ -348,7 +349,7 @@ All major refactoring phases have been completed:
    - ✅ Updated README.md Infrastructure section to include TensorRT-LLM
    - ⏳ **Remaining:** Fully remove inference-api service from docker-compose.yml (waiting for TensorRT-LLM service to be running and verified)
      - **Status:** TensorRT-LLM infrastructure is configured in home_infra/docker-compose.yml, service is running but models need to be compiled/loaded
-     - **Verification:** Use `poetry run -m essence verify-tensorrt-llm` to check migration readiness before removal
+     - **Verification:** Use `poetry run python -m essence verify-tensorrt-llm` to check migration readiness before removal
      - **Current verification result:** TensorRT-LLM container is running but models not loaded (service shows "failed to load all models" - models need compilation)
      - ✅ **Fixed health check endpoint:** Updated home_infra/docker-compose.yml health check from `/health` to `/v2/health/ready` (correct Triton Inference Server endpoint)
      - **Action required:** Compile and load models in TensorRT-LLM repository, then verify service is ready
@@ -405,21 +406,21 @@ All major refactoring phases have been completed:
      - ✅ Model readiness check (validates all required files are present and valid before loading)
      - ✅ Provides step-by-step guidance for compilation process
      - ✅ Comprehensive unit tests (22 tests covering all validation functions, template generation, and file checking)
-     - ✅ Usage: `poetry run -m essence compile-model --model <name> --check-prerequisites --generate-template --generate-config --generate-tokenizer-commands`
-     - ✅ Usage (after compilation): `poetry run -m essence compile-model --model <name> --check-readiness`
+     - ✅ Usage: `poetry run python -m essence compile-model --model <name> --check-prerequisites --generate-template --generate-config --generate-tokenizer-commands`
+     - ✅ Usage (after compilation): `poetry run python -m essence compile-model --model <name> --check-readiness`
    - **Model Compilation (Operational):**
      - ⏳ Compile Qwen3-30B-A3B-Thinking-2507 using TensorRT-LLM build tools (use `compile-model` command for guidance)
      - ⏳ Configure quantization (8-bit as specified in environment variables)
      - ⏳ Set max context length (131072 tokens)
      - ⏳ Place compiled model in repository structure
    - **Model Loading:**
-     - Use `manage-tensorrt-llm` command to load model: `poetry run -m essence manage-tensorrt-llm --action load --model <name>`
+     - Use `manage-tensorrt-llm` command to load model: `poetry run python -m essence manage-tensorrt-llm --action load --model <name>`
      - Verify model appears in repository index
    - **Verification:**
      - Verify GPU usage (must use GPU, CPU fallback FORBIDDEN)
      - Test model inference via gRPC interface (tensorrt-llm:8000)
      - Verify quantization and memory usage
-     - Check model status: `poetry run -m essence manage-tensorrt-llm --action status --model <name>`
+     - Check model status: `poetry run python -m essence manage-tensorrt-llm --action status --model <name>`
 
 **Critical Requirements:**
 - **GPU-only loading:** Large models (30B+) must NEVER load on CPU
@@ -696,19 +697,19 @@ All major refactoring phases have been completed:
 5. **Debug with message history:**
    ```bash
    # Get message history to debug rendering issues
-   poetry run -m essence get-message-history --user-id <id> --limit 10
+   poetry run python -m essence get-message-history --user-id <id> --limit 10
    ```
 
 6. **Test agentic flow:**
    ```bash
    # Test agentic reasoning with coding tasks
-   poetry run -m essence coding-agent --interactive
+   poetry run python -m essence coding-agent --interactive
    ```
 
 7. **Run benchmark evaluations:**
    ```bash
    # Run benchmark evaluations
-   poetry run -m essence run-benchmarks --dataset humaneval --max-tasks 10
+   poetry run python -m essence run-benchmarks --dataset humaneval --max-tasks 10
    ```
 
 **Prerequisites:**
@@ -731,7 +732,7 @@ All major refactoring phases have been completed:
 - **Service code:** `essence/services/<service-name>/` - Actual service implementation
 - **Service config:** `services/<service-name>/` - Dockerfiles and service-specific configuration
 - **Shared code:** `essence/chat/` - Shared utilities for telegram and discord
-- **Commands:** `essence/commands/` - Reusable tools runnable via `poetry run -m essence <command-name>`
+- **Commands:** `essence/commands/` - Reusable tools runnable via `poetry run python -m essence <command-name>`
 - **Scripts:** `scripts/` - Shell scripts for complex container operations and automation only
 - **Tests:** `tests/` - All test code, runnable via pytest
 

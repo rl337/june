@@ -234,16 +234,16 @@ Use `get_message_history()` command to inspect messages:
 
 ```bash
 # Get recent messages
-poetry run -m essence get-message-history --user-id <id> --limit 10
+poetry run python -m essence get-message-history --user-id <id> --limit 10
 
 # Analyze rendering issues
-poetry run -m essence get-message-history --analyze --platform telegram
+poetry run python -m essence get-message-history --analyze --platform telegram
 
 # Compare expected vs actual
-poetry run -m essence get-message-history --compare "expected text" --platform telegram
+poetry run python -m essence get-message-history --compare "expected text" --platform telegram
 
 # Validate message text
-poetry run -m essence get-message-history --validate "message text" --platform telegram
+poetry run python -m essence get-message-history --validate "message text" --platform telegram
 ```
 
 ### Programmatic Access

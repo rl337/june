@@ -7,7 +7,7 @@ This guide explains how to create and use commands in the June project.
 All reusable tools in June are implemented as **commands** that follow a consistent pattern. Commands are run via:
 
 ```bash
-poetry run -m essence <command-name> [arguments]
+poetry run python -m essence <command-name> [arguments]
 ```
 
 ## Available Commands
@@ -62,7 +62,7 @@ Create a new file in `essence/commands/<command_name>.py`:
 Command description.
 
 Usage:
-    poetry run -m essence <command-name> [--option VALUE]
+    poetry run python -m essence <command-name> [--option VALUE]
 """
 import argparse
 import logging
@@ -125,10 +125,10 @@ __all__ = [..., "my_command"]
 
 ```bash
 # Test help
-poetry run -m essence my-command --help
+poetry run python -m essence my-command --help
 
 # Test command
-poetry run -m essence my-command --option value
+poetry run python -m essence my-command --option value
 ```
 
 ## Command Lifecycle
@@ -429,7 +429,7 @@ Commands are automatically discovered via reflection in `essence/__main__.py`:
    Command description.
    
    Usage:
-       poetry run -m essence my-command --option VALUE
+       poetry run python -m essence my-command --option VALUE
    """
    ```
 
@@ -480,7 +480,7 @@ import subprocess
 
 def test_command_via_subprocess():
     result = subprocess.run(
-        ["poetry", "run", "-m", "essence", "my-command", "--option", "value"],
+        ["poetry", "run", "python", "-m", "essence", "my-command", "--option", "value"],
         capture_output=True,
         text=True
     )
@@ -514,8 +514,8 @@ When converting a script to a command:
 
 5. **Test the command**
    ```bash
-   poetry run -m essence my-command --help
-   poetry run -m essence my-command --option value
+   poetry run python -m essence my-command --help
+   poetry run python -m essence my-command --option value
    ```
 
 6. **Remove old script** from `scripts/` (after verification)

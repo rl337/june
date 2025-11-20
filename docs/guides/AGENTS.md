@@ -474,20 +474,20 @@ Telegram/Discord Service → User (Voice Response)
   - `/home/rlee/models/tts/` - TTS models
 
 ### Authorized Model Download
-**ONLY** use `poetry run -m essence download-models` for model downloads:
+**ONLY** use `poetry run python -m essence download-models` for model downloads:
 
 ```bash
 # Download all required models
-poetry run -m essence download-models --all
+poetry run python -m essence download-models --all
 
 # Download specific model
-poetry run -m essence download-models --model Qwen/Qwen3-30B-A3B-Thinking-2507
+poetry run python -m essence download-models --model Qwen/Qwen3-30B-A3B-Thinking-2507
 
 # Check cache status
-poetry run -m essence download-models --status
+poetry run python -m essence download-models --status
 
 # List authorized models
-poetry run -m essence download-models --list
+poetry run python -m essence download-models --list
 ```
 
 ### Runtime Model Loading
@@ -595,7 +595,7 @@ TEST_LIMIT=5 ./tests/scripts/run_tests_with_artifacts.sh
 - **Access:** `docker exec -it june-cli-tools bash`
 
 **Available Tools:**
-- Model download command (`poetry run -m essence download-models`)
+- Model download command (`poetry run python -m essence download-models`)
 - Development utilities (black, isort, flake8, mypy)
 - Testing tools (pytest, pytest-cov)
 - Audio processing (whisper, TTS, librosa)
@@ -976,7 +976,7 @@ All services use the `essence.command.Command` pattern:
 **Execution Flow:**
 ```bash
 # Services are invoked via:
-poetry run -m essence <service-name>-service [args...]
+poetry run python -m essence <service-name>-service [args...]
 
 # Or directly:
 python -m essence <service-name>-service [args...]
@@ -1128,16 +1128,16 @@ docker exec -it june-cli-tools bash
 **Model Management:**
 ```bash
 # Download all models
-docker exec -it june-cli-tools poetry run -m essence download-models --all
+docker exec -it june-cli-tools poetry run python -m essence download-models --all
 
 # Download specific model
-docker exec -it june-cli-tools poetry run -m essence download-models --model Qwen/Qwen3-30B-A3B-Thinking-2507
+docker exec -it june-cli-tools poetry run python -m essence download-models --model Qwen/Qwen3-30B-A3B-Thinking-2507
 
 # Check model status
-docker exec -it june-cli-tools poetry run -m essence download-models --status
+docker exec -it june-cli-tools poetry run python -m essence download-models --status
 
 # List authorized models
-docker exec -it june-cli-tools poetry run -m essence download-models --list
+docker exec -it june-cli-tools poetry run python -m essence download-models --list
 ```
 
 **Development Tools:**
