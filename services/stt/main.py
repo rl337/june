@@ -697,9 +697,29 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
                     actual_device = "cpu"
             
             logger.info(f"Loading Whisper model on device: {actual_device}")
-            self.whisper_model = whisper.load_model(
-                model_name, device=actual_device
-            )
+            
+            # If falling back to CPU but cached model was saved on CUDA, we need to handle device mapping
+            # Set torch device mapping to handle CUDA->CPU conversion for cached models
+            if actual_device == "cpu" and self.device.startswith("cuda"):
+                import torch
+                # Monkey-patch torch.load to handle CUDA->CPU mapping for cached models
+                original_load = torch.load
+                def load_with_cpu_mapping(*args, **kwargs):
+                    if "map_location" not in kwargs:
+                        kwargs["map_location"] = torch.device("cpu")
+                    return original_load(*args, **kwargs)
+                torch.load = load_with_cpu_mapping
+                try:
+                    self.whisper_model = whisper.load_model(
+                        model_name, device=actual_device
+                    )
+                finally:
+                    # Restore original torch.load
+                    torch.load = original_load
+            else:
+                self.whisper_model = whisper.load_model(
+                    model_name, device=actual_device
+                )
 
             # Initialize VAD if enabled
             if config.stt.enable_vad:
