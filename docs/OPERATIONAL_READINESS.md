@@ -227,6 +227,72 @@ Before starting any operational tasks, ensure:
 ### Helper Script
 - `scripts/setup_phase19_operational.sh` - Orchestrates Phase 19 operational workflow (whitelist configuration, service startup, testing guidance)
 
+## Phase 21: USER_MESSAGES.md Round Trip Testing
+
+### Prerequisites
+- [ ] Phase 19 complete (whitelist configured, services running)
+- [ ] Owner users configured (`TELEGRAM_OWNER_USERS`, `DISCORD_OWNER_USERS` in `.env`)
+- [ ] Telegram/Discord services running
+- [ ] Message API service running
+- [ ] Looping agent script ready (`scripts/refactor_agent_loop.sh`)
+
+### Steps
+1. **Verify owner user configuration:**
+   ```bash
+   # Check .env file for owner users
+   grep -E "TELEGRAM_OWNER_USERS|DISCORD_OWNER_USERS" .env
+   ```
+   - Owner users are a subset of whitelisted users (your personal accounts for direct communication)
+   - If not set, add to `.env`:
+     ```bash
+     echo "TELEGRAM_OWNER_USERS=your_telegram_user_id" >> .env
+     echo "DISCORD_OWNER_USERS=your_discord_user_id" >> .env
+     ```
+
+2. **Verify services are running:**
+   ```bash
+   docker compose ps telegram discord message-api
+   ```
+   - All three services should be running and healthy
+
+3. **Start looping agent (if not already running):**
+   ```bash
+   export ENABLE_USER_POLLING=1
+   export USER_POLLING_INTERVAL_SECONDS=120  # 2 minutes
+   ./scripts/refactor_agent_loop.sh
+   ```
+   - Agent will automatically process NEW messages from USER_MESSAGES.md
+
+4. **Test round trip (automated):**
+   ```bash
+   poetry run python scripts/test_phase21_round_trip.py
+   ```
+   - Automated test script verifies all steps of the round trip
+   - Checks prerequisites, sends test message, verifies status transitions
+
+5. **Test round trip (manual):**
+   - Send a text message from owner account via Telegram/Discord
+   - Verify message appears in `/var/data/USER_MESSAGES.md` with status "NEW"
+   - Verify agent processes message (status changes to "PROCESSING" then "RESPONDED")
+   - Verify owner receives response on Telegram/Discord
+   - Check USER_MESSAGES.md for final status
+
+### Verification Commands
+- Check USER_MESSAGES.md: `cat /var/data/USER_MESSAGES.md | grep -A 10 "NEW"`
+- Process messages manually: `poetry run python -m essence process-user-messages`
+- Check Message API: `curl http://localhost:8083/messages | jq`
+- Check agent logs: `tail -f refactor_agent_loop.log | grep "process-user-messages"`
+
+### Helper Scripts
+- `scripts/test_phase21_round_trip.py` - Automated round trip test script
+- `scripts/refactor_agent_loop.sh` - Looping agent with USER_MESSAGES.md processing
+
+### Troubleshooting
+- **No owner users configured:** Set `TELEGRAM_OWNER_USERS` and/or `DISCORD_OWNER_USERS` in `.env`
+- **Message not appearing in USER_MESSAGES.md:** Check service logs, verify owner user ID is correct
+- **Agent not processing messages:** Check looping agent is running, verify `ENABLE_USER_POLLING=1`
+- **Message API not accessible:** Verify message-api service is running on port 8083
+
 ## Common Operational Tasks
 
 ### Service Management
@@ -243,6 +309,9 @@ Key environment variables for operational tasks:
 - `DISCORD_BOT_TOKEN` - For Discord service
 - `TELEGRAM_WHITELISTED_USERS` - For Phase 19
 - `DISCORD_WHITELISTED_USERS` - For Phase 19
+- `TELEGRAM_OWNER_USERS` - For Phase 21 (owner accounts for direct communication)
+- `DISCORD_OWNER_USERS` - For Phase 21 (owner accounts for direct communication)
+- `MESSAGE_API_URL` - For Phase 21 (default: http://localhost:8083)
 
 ### Network Configuration
 - **june_network** - Internal network for june services
@@ -262,6 +331,9 @@ Key environment variables for operational tasks:
 - `scripts/setup_nim_operational.sh` - Phase 15
 - `scripts/run_performance_tests_operational.sh` - Phase 16 Task 5
 - `scripts/run_benchmarks_operational.sh` - Phase 18
+- `scripts/setup_phase19_operational.sh` - Phase 19
+- `scripts/test_phase21_round_trip.py` - Phase 21
+- `scripts/verify_nim_compatibility.sh` - Phase 19 NIM verification
 
 ### Verification Commands
 - `poetry run python -m essence check-environment` - Pre-flight checks
