@@ -32,6 +32,7 @@
     - ✅ Configure Telegram/Discord whitelist for direct agent-user communication (completed)
     - ✅ Start services with whitelist enabled (telegram and discord services started with whitelist configured)
     - ✅ Test Message API with services running (verified API can send messages via Telegram)
+    - ✅ Fixed Message API list endpoint (was using dict access on MessageHistoryEntry objects)
     - ⏳ Test end-to-end communication (send message → verify in USER_REQUESTS.md → agent responds)
   - Phase 15: NIM gRPC connectivity testing (requires NIM service running in home_infra with NGC_API_KEY)
   - Phase 16: End-to-end pipeline testing (requires all services running)
