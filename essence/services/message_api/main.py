@@ -199,32 +199,36 @@ async def get_message(
     try:
         history = get_message_history()
 
-        # Search for message with matching ID
-        filters = {"message_id": message_id}
-        if platform:
-            filters["platform"] = platform
-        if user_id:
-            filters["user_id"] = user_id
+        # Get messages with filters (get_messages doesn't support message_id directly)
+        messages = history.get_messages(
+            platform=platform,
+            user_id=user_id,
+            limit=None,  # Get all matching, then filter by message_id
+        )
 
-        messages = history.get_messages(**filters, limit=1)
+        # Find message with matching ID
+        msg = None
+        for entry in messages:
+            if str(entry.message_id) == str(message_id):
+                msg = entry
+                break
 
-        if not messages:
+        if not msg:
             raise HTTPException(
                 status_code=404, detail=f"Message {message_id} not found"
             )
 
-        msg = messages[0]
         return MessageHistoryItem(
-            platform=msg.get("platform", ""),
-            user_id=msg.get("user_id", ""),
-            chat_id=msg.get("chat_id", ""),
-            message_content=msg.get("message_content", ""),
-            message_type=msg.get("message_type", "text"),
-            message_id=msg.get("message_id"),
-            timestamp=msg.get("timestamp"),
-            raw_text=msg.get("raw_text"),
-            formatted_text=msg.get("formatted_text"),
-            rendering_metadata=msg.get("rendering_metadata"),
+            platform=msg.platform,
+            user_id=msg.user_id,
+            chat_id=msg.chat_id,
+            message_content=msg.message_content,
+            message_type=msg.message_type,
+            message_id=msg.message_id,
+            timestamp=msg.timestamp,
+            raw_text=msg.raw_text,
+            formatted_text=msg.formatted_text,
+            rendering_metadata=msg.rendering_metadata,
         )
 
     except HTTPException:
@@ -297,20 +301,28 @@ async def edit_message(
     try:
         # We need user_id and chat_id to edit - get from message history
         history = get_message_history()
-        filters = {"message_id": message_id}
-        if platform:
-            filters["platform"] = platform
 
-        messages = history.get_messages(**filters, limit=1)
-        if not messages:
+        # Get messages with filters (get_messages doesn't support message_id directly)
+        messages = history.get_messages(
+            platform=platform,
+            limit=None,  # Get all matching, then filter by message_id
+        )
+
+        # Find message with matching ID
+        msg = None
+        for entry in messages:
+            if str(entry.message_id) == str(message_id):
+                msg = entry
+                break
+
+        if not msg:
             raise HTTPException(
                 status_code=404, detail=f"Message {message_id} not found"
             )
 
-        msg = messages[0]
-        user_id = msg.get("user_id")
-        chat_id = msg.get("chat_id")
-        msg_platform = msg.get("platform", platform or "auto")
+        user_id = msg.user_id
+        chat_id = msg.chat_id
+        msg_platform = msg.platform or platform or "auto"
 
         # Convert platform string to CommunicationChannel enum
         platform_map = {
@@ -322,7 +334,7 @@ async def edit_message(
             msg_platform.lower(), CommunicationChannel.AUTO
         )
 
-        message_type = request.message_type or msg.get("message_type", "text")
+        message_type = request.message_type or msg.message_type or "text"
 
         result = edit_message_to_user(
             user_id=user_id,
@@ -371,21 +383,29 @@ async def append_to_message(
     try:
         # Get existing message
         history = get_message_history()
-        filters = {"message_id": message_id}
-        if platform:
-            filters["platform"] = platform
 
-        messages = history.get_messages(**filters, limit=1)
-        if not messages:
+        # Get messages with filters (get_messages doesn't support message_id directly)
+        messages = history.get_messages(
+            platform=platform,
+            limit=None,  # Get all matching, then filter by message_id
+        )
+
+        # Find message with matching ID
+        msg = None
+        for entry in messages:
+            if str(entry.message_id) == str(message_id):
+                msg = entry
+                break
+
+        if not msg:
             raise HTTPException(
                 status_code=404, detail=f"Message {message_id} not found"
             )
 
-        msg = messages[0]
-        existing_content = msg.get("message_content", "")
-        user_id = msg.get("user_id")
-        chat_id = msg.get("chat_id")
-        msg_platform = msg.get("platform", platform or "auto")
+        existing_content = msg.message_content
+        user_id = msg.user_id
+        chat_id = msg.chat_id
+        msg_platform = msg.platform or platform or "auto"
 
         # Determine if we should append, prepend, or replace
         new_content = request.new_message
@@ -410,7 +430,7 @@ async def append_to_message(
             msg_platform.lower(), CommunicationChannel.AUTO
         )
 
-        message_type = request.message_type or msg.get("message_type", "text")
+        message_type = request.message_type or msg.message_type or "text"
 
         result = edit_message_to_user(
             user_id=user_id,
