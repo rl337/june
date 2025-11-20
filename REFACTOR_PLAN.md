@@ -17,7 +17,7 @@
   - Phase 18: Benchmark evaluation (requires LLM service running)
   - Message history debugging (tools ready, requires actual message data from real usage)
 
-**For agents:** All code-related refactoring tasks are complete. The project is ready for operational work. See operational tasks in REFACTOR_PLAN.md for details on starting services and running tests.
+**For agents:** All code-related refactoring tasks are complete. The project is ready for operational work. See operational tasks in REFACTOR_PLAN.md for details on starting services and running tests. See `docs/OPERATIONAL_READINESS.md` for a comprehensive operational readiness checklist.
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 

@@ -16,6 +16,7 @@ This documentation is organized by audience and purpose to help you find what yo
 - **[Contributing Guidelines](guides/CONTRIBUTING.md)** - How to contribute to the project, code review process, and issue reporting
 
 ### For Operators
+- **[Operational Readiness Checklist](OPERATIONAL_READINESS.md)** - Comprehensive checklist for operational tasks, prerequisites, steps, and troubleshooting
 - **[Deployment Guides](guides/DEPLOYMENT.md)** - Local development, production, cloud deployments (AWS/GCP/Azure), single/multi-node setups, configuration, SSL/TLS, backup/recovery, and monitoring
 - **[TensorRT-LLM Setup Guide](guides/TENSORRT_LLM_SETUP.md)** - TensorRT-LLM migration, model repository setup, model compilation, and management
 - **[NIM Setup Guide](guides/NIM_SETUP.md)** - NVIDIA NIM (NVIDIA Inference Microservice) setup, image name verification, NGC API key configuration, and troubleshooting
