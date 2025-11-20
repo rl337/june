@@ -343,8 +343,12 @@ All major refactoring phases have been completed:
    - ✅ Updated docs/API/README.md to remove Gateway API references (service was removed for MVP)
    - ✅ Updated README.md Core Services section to reflect TensorRT-LLM as current LLM service
    - ✅ Updated README.md Infrastructure section to include TensorRT-LLM
-   - ⏳ **Remaining:** Fully remove inference-api service from docker-compose.yml (waiting for TensorRT-LLM setup and verification in home_infra)
-     - Use `poetry run -m essence verify-tensorrt-llm` to check migration readiness before removal
+   - ⏳ **Remaining:** Fully remove inference-api service from docker-compose.yml (waiting for TensorRT-LLM service to be running and verified)
+     - **Status:** TensorRT-LLM infrastructure is configured in home_infra/docker-compose.yml, but service is not currently running
+     - **Verification:** Use `poetry run -m essence verify-tensorrt-llm` to check migration readiness before removal
+     - **Current verification result:** TensorRT-LLM container not running (operational task: start service in home_infra)
+     - **Action required:** Start TensorRT-LLM service in home_infra: `cd /home/rlee/dev/home_infra && docker compose up -d tensorrt-llm`
+     - **After service is running:** Re-run verification, and if all checks pass, remove inference-api service from docker-compose.yml
      - ✅ Improved docker-compose.yml comments to reference verify-tensorrt-llm command for migration verification
    - ✅ **Code Improvement:** Renamed `inference_api_url` parameter to `llm_url` across all agent classes and commands for clarity
      - Updated CodingAgent, LLMClient, and BenchmarkEvaluator to use `llm_url` parameter
