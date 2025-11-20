@@ -2,7 +2,7 @@
 
 ## Status: ✅ **ALL CODE WORK COMPLETE** → ⏳ **OPERATIONAL TASKS REMAINING** (Ready for User Testing)
 
-**Last Updated:** 2025-11-20 (Phase 20 complete - Message API fully operational. Phase 19 progress - services started with whitelist, Message API tested. **CRITICAL FIX:** STT service was loading Whisper on CPU (8.7GB RAM usage, 90% system memory) - fixed to use GPU (`STT_DEVICE=cuda`). Removed NATS dependency causing crashes. **DISCOVERY:** DGX Spark-specific NIMs exist and support ARM64 - Qwen3-32B DGX Spark NIM configured in home_infra, STT/TTS NIMs added with placeholder paths.)
+**Last Updated:** 2025-11-20 (Phase 20 complete - Message API fully operational. Phase 19 progress - services started with whitelist, Message API tested. **CRITICAL FIX:** STT service was loading Whisper on CPU (8.7GB RAM usage, 90% system memory) - fixed to use GPU (`STT_DEVICE=cuda`). Removed NATS dependency causing crashes. **DISCOVERY:** DGX Spark-specific NIMs exist and support ARM64 - Qwen3-32B DGX Spark NIM configured in home_infra, STT/TTS NIMs added with placeholder paths. **NEW:** Created comprehensive operational status summary document (`docs/OPERATIONAL_STATUS.md`) with complete current state, operational tasks, and next steps.)
 
 **Current State:**
 - ✅ **All code implementation complete** (451 tests passing, 8 skipped)
