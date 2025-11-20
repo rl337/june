@@ -257,7 +257,7 @@ class PollUserResponsesCommand(Command):
         pass
 
     @classmethod
-    def add_args(cls, parser) -> None:
+    def add_args(cls, parser: argparse.ArgumentParser) -> None:
         """Add command-specific arguments"""
         parser.add_argument(
             "--timeout-hours",
