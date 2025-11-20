@@ -14,13 +14,13 @@ import subprocess
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from essence.chat.message_history import get_message_history
-from essence.chat.message_history_analysis import validate_message_for_platform
 from essence.chat.message_grouping import (
     format_grouped_message,
     group_messages,
     split_if_too_long,
 )
+from essence.chat.message_history import get_message_history
+from essence.chat.message_history_analysis import validate_message_for_platform
 from essence.chat.user_requests_sync import sync_message_to_user_requests
 
 logger = logging.getLogger(__name__)
