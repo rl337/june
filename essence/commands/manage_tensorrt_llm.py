@@ -39,6 +39,28 @@ from essence.command import Command
 logger = logging.getLogger(__name__)
 
 
+def _format_connection_error(base_url: str, error: Exception) -> str:
+    """
+    Format connection error message with helpful guidance for DNS resolution failures.
+    
+    Args:
+        base_url: The URL that failed to connect
+        error: The connection error exception
+        
+    Returns:
+        Formatted error message with guidance
+    """
+    error_str = str(error)
+    if "name resolution" in error_str.lower() or "temporary failure" in error_str.lower():
+        return (
+            f"Cannot connect to TensorRT-LLM at {base_url}: {error}\n"
+            f"  Note: If running from host, 'tensorrt-llm' hostname is only resolvable within Docker networks.\n"
+            f"  Options: 1) Run from a container on shared-network, 2) Use --tensorrt-llm-url with IP/hostname, 3) Check if service is running"
+        )
+    else:
+        return f"Cannot connect to TensorRT-LLM at {base_url}: {error}"
+
+
 class TensorRTLLMManager:
     """
     Client for managing TensorRT-LLM models via Triton Inference Server API.
@@ -95,7 +117,7 @@ class TensorRTLLMManager:
             logger.error(error_msg)
             return False, error_msg
         except httpx.ConnectError as e:
-            error_msg = f"Cannot connect to TensorRT-LLM at {self.base_url}: {e}"
+            error_msg = _format_connection_error(self.base_url, e)
             logger.error(error_msg)
             return False, error_msg
         except Exception as e:
@@ -136,7 +158,7 @@ class TensorRTLLMManager:
             logger.error(error_msg)
             return False, error_msg
         except httpx.ConnectError as e:
-            error_msg = f"Cannot connect to TensorRT-LLM at {self.base_url}: {e}"
+            error_msg = _format_connection_error(self.base_url, e)
             logger.error(error_msg)
             return False, error_msg
         except Exception as e:
@@ -173,7 +195,7 @@ class TensorRTLLMManager:
                 return False, [], error_msg
 
         except httpx.ConnectError as e:
-            error_msg = f"Cannot connect to TensorRT-LLM at {self.base_url}: {e}"
+            error_msg = _format_connection_error(self.base_url, e)
             logger.error(error_msg)
             return False, [], error_msg
         except Exception as e:
@@ -229,7 +251,7 @@ class TensorRTLLMManager:
                 )
 
         except httpx.ConnectError as e:
-            error_msg = f"Cannot connect to TensorRT-LLM at {self.base_url}: {e}"
+            error_msg = _format_connection_error(self.base_url, e)
             logger.error(error_msg)
             return False, None, error_msg
         except Exception as e:
