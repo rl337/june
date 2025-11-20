@@ -49,6 +49,7 @@ Reusable tools have been migrated to commands. Use these instead of scripts:
 - `deploy_audio_services.sh` - Audio services deployment
 - `setup_qwen3_operational.sh` - Operational workflow for Phase 10.1-10.2 (Qwen3 model setup on GPU)
 - `setup_nim_operational.sh` - Operational workflow for Phase 15 (NVIDIA NIM setup)
+- `setup_phase19_operational.sh` - Operational workflow for Phase 19 (Direct Agent-User Communication)
 - `run_benchmarks_operational.sh` - Operational workflow for Phase 18 (Model evaluation and benchmarking)
 - `run_performance_tests_operational.sh` - Operational workflow for Phase 16 Task 5 (Performance testing)
 
