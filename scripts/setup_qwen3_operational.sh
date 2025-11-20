@@ -148,7 +148,7 @@ echo "Check GPU utilization:"
 echo "  nvidia-smi"
 echo ""
 echo "Test inference:"
-    echo "  poetry run python -m essence coding-agent --task 'Hello, world!' --llm-url $SERVICE_URL"
+echo "  poetry run python -m essence coding-agent --task 'Hello, world!' --llm-url $SERVICE_URL"
 echo ""
 
 echo "=========================================="
