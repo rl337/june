@@ -70,7 +70,10 @@ class TestSyncMessageToUserRequests:
 
     def test_sync_message_creates_file(self, tmp_path):
         """Test that syncing a message creates USER_REQUESTS.md if it doesn't exist."""
-        with patch("essence.chat.user_requests_sync.USER_REQUESTS_FILE", tmp_path / "USER_REQUESTS.md"):
+        with patch(
+            "essence.chat.user_requests_sync.USER_REQUESTS_FILE",
+            tmp_path / "USER_REQUESTS.md",
+        ):
             result = sync_message_to_user_requests(
                 user_id="123",
                 chat_id="456",
@@ -83,7 +86,9 @@ class TestSyncMessageToUserRequests:
             content = (tmp_path / "USER_REQUESTS.md").read_text()
             assert "Test message" in content
             assert "user_id: 123" in content
-            assert "**Platform:** Telegram" in content or "Platform: Telegram" in content
+            assert (
+                "**Platform:** Telegram" in content or "Platform: Telegram" in content
+            )
 
     def test_sync_message_appends_to_existing(self, tmp_path):
         """Test that syncing a message appends to existing file."""
@@ -104,7 +109,10 @@ class TestSyncMessageToUserRequests:
 
     def test_sync_message_with_username(self, tmp_path):
         """Test syncing a message with username."""
-        with patch("essence.chat.user_requests_sync.USER_REQUESTS_FILE", tmp_path / "USER_REQUESTS.md"):
+        with patch(
+            "essence.chat.user_requests_sync.USER_REQUESTS_FILE",
+            tmp_path / "USER_REQUESTS.md",
+        ):
             result = sync_message_to_user_requests(
                 user_id="123",
                 chat_id="456",
@@ -119,7 +127,10 @@ class TestSyncMessageToUserRequests:
 
     def test_sync_message_with_message_id(self, tmp_path):
         """Test syncing a message with message ID."""
-        with patch("essence.chat.user_requests_sync.USER_REQUESTS_FILE", tmp_path / "USER_REQUESTS.md"):
+        with patch(
+            "essence.chat.user_requests_sync.USER_REQUESTS_FILE",
+            tmp_path / "USER_REQUESTS.md",
+        ):
             result = sync_message_to_user_requests(
                 user_id="123",
                 chat_id="456",

@@ -116,7 +116,9 @@ class TestFormatGroupedMessage:
         """Test formatting grouped message with message types."""
         messages = ["Text message", "Code: print('hello')"]
         message_types = ["text", "code"]
-        formatted = format_grouped_message(messages, message_types=message_types, platform="telegram")
+        formatted = format_grouped_message(
+            messages, message_types=message_types, platform="telegram"
+        )
         assert "Text message" in formatted
         assert "Code:" in formatted or "print" in formatted
 
