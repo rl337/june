@@ -29,16 +29,20 @@ COPY pyproject.toml poetry.lock ./
 COPY essence ./essence
 
 # Install dependencies using poetry (skip installing project itself with --no-root)
-# Then install TTS separately with compatible numpy
 # Source Rust environment for TTS package build
 RUN . $HOME/.cargo/env && \
-    poetry install --no-interaction --no-ansi --only main --no-root && \
-    pip install "numpy==1.22.0" "TTS>=0.20.0,<0.23.0"
+    poetry install --no-interaction --no-ansi --only main --no-root
 
 # Install inference-core package in editable mode from source
 # This allows faster iteration during development without rebuilding wheels
+# Note: inference-core may install numpy 2.x, but TTS requires numpy 1.22.0
 COPY packages/inference-core /tmp/inference-core
 RUN pip install -e /tmp/inference-core[audio]
+
+# Install TTS with compatible numpy version AFTER inference-core
+# TTS requires numpy==1.22.0, so we need to downgrade numpy after inference-core installs it
+# Also ensure scipy is compatible with numpy 1.22.0 (scipy<1.10.0 or scipy>=1.11.0 with numpy>=1.21.6)
+RUN pip install --force-reinstall "numpy==1.22.0" "scipy>=1.11.0,<1.12.0" "TTS>=0.20.0,<0.23.0"
 
 ## shared module removed; use inference_core instead
 

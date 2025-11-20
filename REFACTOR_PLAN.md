@@ -53,7 +53,9 @@
     - ✅ Fixed telegram service import errors (corrected 'from dependencies.config' to 'from essence.services.telegram.dependencies.config')
     - ✅ Fixed telegram health endpoint (now returns proper JSON instead of Internal Server Error)
     - ✅ Fixed TTS service essence import issue - changed volume mount from `./services/tts:/app` to `./services/tts:/app/services/tts` to prevent overwriting pyproject.toml and essence
-    - ⚠️ TTS service has scipy/numpy compatibility issue and /var/data permission issue (needs investigation)
+    - ✅ Fixed TTS service scipy/numpy compatibility - install compatible versions after inference-core
+    - ✅ Fixed /var/data permission issue - made directory creation non-fatal for services that don't need it
+    - ⚠️ TTS service build is timing out - need to investigate build process (Docker buildkit issue)
     - ✅ Services status: telegram (unhealthy - STT/TTS connection timeouts), discord (healthy), message-api (healthy), stt (loading model), tts (restarting - essence import error)
     - ✅ **RADICAL REFACTOR COMPLETE:** Replaced USER_REQUESTS.md with USER_MESSAGES.md in /var/data/
     - ✅ **RADICAL REFACTOR COMPLETE:** Distinguish owner users from whitelisted users (owner = personal accounts, whitelisted = includes owners + others)

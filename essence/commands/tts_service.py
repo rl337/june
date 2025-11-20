@@ -104,6 +104,6 @@ class TTSServiceCommand(Command):
         Releases any resources held by the TTS service, including model memory
         and gRPC connections. Calls the service's cleanup method if available.
         """
-        if hasattr(self.service, "cleanup"):
-            self.service.cleanup()
+        # TTS service main() handles its own cleanup via signal handlers
+        # No need to access self.service since we call main() directly
         logger.info("TTS service cleanup complete")

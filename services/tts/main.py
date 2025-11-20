@@ -86,7 +86,8 @@ def main() -> None:
         )
 
     strategy = EspeakTtsStrategy(sample_rate=int(os.getenv("TTS_SAMPLE_RATE", "16000")))
-    app = TtsGrpcApp(strategy, interceptors=interceptors if interceptors else None)
+    # Pass interceptors list (empty list is fine, TtsGrpcApp handles it)
+    app = TtsGrpcApp(strategy, interceptors=interceptors)
     app.initialize()
     app.run()
 

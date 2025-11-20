@@ -15,7 +15,15 @@ logger = logging.getLogger(__name__)
 
 # Path to USER_MESSAGES.md (in /var/data/ directory)
 DATA_DIR = Path("/var/data")
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+# Try to create directory, but handle permission errors gracefully
+# (TTS service doesn't need this directory, so it's OK if creation fails)
+try:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+except (PermissionError, OSError) as e:
+    # Log warning but don't fail - some services (like TTS) don't need this directory
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning(f"Could not create /var/data directory: {e}. This is OK for services that don't use USER_MESSAGES.md")
 USER_MESSAGES_FILE = DATA_DIR / "USER_MESSAGES.md"
 
 
