@@ -24,13 +24,14 @@
     - ✅ NIM access resolved - nim-qwen3 downloaded successfully
     - ✅ LLM NIM (nim-qwen3) configured in home_infra/docker-compose.yml
     - ⏳ **Operational:** Start LLM NIM service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3` (requires NGC_API_KEY)
+    - ⚠️ **BLOCKER:** NIM containers are AMD64-only, but host is ARM64. NIMs won't run on ARM64 architecture. Need ARM64-compatible NIMs or use TensorRT-LLM instead.
     - ⏳ **Research:** Check NGC catalog for STT NIM container availability (https://catalog.ngc.nvidia.com/ → Containers → NIM → search "whisper" or "stt")
     - ⏳ **Research:** Check NGC catalog for TTS NIM container availability (https://catalog.ngc.nvidia.com/ → Containers → NIM → search "tts" or "speech")
     - ⏳ **If STT/TTS NIMs exist:** Add to home_infra/docker-compose.yml following nim-qwen3 pattern
     - ⏳ **If STT/TTS NIMs don't exist:** Continue using custom STT/TTS services (already configured in june/docker-compose.yml)
     - ✅ Configure Telegram/Discord whitelist for direct agent-user communication (completed)
-    - ⏳ Start services with whitelist enabled
-    - ⏳ Test end-to-end communication
+    - ✅ Start services with whitelist enabled (telegram and discord services started with whitelist configured)
+    - ⏳ Test end-to-end communication (services running, ready for testing)
   - Phase 15: NIM gRPC connectivity testing (requires NIM service running in home_infra with NGC_API_KEY)
   - Phase 16: End-to-end pipeline testing (requires all services running)
   - Phase 18: Benchmark evaluation (requires LLM service running)
