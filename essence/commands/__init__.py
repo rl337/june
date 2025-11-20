@@ -23,6 +23,7 @@ from . import get_message_history  # noqa: F401
 from . import inference_api_service  # noqa: F401
 from . import integration_test_service  # noqa: F401
 from . import manage_tensorrt_llm  # noqa: F401
+from . import message_api_service  # noqa: F401
 from . import monitor_gpu  # noqa: F401
 from . import poll_user_responses  # noqa: F401
 from . import read_user_requests  # noqa: F401
@@ -61,4 +62,5 @@ __all__ = [
     "compile_model",
     "read_user_requests",
     "poll_user_responses",
+    "message_api_service",
 ]

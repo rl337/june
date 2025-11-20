@@ -365,6 +365,41 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+  message-api:
+    build:
+      context: .
+      dockerfile: ./services/message-api/Dockerfile
+    container_name: june-message-api
+    restart: unless-stopped
+    ports:
+    - 8082:8082
+    environment:
+    - MESSAGE_API_PORT=8082
+    - MESSAGE_API_HOST=0.0.0.0
+    - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+    - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+    - TELEGRAM_WHITELISTED_USERS=${TELEGRAM_WHITELISTED_USERS:-}
+    - DISCORD_WHITELISTED_USERS=${DISCORD_WHITELISTED_USERS:-}
+    - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    - ENABLE_TRACING=${ENABLE_TRACING:-true}
+    - JAEGER_ENDPOINT=http://common-jaeger:14268/api/traces
+    - JAEGER_AGENT_HOST=common-jaeger
+    - JAEGER_AGENT_PORT=6831
+    volumes:
+    - /var/log/june/message-api:/logs
+    networks:
+    - june_network
+    - shared-network
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:8082/health
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
   integration-test:
     build:
       context: .
@@ -372,7 +407,7 @@ services:
     container_name: june-integration-test
     restart: unless-stopped
     ports:
-    - 8082:8082
+    - 8084:8082
     environment:
     - INTEGRATION_TEST_SERVICE_PORT=8082
     - INTEGRATION_TEST_SERVICE_HOST=0.0.0.0
