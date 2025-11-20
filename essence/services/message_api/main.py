@@ -28,10 +28,12 @@ from essence.chat.agent_communication import (
     send_message_to_user,
 )
 from essence.chat.message_history import get_message_history
-from inference_core import config, setup_logging
 
 # Setup logging
-setup_logging(config.monitoring.log_level, "message-api")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
