@@ -1,37 +1,30 @@
 # Load Testing Configuration
 # This file configures load test scenarios and target endpoints
+#
+# Note: Gateway service was removed for MVP. Services now communicate directly via gRPC.
+# Gateway REST/WebSocket tests are obsolete and kept for reference only.
 
 # Service endpoints
 services:
-  gateway:
-    host: "http://localhost:8000"
-    rest_endpoints:
-      - path: "/health"
-        method: "GET"
-        weight: 10
-      - path: "/api/v1/llm/generate"
-        method: "POST"
-        weight: 30
-        requires_auth: true
-      - path: "/api/v1/tts/speak"
-        method: "POST"
-        weight: 20
-        requires_auth: true
-      - path: "/api/v1/audio/transcribe"
-        method: "POST"
-        weight: 20
-        requires_auth: true
-      - path: "/chat"
-        method: "POST"
-        weight: 40
-        requires_auth: true
-    websocket:
-      path: "/ws/{user_id}"
-      weight: 30
+  # Gateway service - OBSOLETE (service removed, kept for reference only)
+  # gateway:
+  #   host: "http://localhost:8000"
+  #   rest_endpoints: [...]
+  #   websocket: [...]
+  
+  # gRPC Services - Active
   grpc:
-    inference_api:
-      host: "localhost:50051"
+    # LLM Inference Service
+    # Default: TensorRT-LLM (tensorrt-llm:8000 in home_infra/shared-network)
+    # Alternative: NVIDIA NIM (nim-qwen3:8001 in home_infra/shared-network)
+    # Legacy: inference-api (inference-api:50051, use --profile legacy)
+    tensorrt_llm:
+      host: "tensorrt-llm:8000"  # Default LLM service (TensorRT-LLM)
       weight: 30
+    # Legacy inference-api (deprecated, use --profile legacy)
+    # inference_api:
+    #   host: "localhost:50051"
+    #   weight: 30
     stt:
       host: "localhost:50052"
       weight: 20
@@ -88,7 +81,7 @@ metrics:
     - cpu
     - memory
     - gpu
-    - database_connections
+    # Note: database_connections removed (PostgreSQL was removed for MVP)
 
 # Report settings
 reports:

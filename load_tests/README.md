@@ -35,9 +35,8 @@ pip install -r load_tests/requirements.txt
 python load_tests/run_load_tests.py --scenario baseline
 
 # Run specific test type
-python load_tests/run_load_tests.py --scenario baseline --test-type rest
-python load_tests/run_load_tests.py --scenario baseline --test-type websocket
 python load_tests/run_load_tests.py --scenario baseline --test-type grpc
+# Note: --test-type rest and --test-type websocket are obsolete (Gateway service was removed)
 ```
 
 ### Run Target Load Test (10x Capacity)

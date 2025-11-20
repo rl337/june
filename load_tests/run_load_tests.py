@@ -86,11 +86,18 @@ def run_grpc_test(config: dict, output_dir: Path):
 
     grpc_config = config.get("services", {}).get("grpc", {})
 
+    # Get LLM host - prefer TensorRT-LLM (default), fallback to legacy inference-api
+    llm_host = (
+        grpc_config.get("tensorrt_llm", {}).get("host")
+        or grpc_config.get("inference_api", {}).get("host")
+        or "tensorrt-llm:8000"  # Default to TensorRT-LLM
+    )
+
     cmd = [
         sys.executable,
         "load_tests/grpc/grpc_load_test.py",
         "--inference-host",
-        grpc_config.get("inference_api", {}).get("host", "localhost:50051"),
+        llm_host,
         "--stt-host",
         grpc_config.get("stt", {}).get("host", "localhost:50052"),
         "--tts-host",
@@ -143,8 +150,8 @@ def main():
         "--test-type",
         type=str,
         choices=["rest", "websocket", "grpc", "all"],
-        default="all",
-        help="Type of test to run",
+        default="grpc",  # Default to grpc since gateway tests are obsolete
+        help="Type of test to run (rest/websocket are obsolete - Gateway service was removed)",
     )
     parser.add_argument(
         "--output-dir",
@@ -153,7 +160,7 @@ def main():
         help="Output directory for reports",
     )
     parser.add_argument(
-        "--host", type=str, help="Override Gateway host (default from config)"
+        "--host", type=str, help="Override Gateway host (OBSOLETE - Gateway service was removed, only used for obsolete REST/WebSocket tests)"
     )
 
     args = parser.parse_args()
@@ -175,7 +182,7 @@ def main():
     logger.info(f"Running scenario: {scenario_name}")
     logger.info(f"  Description: {scenario.get('description', 'N/A')}")
 
-    # Get host
+    # Get host (only used for obsolete REST/WebSocket tests)
     host = args.host or config.get("services", {}).get("gateway", {}).get(
         "host", "http://localhost:8000"
     )
@@ -188,8 +195,9 @@ def main():
 
     results = {}
 
-    # Run REST tests
+    # Run REST tests (OBSOLETE - Gateway service was removed)
     if args.test_type in ["rest", "all"]:
+        logger.warning("⚠️  REST tests are obsolete - Gateway service was removed. Tests may fail.")
         locust_file = Path(__file__).parent / "locust" / "gateway_rest.py"
         if locust_file.exists():
             success = run_locust_test(
@@ -204,8 +212,9 @@ def main():
         else:
             logger.warning(f"Locust file not found: {locust_file}")
 
-    # Run WebSocket tests
+    # Run WebSocket tests (OBSOLETE - Gateway service was removed)
     if args.test_type in ["websocket", "all"]:
+        logger.warning("⚠️  WebSocket tests are obsolete - Gateway service was removed. Tests may fail.")
         locust_file = Path(__file__).parent / "locust" / "gateway_websocket.py"
         if locust_file.exists():
             success = run_locust_test(
