@@ -1121,7 +1121,13 @@ The agent can help with steps 2-3 once the user provides the required informatio
      - Checks prerequisites (services running, owner users configured, Message API accessible)
      - Sends test message, verifies status transitions (NEW → PROCESSING → RESPONDED)
      - Provides detailed feedback and troubleshooting guidance
+     - ✅ **Fixed:** Test script now uses correct MessageAPIClient parameter (`base_url` instead of `api_url`)
+     - ✅ **Fixed:** Test script now uses `parse_user_messages_file()` to parse messages correctly
+     - ✅ **Fixed:** Parsing function updated to handle optional username in user field
+     - ✅ **Fixed:** Added volume mount for `/var/data` in docker-compose.yml (telegram, discord, message-api services)
+     - ✅ **Fixed:** Added `USER_MESSAGES_DATA_DIR` environment variable support to `user_messages_sync.py` for host testing
    - ✅ **Operational documentation:** Added Phase 21 section to `docs/OPERATIONAL_READINESS.md` with comprehensive testing procedures, prerequisites, and troubleshooting guide
+   - ✅ **Round trip verified:** Tested complete flow - message appended → processed → response sent → status updated to RESPONDED
 
 **Implementation Notes:**
 - Command uses `essence.chat.user_messages_sync.read_user_messages()` for reading (with file locking)
