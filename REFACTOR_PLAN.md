@@ -949,13 +949,13 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - ✅ Moved integration-test to port 8084 to free up 8082 for message-api
    - ⏳ **NEXT:** Test service starts: `docker compose up -d message-api`
 
-4. **Update agent code to use API instead of direct calls:** ⏳ IN PROGRESS (HIGH PRIORITY)
+4. **Update agent code to use API instead of direct calls:** ✅ COMPLETED (2025-11-20)
    - ✅ Created helper module `essence/chat/message_api_client.py` for API client
    - ✅ MessageAPIClient class with all API operations (send, edit, list, get)
    - ✅ Convenience functions for backward compatibility
-   - ⏳ Update `essence/agents/reasoning.py` to use API (replace direct calls in _send_agent_message, _ask_for_clarification, _request_help, _report_progress)
-   - ⏳ Update `scripts/refactor_agent_loop.sh` to use API (replace send_message_to_user calls)
-   - ⏳ Test agent can send messages via API
+   - ✅ Updated `essence/agents/reasoning.py` to use API (replaced direct calls in _send_agent_message, _ask_for_clarification, _request_help, _report_progress)
+   - ✅ Updated `scripts/refactor_agent_loop.sh` documentation to use Message API
+   - ⏳ **NEXT:** Test agent can send messages via API (requires message-api service running)
 
 5. **Test API endpoints:** ⏳ TODO (HIGH PRIORITY)
    - Test GET /messages with various filters
