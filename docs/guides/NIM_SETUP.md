@@ -180,19 +180,24 @@ poetry run python -m essence verify-nim --json
 
 ### Using NIM in June Services
 
-June services can use NIM by setting the `LLM_URL` environment variable:
+June services can use NIM by setting the `LLM_URL` environment variable. The easiest way is to use the helper script:
 
+**Option 1: Use helper script (Recommended)**
 ```bash
-# In docker-compose.yml or environment
-LLM_URL=grpc://nim-qwen3:8001
+# Verify NIM is ready first
+./scripts/switch_to_nim.sh --verify-only
+
+# Switch to NIM (verifies, updates config, restarts services)
+./scripts/switch_to_nim.sh
+
+# Or update .env file instead of docker-compose.yml
+./scripts/switch_to_nim.sh --use-env
+
+# Or update config without restarting services
+./scripts/switch_to_nim.sh --no-restart
 ```
 
-**Default configuration:**
-- Telegram service: Uses TensorRT-LLM by default (`tensorrt-llm:8000`)
-- Discord service: Uses TensorRT-LLM by default (`tensorrt-llm:8000`)
-- To switch to NIM: Set `LLM_URL=grpc://nim-qwen3:8001`
-
-### Service Configuration
+**Option 2: Manual configuration**
 
 Update `docker-compose.yml` to use NIM:
 
@@ -203,6 +208,23 @@ services:
       - LLM_URL=grpc://nim-qwen3:8001  # Use NIM instead of TensorRT-LLM
     # ... rest of configuration
 ```
+
+Or set in `.env` file:
+```bash
+LLM_URL=grpc://nim-qwen3:8001
+```
+
+**Default configuration:**
+- Telegram service: Uses TensorRT-LLM by default (`tensorrt-llm:8000`)
+- Discord service: Uses TensorRT-LLM by default (`tensorrt-llm:8000`)
+- To switch to NIM: Set `LLM_URL=grpc://nim-qwen3:8001`
+
+**Important:** Always verify NIM is ready before switching:
+```bash
+poetry run python -m essence verify-nim --nim-host nim-qwen3 --http-port 8003 --grpc-port 8001
+```
+
+The helper script (`switch_to_nim.sh`) automatically verifies NIM is ready before making changes.
 
 ## Troubleshooting
 
