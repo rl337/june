@@ -41,8 +41,9 @@ RUN pip install -e /tmp/inference-core[audio]
 
 # Install TTS with compatible numpy version AFTER inference-core
 # TTS requires numpy==1.22.0, so we need to downgrade numpy after inference-core installs it
-# Also ensure scipy is compatible with numpy 1.22.0 (scipy<1.10.0 or scipy>=1.11.0 with numpy>=1.21.6)
-RUN pip install --force-reinstall "numpy==1.22.0" "scipy>=1.11.0,<1.12.0" "TTS>=0.20.0,<0.23.0"
+# Also ensure scipy is compatible with numpy 1.22.0 (scipy>=1.11.0 with numpy>=1.21.6)
+# Use --no-cache-dir to speed up installation and reduce build time
+RUN pip install --no-cache-dir --force-reinstall "numpy==1.22.0" "scipy>=1.11.0,<1.12.0" "TTS>=0.20.0,<0.23.0"
 
 ## shared module removed; use inference_core instead
 
