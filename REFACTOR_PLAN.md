@@ -10,11 +10,16 @@
 - ✅ **GitHub Actions passing** (all workflows successful)
 - ✅ **No uncommitted changes**
 - ✅ **Phase 19 - Direct Agent-User Communication:** All code implementation tasks complete (whitelist, routing, USER_REQUESTS.md syncing, message grouping/editing, service conflict prevention, polling loop integration)
-- ⏳ **Remaining work is operational** (requires services to be running):
-  - Phase 10.1-10.2: Model download and service startup (requires HUGGINGFACE_TOKEN, model download time)
+- ⏳ **HIGH PRIORITY OPERATIONAL TASKS (AGENT SHOULD WORK ON THESE):**
+  - 🚨 **Phase 19: Deploy NIMs and enable Telegram/Discord communication** (IMMEDIATE PRIORITY)
+    - Deploy NIMs in home_infra for inference (TTS, STT, agent efforts)
+    - Configure Telegram/Discord whitelist for direct agent-user communication
+    - Start services with whitelist enabled
+    - Test end-to-end communication
   - Phase 15: NIM gRPC connectivity testing (requires NIM service running in home_infra with NGC_API_KEY)
   - Phase 16: End-to-end pipeline testing (requires all services running)
   - Phase 18: Benchmark evaluation (requires LLM service running)
+  - Phase 10.1-10.2: Model download and service startup (requires HUGGINGFACE_TOKEN, model download time)
   - Message history debugging (tools ready, requires actual message data from real usage)
 
 **For agents:** All code-related refactoring tasks are complete. The project is ready for operational work. See operational tasks in REFACTOR_PLAN.md for details on starting services and running tests. See `docs/OPERATIONAL_READINESS.md` for a comprehensive operational readiness checklist.
@@ -145,23 +150,31 @@ All major refactoring phases have been completed:
 
 ## Next Development Priorities
 
-### Phase 19: Direct Agent-User Communication ⏳ NEW HIGH PRIORITY
+### Phase 19: Direct Agent-User Communication 🚨 IMMEDIATE PRIORITY - OPERATIONAL DEPLOYMENT
 
-**Goal:** Establish direct communication channel between the looping agent and whitelisted end users via Telegram/Discord, replacing the current agentic flow in these services.
+**Goal:** Establish direct communication channel between the looping agent and whitelisted end users via Telegram/Discord, replacing the current agentic flow in these services. Deploy NIMs for GPU-optimized inference (TTS, STT, agent efforts).
 
-**Status:** ✅ COMPLETED - All code implementation tasks complete, including polling loop integration
+**Status:** ✅ Code implementation complete, ⏳ **OPERATIONAL DEPLOYMENT PENDING (AGENT SHOULD WORK ON THIS NOW)**
 1. ✅ Whitelisted user communication (code complete)
 2. ✅ Replace agentic flow with direct communication (code complete)
 3. ✅ Sync messages to USER_REQUESTS.md (code complete)
 4. ✅ Message grouping and editing (code complete)
 5. ✅ Periodic message polling (utility implemented, polling loop integrated into refactor_agent_loop.sh)
 6. ✅ Service conflict prevention (code complete)
-7. ⏳ **OPERATIONAL DEPLOYMENT PENDING:**
-   - ⏳ NIMs not deployed for all inference (depends on Phase 15 Task 4)
-   - ⏳ No actual exchanges happening between user and looping agent via Telegram/Discord
-   - ⏳ Whitelist configuration not set up
-   - ⏳ Telegram/Discord services not running with whitelist enabled
-   - ⏳ End-to-end testing not performed
+7. ⏳ **OPERATIONAL DEPLOYMENT PENDING (HIGH PRIORITY - AGENT SHOULD DO THIS):**
+   - ⏳ **NIMs not deployed** - NIM service exists in home_infra/docker-compose.yml but not running
+     - **Impact:** No GPU-optimized inference available for TTS, STT, and agent efforts
+     - **Action:** Agent should deploy NIMs using `scripts/setup_nim_operational.sh` or manual steps
+   - ⏳ **No actual exchanges happening** - Telegram/Discord services not configured for direct agent-user communication
+     - **Impact:** User cannot communicate directly with looping agent via Telegram/Discord
+     - **Action:** Agent should configure whitelist and restart services
+   - ⏳ **Whitelist configuration not set up** - TELEGRAM_WHITELISTED_USERS not configured
+     - **Impact:** Messages from user are not routed to agent, they go through normal agentic flow
+     - **Action:** Agent should set whitelist env vars and restart services
+   - ⏳ **Telegram/Discord services not running with whitelist enabled** - Services running but without whitelist config
+     - **Impact:** Even if whitelist is set, services need restart to load it
+     - **Action:** Agent should restart services with whitelist configuration
+   - ⏳ **End-to-end testing not performed** - Cannot verify communication works until above steps complete
 
 **Tasks:**
 1. **Establish whitelisted user communication:** ✅ COMPLETED
@@ -221,25 +234,44 @@ All major refactoring phases have been completed:
      - Can be disabled via ENABLE_USER_POLLING=0 environment variable
      - This enables the agent to respond to user messages even when the user doesn't respond immediately
 
-**Operational Deployment Tasks (REQUIRED FOR COMPLETION):**
-1. **Deploy NIMs for inference:** ⏳ TODO (depends on Phase 15 Task 4)
-   - NIMs must be deployed and running in home_infra
-   - NIM service must be accessible via gRPC (nim-qwen3:8001)
-   - All inference must route through NIMs (not legacy inference-api)
-   - Verify NIM connectivity: `poetry run python -m essence verify-nim --nim-host nim-qwen3 --http-port 8003 --grpc-port 8001`
+**Operational Deployment Tasks (REQUIRED FOR COMPLETION - HIGH PRIORITY FOR AGENT):**
 
-2. **Configure whitelisted users:** ⏳ TODO
-   - Set `TELEGRAM_WHITELISTED_USERS` environment variable (comma-separated user IDs)
-   - Set `DISCORD_WHITELISTED_USERS` environment variable (comma-separated user IDs)
-   - Verify whitelist configuration is loaded correctly
-   - **Helper Script:** `scripts/setup_phase19_operational.sh` - Orchestrates operational workflow (whitelist configuration, service startup, testing guidance)
+🚨 **IMMEDIATE PRIORITY:** These tasks enable NIM inference and direct agent-user communication via Telegram/Discord. The agent should work on these NOW.
 
-3. **Start Telegram/Discord services with whitelist:** ⏳ TODO
-   - Start Telegram service with whitelist environment variables set
-   - Start Discord service with whitelist environment variables set
-   - Verify services are routing whitelisted users correctly
-   - Verify non-whitelisted users still use existing agentic flow
+1. **Deploy NIMs for inference:** ⏳ TODO (HIGH PRIORITY - Agent should do this)
+   - **Why:** NIMs provide GPU-optimized inference for TTS, STT, and agent efforts. Hardware is designed for this.
+   - **Steps:**
+     - Check if `NGC_API_KEY` is set in home_infra environment
+     - If not set, guide user to set it (required for pulling NIM images)
+     - Start NIM service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3`
+     - Verify NIM is running: `docker compose ps nim-qwen3`
+     - Verify NIM connectivity: `cd /home/rlee/dev/june && poetry run python -m essence verify-nim --nim-host nim-qwen3 --http-port 8003 --grpc-port 8001`
+     - Update june services to use NIM endpoint (set `LLM_URL=grpc://nim-qwen3:8001` in docker-compose.yml or .env)
+   - **Helper Script:** `scripts/setup_nim_operational.sh` - Orchestrates NIM deployment
+   - **Note:** This is operational work (starting Docker services), not code changes. Code is already complete.
+
+2. **Configure whitelisted users and enable Telegram/Discord communication:** ⏳ TODO (HIGH PRIORITY - Agent should do this)
+   - **Why:** This enables direct communication between the user and the looping agent via Telegram/Discord. Code is complete, just needs operational setup.
+   - **Steps:**
+     - Get user's Telegram user ID (can query Telegram API or ask user)
+     - Set `TELEGRAM_WHITELISTED_USERS` environment variable (comma-separated user IDs)
+     - Set `DISCORD_WHITELISTED_USERS` environment variable (comma-separated user IDs) if using Discord
+     - Add to docker-compose.yml environment section for telegram/discord services
+     - Or use helper script: `./scripts/setup_phase19_operational.sh --telegram-users USER_ID`
+   - **Helper Script:** `scripts/setup_phase19_operational.sh` - Orchestrates whitelist configuration and service startup
+   - **Note:** This is operational work (setting environment variables and restarting services), not code changes. Code is already complete.
+
+3. **Start Telegram/Discord services with whitelist:** ⏳ TODO (HIGH PRIORITY - Agent should do this)
+   - **Why:** Services need to be restarted with whitelist configuration to enable direct agent-user communication.
+   - **Steps:**
+     - Stop Telegram service: `cd /home/rlee/dev/june && docker compose stop telegram`
+     - Start Telegram service with whitelist env var: `TELEGRAM_WHITELISTED_USERS=USER_ID docker compose up -d telegram`
+     - Or update docker-compose.yml to include whitelist in environment section, then: `docker compose up -d telegram`
+     - Verify service is running: `docker compose ps telegram`
+     - Check logs to verify whitelist is loaded: `docker compose logs telegram | grep -i whitelist`
+     - Repeat for Discord if using Discord
    - **Helper Script:** `scripts/setup_phase19_operational.sh` - Automates service startup with whitelist configuration
+   - **Note:** This is operational work (restarting services with new config), not code changes. Code is already complete.
 
 4. **Integrate polling loop into agent script:** ✅ COMPLETED
    - ✅ Added polling loop to `scripts/refactor_agent_loop.sh`

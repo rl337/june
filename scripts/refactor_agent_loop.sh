@@ -255,7 +255,12 @@ You are working on refactoring the june project. Your task is to:
    - **If you fix a CI issue, create a task in todorama to track it:** Use MCP to create a task documenting what was fixed
 
 4. **Pick an unfinished task** - If no GitHub Actions failures and no MCP tasks:
-   - **HIGH PRIORITY:** Check Phase 19 (Direct Agent-User Communication) in REFACTOR_PLAN.md - this is the NEW HIGH PRIORITY task
+   - **🚨 IMMEDIATE PRIORITY:** Phase 19 Operational Deployment Tasks (see REFACTOR_PLAN.md):
+     - Deploy NIMs for inference (TTS, STT, agent efforts) - hardware is designed for this
+     - Configure Telegram/Discord whitelist for direct agent-user communication
+     - Start services with whitelist enabled
+     - These are operational tasks (starting services, setting env vars), not code changes - code is already complete
+   - **HIGH PRIORITY:** Check Phase 19 (Direct Agent-User Communication) in REFACTOR_PLAN.md - operational deployment tasks
    - Look for tasks marked with ⏳ TODO in the REFACTOR_PLAN.md
    - **For operational tasks that are blocked**, create MCP tasks in todorama to track them:
      - Example: "Phase 15 Task 4: Compile Qwen3 model" → Create task in todorama with details
