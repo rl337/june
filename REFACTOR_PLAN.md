@@ -401,6 +401,10 @@ The agent can help with steps 2-3 once the user provides the required informatio
      - ✅ Verify LLM NIM is running: `docker compose ps nim-qwen3` → **RUNNING** (status: health: starting, downloading model files)
      - ⏳ Verify LLM NIM connectivity: `cd /home/rlee/dev/june && poetry run python -m essence verify-nim --nim-host nim-qwen3 --http-port 8003 --grpc-port 8001` → **PENDING** (waiting for model initialization to complete)
      - ⏳ Update june services to use NIM endpoint (set `LLM_URL=grpc://nim-qwen3:8001` in docker-compose.yml or .env)
+       - ✅ **Helper script created:** `scripts/switch_to_nim.sh` - Automated script to switch june services to NIM endpoint
+       - Usage: `./scripts/switch_to_nim.sh [--verify-only] [--use-env] [--no-restart]`
+       - Verifies NIM is ready, updates LLM_URL configuration, and restarts services
+       - Supports both docker-compose.yml and .env file configuration
      - ⏳ Configure STT service to use STT NIM (once deployed)
      - ⏳ Configure TTS service to use TTS NIM (once deployed)
    - **Helper Script:** `scripts/setup_nim_operational.sh` - Orchestrates NIM deployment
