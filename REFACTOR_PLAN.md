@@ -135,6 +135,7 @@ All major refactoring phases have been completed:
 - ⏳ Model download (if not already done): `docker compose run --rm cli-tools poetry run -m essence download-models --model Qwen/Qwen3-30B-A3B-Thinking-2507`
 - ⏳ Service startup: `docker compose up -d inference-api` (or TensorRT-LLM once Phase 15 is complete)
 - ⏳ Testing & validation: Test model loading, GPU utilization, coding agent, benchmark evaluations
+- ✅ **Operational Workflow Script:** Created `scripts/setup_qwen3_operational.sh` to orchestrate Phase 10.1-10.2 operational tasks. Script performs pre-flight checks, model download status verification, service startup guidance, and verification steps. Supports `--skip-check`, `--skip-download`, and `--use-legacy` options. Makes operational tasks easier to execute.
 
 **See:** `QWEN3_SETUP_PLAN.md` for detailed setup instructions and operational guide.
 

@@ -47,6 +47,7 @@ Reusable tools have been migrated to commands. Use these instead of scripts:
 - `run_benchmarks.sh` - Benchmark automation wrapper
 - `review_sandbox.sh` - Shell wrapper for review_sandbox command
 - `deploy_audio_services.sh` - Audio services deployment
+- `setup_qwen3_operational.sh` - Operational workflow for Phase 10.1-10.2 (Qwen3 model setup on GPU)
 
 ### Test Utilities (Should Move to tests/)
 - `test_*.py` files - Should be moved to `tests/scripts/` or converted to pytest
