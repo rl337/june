@@ -22,9 +22,12 @@
     - Update agent loop to use API instead of direct calls
   - 🚨 **Phase 19: Deploy NIMs and enable Telegram/Discord communication** (HIGH PRIORITY - NOW UNBLOCKED)
     - ✅ NIM access resolved - nim-qwen3 downloaded successfully
-    - ⏳ Deploy LLM NIM (nim-qwen3) in home_infra
-    - ⏳ Deploy STT NIM in home_infra (check NGC catalog for STT NIM container)
-    - ⏳ Deploy TTS NIM in home_infra (check NGC catalog for TTS NIM container)
+    - ✅ LLM NIM (nim-qwen3) configured in home_infra/docker-compose.yml
+    - ⏳ **Operational:** Start LLM NIM service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3` (requires NGC_API_KEY)
+    - ⏳ **Research:** Check NGC catalog for STT NIM container availability (https://catalog.ngc.nvidia.com/ → Containers → NIM → search "whisper" or "stt")
+    - ⏳ **Research:** Check NGC catalog for TTS NIM container availability (https://catalog.ngc.nvidia.com/ → Containers → NIM → search "tts" or "speech")
+    - ⏳ **If STT/TTS NIMs exist:** Add to home_infra/docker-compose.yml following nim-qwen3 pattern
+    - ⏳ **If STT/TTS NIMs don't exist:** Continue using custom STT/TTS services (already configured in june/docker-compose.yml)
     - ✅ Configure Telegram/Discord whitelist for direct agent-user communication (completed)
     - ⏳ Start services with whitelist enabled
     - ⏳ Test end-to-end communication
