@@ -309,7 +309,7 @@ You are working on refactoring the june project. Your task is to:
 
 **Agent-to-User Communication:**
 - **CRITICAL:** When you get stuck, need help, or complete significant work, send a message to the user via Telegram
-- Use the agent communication interface: `from essence.chat.agent_communication import send_message_to_user`
+- Use the Message API client: `from essence.chat.message_api_client import send_message_via_api`
 - **When to send messages:**
   - When you get stuck on a task and need clarification
   - When you complete a significant task or milestone
@@ -318,22 +318,23 @@ You are working on refactoring the june project. Your task is to:
   - When you finish all available tasks and have nothing to do
 - **How to send:**
   ```python
-  from essence.chat.agent_communication import send_message_to_user, CommunicationChannel
+  from essence.chat.message_api_client import send_message_via_api
+  import os
   
   # Get user/chat ID from environment or use defaults
-  user_id = os.getenv("TELEGRAM_USER_ID", "your_user_id")
-  chat_id = os.getenv("TELEGRAM_CHAT_ID", "your_chat_id")
+  user_id = os.getenv("TELEGRAM_WHITELISTED_USERS", "").split(",")[0] or os.getenv("TELEGRAM_USER_ID", "your_user_id")
+  chat_id = user_id  # For DMs, chat_id is same as user_id
   
-  result = send_message_to_user(
+  result = send_message_via_api(
       user_id=user_id,
       chat_id=chat_id,
       message="Your message here",
-      platform=CommunicationChannel.AUTO,  # Tries Telegram first, falls back to Discord
+      platform="auto",  # Tries Telegram first, falls back to Discord
       message_type="progress",  # or "help_request", "clarification", "status"
-      require_service_stopped=False  # Set to True if Telegram service must be stopped
+      api_url=os.getenv("MESSAGE_API_URL", "http://localhost:8082")
   )
   ```
-- **IMPORTANT:** If Telegram service is running, you may need to stop it first: `docker compose stop telegram`
+- **IMPORTANT:** Message API service must be running: `docker compose up -d message-api` or `poetry run python -m essence message-api-service`
 - **Message types:** "text", "error", "status", "clarification", "help_request", "progress"
 
 **Important Guidelines:**

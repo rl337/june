@@ -753,18 +753,18 @@ class AgenticReasoner:
             return False
 
         try:
-            from essence.chat.agent_communication import (
-                CommunicationChannel,
-                send_message_to_user,
-            )
+            # Use Message API instead of direct function calls
+            from essence.chat.message_api_client import send_message_via_api
 
-            result = send_message_to_user(
+            # Map CommunicationChannel.AUTO to "auto" string
+            platform_str = "auto"  # AUTO tries Telegram first, falls back to Discord
+
+            result = send_message_via_api(
                 user_id=str(context.user_id),
                 chat_id=str(context.chat_id),
                 message=message,
-                platform=CommunicationChannel.AUTO,
+                platform=platform_str,
                 message_type=message_type,
-                require_service_stopped=False,  # Don't require service stopped for optional communication
             )
 
             if result.get("success"):
@@ -803,17 +803,18 @@ class AgenticReasoner:
             return False
 
         try:
-            from essence.chat.agent_communication import (
-                CommunicationChannel,
-                ask_for_clarification,
-            )
+            from essence.chat.message_api_client import send_message_via_api
 
-            result = ask_for_clarification(
+            message = f"❓ **Clarification Needed**\n\n{question}"
+            if context_info:
+                message += f"\n\n_Context: {context_info}_"
+
+            result = send_message_via_api(
                 user_id=str(context.user_id) if context.user_id else "",
                 chat_id=str(context.chat_id) if context.chat_id else "",
-                question=question,
-                context=context_info,
-                platform=CommunicationChannel.AUTO,
+                message=message,
+                platform="auto",
+                message_type="clarification",
             )
 
             return result.get("success", False)
@@ -843,17 +844,18 @@ class AgenticReasoner:
             return False
 
         try:
-            from essence.chat.agent_communication import (
-                CommunicationChannel,
-                request_help,
-            )
+            from essence.chat.message_api_client import send_message_via_api
 
-            result = request_help(
+            message = f"🆘 **Help Requested**\n\n{issue}"
+            if blocker_description:
+                message += f"\n\n_Details: {blocker_description}_"
+
+            result = send_message_via_api(
                 user_id=str(context.user_id) if context.user_id else "",
                 chat_id=str(context.chat_id) if context.chat_id else "",
-                issue=issue,
-                blocker_description=blocker_description,
-                platform=CommunicationChannel.AUTO,
+                message=message,
+                platform="auto",
+                message_type="help_request",
             )
 
             return result.get("success", False)
@@ -883,17 +885,18 @@ class AgenticReasoner:
             return False
 
         try:
-            from essence.chat.agent_communication import (
-                CommunicationChannel,
-                report_progress,
-            )
+            from essence.chat.message_api_client import send_message_via_api
 
-            result = report_progress(
+            message = f"📊 **Progress Update**\n\n{progress_message}"
+            if completion_percentage is not None:
+                message += f"\n\n_Completion: {completion_percentage}%_"
+
+            result = send_message_via_api(
                 user_id=str(context.user_id) if context.user_id else "",
                 chat_id=str(context.chat_id) if context.chat_id else "",
-                progress_message=progress_message,
-                completion_percentage=completion_percentage,
-                platform=CommunicationChannel.AUTO,
+                message=message,
+                platform="auto",
+                message_type="progress",
             )
 
             return result.get("success", False)
