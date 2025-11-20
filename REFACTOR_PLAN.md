@@ -37,8 +37,11 @@
     - ✅ Fixed STT service missing torchaudio dependency (added to pyproject.toml, rebuilt container)
     - ✅ Fixed STT Dockerfile missing june-grpc-api (added package installation)
     - ✅ Fixed STT model name parsing (extract model name from path format for Whisper)
-    - ✅ Services rebuilt and starting correctly (telegram, discord, message-api healthy, stt loading model)
-    - ⏳ Test end-to-end communication (send message → verify in USER_REQUESTS.md → agent responds)
+    - ✅ Fixed telegram service import errors (corrected 'from dependencies.config' to 'from essence.services.telegram.dependencies.config')
+    - ✅ Fixed telegram health endpoint (now returns proper JSON instead of Internal Server Error)
+    - ⚠️ TTS service still has essence import issue - Dockerfile copies essence but python can't find it (needs investigation)
+    - ✅ Services status: telegram (unhealthy - STT/TTS connection timeouts), discord (healthy), message-api (healthy), stt (loading model), tts (restarting - essence import error)
+    - ⏳ Test end-to-end communication (send message → verify in USER_REQUESTS.md → agent responds) - BLOCKED by TTS service issue
   - Phase 15: NIM gRPC connectivity testing (requires NIM service running in home_infra with NGC_API_KEY)
   - Phase 16: End-to-end pipeline testing (requires all services running)
   - Phase 18: Benchmark evaluation (requires LLM service running)
