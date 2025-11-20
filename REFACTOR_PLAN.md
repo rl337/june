@@ -26,6 +26,29 @@
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
+## Active Feature Branches
+
+**CRITICAL:** All development work must happen on feature branches, not directly on `main`. See `AGENTS.md` for branching strategy details.
+
+**Current Active Branches:**
+- None currently active
+
+**Branch Status:**
+- ⏳ IN PROGRESS - Work actively happening on this branch
+- ✅ READY TO MERGE - Feature complete, ready for squash merge to main
+- ⏸️ PAUSED - Work temporarily paused (document reason)
+- ❌ ABANDONED - Work abandoned (document reason and cleanup)
+
+**Format for tracking:**
+```markdown
+- `feature/phase-19-whitelist-config` - ⏳ IN PROGRESS
+  - Task: Configure Telegram/Discord whitelist user IDs
+  - Started: 2025-11-20
+  - Status: Extracted Telegram ID (39833618), need Discord numeric user ID
+  - Related: Phase 19 Task 2
+  - Last Updated: 2025-11-20
+```
+
 ## Goal
 
 Build a complete **voice message → STT → LLM → TTS → voice response** system with **agentic LLM reasoning** before responding, supporting both **Telegram** and **Discord** platforms.

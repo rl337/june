@@ -9,6 +9,7 @@ This document provides essential context and guidelines for AI agents working on
 **Status:** See `REFACTOR_PLAN.md` for detailed progress and TODO items.
 
 **CRITICAL:** Run tests at the start and end of every turn and fix any breakages. 
+**CRITICAL:** Use feature branches for all work - never commit directly to main. See "Git Branching Strategy" section below.
 **CRITICAL:** Check in outstanding logically grouped changes with good descriptive commit messages. If there are commits unpushed, push upstream
 
 ## Project Structure
@@ -336,14 +337,122 @@ When completing tasks:
 - Check existing service code in `essence/services/` for patterns
 - Review docker-compose.yml to understand service configuration
 
+## Git Branching Strategy
+
+**CRITICAL:** All development work must happen on feature branches, not directly on `main`.
+
+### Why Feature Branches?
+
+- **Clean history:** Main branch stays clean with meaningful, squashed commits
+- **Better organization:** Related changes grouped together in feature branches
+- **Easier review:** Each feature can be reviewed as a unit before merging
+- **Reduced noise:** Avoids proliferation of trivial commits (e.g., "Update timestamp", "Fix typo") on main
+
+### Branching Workflow
+
+1. **Create feature branch from main:**
+   ```bash
+   git checkout main
+   git pull origin main
+   git checkout -b feature/phase-19-whitelist-config
+   ```
+   - Branch naming: `feature/<descriptive-name>` or `feature/phase-<N>-<task>`
+   - Examples: `feature/phase-19-whitelist-config`, `feature/nim-deployment`, `feature/telegram-user-ids`
+
+2. **Work on the feature branch:**
+   - Make all commits to the feature branch
+   - Commit frequently with descriptive messages
+   - Group related changes logically
+   - Push feature branch regularly: `git push origin feature/branch-name`
+
+3. **Track in REFACTOR_PLAN.md:**
+   - Add feature branch to "Active Feature Branches" section
+   - Update status as work progresses
+   - Link to specific tasks/phases
+
+4. **When feature is complete:**
+   - Ensure all tests pass: `poetry run pytest tests/`
+   - Squash commits into logical groups (if needed): `git rebase -i main`
+   - Update REFACTOR_PLAN.md to mark tasks complete
+   - Create pull request or merge with squash:
+     ```bash
+     git checkout main
+     git pull origin main
+     git merge --squash feature/branch-name
+     git commit -m "Feature: <descriptive name>
+     
+     <detailed description of what was implemented>
+     
+     Closes: <task reference from REFACTOR_PLAN.md>"
+     git push origin main
+     git branch -d feature/branch-name  # Delete local branch
+     git push origin --delete feature/branch-name  # Delete remote branch
+     ```
+
+### What Goes in a Feature Branch?
+
+- **One feature or task** from REFACTOR_PLAN.md
+- **All related changes:**
+  - Code changes
+  - Tests
+  - Documentation updates
+  - Configuration changes
+  - Related fixes and improvements
+
+### What Stays on Main?
+
+- **Only merged features** (via squash merge)
+- **Hotfixes** (critical production issues) - use `hotfix/` branches
+- **No trivial commits** like:
+  - "Update timestamp"
+  - "Fix typo" (unless part of a feature)
+  - "Cleanup whitespace" (unless part of a feature)
+  - Multiple small documentation updates (group into feature)
+
+### Branch Naming Conventions
+
+- `feature/phase-<N>-<task-name>` - For refactoring plan tasks
+- `feature/<descriptive-name>` - For other features
+- `hotfix/<issue-description>` - For critical fixes
+- Examples:
+  - `feature/phase-19-whitelist-config`
+  - `feature/telegram-user-id-extraction`
+  - `feature/nim-deployment-setup`
+  - `hotfix/telegram-service-crash`
+
+### Tracking Feature Branches
+
+- **In REFACTOR_PLAN.md:** Add to "Active Feature Branches" section
+- **Format:**
+  ```markdown
+  ### Active Feature Branches
+  
+  - `feature/phase-19-whitelist-config` - ⏳ IN PROGRESS
+    - Task: Configure Telegram/Discord whitelist user IDs
+    - Started: 2025-11-20
+    - Status: Extracted Telegram ID, need Discord ID
+    - Related: Phase 19 Task 2
+  ```
+
 ## Workflow for Refactoring Agent
 
-1. **Read REFACTOR_PLAN.md** - Understand current state
-2. **Pick ONE unfinished task** - Don't try to do everything at once
-3. **Work on the task** - Make focused, incremental changes
-4. **Update REFACTOR_PLAN.md** - Document what you did and what you discovered
-5. **Verify changes** - Make sure things still work
-6. **Commit progress** - Keep the plan updated for next iteration
+1. **Check for active feature branches** - See REFACTOR_PLAN.md "Active Feature Branches" section
+2. **If no active branch, create one:**
+   - Pick a task from REFACTOR_PLAN.md
+   - Create feature branch: `git checkout -b feature/phase-<N>-<task>`
+   - Add branch to REFACTOR_PLAN.md "Active Feature Branches" section
+3. **Work on the feature branch:**
+   - Make focused, incremental changes
+   - Commit frequently with descriptive messages
+   - Push feature branch regularly
+4. **Update REFACTOR_PLAN.md:**
+   - Document progress in feature branch section
+   - Update task status
+5. **When feature complete:**
+   - Squash commits if needed
+   - Merge to main with squash
+   - Update REFACTOR_PLAN.md to mark complete
+   - Delete feature branch
 
 ## Key Principles
 
