@@ -79,7 +79,7 @@
         - ✅ **Resilient inference_core Import:** Made inference_core import catch AttributeError for scipy/numpy issues
       - **Verification:** TTS service started successfully at 2025-11-20 12:49:24. `TtsGrpcApp` is available (verified: `TtsGrpcApp available: True`). No more import errors. Service is running and healthy.
       - **Note:** Build took ~3 minutes (much faster than expected 30+ minutes) - likely due to Docker layer caching from previous builds.
-    - ✅ Services status: telegram (unhealthy - STT/TTS connection timeouts), discord (healthy), message-api (healthy), stt (loading model), tts (restarting - essence import error)
+    - ✅ Services status: telegram (unhealthy - STT/TTS connection timeouts), discord (healthy), message-api (healthy), stt (loading model), tts (running - ✅ all fixes applied, service healthy)
     - ✅ **RADICAL REFACTOR COMPLETE:** Replaced USER_REQUESTS.md with USER_MESSAGES.md in /var/data/
     - ✅ **RADICAL REFACTOR COMPLETE:** Distinguish owner users from whitelisted users (owner = personal accounts, whitelisted = includes owners + others)
     - ✅ **RADICAL REFACTOR COMPLETE:** Non-whitelisted users now ignored completely (no response)
