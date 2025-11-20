@@ -14,14 +14,9 @@
 - ✅ **NIM Access Resolved:** NGC API token updated with correct permissions, nim-qwen3 downloaded successfully. STT and TTS NIMs now available for deployment.
 - ⏳ **🚨 TOP PRIORITY - BI-DIRECTIONAL COMMUNICATION (AGENT MUST WORK ON THIS FIRST):**
   - 🚨 **Phase 21: Looping Agent USER_MESSAGES.md Integration** (CRITICAL - Enables round trip communication)
-    - ⏳ Update looping agent script (`scripts/refactor_agent_loop.sh`) to read USER_MESSAGES.md
-    - ⏳ Process messages with status "NEW" from USER_MESSAGES.md
-    - ⏳ Update message status to "PROCESSING" when agent starts processing
-    - ⏳ Generate response using LLM (when inference engines are running)
-    - ⏳ Send response via Message API (POST /messages or PATCH /messages/{id})
-    - ⏳ Update message status to "RESPONDED" after successful response
-    - ⏳ Handle errors by updating status to "ERROR"
-    - ⏳ Test complete round trip: owner sends message → agent reads from USER_MESSAGES.md → agent responds → owner receives response
+    - ✅ Create process-user-messages essence command (reads NEW messages, processes, sends responses)
+    - ⏳ Integrate command into looping agent script (`scripts/refactor_agent_loop.sh`)
+    - ⏳ Test complete round trip: owner sends message → agent processes via command → agent responds → owner receives response
     - **Why:** User needs to test round trip before going away from computer. This closes the communication loop so agent can ask questions and get answers via USER_MESSAGES.md
   - 🚨 **Phase 20: Message API Service** (IMMEDIATE PRIORITY - Blocks all future agent-user communication)
     - Create Message API service with GET/POST/PUT/PATCH endpoints
@@ -1060,23 +1055,21 @@ The agent can help with steps 2-3 once the user provides the required informatio
 - Essential for autonomous agent operation when user is unavailable
 
 **Tasks:**
-1. **Update looping agent script to read USER_MESSAGES.md:** ⏳ TODO
-   - Read `/var/data/USER_MESSAGES.md` using `essence.chat.user_messages_sync.read_user_messages()`
-   - Parse messages with status "NEW"
-   - Use file locking to minimize concurrent read/write issues
-   - Filter for owner user messages (or process all NEW messages)
+1. **Create process-user-messages command:** ✅ COMPLETED
+   - ✅ Created `essence/commands/process_user_messages.py` command
+   - ✅ Command reads USER_MESSAGES.md and finds messages with status "NEW"
+   - ✅ Updates status to "PROCESSING" when processing starts
+   - ✅ Generates response (placeholder for now, will use LLM when inference engines are running)
+   - ✅ Sends response via Message API
+   - ✅ Updates status to "RESPONDED" on success or "ERROR" on failure
+   - ✅ Registered command in `essence/commands/__init__.py`
+   - ✅ Command can be run: `poetry run python -m essence process-user-messages`
 
-2. **Process NEW messages:** ⏳ TODO
-   - Update message status to "PROCESSING" when agent starts processing
-   - Extract message content, user_id, chat_id, platform from USER_MESSAGES.md entry
-   - Generate response (when inference engines are running, or use placeholder for now)
-   - Handle errors by updating status to "ERROR"
-
-3. **Send response via Message API:** ⏳ TODO
-   - Use Message API client (`essence.chat.message_api_client.send_message_via_api()`)
-   - Send response to original user_id/chat_id on original platform
-   - Update message status to "RESPONDED" after successful response
-   - Handle API errors gracefully
+2. **Integrate command into looping agent script:** ⏳ TODO
+   - Add periodic call to `process-user-messages` command in `scripts/refactor_agent_loop.sh`
+   - Can run in background polling loop (similar to existing user response polling)
+   - Configure polling interval (default: every 2 minutes)
+   - Handle command failures gracefully
 
 4. **Test complete round trip:** ⏳ TODO
    - Owner sends message via Telegram/Discord
@@ -1087,12 +1080,12 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - Verify message status updated to "RESPONDED" in USER_MESSAGES.md
 
 **Implementation Notes:**
-- Use `essence.chat.user_messages_sync.read_user_messages()` for reading (with file locking)
-- Use `essence.chat.user_messages_sync.update_message_status()` for status updates (with file locking)
-- Use `essence.chat.message_api_client.send_message_via_api()` for sending responses
-- Integrate into `scripts/refactor_agent_loop.sh` - add periodic check for NEW messages
+- Command uses `essence.chat.user_messages_sync.read_user_messages()` for reading (with file locking)
+- Command uses `essence.chat.user_messages_sync.update_message_status()` for status updates (with file locking)
+- Command uses `essence.chat.message_api_client.send_message_via_api()` for sending responses
+- Integrate command into `scripts/refactor_agent_loop.sh` - add periodic call to `process-user-messages`
 - Can run in background polling loop (similar to existing user response polling)
-- When inference engines are not running, can send placeholder response or skip processing
+- When inference engines are not running, command sends placeholder response (can be enhanced later)
 
 **File Structure:**
 - USER_MESSAGES.md location: `/var/data/USER_MESSAGES.md`
