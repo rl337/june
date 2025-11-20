@@ -462,28 +462,106 @@ class Planner:
     def _extract_tool_args(
         self, user_request: str, tool: Any
     ) -> Optional[Dict[str, Any]]:
-        """Extract tool arguments from the request."""
-        # Simple extraction: look for common patterns
-        # TODO: Implement more sophisticated argument extraction
+        """
+        Extract tool arguments from the request.
+
+        Enhanced extraction that looks for common patterns:
+        - File paths (with various extensions)
+        - URLs (http/https)
+        - Numbers (integers, floats)
+        - Quoted strings
+        - Common parameter patterns (key=value, key: value)
+        """
+        import re
 
         args = {}
 
-        # Look for file paths
-        if "file" in user_request.lower():
-            # Try to find file path patterns
-            import re
+        # Look for file paths (enhanced patterns)
+        file_patterns = [
+            r'["\']([^"\']+\.(py|txt|md|json|yaml|yml|toml|ini|cfg|conf|sh|bash))["\']',
+            r"([a-zA-Z0-9_/\\-]+\.(py|txt|md|json|yaml|yml|toml|ini|cfg|conf|sh|bash))",
+            r"(?:file|path|filename)[\s:=]+([a-zA-Z0-9_/\\-]+\.(?:py|txt|md|json|yaml|yml|toml|ini|cfg|conf|sh|bash))",
+        ]
+        for pattern in file_patterns:
+            matches = re.findall(pattern, user_request, re.IGNORECASE)
+            if matches:
+                file_path = (
+                    matches[0][0] if isinstance(matches[0], tuple) else matches[0]
+                )
+                args["file_path"] = file_path
+                break
 
-            file_patterns = [
-                r'["\']([^"\']+\.(py|txt|md|json|yaml|yml))["\']',
-                r"([a-zA-Z0-9_/]+\.(py|txt|md|json|yaml|yml))",
-            ]
-            for pattern in file_patterns:
-                matches = re.findall(pattern, user_request)
-                if matches:
-                    args["file_path"] = (
-                        matches[0][0] if isinstance(matches[0], tuple) else matches[0]
-                    )
-                    break
+        # Look for URLs
+        url_pattern = r"(https?://[^\s\)]+)"
+        url_matches = re.findall(url_pattern, user_request)
+        if url_matches:
+            args["url"] = url_matches[0]
+
+        # Look for numbers (floats first, then integers)
+        # Check for floats first to avoid matching integer part of float
+        float_pattern = r"\b(\d+\.\d+)\b"
+        float_matches = re.findall(float_pattern, user_request)
+        if float_matches:
+            try:
+                args["number"] = float(float_matches[0])
+            except ValueError:
+                pass
+        else:
+            # Only look for integers if no floats found
+            int_pattern = r"\b(\d+)\b"
+            int_matches = re.findall(int_pattern, user_request)
+            if int_matches:
+                try:
+                    args["number"] = int(int_matches[0])
+                except ValueError:
+                    pass
+
+        # Look for quoted strings (content, text, message, etc.)
+        quoted_string_pattern = r'["\']([^"\']+)["\']'
+        quoted_matches = re.findall(quoted_string_pattern, user_request)
+        if quoted_matches and "content" not in args:
+            # Use first quoted string as content if no file path found
+            if "file_path" not in args:
+                args["content"] = quoted_matches[0]
+
+        # Look for key=value or key: value patterns
+        # Pattern: word=value or word: value (but not word=value=value)
+        key_value_pattern = r"(\w+)[=:]\s*([^\s,=:]+)"
+        matches = re.findall(key_value_pattern, user_request)
+        for key, value in matches:
+            # Skip common words that aren't parameters
+            skip_words = {
+                "the",
+                "a",
+                "an",
+                "is",
+                "are",
+                "to",
+                "for",
+                "with",
+                "and",
+                "or",
+                "set",
+                "get",
+                "use",
+                "from",
+                "this",
+                "that",
+                "file",
+                "path",
+            }
+            if key.lower() not in skip_words:
+                # Clean up value (remove trailing punctuation)
+                value = value.rstrip(".,;!?")
+                # Try to convert value to appropriate type
+                if value.isdigit():
+                    args[key] = int(value)
+                elif re.match(r"^\d+\.\d+$", value):
+                    args[key] = float(value)
+                elif value.lower() in ["true", "false"]:
+                    args[key] = value.lower() == "true"
+                else:
+                    args[key] = value
 
         return args if args else None
 

@@ -686,6 +686,75 @@ class TestComponentIntegration:
         assert steps[1].description == "Step 2"
         assert steps[1].tool_name == "write_file"
 
+    def test_planner_extract_tool_args_file_path(
+        self, planner, conversation_context, mock_tools
+    ):
+        """Test that planner can extract file path arguments."""
+        from essence.agents.planner import Planner
+
+        test_planner = Planner(llm_client=None, enable_cache=False)
+
+        # Test file path extraction
+        request = 'Read the file "test.py"'
+        args = test_planner._extract_tool_args(request, None)
+        assert args is not None
+        assert "file_path" in args
+        assert args["file_path"] == "test.py"
+
+    def test_planner_extract_tool_args_url(
+        self, planner, conversation_context, mock_tools
+    ):
+        """Test that planner can extract URL arguments."""
+        from essence.agents.planner import Planner
+
+        test_planner = Planner(llm_client=None, enable_cache=False)
+
+        # Test URL extraction
+        request = "Download from https://example.com/file.txt"
+        args = test_planner._extract_tool_args(request, None)
+        assert args is not None
+        assert "url" in args
+        assert args["url"] == "https://example.com/file.txt"
+
+    def test_planner_extract_tool_args_numbers(
+        self, planner, conversation_context, mock_tools
+    ):
+        """Test that planner can extract number arguments."""
+        from essence.agents.planner import Planner
+
+        test_planner = Planner(llm_client=None, enable_cache=False)
+
+        # Test integer extraction
+        request = "Process 42 items"
+        args = test_planner._extract_tool_args(request, None)
+        assert args is not None
+        assert "number" in args
+        assert args["number"] == 42
+
+        # Test float extraction
+        request = "Set timeout to 3.5 seconds"
+        args = test_planner._extract_tool_args(request, None)
+        assert args is not None
+        assert "number" in args
+        assert args["number"] == 3.5
+
+    def test_planner_extract_tool_args_key_value(
+        self, planner, conversation_context, mock_tools
+    ):
+        """Test that planner can extract key=value arguments."""
+        from essence.agents.planner import Planner
+
+        test_planner = Planner(llm_client=None, enable_cache=False)
+
+        # Test key=value extraction
+        request = "Set timeout=30 and retries=3"
+        args = test_planner._extract_tool_args(request, None)
+        assert args is not None
+        assert "timeout" in args
+        assert args["timeout"] == 30
+        assert "retries" in args
+        assert args["retries"] == 3
+
 
 class TestReasoningResult:
     """Test ReasoningResult structure and behavior."""
