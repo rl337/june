@@ -969,7 +969,9 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - ⏳ Test PATCH /messages/{message_id} to append to message (requires message_id from send)
    - ⏳ Verify messages appear in Telegram/Discord (end-to-end test)
    - ⏳ Verify message history is updated correctly
-   - ⏳ **NOTE:** Port 8082 conflict - switchboard service (agenticness) was using it. Need to ensure it's stopped before starting message-api. For manual testing, use port 8085.
+   - ✅ Changed message-api port to 8083 to avoid switchboard conflict (port 8082)
+   - ✅ Fixed second f-string syntax error in review_sandbox.py (line 109)
+   - ⏳ **NOTE:** Container still needs debugging - command discovery may have other issues
    - ⏳ **NOTE:** Full send/edit/append testing requires bot tokens (TELEGRAM_BOT_TOKEN, DISCORD_BOT_TOKEN) which are configured in docker-compose.yml. API structure verified working.
 
 6. **Update agent loop to use API:** ✅ COMPLETED (2025-11-20)
