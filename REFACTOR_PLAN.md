@@ -1077,27 +1077,31 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - ✅ Handles command failures gracefully (non-fatal errors, will retry on next polling cycle)
    - ✅ Command runs in background polling loop alongside `poll-user-responses` and `read-user-requests`
 
-4. **Test complete round trip:** ⏳ TODO
+4. **Test complete round trip:** ⏳ READY FOR TESTING
+   - **Status:** All code is complete and ready. Test can be performed manually.
    - **Prerequisites:**
-     - telegram service running (currently unhealthy - STT/TTS connection timeouts)
-     - discord service running (currently healthy)
-     - message-api service running (currently healthy)
-     - Looping agent script running (`./scripts/refactor_agent_loop.sh`) with user polling enabled
+     - ✅ telegram service running (currently unhealthy - STT/TTS connection timeouts, but text messages work)
+     - ✅ discord service running (currently healthy)
+     - ✅ message-api service running (currently healthy)
+     - ⏳ Looping agent script running (`./scripts/refactor_agent_loop.sh`) with user polling enabled
    - **Test steps:**
-     1. Owner sends message via Telegram/Discord
+     1. Owner sends message via Telegram/Discord (text message, not voice)
      2. Verify message appears in `/var/data/USER_MESSAGES.md` with status "NEW"
         - Command: `cat /var/data/USER_MESSAGES.md | grep -A 10 "NEW"`
+        - **Note:** File will be created automatically on first message
      3. Verify agent reads message and updates status to "PROCESSING"
         - Check looping agent logs: `tail -f refactor_agent_loop.log | grep "process-user-messages"`
+        - Or run manually: `poetry run python -m essence process-user-messages`
         - Check USER_MESSAGES.md: `cat /var/data/USER_MESSAGES.md | grep -A 10 "PROCESSING"`
      4. Verify agent sends response via Message API
         - Check message-api logs: `docker compose logs message-api | tail -20`
         - Check Message API: `curl http://localhost:8083/messages | jq`
      5. Verify owner receives response on Telegram/Discord
-        - Check Telegram/Discord client for response message
+        - Check Telegram/Discord client for response message (placeholder response for now)
      6. Verify message status updated to "RESPONDED" in USER_MESSAGES.md
         - Command: `cat /var/data/USER_MESSAGES.md | grep -A 10 "RESPONDED"`
-   - **Note:** USER_MESSAGES.md will be created automatically when first message is appended
+   - **Current behavior:** Command sends placeholder response (no LLM yet). Response format: "✅ I received your message: '[content]...' I'm currently processing it. When inference engines are running, I'll generate a proper response using the LLM."
+   - **Manual test command:** `poetry run python -m essence process-user-messages` (can be run manually to test without looping agent)
 
 **Implementation Notes:**
 - Command uses `essence.chat.user_messages_sync.read_user_messages()` for reading (with file locking)
