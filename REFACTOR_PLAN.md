@@ -45,6 +45,9 @@
        - ⚠️ **ARM64 support unclear** - needs verification in NGC catalog
        - ⏳ **Action:** Verify Riva TTS NIM ARM64/DGX Spark compatibility and exact image path
        - ✅ **Helper script created:** `scripts/verify_nim_compatibility.sh` - Automated script to check NIM compatibility and provide guidance
+       - ✅ **Improved list-nims command:** Added Riva TTS NIM entries (Magpie, FastPitch) to known NIMs list (marked as unknown compatibility, needs verification)
+       - Usage: `./scripts/verify_nim_compatibility.sh [--stt-only] [--tts-only]` or `poetry run python -m essence list-nims --filter tts --dgx-spark-only`
+       - Requires NGC_API_KEY for full functionality (queries NGC catalog via list-nims command)
      - 📄 **Documentation:** Created `docs/NIM_AVAILABILITY.md` with detailed NIM availability status
     - ⏳ **If STT/TTS NIMs exist:** Add to home_infra/docker-compose.yml following nim-qwen3 pattern
     - ⏳ **If STT/TTS NIMs don't exist:** Continue using custom STT/TTS services (already configured in june/docker-compose.yml)
