@@ -430,32 +430,151 @@ class Planner:
         return required_tools
 
     def _create_steps(self, user_request: str, required_tools: List[Any]) -> List[Step]:
-        """Create execution steps from the request."""
+        """
+        Create execution steps from the request.
+
+        Enhanced step breakdown that attempts to split requests into multiple steps
+        based on common patterns (conjunctions, sequential keywords, numbered steps).
+        """
+        import re
+
         steps = []
 
-        # Simple step creation: break request into logical parts
-        # For now, create a single step
-        # TODO: Implement more sophisticated step breakdown
+        # Try to break down request into multiple steps
+        # Look for common patterns that indicate multiple steps:
+        # - "and" (conjunction)
+        # - "then" (sequence)
+        # - "first", "second", "third", etc. (numbered steps)
+        # - "step 1", "step 2", etc. (explicit steps)
+        # - Semicolons (separated actions)
 
-        step_description = user_request
-        tool_name = None
-        tool_args = None
+        # Pattern 1: Numbered steps (e.g., "first do X, then do Y, finally do Z")
+        numbered_patterns = [
+            r"(?:first|1st|step\s*1)[\s,]+(.+?)(?=,?\s*(?:then|second|2nd|step\s*2|finally|last|and)|$)",
+            r"(?:second|2nd|step\s*2|then)[\s,]+(.+?)(?=,?\s*(?:third|3rd|step\s*3|finally|last|and)|$)",
+            r"(?:third|3rd|step\s*3|then)[\s,]+(.+?)(?=,?\s*(?:fourth|4th|step\s*4|finally|last|and)|$)",
+            r"(?:finally|last|then)[\s,]+(.+?)(?=$)",
+        ]
 
-        # Try to extract tool information
-        if required_tools:
-            tool = required_tools[0]
-            tool_name = tool.name if hasattr(tool, "name") else str(tool)
-            # Try to extract arguments from request
-            tool_args = self._extract_tool_args(user_request, tool)
+        # Pattern 2: Conjunctions (e.g., "do X and do Y")
+        conjunction_pattern = r"(.+?)\s+(?:and|then|,)\s+(.+?)(?=\s+(?:and|then|,)|$)"
 
-        steps.append(
-            Step(
-                step_id=1,
-                description=step_description,
-                tool_name=tool_name,
-                tool_args=tool_args,
+        # Pattern 3: Semicolons (e.g., "do X; do Y; do Z")
+        semicolon_pattern = r"([^;]+);\s*"
+
+        # Try numbered steps first
+        numbered_matches = []
+        for pattern in numbered_patterns:
+            matches = re.finditer(pattern, user_request, re.IGNORECASE)
+            for match in matches:
+                step_text = match.group(1).strip()
+                if step_text:
+                    numbered_matches.append(step_text)
+
+        if len(numbered_matches) > 1:
+            # Found numbered steps - create steps from them
+            for idx, step_text in enumerate(numbered_matches, start=1):
+                tool_name = None
+                tool_args = None
+
+                # Try to match step to a tool
+                if required_tools:
+                    for tool in required_tools:
+                        tool_str = tool.name if hasattr(tool, "name") else str(tool)
+                        if tool_str.lower() in step_text.lower():
+                            tool_name = tool_str
+                            tool_args = self._extract_tool_args(step_text, tool)
+                            break
+
+                steps.append(
+                    Step(
+                        step_id=idx,
+                        description=step_text,
+                        tool_name=tool_name,
+                        tool_args=tool_args,
+                    )
+                )
+        else:
+            # Try semicolon-separated steps
+            semicolon_matches = re.split(semicolon_pattern, user_request)
+            semicolon_matches = [m.strip() for m in semicolon_matches if m.strip()]
+
+            if len(semicolon_matches) > 1:
+                # Found semicolon-separated steps
+                for idx, step_text in enumerate(semicolon_matches, start=1):
+                    tool_name = None
+                    tool_args = None
+
+                    if required_tools:
+                        for tool in required_tools:
+                            tool_str = tool.name if hasattr(tool, "name") else str(tool)
+                            if tool_str.lower() in step_text.lower():
+                                tool_name = tool_str
+                                tool_args = self._extract_tool_args(step_text, tool)
+                                break
+
+                    steps.append(
+                        Step(
+                            step_id=idx,
+                            description=step_text,
+                            tool_name=tool_name,
+                            tool_args=tool_args,
+                        )
+                    )
+            else:
+                # Try conjunction pattern
+                conjunction_match = re.match(
+                    conjunction_pattern, user_request, re.IGNORECASE
+                )
+                if conjunction_match:
+                    part1 = conjunction_match.group(1).strip()
+                    part2 = conjunction_match.group(2).strip()
+
+                    # Create two steps
+                    for idx, step_text in enumerate([part1, part2], start=1):
+                        tool_name = None
+                        tool_args = None
+
+                        if required_tools:
+                            for tool in required_tools:
+                                tool_str = (
+                                    tool.name if hasattr(tool, "name") else str(tool)
+                                )
+                                if tool_str.lower() in step_text.lower():
+                                    tool_name = tool_str
+                                    tool_args = self._extract_tool_args(step_text, tool)
+                                    break
+
+                        steps.append(
+                            Step(
+                                step_id=idx,
+                                description=step_text,
+                                tool_name=tool_name,
+                                tool_args=tool_args,
+                            )
+                        )
+
+        # If no breakdown found, create a single step (fallback)
+        if not steps:
+            step_description = user_request
+            tool_name = None
+            tool_args = None
+
+            # Try to extract tool information
+            if required_tools:
+                tool = required_tools[0]
+                tool_name = tool.name if hasattr(tool, "name") else str(tool)
+                # Try to extract arguments from request
+                tool_args = self._extract_tool_args(user_request, tool)
+
+            steps.append(
+                Step(
+                    step_id=1,
+                    description=step_description,
+                    tool_name=tool_name,
+                    tool_args=tool_args,
+                )
             )
-        )
 
         return steps
 

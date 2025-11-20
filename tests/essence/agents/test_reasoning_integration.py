@@ -755,6 +755,63 @@ class TestComponentIntegration:
         assert "retries" in args
         assert args["retries"] == 3
 
+    def test_planner_create_steps_numbered(
+        self, planner, conversation_context, mock_tools
+    ):
+        """Test that planner can break down numbered step requests."""
+        from essence.agents.planner import Planner
+
+        test_planner = Planner(llm_client=None, enable_cache=False)
+
+        # Test numbered steps
+        request = "First read the file test.py, then write output.txt, finally process the data"
+        steps = test_planner._create_steps(request, list(mock_tools.values()))
+        assert len(steps) >= 2  # Should break down into multiple steps
+        assert any("read" in step.description.lower() for step in steps)
+        assert any("write" in step.description.lower() for step in steps)
+
+    def test_planner_create_steps_semicolon(
+        self, planner, conversation_context, mock_tools
+    ):
+        """Test that planner can break down semicolon-separated requests."""
+        from essence.agents.planner import Planner
+
+        test_planner = Planner(llm_client=None, enable_cache=False)
+
+        # Test semicolon-separated steps
+        request = "Read file.txt; Process the data; Write output.json"
+        steps = test_planner._create_steps(request, list(mock_tools.values()))
+        assert len(steps) >= 2  # Should break down into multiple steps
+
+    def test_planner_create_steps_conjunction(
+        self, planner, conversation_context, mock_tools
+    ):
+        """Test that planner can break down conjunction requests."""
+        from essence.agents.planner import Planner
+
+        test_planner = Planner(llm_client=None, enable_cache=False)
+
+        # Test conjunction pattern
+        request = "Read the file and write the output"
+        steps = test_planner._create_steps(request, list(mock_tools.values()))
+        assert len(steps) >= 2  # Should break down into multiple steps
+        assert any("read" in step.description.lower() for step in steps)
+        assert any("write" in step.description.lower() for step in steps)
+
+    def test_planner_create_steps_single(
+        self, planner, conversation_context, mock_tools
+    ):
+        """Test that planner creates single step when no breakdown patterns found."""
+        from essence.agents.planner import Planner
+
+        test_planner = Planner(llm_client=None, enable_cache=False)
+
+        # Test single step (no breakdown patterns)
+        request = "Process this request"
+        steps = test_planner._create_steps(request, list(mock_tools.values()))
+        assert len(steps) == 1  # Should create single step
+        assert steps[0].description == request
+
 
 class TestReasoningResult:
     """Test ReasoningResult structure and behavior."""
