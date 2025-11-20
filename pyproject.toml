@@ -31,6 +31,7 @@ dependencies = [
     
     # Machine Learning and AI
     "torch>=2.1.0",
+    "torchaudio>=2.1.0",  # Audio processing for STT service
     "transformers>=4.35.0",
     "accelerate>=0.24.0",
     "bitsandbytes>=0.41.0",
