@@ -383,17 +383,14 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - **Helper Script:** `scripts/setup_phase19_operational.sh` - Orchestrates whitelist configuration and service startup
    - **Note:** Infrastructure changes complete (docker-compose.yml updated, documentation improved). Remaining work is operational (setting user IDs and restarting services).
 
-3. **Start Telegram/Discord services with whitelist:** ⏳ TODO (HIGH PRIORITY - Agent should do this now that whitelist is configured)
-   - **Why:** Services need to be restarted with whitelist configuration to enable direct agent-user communication.
-   - **Steps:**
-     - Stop Telegram service: `cd /home/rlee/dev/june && docker compose stop telegram`
-     - Start Telegram service with whitelist env var: `TELEGRAM_WHITELISTED_USERS=USER_ID docker compose up -d telegram`
-     - Or update docker-compose.yml to include whitelist in environment section, then: `docker compose up -d telegram`
-     - Verify service is running: `docker compose ps telegram`
-     - Check logs to verify whitelist is loaded: `docker compose logs telegram | grep -i whitelist`
-     - Repeat for Discord if using Discord
+3. **Start Telegram/Discord services with whitelist:** ✅ COMPLETED
+   - ✅ Services are running with whitelist configured (TELEGRAM_WHITELISTED_USERS is set)
+   - ✅ Telegram service running (unhealthy due to STT/TTS timeouts, but text messages work)
+   - ✅ Discord service running (healthy)
+   - ✅ Message API service running (healthy)
+   - ⚠️ **Note:** TELEGRAM_OWNER_USERS and DISCORD_OWNER_USERS should be configured in .env file for USER_MESSAGES.md flow to work correctly
+   - **To configure owner users:** Add `TELEGRAM_OWNER_USERS=39833618` and `DISCORD_OWNER_USERS=<discord_id>` to `.env` file, then restart services
    - **Helper Script:** `scripts/setup_phase19_operational.sh` - Automates service startup with whitelist configuration
-   - **Note:** This is operational work (restarting services with new config), not code changes. Code is already complete.
 
 4. **Integrate polling loop into agent script:** ✅ COMPLETED
    - ✅ Added polling loop to `scripts/refactor_agent_loop.sh`
@@ -405,23 +402,25 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - ⏳ **Operational:** Test polling processes user responses (requires services running)
 
 5. **Test end-to-end communication:** ⏳ TODO
-   - Send test message from whitelisted user via Telegram
-   - Verify message appears in USER_REQUESTS.md
-   - Verify agent reads and responds to message
-   - Verify agent response appears in Telegram
-   - Verify agent response synced to USER_REQUESTS.md
-   - Test message grouping and editing
-   - Test periodic polling detects responses
-   - Test service conflict prevention (disable Telegram service when agent communicating)
+   - **Note:** This task references USER_REQUESTS.md, but the system now uses USER_MESSAGES.md (see Phase 21)
+   - Send test message from owner user via Telegram/Discord
+   - Verify message appears in `/var/data/USER_MESSAGES.md` with status "NEW"
+   - Verify agent reads and processes message via `process-user-messages` command
+   - Verify agent sends response via Message API
+   - Verify owner receives response on Telegram/Discord
+   - Verify message status updated to "RESPONDED" in USER_MESSAGES.md
    - **Helper Script:** `scripts/setup_phase19_operational.sh` - Provides step-by-step testing guidance
+   - **See Phase 21 Task 4 for detailed test steps**
 
 6. **Verify actual exchanges happening:** ⏳ TODO (Operational task, requires services running)
-   - Confirm user can send messages to looping agent via Telegram/Discord
-   - Confirm agent can send messages to user via Telegram/Discord
-   - Confirm messages are synced to USER_REQUESTS.md
-   - Confirm polling loop is working
-   - Confirm message grouping/editing is working
-   - Confirm service conflict prevention is working
+   - **Note:** This task references USER_REQUESTS.md, but the system now uses USER_MESSAGES.md (see Phase 21)
+   - Confirm owner user can send messages via Telegram/Discord (messages append to USER_MESSAGES.md)
+   - Confirm agent processes messages via `process-user-messages` command (runs in polling loop)
+   - Confirm agent sends responses via Message API
+   - Confirm owner receives responses on Telegram/Discord
+   - Confirm messages are synced to USER_MESSAGES.md with proper status updates
+   - Confirm polling loop is working (process-user-messages runs every 2 minutes)
+   - **See Phase 21 Task 4 for detailed verification steps**
 
 7. **Service conflict prevention:** ✅ COMPLETED
    - ✅ **CRITICAL:** When direct agent communication is active via Telegram, the Telegram service MUST be disabled to prevent race conditions
