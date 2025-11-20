@@ -206,6 +206,16 @@ June uses Qwen3-30B-A3B-Thinking-2507 for LLM inference. The model runs in Docke
 
 ### Quick Setup
 
+**Option A: Automated Workflow (Recommended)**
+```bash
+# Run the operational workflow script for guided setup
+./scripts/setup_qwen3_operational.sh
+```
+
+This script orchestrates all setup steps: pre-flight checks, model download, service startup guidance, and verification.
+
+**Option B: Manual Setup**
+
 0. **Pre-flight environment check (recommended):**
    ```bash
    # Validate environment readiness before proceeding
