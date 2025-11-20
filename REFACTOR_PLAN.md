@@ -54,9 +54,7 @@ All major refactoring phases have been completed:
   - `test_poll_user_responses.py` - 11 tests for poll-user-responses command
   - `test_check_service_status.py` - 9 tests for check-service-status command
   - Fixed parser bug in `read_user_requests.py` to properly handle "** " prefix in parsed values
-  - `test_user_requests_sync.py` - Tests for whitelist management, message syncing, and status updates (14 tests)
-  - `test_message_grouping.py` - Tests for message grouping, formatting, and splitting (16 tests)
-  - All 30 new tests passing, total test count: 420 passed, 1 skipped
+  - All 60 new tests passing, total test count: 451 passed, 1 skipped
 - ✅ **Benchmark Evaluation Documentation:** Updated docs/guides/QWEN3_BENCHMARK_EVALUATION.md to use command pattern consistently (prefer `poetry run python -m essence run-benchmarks` over script wrapper), fixed `--inference-api-url` to `--llm-url` to match actual command arguments, added note about NVIDIA NIM support
 - ✅ **REFACTOR_PLAN.md Cleanup:** Removed outdated agent monitor alerts from November 19th that were no longer relevant, cleaned up trailing blank lines
 - ✅ **Documentation Consistency:** Fixed Phase 18 documentation inconsistency in "Next Steps" section (framework is already complete from Phase 10, not a TODO item)

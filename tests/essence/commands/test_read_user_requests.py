@@ -159,6 +159,7 @@ class TestReadUserRequestsCommand:
     def test_command_run_with_requests(self, mock_get_pending):
         """Test command run with pending requests."""
         from argparse import Namespace
+
         from essence.commands.read_user_requests import UserRequest
 
         mock_get_pending.return_value = [

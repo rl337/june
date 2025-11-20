@@ -106,6 +106,7 @@ class TestPollUserResponsesCommand:
     def test_command_run_with_responses(self, mock_check):
         """Test command run when responses found."""
         from argparse import Namespace
+
         from essence.commands.read_user_requests import UserRequest
 
         mock_check.return_value = (
