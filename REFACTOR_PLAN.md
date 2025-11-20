@@ -229,11 +229,14 @@ All major refactoring phases have been completed:
    - Verify services are routing whitelisted users correctly
    - Verify non-whitelisted users still use existing agentic flow
 
-4. **Integrate polling loop into agent script:** ⏳ TODO
-   - Add polling loop to `scripts/refactor_agent_loop.sh`
-   - Configure polling interval (default: 30 seconds to 5 minutes)
-   - Test polling detects new user requests
-   - Test polling processes user responses
+4. **Integrate polling loop into agent script:** ✅ COMPLETED
+   - ✅ Added polling loop to `scripts/refactor_agent_loop.sh`
+   - ✅ Configured polling interval (default: 2 minutes, configurable via USER_POLLING_INTERVAL_SECONDS)
+   - ✅ Polling runs in background, calling `poll-user-responses` and `read-user-requests` commands
+   - ✅ Graceful shutdown handling for polling process
+   - ✅ Can be disabled via ENABLE_USER_POLLING=0
+   - ⏳ **Operational:** Test polling detects new user requests (requires services running)
+   - ⏳ **Operational:** Test polling processes user responses (requires services running)
 
 5. **Test end-to-end communication:** ⏳ TODO
    - Send test message from whitelisted user via Telegram
@@ -245,7 +248,7 @@ All major refactoring phases have been completed:
    - Test periodic polling detects responses
    - Test service conflict prevention (disable Telegram service when agent communicating)
 
-6. **Verify actual exchanges happening:** ⏳ TODO
+6. **Verify actual exchanges happening:** ⏳ TODO (Operational task, requires services running)
    - Confirm user can send messages to looping agent via Telegram/Discord
    - Confirm agent can send messages to user via Telegram/Discord
    - Confirm messages are synced to USER_REQUESTS.md
@@ -253,7 +256,7 @@ All major refactoring phases have been completed:
    - Confirm message grouping/editing is working
    - Confirm service conflict prevention is working
 
-6. **Service conflict prevention:** ✅ COMPLETED
+7. **Service conflict prevention:** ✅ COMPLETED
    - ✅ **CRITICAL:** When direct agent communication is active via Telegram, the Telegram service MUST be disabled to prevent race conditions
    - ✅ **CRITICAL:** When direct agent communication is active via Discord, the Discord service MUST be disabled to prevent race conditions
    - ✅ Implemented service status checking before enabling direct communication (`verify_service_stopped_for_platform()`)
