@@ -4,6 +4,7 @@ Command to list available NVIDIA NIM containers for DGX Spark.
 This command queries NGC catalog and NIM services to discover available models,
 their sizes, and compatibility information.
 """
+import base64
 import json
 import logging
 import os
@@ -192,8 +193,12 @@ class ListNIMsCommand(Command):
                 # Try to get catalog of repositories
                 # Docker registry v2 API: GET /v2/_catalog
                 # For specific org: GET /v2/{org}/_catalog
+                # Docker registry authentication: Use Basic auth with $oauthtoken as username and NGC_API_KEY as password
+                auth_string = f"$oauthtoken:{self.ngc_api_key}"
+                auth_bytes = auth_string.encode("utf-8")
+                auth_b64 = base64.b64encode(auth_bytes).decode("utf-8")
                 headers = {
-                    "Authorization": f"Bearer {self.ngc_api_key}",
+                    "Authorization": f"Basic {auth_b64}",
                     "Accept": "application/json",
                 }
 
