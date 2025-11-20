@@ -19,12 +19,10 @@ from fastapi.responses import JSONResponse, Response
 from inference_core import config, setup_logging
 from prometheus_client import CONTENT_TYPE_LATEST, CollectorRegistry, generate_latest
 
-from essence.chat.agent.handler import process_agent_message, stream_agent_message
-from essence.chat.message_builder import MessageBuilder
-from essence.services.discord.message_history_helpers import (
-    edit_with_history,
-    send_with_history,
-)
+# Removed unused imports after radical refactor:
+# - process_agent_message, stream_agent_message (old agentic flow)
+# - MessageBuilder (old agentic flow)
+# - edit_with_history, send_with_history (old agentic flow)
 
 # Initialize tracing early
 try:
@@ -144,102 +142,156 @@ class DiscordBotService:
         # Note: 'help' is a built-in command in discord.py, so we don't override it
         # Users can use !help to see all commands including !ping
 
+    async def _handle_message(self, message: discord.Message):
+        """
+        Handle incoming Discord messages.
 
+        Flow:
+        - Non-whitelisted users: Ignore completely (no response)
+        - Owner users: Append to USER_MESSAGES.md with status "NEW" for looping agent to process
+        - Whitelisted (non-owner) users: Forward message to owner
 
-        except Exception as e:
-            logger.error(f"Error handling Discord message: {e}", exc_info=True)
-        except Exception as e:
-            logger.error(f"Error handling Discord message: {e}", exc_info=True)
-            # 1. Send "received request" immediately
-            # 2. Send "processing" when making agentic call
-            # 3. Send "generating" with dots for each chunk
-            # 4. Replace with final result when done
-
-            status_message = None
-            chunk_count = 0
-            raw_llm_response = ""
-
-            # Step 1: Send "received request" immediately
-            try:
-                status_message = await send_with_history(
-                    message.channel,
-                    "✅ Received request",
-                    user_id=str(user_id),
-                    message_type="status",
-                )
-                logger.info(f"Sent 'received request' to user {user_id}")
-            except Exception as e:
-                logger.warning(
-                    f"Failed to send 'received request': {e}, continuing anyway"
-                )
-                # Continue processing even if initial status fails
-
-            # Step 2: Update to "processing" when making agentic call
-            if status_message:
+        Args:
+            message: Discord message object
+        """
+        if tracer:
+            with tracer.start_as_current_span("discord.message.handle") as span:
                 try:
-                    await edit_with_history(
-                        status_message,
-                        "🔄 Processing...",
-                        user_id=str(user_id),
-                        message_type="status",
-                    )
-                    logger.info(f"Updated to 'processing' for user {user_id}")
+                    self._handle_message_impl(message, span)
                 except Exception as e:
-                    logger.warning(f"Failed to update to 'processing': {e}")
+                    logger.error(f"Error handling Discord message: {e}", exc_info=True)
+                    if span:
+                        span.record_exception(e)
+                        span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+        else:
+            try:
+                self._handle_message_impl(message, None)
+            except Exception as e:
+                logger.error(f"Error handling Discord message: {e}", exc_info=True)
 
-            # Initialize message builder for final result (using markdown format for Discord)
-            message_builder = MessageBuilder(
-                service_name="discord",
-                user_id=str(user_id),
-                chat_id=str(channel_id),
-                format="markdown",  # Discord supports markdown natively
+    def _handle_message_impl(self, message: discord.Message, span):
+        """Implementation of message handling (separated for tracing)."""
+        user_id = str(message.author.id)
+        channel_id = str(message.channel.id)
+        user_message = message.content
+
+        # Set span attributes if tracing is available
+        if span:
+            span.set_attribute("user_id", user_id)
+            span.set_attribute("chat_id", channel_id)
+            span.set_attribute("message_length", len(user_message) if user_message else 0)
+            span.set_attribute("platform", "discord")
+
+        # Check if user is whitelisted
+        from essence.chat.user_messages_sync import (
+            is_user_whitelisted,
+            is_user_owner,
+            append_message_to_user_messages,
+            get_owner_users,
+        )
+
+        is_whitelisted = is_user_whitelisted(user_id, "discord")
+        if span:
+            span.set_attribute("whitelisted", is_whitelisted)
+
+        # Non-whitelisted users: Ignore completely (no response)
+        if not is_whitelisted:
+            logger.info(f"Ignoring message from non-whitelisted user {user_id}")
+            if span:
+                span.set_attribute("action", "ignored")
+                span.set_status(trace.Status(trace.StatusCode.OK))
+            return  # Silently ignore - don't send any response
+
+        # Get username if available
+        username = None
+        try:
+            if message.author.name:
+                username = message.author.name
+        except Exception:
+            pass
+
+        # Check if user is owner
+        is_owner = is_user_owner(user_id, "discord")
+        if span:
+            span.set_attribute("is_owner", is_owner)
+
+        if is_owner:
+            # Owner: Append to USER_MESSAGES.md with status "NEW"
+            logger.info(
+                f"Owner user {user_id} - appending to USER_MESSAGES.md with status NEW"
             )
 
-            try:
-                # Stream responses from the agent
-                for message_text, is_final, message_type in stream_agent_message(
-                    message.content,
-                    user_id=user_id,
-                    chat_id=channel_id,
-                    platform="discord",
-                    agent_script_name="telegram_response_agent.sh",  # Use same script for now
-                    agent_script_simple_name="telegram_response_agent_simple.sh",
-                    max_message_length=2000,  # Discord message limit
-                ):
-                    # Skip empty final signal - we'll handle final result separately
-                    if not message_text and is_final:
-                        break
+            success = append_message_to_user_messages(
+                user_id=user_id,
+                chat_id=channel_id,
+                platform="discord",
+                message_type="Request",
+                content=user_message,
+                message_id=str(message.id),
+                status="NEW",
+                username=username,
+            )
 
-                    if not message_text:
-                        continue
+            if success:
+                if span:
+                    span.set_attribute("action", "appended_to_user_messages")
+                logger.info(f"Successfully appended owner message to USER_MESSAGES.md")
+            else:
+                if span:
+                    span.set_attribute("action", "append_failed")
+                logger.error(f"Failed to append owner message to USER_MESSAGES.md")
 
-                    # Track the raw LLM response - use result type as authoritative, otherwise keep longest
-                    if message_type == "result":
-                        raw_llm_response = message_text
-                        logger.info(
-                            f"Received authoritative result message: {len(raw_llm_response)} chars"
-                        )
-                    elif len(message_text) > len(raw_llm_response):
-                        raw_llm_response = message_text
-                        logger.debug(
-                            f"Extended raw_llm_response: {len(raw_llm_response)} chars"
-                        )
+            if span:
+                span.set_status(trace.Status(trace.StatusCode.OK))
+            return
 
-                    # Step 3: Update status to "generating" with dots for each chunk
-                    chunk_count += 1
-                    if status_message:
-                        dots = "." * min(chunk_count, 5)  # Max 5 dots
-                        try:
-                            await edit_with_history(
-                                status_message,
-                                f"⚙️ Generating{dots}",
-                                user_id=str(user_id),
-                                message_type="status",
-                            )
-                        except Exception as e:
-                            logger.debug(f"Failed to update generating status: {e}")
+        else:
+            # Whitelisted (non-owner): Forward to owner
+            logger.info(
+                f"Whitelisted (non-owner) user {user_id} - forwarding message to owner"
+            )
 
-                # Step 4: Replace with final result when done
-                if raw_llm_response:
-                    try:
-                        # Build full turn and render
+            # Get owner user IDs for forwarding
+            owner_users = get_owner_users("discord")
+            if not owner_users:
+                logger.warning(
+                    "No owner users configured, cannot forward whitelisted user message"
+                )
+                if span:
+                    span.set_attribute("action", "forward_failed_no_owner")
+                    span.set_status(trace.Status(trace.StatusCode.ERROR))
+                return
+
+            # Forward to first owner (for now - could be enhanced to forward to all)
+            owner_user_id = owner_users[0]
+
+            # Append forwarded message to USER_MESSAGES.md
+            forward_content = f"[Forwarded from whitelisted user {user_id} ({username or 'unknown'})] {user_message}"
+
+            success = append_message_to_user_messages(
+                user_id=owner_user_id,
+                chat_id=channel_id,  # Use original chat_id
+                platform="discord",
+                message_type="Request",
+                content=forward_content,
+                message_id=str(message.id),
+                status="NEW",
+                username=f"forwarded_from_{user_id}",
+            )
+
+            if success:
+                if span:
+                    span.set_attribute("action", "forwarded_to_owner")
+                logger.info(
+                    f"Successfully forwarded whitelisted user message to owner {owner_user_id}"
+                )
+            else:
+                if span:
+                    span.set_attribute("action", "forward_failed")
+                logger.error(
+                    f"Failed to forward whitelisted user message to owner {owner_user_id}"
+                )
+
+            if span:
+                span.set_status(trace.Status(trace.StatusCode.OK))
+            return
