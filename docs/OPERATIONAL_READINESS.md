@@ -182,15 +182,27 @@ Before starting any operational tasks, ensure:
 
 ### Steps
 1. **Configure whitelisted users:**
-   ```bash
-   export TELEGRAM_WHITELISTED_USERS="user_id1,user_id2"
-   export DISCORD_WHITELISTED_USERS="user_id1,user_id2"
-   ```
+   - **Option 1:** Set in `.env` file (recommended):
+     ```bash
+     echo "TELEGRAM_WHITELISTED_USERS=user_id1,user_id2" >> .env
+     echo "DISCORD_WHITELISTED_USERS=user_id1,user_id2" >> .env
+     ```
+   - **Option 2:** Set as environment variables:
+     ```bash
+     export TELEGRAM_WHITELISTED_USERS="user_id1,user_id2"
+     export DISCORD_WHITELISTED_USERS="user_id1,user_id2"
+     ```
+   - **Option 3:** Use helper script:
+     ```bash
+     ./scripts/setup_phase19_operational.sh --telegram-users user_id1,user_id2
+     ```
+   - **Note:** Whitelist environment variables are already configured in `docker-compose.yml` (telegram and discord services). Just set the values in `.env` or as environment variables.
 
 2. **Start services with whitelist:**
    ```bash
    docker compose up -d telegram discord
    ```
+   - Services will automatically load whitelist configuration from environment variables or `.env` file
 
 3. **Verify whitelist configuration:**
    - Check service logs for whitelist loading
