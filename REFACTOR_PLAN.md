@@ -87,7 +87,12 @@
 **CRITICAL:** All development work must happen on feature branches, not directly on `main`. See `AGENTS.md` for branching strategy details.
 
 **Current Active Branches:**
-- None currently active
+- `feature/dgx-spark-nim-deployment` - ⏳ IN PROGRESS
+  - Task: Phase 19/21 improvements (owner user configuration, discord service fixes, CI fixes)
+  - Started: 2025-11-20
+  - Status: Work in progress - 27 commits ahead of main
+  - Related: Phase 19, Phase 21, CI fixes
+  - Last Updated: 2025-11-20
 
 **Branch Status:**
 - ⏳ IN PROGRESS - Work actively happening on this branch
