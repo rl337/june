@@ -269,13 +269,13 @@ The agent can help with steps 2-3 once the user provides the required informatio
            - Account activation for NIM services
          - Verify if there's a trial/development access option
        - Once account has NIM access, the image should pull successfully
-     - ⏳ Start NIM service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3` (blocked on image name verification)
+     - ⏳ Start NIM service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3` (blocked on account NIM access/subscription)
      - ⏳ Verify NIM is running: `docker compose ps nim-qwen3` (blocked on service start)
      - ⏳ Verify NIM connectivity: `cd /home/rlee/dev/june && poetry run python -m essence verify-nim --nim-host nim-qwen3 --http-port 8003 --grpc-port 8001` (blocked on service start)
      - ⏳ Update june services to use NIM endpoint (set `LLM_URL=grpc://nim-qwen3:8001` in docker-compose.yml or .env) (blocked on service verification)
    - **Helper Script:** `scripts/setup_nim_operational.sh` - Orchestrates NIM deployment
    - **Note:** This is operational work (starting Docker services), not code changes. Code is already complete.
-   - **Action Required:** Verify correct NIM image name in NGC catalog and update `home_infra/docker-compose.yml` if needed. NGC_API_KEY is set and Docker is authenticated, but image name may be incorrect.
+   - **Action Required:** Image path is correct (`nvcr.io/nim/qwen/qwen3-32b:1.0.0`), NGC_API_KEY is set, Docker is authenticated. Account needs NIM access/subscription to pull the image. User must check NGC account subscription status and enable NIM access.
 
 2. **Configure whitelisted users and enable Telegram/Discord communication:** ⏳ IN PROGRESS (HIGH PRIORITY - Agent working on this)
    - **Why:** This enables direct communication between the user and the looping agent via Telegram/Discord. Code is complete, just needs operational setup.
