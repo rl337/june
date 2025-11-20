@@ -85,6 +85,21 @@ def main() -> None:
             "Rate limiting enabled for TTS service (in-memory, Redis not required)"
         )
 
+    # Check if TtsGrpcApp is available (may be None if import failed due to scipy/numpy issues)
+    if TtsGrpcApp is None:
+        logger.error(
+            "TtsGrpcApp is not available. This usually indicates a scipy/numpy compatibility issue."
+        )
+        logger.error(
+            "The TTS service requires compatible scipy/numpy versions. Check Dockerfile for correct versions."
+        )
+        logger.error(
+            "Expected: numpy==1.22.0, scipy>=1.11.0,<1.12.0. Rebuild the container to apply fixes."
+        )
+        raise RuntimeError(
+            "TtsGrpcApp not available - scipy/numpy compatibility issue. Rebuild container."
+        )
+
     strategy = EspeakTtsStrategy(sample_rate=int(os.getenv("TTS_SAMPLE_RATE", "16000")))
     # Pass interceptors list (empty list is fine, TtsGrpcApp handles it)
     app = TtsGrpcApp(strategy, interceptors=interceptors)

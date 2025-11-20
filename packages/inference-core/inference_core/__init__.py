@@ -42,12 +42,17 @@ get_timestamp = _utils.get_timestamp
 generate_id = _utils.generate_id
 CircularBuffer = _utils.CircularBuffer
 # Import server classes optionally - they require grpc which may not be available
+# Also catch AttributeError for scipy/numpy compatibility issues (e.g., _ARRAY_API not found)
 try:
     from .servers.llm_server import LlmGrpcApp
     from .servers.stt_server import SttGrpcApp
     from .servers.tts_server import TtsGrpcApp
-except ImportError:
-    # grpc not available - these classes won't be available
+except (ImportError, AttributeError) as e:
+    # grpc not available or scipy/numpy compatibility issue - these classes won't be available
+    # Log the error for debugging but don't fail - services can still work without these
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning(f"Could not import gRPC server classes: {e}. Services may not be available.")
     SttGrpcApp = None
     TtsGrpcApp = None
     LlmGrpcApp = None
