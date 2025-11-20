@@ -65,7 +65,10 @@
     - ✅ **Fixed:** Made TTS import lazy in `download_models.py` to avoid scipy/numpy compatibility errors during command discovery. TTS is now only imported when actually needed (in `download_tts_model()` method), allowing TTS service to start even if TTS package has dependency issues.
     - ✅ **Fixed:** Made `inference_core` import more resilient by catching `AttributeError` (for scipy/numpy issues like `_ARRAY_API not found`) in addition to `ImportError`. This prevents `TtsGrpcApp` from being set to `None` due to scipy/numpy compatibility issues.
     - ✅ **Fixed:** Added better error handling in TTS service `main()` to provide clear error messages when `TtsGrpcApp` is None, explaining that a container rebuild is needed.
-    - ⏳ **Action Required:** Rebuild TTS container to apply scipy/numpy compatibility fixes: `docker compose build tts` (build is running in background)
+    - ⏳ **Action Required:** Rebuild TTS container to apply scipy/numpy compatibility fixes: `docker compose build tts`
+      - **Status:** Previous build attempt completed (image timestamp: 2 hours ago), but container still using old image
+      - **Issue:** Container needs rebuild with latest code changes (lazy TTS import, resilient inference_core import)
+      - **Note:** Build may timeout (>30 minutes) due to TTS package installation slowness. Consider using `--no-cache` or splitting into multiple build stages if needed.
     - ✅ Services status: telegram (unhealthy - STT/TTS connection timeouts), discord (healthy), message-api (healthy), stt (loading model), tts (restarting - essence import error)
     - ✅ **RADICAL REFACTOR COMPLETE:** Replaced USER_REQUESTS.md with USER_MESSAGES.md in /var/data/
     - ✅ **RADICAL REFACTOR COMPLETE:** Distinguish owner users from whitelisted users (owner = personal accounts, whitelisted = includes owners + others)
