@@ -251,26 +251,24 @@ The agent can help with steps 2-3 once the user provides the required informatio
      - ✅ NIM service configured in `home_infra/docker-compose.yml` (nim-qwen3 service exists)
      - ✅ `NGC_API_KEY` environment variable is set in `/home/rlee/dev/home_infra/.env`
      - ✅ Docker logged in to NGC registry (`nvcr.io`) successfully
-     - ❌ **BLOCKER:** Image name verification needed - Docker pull fails with "Access Denied" for `nvcr.io/nvidia/nim_qwen3_30b_instruct:latest`
-     - ❌ NIM service not running (cannot start due to image pull failure)
+     - ✅ Image path updated to correct path: `nvcr.io/nim/qwen/qwen3-32b:1.0.0` (from NGC catalog)
+     - ⏳ **BLOCKER:** Docker pull fails with "Payment Required" - account needs NIM access/subscription
+     - ❌ NIM service not running (cannot start due to account access requirement)
    - **Steps:**
      - ✅ Checked if `NGC_API_KEY` is set in home_infra environment → **SET** (found in `.env` file)
      - ✅ Logged Docker into NGC registry using NGC_API_KEY → **SUCCESS**
-     - ⏳ **BLOCKER:** Image name needs verification - current image `nvcr.io/nvidia/nim_qwen3_30b_instruct:latest` may be incorrect
-       - **Attempted image names (all failed with "Access Denied"):**
-         - `nvcr.io/nvidia/nim_qwen3_30b_instruct:latest` (current config)
-         - `nvcr.io/nvstaging/nim_qwen3_30b_instruct:latest` (staging)
-         - `nvcr.io/nvidia/nim-qwen3-30b-instruct:latest` (hyphenated)
-       - **Possible reasons for failure:**
-         - Qwen3 NIM container may not exist yet in NGC catalog
-         - Image name format may be completely different
-         - NGC_API_KEY may not have access to NIM containers (may need special permissions)
-         - Container may not be publicly available yet
-       - **Action Required:** User must manually verify image name in NGC catalog: https://catalog.ngc.nvidia.com/
-         - Navigate to Containers → NIM (or search for "NIM")
-         - Search for "qwen3" or "qwen"
-         - Find the correct container name and update `home_infra/docker-compose.yml`
-       - See `docs/guides/NIM_SETUP.md` for detailed verification steps
+     - ✅ Image path verified and updated: `nvcr.io/nim/qwen/qwen3-32b:1.0.0` (from NGC catalog: https://catalog.ngc.nvidia.com/orgs/nim/teams/qwen/containers/qwen3-32b)
+     - ⏳ **BLOCKER:** Docker pull fails with "Payment Required" error
+       - **Status:** Image path is correct, API key is working, but account needs NIM access
+       - **Action Required:** User must check NGC account for NIM access/subscription:
+         - Go to https://catalog.ngc.nvidia.com/
+         - Check account subscription/access status
+         - Some NIM containers require:
+           - Enterprise subscription
+           - Special access permissions
+           - Account activation for NIM services
+         - Verify if there's a trial/development access option
+       - Once account has NIM access, the image should pull successfully
      - ⏳ Start NIM service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3` (blocked on image name verification)
      - ⏳ Verify NIM is running: `docker compose ps nim-qwen3` (blocked on service start)
      - ⏳ Verify NIM connectivity: `cd /home/rlee/dev/june && poetry run python -m essence verify-nim --nim-host nim-qwen3 --http-port 8003 --grpc-port 8001` (blocked on service start)
