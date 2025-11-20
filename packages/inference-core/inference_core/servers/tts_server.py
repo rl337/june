@@ -11,7 +11,7 @@ from june_grpc_api.generated import tts_pb2, tts_pb2_grpc
 
 from ..config import config
 from ..strategies import InferenceRequest, TtsStrategy
-from ..utils import setup_logging
+from .. import setup_logging
 
 logger = logging.getLogger(__name__)
 
