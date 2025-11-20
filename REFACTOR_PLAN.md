@@ -37,10 +37,14 @@
        - ✅ **Found:** Riva ASR NIM available (Parakeet ASR-CTC-1.1B-EnUS) - different model than Whisper but same function
        - ⚠️ **ARM64 support unclear** - needs verification in NGC catalog
        - ⏳ **Action:** Verify Riva ASR NIM ARM64/DGX Spark compatibility and exact image path
+       - ✅ **Helper script created:** `scripts/verify_nim_compatibility.sh` - Automated script to check NIM compatibility and provide guidance
+       - Usage: `./scripts/verify_nim_compatibility.sh [--stt-only] [--tts-only]`
+       - Requires NGC_API_KEY for full functionality (queries NGC catalog via list-nims command)
      - ⏳ **Research:** Check NGC catalog for TTS NIM container availability (https://catalog.ngc.nvidia.com/ → Containers → NIM → search "tts" or "speech") - **OR use `list-nims --filter tts --dgx-spark-only` command**
        - ✅ **Found:** Riva TTS NIM available (Magpie TTS Multilingual, FastPitch-HiFiGAN-EN) - different models than FastSpeech2 but same function
        - ⚠️ **ARM64 support unclear** - needs verification in NGC catalog
        - ⏳ **Action:** Verify Riva TTS NIM ARM64/DGX Spark compatibility and exact image path
+       - ✅ **Helper script created:** `scripts/verify_nim_compatibility.sh` - Automated script to check NIM compatibility and provide guidance
      - 📄 **Documentation:** Created `docs/NIM_AVAILABILITY.md` with detailed NIM availability status
     - ⏳ **If STT/TTS NIMs exist:** Add to home_infra/docker-compose.yml following nim-qwen3 pattern
     - ⏳ **If STT/TTS NIMs don't exist:** Continue using custom STT/TTS services (already configured in june/docker-compose.yml)
