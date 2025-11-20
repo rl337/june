@@ -5,7 +5,7 @@
 **Last Updated:** 2025-11-19
 
 **Current State:**
-- ✅ **All code implementation complete** (390 tests passing, 8 skipped)
+- ✅ **All code implementation complete** (390 tests passing, 1 skipped)
 - ✅ **All infrastructure ready** (commands, tools, documentation)
 - ✅ **GitHub Actions passing** (all workflows successful)
 - ✅ **No uncommitted changes**
@@ -809,11 +809,11 @@ All code changes, cleanup, and refactoring tasks have been completed:
 **Code/Documentation Status:** All code and documentation work for TensorRT-LLM migration is complete. The project is ready for operational work (model compilation, loading, and verification). All tools, commands, and documentation are in place to support the migration.
 
 **Current Status Summary (2025-11-19):**
-- ✅ All code implementation complete (390 tests passing, 8 skipped)
+- ✅ All code implementation complete (390 tests passing, 1 skipped)
 - ✅ All infrastructure ready (commands, tools, documentation)
 - ✅ GitHub Actions passing
 - ✅ No uncommitted changes
-- ✅ All tests passing (390 passed, 8 skipped)
+- ✅ All tests passing (390 passed, 1 skipped)
 - ⏳ Remaining work is operational (requires services to be running):
   - Phase 10.1-10.2: Model download and service startup (requires HUGGINGFACE_TOKEN, model download time)
   - Phase 15: NIM gRPC connectivity testing (requires NIM service running in home_infra)
