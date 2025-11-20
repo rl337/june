@@ -12,21 +12,20 @@
 - ✅ **Phase 19 - Direct Agent-User Communication:** All code implementation tasks complete (whitelist, routing, USER_REQUESTS.md syncing, message grouping/editing, service conflict prevention, polling loop integration)
 - ✅ **DM Verification:** Agent verified can send DMs on both Telegram and Discord (test script successful)
 - ✅ **NIM Access Resolved:** NGC API token updated with correct permissions, nim-qwen3 downloaded successfully. STT and TTS NIMs now available for deployment.
-- ⏳ **🚨 TOP PRIORITY - BI-DIRECTIONAL COMMUNICATION (AGENT MUST WORK ON THIS FIRST):**
-  - 🚨 **Phase 21: Looping Agent USER_MESSAGES.md Integration** (CRITICAL - Enables round trip communication)
+- ✅ **🚨 BI-DIRECTIONAL COMMUNICATION COMPLETE:**
+  - ✅ **Phase 21: Looping Agent USER_MESSAGES.md Integration** (COMPLETE - Round trip verified and working)
     - ✅ Create process-user-messages essence command (reads NEW messages, processes, sends responses)
     - ✅ Integrate command into looping agent script (`scripts/refactor_agent_loop.sh`)
-    - ⏳ **READY FOR TESTING:** Test complete round trip: owner sends message → agent processes via command → agent responds → owner receives response
-    - **Why:** User needs to test round trip before going away from computer. This closes the communication loop so agent can ask questions and get answers via USER_MESSAGES.md
-    - **Status:** All components ready - services running, command integrated, Message API accessible
+    - ✅ **COMPLETED:** Test complete round trip: owner sends message → agent processes via command → agent responds → owner receives response
+    - **Status:** ✅ Round trip verified and working - all components functional
     - ✅ **Fixed:** GitHub Actions CI failure - added Python dev headers for webrtcvad build
-  - 🚨 **Phase 20: Message API Service** (IMMEDIATE PRIORITY - Blocks all future agent-user communication)
-    - Create Message API service with GET/POST/PUT/PATCH endpoints
-    - Replace direct function calls with API calls
-    - Create command to run Message API service
-    - Add service to docker-compose.yml
-    - Test API endpoints work correctly
-    - Update agent loop to use API instead of direct calls
+  - ✅ **Phase 20: Message API Service** (COMPLETE - All API endpoints tested and working)
+    - ✅ Create Message API service with GET/POST/PUT/PATCH endpoints
+    - ✅ Replace direct function calls with API calls
+    - ✅ Create command to run Message API service
+    - ✅ Add service to docker-compose.yml
+    - ✅ Test API endpoints work correctly
+    - ✅ Update agent loop to use API instead of direct calls
   - 🚨 **Phase 19: Deploy NIMs and enable Telegram/Discord communication** (HIGH PRIORITY - NOW UNBLOCKED)
     - ✅ NIM access resolved - nim-qwen3 downloaded successfully
     - ✅ LLM NIM (nim-qwen3) configured in home_infra/docker-compose.yml
@@ -79,7 +78,7 @@
   - Message history debugging (tools ready, requires actual message data from real usage)
 
 **For agents:** 
-- 🚨 **TOP PRIORITY:** Phase 20 (Message API Service) - Establish bi-directional communication. Agent must be able to send/receive messages via API before proceeding with other tasks.
+- ✅ **COMPLETE:** Phase 20 (Message API Service) and Phase 21 (USER_MESSAGES.md Integration) - Bi-directional communication established and verified working.
 - All code-related refactoring tasks are complete. The project is ready for operational work. 
 - See operational tasks in REFACTOR_PLAN.md for details on starting services and running tests. 
 - See `docs/OPERATIONAL_READINESS.md` for a comprehensive operational readiness checklist.
