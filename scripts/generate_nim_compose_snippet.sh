@@ -98,7 +98,7 @@ echo "# Note: Verify ARM64/DGX Spark compatibility before deploying:"
 echo "#   - Check NGC catalog: https://catalog.ngc.nvidia.com/"
 echo "#   - Verify image path and architecture support"
 FILTER_TYPE=$([ "$GENERATE_STT" = true ] && echo "stt" || echo "tts")
-echo "#   - Use: poetry run python -m essence list-nims --filter ${FILTER_TYPE} --dgx-spark-only""
+echo "#   - Use: poetry run python -m essence list-nims --filter ${FILTER_TYPE} --dgx-spark-only"
 echo "#"
 echo "${SERVICE_NAME}:"
 echo "  image: ${IMAGE}"
