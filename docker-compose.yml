@@ -278,9 +278,8 @@ services:
     healthcheck:
       test:
       - CMD
-      - wget
-      - -q
-      - --spider
+      - curl
+      - -f
       - http://localhost:8080/health
       interval: 30s
       timeout: 10s
