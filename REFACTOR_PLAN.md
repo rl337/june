@@ -13,6 +13,16 @@
 - ✅ **DM Verification:** Agent verified can send DMs on both Telegram and Discord (test script successful)
 - ✅ **NIM Access Resolved:** NGC API token updated with correct permissions, nim-qwen3 downloaded successfully. STT and TTS NIMs now available for deployment.
 - ⏳ **🚨 TOP PRIORITY - BI-DIRECTIONAL COMMUNICATION (AGENT MUST WORK ON THIS FIRST):**
+  - 🚨 **Phase 21: Looping Agent USER_MESSAGES.md Integration** (CRITICAL - Enables round trip communication)
+    - ⏳ Update looping agent script (`scripts/refactor_agent_loop.sh`) to read USER_MESSAGES.md
+    - ⏳ Process messages with status "NEW" from USER_MESSAGES.md
+    - ⏳ Update message status to "PROCESSING" when agent starts processing
+    - ⏳ Generate response using LLM (when inference engines are running)
+    - ⏳ Send response via Message API (POST /messages or PATCH /messages/{id})
+    - ⏳ Update message status to "RESPONDED" after successful response
+    - ⏳ Handle errors by updating status to "ERROR"
+    - ⏳ Test complete round trip: owner sends message → agent reads from USER_MESSAGES.md → agent responds → owner receives response
+    - **Why:** User needs to test round trip before going away from computer. This closes the communication loop so agent can ask questions and get answers via USER_MESSAGES.md
   - 🚨 **Phase 20: Message API Service** (IMMEDIATE PRIORITY - Blocks all future agent-user communication)
     - Create Message API service with GET/POST/PUT/PATCH endpoints
     - Replace direct function calls with API calls
@@ -41,7 +51,13 @@
     - ✅ Fixed telegram health endpoint (now returns proper JSON instead of Internal Server Error)
     - ⚠️ TTS service still has essence import issue - Dockerfile copies essence but python can't find it (needs investigation)
     - ✅ Services status: telegram (unhealthy - STT/TTS connection timeouts), discord (healthy), message-api (healthy), stt (loading model), tts (restarting - essence import error)
-    - ⏳ Test end-to-end communication (send message → verify in USER_REQUESTS.md → agent responds) - BLOCKED by TTS service issue
+    - ✅ **RADICAL REFACTOR COMPLETE:** Replaced USER_REQUESTS.md with USER_MESSAGES.md in /var/data/
+    - ✅ **RADICAL REFACTOR COMPLETE:** Distinguish owner users from whitelisted users (owner = personal accounts, whitelisted = includes owners + others)
+    - ✅ **RADICAL REFACTOR COMPLETE:** Non-whitelisted users now ignored completely (no response)
+    - ✅ **RADICAL REFACTOR COMPLETE:** Owner messages append to USER_MESSAGES.md with status "NEW"
+    - ✅ **RADICAL REFACTOR COMPLETE:** Whitelisted (non-owner) messages forwarded to owner
+    - ✅ **RADICAL REFACTOR COMPLETE:** Removed all agentic flow from telegram/discord services
+    - ⏳ **Phase 21:** Update looping agent script to read USER_MESSAGES.md and process NEW messages (CRITICAL - needed for round trip testing)
   - Phase 15: NIM gRPC connectivity testing (requires NIM service running in home_infra with NGC_API_KEY)
   - Phase 16: End-to-end pipeline testing (requires all services running)
   - Phase 18: Benchmark evaluation (requires LLM service running)
