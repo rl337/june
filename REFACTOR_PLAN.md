@@ -380,7 +380,9 @@ The agent can help with steps 2-3 once the user provides the required informatio
      - ✅ Both user IDs configured in `.env` file (not committed to git)
      - ⏳ **NEXT:** Restart services to load whitelist configuration: `docker compose up -d telegram discord` (agent can do this)
      - Or use helper script: `./scripts/setup_phase19_operational.sh --telegram-users USER_ID`
-   - **Helper Script:** `scripts/setup_phase19_operational.sh` - Orchestrates whitelist configuration and service startup
+   - **Helper Script:** `scripts/setup_phase19_operational.sh` - Orchestrates whitelist and owner user configuration and service startup
+   - ✅ **Updated:** Script now supports `--telegram-owner-users` and `--discord-owner-users` flags for configuring owner users
+   - ✅ **Updated:** Script verifies owner user configuration and warns if not set (required for USER_MESSAGES.md flow)
    - **Note:** Infrastructure changes complete (docker-compose.yml updated, documentation improved). Remaining work is operational (setting user IDs and restarting services).
 
 3. **Start Telegram/Discord services with whitelist:** ✅ COMPLETED
