@@ -212,6 +212,9 @@ Before starting any operational tasks, ensure:
 - Read user requests: `poetry run python -m essence read-user-requests`
 - Poll for responses: `poetry run python -m essence poll-user-responses`
 
+### Helper Script
+- `scripts/setup_phase19_operational.sh` - Orchestrates Phase 19 operational workflow (whitelist configuration, service startup, testing guidance)
+
 ## Common Operational Tasks
 
 ### Service Management
