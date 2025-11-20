@@ -372,7 +372,7 @@ services:
     container_name: june-message-api
     restart: unless-stopped
     ports:
-    - 8082:8082
+    - 8083:8082
     environment:
     - MESSAGE_API_PORT=8082
     - MESSAGE_API_HOST=0.0.0.0
