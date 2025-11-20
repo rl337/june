@@ -2,7 +2,7 @@
 
 ## Status: ✅ **ALL CODE WORK COMPLETE** → ⏳ **OPERATIONAL TASKS REMAINING** (Ready for User Testing)
 
-**Last Updated:** 2025-11-20 (Phase 20 complete - Message API fully operational. Phase 19 progress - services started with whitelist, Message API tested. **CRITICAL FIX:** STT service was loading Whisper on CPU (8.7GB RAM usage, 90% system memory) - fixed to use GPU (`STT_DEVICE=cuda`). Removed NATS dependency causing crashes. **DISCOVERY:** DGX Spark-specific NIMs exist and support ARM64 - Qwen3-32B DGX Spark NIM configured in home_infra, STT/TTS NIMs added with placeholder paths. **NEW:** Created comprehensive operational status summary document (`docs/OPERATIONAL_STATUS.md`) with complete current state, operational tasks, and next steps. **NEW:** Created Riva NIM deployment guide (`docs/guides/RIVA_NIM_DEPLOYMENT.md`) with complete step-by-step workflow for deploying Riva ASR/TTS NIMs, integrating all helper scripts and tools. **NEW:** Updated documentation index (`docs/README.md`) to include Riva NIM deployment guide.)
+**Last Updated:** 2025-11-20 (Phase 20 complete - Message API fully operational. Phase 19 progress - services started with whitelist, Message API tested. **CRITICAL FIX:** STT service was loading Whisper on CPU (8.7GB RAM usage, 90% system memory) - fixed to use GPU (`STT_DEVICE=cuda`). Removed NATS dependency causing crashes. **RESOLVED:** DGX Spark NIMs support ARM64 - Qwen3-32B DGX Spark NIM confirmed ARM64-compatible and configured in home_infra. STT/TTS NIMs (Riva ASR/TTS) configured with confirmed image paths, ARM64 compatibility needs verification. **NEW:** Created comprehensive operational status summary document (`docs/OPERATIONAL_STATUS.md`) with complete current state, operational tasks, and next steps. **NEW:** Created Riva NIM deployment guide (`docs/guides/RIVA_NIM_DEPLOYMENT.md`) with complete step-by-step workflow for deploying Riva ASR/TTS NIMs, integrating all helper scripts and tools. **NEW:** Updated documentation index (`docs/README.md`) to include Riva NIM deployment guide.)
 
 **Current State:**
 - ✅ **All code implementation complete** (451 tests passing, 8 skipped)
@@ -31,29 +31,30 @@
     - ✅ LLM NIM (nim-qwen3) configured in home_infra/docker-compose.yml
     - ✅ **Tool Available:** `list-nims` command exists to discover available NIM containers - use `poetry run python -m essence list-nims --dgx-spark-only --filter stt` or `--filter tts` to find SparkStation-compatible models for STT/TTS evaluation
     - ⏳ **Operational:** Start LLM NIM service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3` (requires NGC_API_KEY)
-    - ⚠️ **BLOCKER:** NIM containers are AMD64-only, but host is ARM64. NIMs won't run on ARM64 architecture. Need ARM64-compatible NIMs or use TensorRT-LLM instead.
-     - ⏳ **Research:** Check NGC catalog for STT NIM container availability (https://catalog.ngc.nvidia.com/ → Containers → NIM → search "whisper" or "stt") - **OR use `list-nims --filter stt --dgx-spark-only` command**
-       - ✅ **Found:** Riva ASR NIM available (Parakeet ASR-CTC-1.1B-EnUS) - different model than Whisper but same function
-       - ⚠️ **ARM64 support unclear** - needs verification in NGC catalog
-       - ⏳ **Action:** Verify Riva ASR NIM ARM64/DGX Spark compatibility and exact image path
+    - ✅ **RESOLVED:** DGX Spark NIMs support ARM64 architecture! The Qwen3-32B DGX Spark NIM is confirmed ARM64-compatible and configured in home_infra/docker-compose.yml.
+     - ✅ **LLM NIM:** Qwen3-32B DGX Spark NIM confirmed ARM64-compatible (image: `nvcr.io/nim/qwen/qwen3-32b-dgx-spark:1.0.0`)
+     - ⏳ **STT NIM:** Riva ASR NIM available (Parakeet ASR-CTC-1.1B-EnUS) - image path confirmed (`nvcr.io/nim/riva/riva-asr:latest`)
+       - ⚠️ **ARM64 support unclear** - needs verification in NGC catalog (marked as unknown in list-nims output)
+       - ⏳ **Action:** Verify Riva ASR NIM ARM64/DGX Spark compatibility via NGC catalog or test deployment
        - ✅ **Helper script created:** `scripts/verify_nim_compatibility.sh` - Automated script to check NIM compatibility and provide guidance
        - ✅ **Improved list-nims command:** Added Riva ASR NIM to known NIMs list (marked as unknown compatibility, needs verification)
        - Usage: `./scripts/verify_nim_compatibility.sh [--stt-only] [--tts-only]` or `poetry run python -m essence list-nims --filter stt --dgx-spark-only`
        - Requires NGC_API_KEY for full functionality (queries NGC catalog via list-nims command)
-     - ⏳ **Research:** Check NGC catalog for TTS NIM container availability (https://catalog.ngc.nvidia.com/ → Containers → NIM → search "tts" or "speech") - **OR use `list-nims --filter tts --dgx-spark-only` command**
-       - ✅ **Found:** Riva TTS NIM available (Magpie TTS Multilingual, FastPitch-HiFiGAN-EN) - different models than FastSpeech2 but same function
-       - ⚠️ **ARM64 support unclear** - needs verification in NGC catalog
-       - ⏳ **Action:** Verify Riva TTS NIM ARM64/DGX Spark compatibility and exact image path
+     - ⏳ **TTS NIM:** Riva TTS NIM available (Magpie TTS Multilingual, FastPitch-HiFiGAN-EN) - image path confirmed (`nvcr.io/nim/riva/riva-tts:latest`)
+       - ⚠️ **ARM64 support unclear** - needs verification in NGC catalog (marked as unknown in list-nims output)
+       - ⏳ **Action:** Verify Riva TTS NIM ARM64/DGX Spark compatibility via NGC catalog or test deployment
        - ✅ **Helper script created:** `scripts/verify_nim_compatibility.sh` - Automated script to check NIM compatibility and provide guidance
        - ✅ **Improved list-nims command:** Added Riva TTS NIM entries (Magpie, FastPitch) to known NIMs list (marked as unknown compatibility, needs verification)
        - Usage: `./scripts/verify_nim_compatibility.sh [--stt-only] [--tts-only]` or `poetry run python -m essence list-nims --filter tts --dgx-spark-only`
        - Requires NGC_API_KEY for full functionality (queries NGC catalog via list-nims command)
      - 📄 **Documentation:** Created `docs/NIM_AVAILABILITY.md` with detailed NIM availability status
-    - ⏳ **If STT/TTS NIMs exist:** Add to home_infra/docker-compose.yml following nim-qwen3 pattern
+    - ✅ **STT/TTS NIMs configured:** Added to home_infra/docker-compose.yml following nim-qwen3 pattern
+      - ✅ **nim-stt service:** Configured with image `nvcr.io/nim/riva/riva-asr:latest` (gRPC port 8002, HTTP port 8004)
+      - ✅ **nim-tts service:** Configured with image `nvcr.io/nim/riva/riva-tts:latest` (gRPC port 8005, HTTP port 8006)
+      - ⚠️ **Note:** Image paths confirmed, but ARM64 compatibility needs verification (marked as unknown in list-nims)
       - ✅ **Helper script created:** `scripts/generate_nim_compose_snippet.sh` - Generates docker-compose.yml service snippets for Riva NIMs
-      - Usage: `./scripts/generate_nim_compose_snippet.sh --stt --image nvcr.io/nim/riva/riva-asr:1.0.0` or `--tts --image nvcr.io/nim/riva/riva-tts:1.0.0`
-      - Script generates complete service definition following nim-qwen3 pattern (GPU allocation, health checks, tracing, etc.)
-      - ✅ **Deployment guide created:** `docs/guides/RIVA_NIM_DEPLOYMENT.md` - Complete step-by-step workflow for deploying Riva ASR/TTS NIMs, integrating all helper scripts and tools
+      - ✅ **Deployment guide created:** `docs/guides/RIVA_NIM_DEPLOYMENT.md` - Complete step-by-step workflow for deploying Riva ASR/TTS NIMs
+      - ⏳ **Next:** Verify ARM64 compatibility by testing deployment or checking NGC catalog
     - ⏳ **If STT/TTS NIMs don't exist:** Continue using custom STT/TTS services (already configured in june/docker-compose.yml)
     - ✅ Configure Telegram/Discord whitelist for direct agent-user communication (completed)
     - ✅ Start services with whitelist enabled (telegram and discord services started with whitelist configured)
