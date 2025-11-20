@@ -209,7 +209,9 @@ async def get_message(
         # Find message with matching ID
         msg = None
         for entry in messages:
-            if str(entry.message_id) == str(message_id):
+            # Handle both string and None message_id
+            entry_id = str(entry.message_id) if entry.message_id is not None else None
+            if entry_id == str(message_id):
                 msg = entry
                 break
 
@@ -224,8 +226,8 @@ async def get_message(
             chat_id=msg.chat_id,
             message_content=msg.message_content,
             message_type=msg.message_type,
-            message_id=msg.message_id,
-            timestamp=msg.timestamp,
+            message_id=str(msg.message_id) if msg.message_id is not None else None,
+            timestamp=msg.timestamp.isoformat() if msg.timestamp else None,
             raw_text=msg.raw_text,
             formatted_text=msg.formatted_text,
             rendering_metadata=msg.rendering_metadata,
