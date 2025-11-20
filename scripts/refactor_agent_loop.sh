@@ -195,6 +195,35 @@ You are working on refactoring the june project. Your task is to:
    - Dependencies between tasks
    Add these to REFACTOR_PLAN.md in the appropriate section so the next iteration can understand and act on them.
 
+**Agent-to-User Communication:**
+- **CRITICAL:** When you get stuck, need help, or complete significant work, send a message to the user via Telegram
+- Use the agent communication interface: `from essence.chat.agent_communication import send_message_to_user`
+- **When to send messages:**
+  - When you get stuck on a task and need clarification
+  - When you complete a significant task or milestone
+  - When you encounter blockers that prevent progress
+  - When you need user input or direction
+  - When you finish all available tasks and have nothing to do
+- **How to send:**
+  ```python
+  from essence.chat.agent_communication import send_message_to_user, CommunicationChannel
+  
+  # Get user/chat ID from environment or use defaults
+  user_id = os.getenv("TELEGRAM_USER_ID", "your_user_id")
+  chat_id = os.getenv("TELEGRAM_CHAT_ID", "your_chat_id")
+  
+  result = send_message_to_user(
+      user_id=user_id,
+      chat_id=chat_id,
+      message="Your message here",
+      platform=CommunicationChannel.AUTO,  # Tries Telegram first, falls back to Discord
+      message_type="progress",  # or "help_request", "clarification", "status"
+      require_service_stopped=False  # Set to True if Telegram service must be stopped
+  )
+  ```
+- **IMPORTANT:** If Telegram service is running, you may need to stop it first: `docker compose stop telegram`
+- **Message types:** "text", "error", "status", "clarification", "help_request", "progress"
+
 **Important Guidelines:**
 - **CRITICAL - 30 MINUTE TIMEOUT:** Each iteration has a 30-minute timeout. If an operation takes longer than 30 minutes, it will be terminated. 
   - **Use timeouts for individual commands:** Always use the `timeout` command for operations that might hang (tests, network operations, etc.):
