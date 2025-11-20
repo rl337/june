@@ -264,16 +264,22 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - **Note:** This is operational work (starting Docker services), not code changes. Code is already complete.
    - **Action Required:** User must set `NGC_API_KEY` in `/home/rlee/dev/home_infra/.env` before NIM service can be started.
 
-2. **Configure whitelisted users and enable Telegram/Discord communication:** ⏳ TODO (HIGH PRIORITY - Agent should do this)
+2. **Configure whitelisted users and enable Telegram/Discord communication:** ⏳ IN PROGRESS (HIGH PRIORITY - Agent working on this)
    - **Why:** This enables direct communication between the user and the looping agent via Telegram/Discord. Code is complete, just needs operational setup.
+   - **Current Status (2025-11-20):**
+     - ✅ Added `TELEGRAM_WHITELISTED_USERS` environment variable to telegram service in docker-compose.yml
+     - ✅ Added `DISCORD_WHITELISTED_USERS` environment variable to discord service in docker-compose.yml
+     - ✅ Environment variables configured with default empty value (can be set via .env file or docker compose)
+     - ⏳ **BLOCKER:** User needs to provide Telegram user ID(s) to configure whitelist
    - **Steps:**
-     - Get user's Telegram user ID (can query Telegram API or ask user)
-     - Set `TELEGRAM_WHITELISTED_USERS` environment variable (comma-separated user IDs)
-     - Set `DISCORD_WHITELISTED_USERS` environment variable (comma-separated user IDs) if using Discord
-     - Add to docker-compose.yml environment section for telegram/discord services
+     - ✅ Added whitelist environment variables to docker-compose.yml (telegram and discord services)
+     - ⏳ **BLOCKER:** Get user's Telegram user ID (can query Telegram API or ask user)
+     - ⏳ Set `TELEGRAM_WHITELISTED_USERS` in .env file or docker-compose.yml (comma-separated user IDs)
+     - ⏳ Set `DISCORD_WHITELISTED_USERS` in .env file or docker-compose.yml if using Discord (comma-separated user IDs)
+     - ⏳ Restart services to load whitelist configuration
      - Or use helper script: `./scripts/setup_phase19_operational.sh --telegram-users USER_ID`
    - **Helper Script:** `scripts/setup_phase19_operational.sh` - Orchestrates whitelist configuration and service startup
-   - **Note:** This is operational work (setting environment variables and restarting services), not code changes. Code is already complete.
+   - **Note:** Infrastructure changes complete (docker-compose.yml updated). Remaining work is operational (setting user IDs and restarting services).
 
 3. **Start Telegram/Discord services with whitelist:** ⏳ TODO (HIGH PRIORITY - Agent should do this)
    - **Why:** Services need to be restarted with whitelist configuration to enable direct agent-user communication.

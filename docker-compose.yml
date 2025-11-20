@@ -236,6 +236,10 @@ services:
     environment:
     - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
     - TELEGRAM_AUTHORIZED_USERS=${TELEGRAM_AUTHORIZED_USERS:-39833618}
+    - TELEGRAM_WHITELISTED_USERS=${TELEGRAM_WHITELISTED_USERS:-}
+      # Phase 19: Comma-separated list of user IDs for direct agent-user communication
+      # Only whitelisted users can communicate directly with the looping agent
+      # Example: TELEGRAM_WHITELISTED_USERS=123456789,987654321
     - CURSOR_AGENT_EXE=/usr/local/bin/cursor-tools/cursor-agent
     - CURSOR_API_KEY=${CURSOR_API_KEY:-}
     - CURSOR_AGENT=1
@@ -310,6 +314,10 @@ services:
     environment:
     - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN:-}
     - DISCORD_AUTHORIZED_USERS=${DISCORD_AUTHORIZED_USERS:-}
+    - DISCORD_WHITELISTED_USERS=${DISCORD_WHITELISTED_USERS:-}
+      # Phase 19: Comma-separated list of user IDs for direct agent-user communication
+      # Only whitelisted users can communicate directly with the looping agent
+      # Example: DISCORD_WHITELISTED_USERS=123456789,987654321
     - CURSOR_AGENT_EXE=/usr/local/bin/cursor-tools/cursor-agent
     - CURSOR_API_KEY=${CURSOR_API_KEY:-}
     - CURSOR_AGENT=1
