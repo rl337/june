@@ -42,16 +42,19 @@ logger = logging.getLogger(__name__)
 def _format_connection_error(base_url: str, error: Exception) -> str:
     """
     Format connection error message with helpful guidance for DNS resolution failures.
-    
+
     Args:
         base_url: The URL that failed to connect
         error: The connection error exception
-        
+
     Returns:
         Formatted error message with guidance
     """
     error_str = str(error)
-    if "name resolution" in error_str.lower() or "temporary failure" in error_str.lower():
+    if (
+        "name resolution" in error_str.lower()
+        or "temporary failure" in error_str.lower()
+    ):
         return (
             f"Cannot connect to TensorRT-LLM at {base_url}: {error}\n"
             f"  Note: If running from host, 'tensorrt-llm' hostname is only resolvable within Docker networks.\n"
