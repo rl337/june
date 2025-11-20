@@ -1033,6 +1033,58 @@ The agent can help with steps 2-3 once the user provides the required informatio
 
 **Note:** This is operational work (creating service, integrating API, testing). Code for API service is complete, needs deployment and integration.
 
+### Phase 21: Looping Agent USER_MESSAGES.md Integration 🚨 CRITICAL PRIORITY
+
+**Goal:** Enable complete round trip communication between owner and looping agent via USER_MESSAGES.md. Agent reads NEW messages, processes them, responds via Message API, and updates status. This closes the communication loop so agent can ask questions and get answers.
+
+**Status:** ⏳ **IN PROGRESS** - Code refactor complete (USER_MESSAGES.md created, services updated), looping agent integration pending
+
+**Why This Is Critical:**
+- User needs to test round trip before going away from computer
+- Enables agent to ask questions and get answers via USER_MESSAGES.md
+- Closes the communication loop: owner → USER_MESSAGES.md → agent → Message API → owner
+- Essential for autonomous agent operation when user is unavailable
+
+**Tasks:**
+1. **Update looping agent script to read USER_MESSAGES.md:** ⏳ TODO
+   - Read `/var/data/USER_MESSAGES.md` using `essence.chat.user_messages_sync.read_user_messages()`
+   - Parse messages with status "NEW"
+   - Use file locking to minimize concurrent read/write issues
+   - Filter for owner user messages (or process all NEW messages)
+
+2. **Process NEW messages:** ⏳ TODO
+   - Update message status to "PROCESSING" when agent starts processing
+   - Extract message content, user_id, chat_id, platform from USER_MESSAGES.md entry
+   - Generate response (when inference engines are running, or use placeholder for now)
+   - Handle errors by updating status to "ERROR"
+
+3. **Send response via Message API:** ⏳ TODO
+   - Use Message API client (`essence.chat.message_api_client.send_message_via_api()`)
+   - Send response to original user_id/chat_id on original platform
+   - Update message status to "RESPONDED" after successful response
+   - Handle API errors gracefully
+
+4. **Test complete round trip:** ⏳ TODO
+   - Owner sends message via Telegram/Discord
+   - Verify message appears in USER_MESSAGES.md with status "NEW"
+   - Verify agent reads message and updates status to "PROCESSING"
+   - Verify agent sends response via Message API
+   - Verify owner receives response on Telegram/Discord
+   - Verify message status updated to "RESPONDED" in USER_MESSAGES.md
+
+**Implementation Notes:**
+- Use `essence.chat.user_messages_sync.read_user_messages()` for reading (with file locking)
+- Use `essence.chat.user_messages_sync.update_message_status()` for status updates (with file locking)
+- Use `essence.chat.message_api_client.send_message_via_api()` for sending responses
+- Integrate into `scripts/refactor_agent_loop.sh` - add periodic check for NEW messages
+- Can run in background polling loop (similar to existing user response polling)
+- When inference engines are not running, can send placeholder response or skip processing
+
+**File Structure:**
+- USER_MESSAGES.md location: `/var/data/USER_MESSAGES.md`
+- Status values: "NEW", "PROCESSING", "RESPONDED", "ERROR"
+- File locking: Uses `fcntl` for exclusive/shared locks (open/write/close pattern)
+
 ### Phase 18: Model Evaluation and Benchmarking ⏳ TODO
 
 **Operational Tasks:**
