@@ -126,7 +126,10 @@ async def handle_text_message(
             span.set_attribute("authorized", True)
 
             # Check if user is whitelisted for direct agent communication
-            from essence.chat.user_requests_sync import is_user_whitelisted, sync_message_to_user_requests
+            from essence.chat.user_requests_sync import (
+                is_user_whitelisted,
+                sync_message_to_user_requests,
+            )
 
             is_whitelisted = is_user_whitelisted(str(user_id), "telegram")
             span.set_attribute("whitelisted", is_whitelisted)
@@ -165,7 +168,9 @@ async def handle_text_message(
                         "You will receive a response when the agent processes your request."
                     )
                 except Exception as e:
-                    logger.warning(f"Failed to send acknowledgment to whitelisted user: {e}")
+                    logger.warning(
+                        f"Failed to send acknowledgment to whitelisted user: {e}"
+                    )
 
                 span.set_status(trace.Status(trace.StatusCode.OK))
                 return  # Skip agentic flow for whitelisted users

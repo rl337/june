@@ -227,15 +227,14 @@ def _send_telegram_message(
                 # Sync to USER_REQUESTS.md if user is whitelisted
                 try:
                     from essence.chat.user_requests_sync import is_user_whitelisted
+
                     if is_user_whitelisted(user_id, "telegram"):
                         # Try to get username from message history
                         username = None
                         try:
                             history = get_message_history()
                             user_messages = history.get_messages(
-                                platform="telegram",
-                                user_id=user_id,
-                                limit=1
+                                platform="telegram", user_id=user_id, limit=1
                             )
                             if user_messages:
                                 username = user_messages[0].get("username")
@@ -249,7 +248,9 @@ def _send_telegram_message(
                             message_type=message_type.replace("_", " ").title(),
                             content=message,
                             message_id=message_id,
-                            status="Responded" if message_type in ["response", "progress"] else "Pending",
+                            status="Responded"
+                            if message_type in ["response", "progress"]
+                            else "Pending",
                             username=username,
                         )
                 except Exception as e:
@@ -341,15 +342,14 @@ def _send_discord_message(
         # Sync to USER_REQUESTS.md if user is whitelisted
         try:
             from essence.chat.user_requests_sync import is_user_whitelisted
+
             if is_user_whitelisted(user_id, "discord"):
                 # Try to get username from message history
                 username = None
                 try:
                     history = get_message_history()
                     user_messages = history.get_messages(
-                        platform="discord",
-                        user_id=user_id,
-                        limit=1
+                        platform="discord", user_id=user_id, limit=1
                     )
                     if user_messages:
                         username = user_messages[0].get("username")
@@ -363,7 +363,9 @@ def _send_discord_message(
                     message_type=message_type.replace("_", " ").title(),
                     content=message,
                     message_id=message_id,
-                    status="Responded" if message_type in ["response", "progress"] else "Pending",
+                    status="Responded"
+                    if message_type in ["response", "progress"]
+                    else "Pending",
                     username=username,
                 )
         except Exception as e:

@@ -151,7 +151,10 @@ class DiscordBotService:
             channel_id = message.channel.id
 
             # Check if user is whitelisted for direct agent communication
-            from essence.chat.user_requests_sync import is_user_whitelisted, sync_message_to_user_requests
+            from essence.chat.user_requests_sync import (
+                is_user_whitelisted,
+                sync_message_to_user_requests,
+            )
 
             is_whitelisted = is_user_whitelisted(str(user_id), "discord")
 
@@ -192,7 +195,9 @@ class DiscordBotService:
                         message_type="status",
                     )
                 except Exception as e:
-                    logger.warning(f"Failed to send acknowledgment to whitelisted user: {e}")
+                    logger.warning(
+                        f"Failed to send acknowledgment to whitelisted user: {e}"
+                    )
 
                 return  # Skip agentic flow for whitelisted users
 

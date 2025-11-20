@@ -77,7 +77,9 @@ def parse_user_requests_file(file_path: Path) -> List[UserRequest]:
         user_id = None
         chat_id = None
         platform = None
-        message_type = match.group(2).split("\n")[0].strip()  # First line is message type
+        message_type = (
+            match.group(2).split("\n")[0].strip()
+        )  # First line is message type
         content_text = None
         message_id = None
         status = "Pending"
@@ -175,7 +177,9 @@ class ReadUserRequestsCommand(Command):
             print(f"  User: {req.username or 'Unknown'} (ID: {req.user_id})")
             print(f"  Platform: {req.platform}")
             print(f"  Chat ID: {req.chat_id}")
-            print(f"  Content: {req.content[:100]}{'...' if len(req.content) > 100 else ''}")
+            print(
+                f"  Content: {req.content[:100]}{'...' if len(req.content) > 100 else ''}"
+            )
             print(f"  Status: {req.status}")
             if req.message_id:
                 print(f"  Message ID: {req.message_id}")

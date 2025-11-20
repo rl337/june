@@ -104,7 +104,8 @@ def sync_message_to_user_requests(
         # Append to file (before the "<!-- Messages will be synced here automatically -->" comment)
         if "<!-- Messages will be synced here automatically -->" in current_content:
             new_content = current_content.replace(
-                "<!-- Messages will be synced here automatically -->", entry + "<!-- Messages will be synced here automatically -->"
+                "<!-- Messages will be synced here automatically -->",
+                entry + "<!-- Messages will be synced here automatically -->",
             )
         else:
             # If comment not found, append to end
@@ -112,7 +113,9 @@ def sync_message_to_user_requests(
 
         # Write back to file
         USER_REQUESTS_FILE.write_text(new_content, encoding="utf-8")
-        logger.debug(f"Synced {message_type} message to USER_REQUESTS.md for user {user_id}")
+        logger.debug(
+            f"Synced {message_type} message to USER_REQUESTS.md for user {user_id}"
+        )
         return True
 
     except Exception as e:
@@ -156,7 +159,7 @@ def update_message_status(
                 # Check if this entry matches our criteria
                 # Look backwards for user_id and optionally message_id/timestamp
                 entry_start = max(0, i - 10)  # Look back up to 10 lines
-                entry_lines = lines[entry_start:i + 1]
+                entry_lines = lines[entry_start : i + 1]
                 entry_text = "\n".join(entry_lines)
 
                 # Check if this entry matches
@@ -179,7 +182,9 @@ def update_message_status(
             logger.debug(f"Updated message status to {new_status} for user {user_id}")
             return True
         else:
-            logger.warning(f"Could not find matching message to update status for user {user_id}")
+            logger.warning(
+                f"Could not find matching message to update status for user {user_id}"
+            )
             return False
 
     except Exception as e:
