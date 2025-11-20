@@ -97,17 +97,17 @@ def parse_user_requests_file(file_path: Path) -> List[UserRequest]:
                 if username_match:
                     username = f"@{username_match.group(1)}"
             elif line.startswith("- **Platform:**"):
-                platform = line.split(":", 1)[1].strip()
+                platform = line.split(":", 1)[1].strip().replace("**", "").strip()
             elif line.startswith("- **Type:**"):
-                message_type = line.split(":", 1)[1].strip()
+                message_type = line.split(":", 1)[1].strip().replace("**", "").strip()
             elif line.startswith("- **Content:**"):
-                content_text = line.split(":", 1)[1].strip()
+                content_text = line.split(":", 1)[1].strip().replace("**", "").strip()
             elif line.startswith("- **Message ID:**"):
-                message_id = line.split(":", 1)[1].strip()
+                message_id = line.split(":", 1)[1].strip().replace("**", "").strip()
             elif line.startswith("- **Chat ID:**"):
-                chat_id = line.split(":", 1)[1].strip()
+                chat_id = line.split(":", 1)[1].strip().replace("**", "").strip()
             elif line.startswith("- **Status:**"):
-                status = line.split(":", 1)[1].strip()
+                status = line.split(":", 1)[1].strip().replace("**", "").strip()
 
         # Only include requests (not responses)
         if message_type == "Request" and user_id and content_text:
