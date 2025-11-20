@@ -33,6 +33,10 @@ COPY essence ./essence
 RUN . $HOME/.cargo/env && \
     poetry install --no-interaction --no-ansi --only main --no-root
 
+# Install june-grpc-api package first (required by inference-core)
+COPY packages/june-grpc-api /tmp/june-grpc-api
+RUN pip install -e /tmp/june-grpc-api
+
 # Install inference-core package in editable mode from source
 # This allows faster iteration during development without rebuilding wheels
 # Note: inference-core may install numpy 2.x, but TTS requires numpy 1.22.0
