@@ -13,10 +13,7 @@ from typing import List, Optional
 
 from essence.chat.user_requests_sync import update_message_status
 from essence.command import Command
-from essence.commands.read_user_requests import (
-    UserRequest,
-    parse_user_requests_file,
-)
+from essence.commands.read_user_requests import UserRequest, parse_user_requests_file
 
 logger = logging.getLogger(__name__)
 
