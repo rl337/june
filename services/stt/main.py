@@ -664,8 +664,14 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
             logger.info(f"Loading Whisper model: {config.stt.model_name}")
 
             # Load Whisper model
+            # Extract model name from path format (e.g., "openai/whisper-large-v3" -> "large-v3")
+            model_name = config.stt.model_name
+            if "/" in model_name:
+                # Extract just the model name part (e.g., "openai/whisper-large-v3" -> "large-v3")
+                model_name = model_name.split("/")[-1].replace("whisper-", "")
+            
             self.whisper_model = whisper.load_model(
-                config.stt.model_name, device=self.device
+                model_name, device=self.device
             )
 
             # Initialize VAD if enabled
