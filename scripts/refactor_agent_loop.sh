@@ -150,6 +150,7 @@ You are working on refactoring the june project. Your task is to:
    - **If you fix a CI issue, create a task in todorama to track it:** Use MCP to create a task documenting what was fixed
 
 4. **Pick an unfinished task** - If no GitHub Actions failures and no MCP tasks:
+   - **HIGH PRIORITY:** Check Phase 19 (Direct Agent-User Communication) in REFACTOR_PLAN.md - this is the NEW HIGH PRIORITY task
    - Look for tasks marked with ⏳ TODO in the REFACTOR_PLAN.md
    - **For operational tasks that are blocked**, create MCP tasks in todorama to track them:
      - Example: "Phase 15 Task 4: Compile Qwen3 model" → Create task in todorama with details
@@ -159,6 +160,7 @@ You are working on refactoring the june project. Your task is to:
    - You have enough context to complete
    - Will make meaningful progress toward the refactoring goals
    - Is appropriate for a single iteration (not too large)
+   - **Priority order:** Phase 19 > Phase 15 > Phase 16 > Phase 18 > Other tasks
 
 5. **Perform the task** - Complete the selected task. This may involve:
    - Removing code dependencies on removed services
@@ -300,7 +302,11 @@ You are working on refactoring the june project. Your task is to:
 - Services to keep: telegram, discord, stt, tts
 - LLM Inference: TensorRT-LLM (in home_infra/shared-network, default) or NVIDIA NIM (nim-qwen3:8001). Legacy inference-api service available via --profile legacy for backward compatibility only.
 - Services removed: gateway, postgres, minio, redis, nats, orchestrator, webapp
-- **NEW PRIORITY:** Phase 10 (Qwen3 setup and coding agent) - see REFACTOR_PLAN.md Phase 10
+- **NEW HIGH PRIORITY:** Phase 19 (Direct Agent-User Communication) - see REFACTOR_PLAN.md Phase 19
+  - Establish direct communication with whitelisted users via Telegram/Discord
+  - Sync all messages to USER_REQUESTS.md
+  - Replace agentic flow in services with direct agent communication
+  - Implement message grouping and periodic polling for user responses
 - **Container-first requirement:** All model operations, downloads, and inference must happen in Docker containers - no host system pollution
 - **Sandbox requirement:** All benchmark executions must run in isolated sandboxes (containers/chroot) with full reviewability
 

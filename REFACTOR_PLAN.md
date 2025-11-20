@@ -9,6 +9,7 @@
 - ✅ **All infrastructure ready** (commands, tools, documentation)
 - ✅ **GitHub Actions passing** (all workflows successful)
 - ✅ **No uncommitted changes**
+- ⏳ **NEW HIGH PRIORITY:** Phase 19 - Direct Agent-User Communication (immediate implementation required)
 - ⏳ **Remaining work is operational** (requires services to be running):
   - Phase 10.1-10.2: Model download and service startup (requires HUGGINGFACE_TOKEN, model download time)
   - Phase 15: NIM gRPC connectivity testing (requires NIM service running in home_infra with NGC_API_KEY)
@@ -120,6 +121,88 @@ All major refactoring phases have been completed:
 - All services communicate via gRPC directly
 
 ## Next Development Priorities
+
+### Phase 19: Direct Agent-User Communication ⏳ NEW HIGH PRIORITY
+
+**Goal:** Establish direct communication channel between the looping agent and whitelisted end users via Telegram/Discord, replacing the current agentic flow in these services.
+
+**Status:** ⏳ NEW PRIORITY - Immediate implementation required
+
+**Tasks:**
+1. **Establish whitelisted user communication:** ⏳ TODO
+   - ⏳ Create user whitelist configuration (environment variables or config file)
+   - ⏳ Implement user whitelist checking in Telegram/Discord services
+   - ⏳ Only whitelisted users can communicate directly with the looping agent
+   - ⏳ Non-whitelisted users continue to use the existing agentic flow
+
+2. **Replace agentic flow with direct communication:** ⏳ TODO
+   - ⏳ Modify Telegram service to route whitelisted user messages directly to looping agent
+   - ⏳ Modify Discord service to route whitelisted user messages directly to looping agent
+   - ⏳ Disable current agentic flow for whitelisted users
+   - ⏳ Implement message routing logic to distinguish agent communication from regular bot responses
+
+3. **Sync messages to USER_REQUESTS.md:** ⏳ TODO
+   - ⏳ Create `USER_REQUESTS.md` file to track all user-agent communication
+   - ⏳ Implement message syncing: All messages exchanged between whitelisted users and the looping agent are synced to USER_REQUESTS.md
+   - ⏳ Format: Timestamp, user_id, platform, message_type (request/response), content
+   - ⏳ Update USER_REQUESTS.md in real-time as messages are exchanged
+   - ⏳ Include message metadata (message_id, chat_id, timestamp, platform)
+
+4. **Message grouping and editing:** ⏳ TODO
+   - ⏳ Group multiple requests into a single message when possible
+   - ⏳ Use message editing (edit_text/edit_message) to update grouped messages
+   - ⏳ If grouping is not possible, send small groups of messages (2-3 max)
+   - ⏳ Implement message grouping logic based on:
+     - Time window (group requests within X seconds)
+     - Message length (group if total length is reasonable)
+     - Message type (group similar types together)
+
+5. **Periodic message polling:** ⏳ TODO
+   - ⏳ Implement periodic polling to check for user responses
+   - ⏳ Poll interval: Configurable (default: 30 seconds to 5 minutes)
+   - ⏳ Check for new messages from whitelisted users
+   - ⏳ Process responses and update USER_REQUESTS.md
+   - ⏳ Handle long delays: User may not respond for hours/days
+   - ⏳ Implement message state tracking (pending, responded, timeout)
+
+6. **Service conflict prevention:** ⏳ TODO
+   - ⏳ **CRITICAL:** When direct agent communication is active via Telegram, the Telegram service MUST be disabled to prevent race conditions
+   - ⏳ **CRITICAL:** When direct agent communication is active via Discord, the Discord service MUST be disabled to prevent race conditions
+   - ⏳ Implement service status checking before enabling direct communication
+   - ⏳ Provide clear error messages if services are running when agent tries to communicate
+   - ⏳ Document service management workflow (stop service → enable agent communication → start service when done)
+
+**Implementation Details:**
+- **User Whitelist:** Environment variables `TELEGRAM_WHITELISTED_USERS` and `DISCORD_WHITELISTED_USERS` (comma-separated user IDs)
+- **Message Sync Format:** Markdown file with structured entries:
+  ```markdown
+  ## [2025-11-19 12:00:00] User Request
+  - **User:** @username (user_id: 123456789)
+  - **Platform:** Telegram
+  - **Type:** Request
+  - **Content:** [message content]
+  - **Message ID:** 12345
+  - **Chat ID:** 987654321
+
+  ## [2025-11-19 12:05:00] Agent Response
+  - **User:** @username (user_id: 123456789)
+  - **Platform:** Telegram
+  - **Type:** Response
+  - **Content:** [response content]
+  - **Message ID:** 12346
+  - **Chat ID:** 987654321
+  ```
+- **Polling Implementation:** Background task that periodically checks for new messages
+- **Message Grouping:** Smart grouping based on time window and message length
+- **Service Management:** Commands to start/stop services when agent communication is needed
+
+**Use Cases:**
+- User sends a request → Agent processes it → Response synced to USER_REQUESTS.md
+- Agent needs clarification → Sends message to user → Waits for response (polling) → Processes response
+- Multiple quick requests → Grouped into single message → Edited as agent processes each
+- Long delay between request and response → Polling continues until response received or timeout
+
+**Priority:** This is a NEW HIGH PRIORITY task that should be implemented immediately. It enables direct communication between the looping agent and the end user, which is essential for the agent to ask for help, clarification, and report progress.
 
 ### Phase 10: Qwen3 Setup and Coding Agent ✅ COMPLETED
 
@@ -841,26 +924,4 @@ All code changes, cleanup, and refactoring tasks have been completed:
   - Phase 18: Benchmark evaluation (requires LLM service running)
   - Message history debugging (tools ready, requires actual message data from real usage)
 - ⚠️ **Note:** Attempted to create MCP todorama tasks for operational work tracking, but encountered persistent database schema issue (table tasks has no column named priority). Operational tasks remain documented in REFACTOR_PLAN.md TODO items. MCP todorama service needs schema update to support task creation with priority field.
-
-
-## Agent Monitor Alert - 2025-11-19 22:33:46
-
-**Status:** Agent appears to be stuck: 33:46] AGENT STUCK DETECTED: Agent appears to be in a loop (low pattern diversity)
-Unknown reason
-
-**Current Task:** 
-
-**Recommendations:**
-- If stuck on a specific task, consider breaking it into smaller subtasks
-- If encountering errors, check logs and fix the underlying issue
-- If no progress is being made, consider moving to a different task
-- If blocked by external dependencies, document the blocker and move on
-
-**Action:** Agent should review this alert and either:
-1. Continue with current task if progress is being made
-2. Break down the task into smaller steps
-3. Move to a different task if blocked
-4. Ask for help if truly stuck
-
----
 
