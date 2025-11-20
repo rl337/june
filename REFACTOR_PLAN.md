@@ -970,11 +970,12 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - ⏳ **NOTE:** Port 8082 conflict - integration-test or another service using it. Docker-compose will handle this. For manual testing, use port 8085.
    - ⏳ **NOTE:** Full send/edit/append testing requires bot tokens (TELEGRAM_BOT_TOKEN, DISCORD_BOT_TOKEN) which are configured in docker-compose.yml. API structure verified working.
 
-6. **Update agent loop to use API:** ⏳ TODO (HIGH PRIORITY)
-   - Update `scripts/refactor_agent_loop.sh` to use Message API
-   - Ensure agent can send help requests via API
-   - Ensure agent can read user responses via API
-   - Test end-to-end: Agent sends message → User responds → Agent reads response
+6. **Update agent loop to use API:** ✅ COMPLETED (2025-11-20)
+   - ✅ Updated `scripts/refactor_agent_loop.sh` prompt to use Message API client
+   - ✅ Changed from `send_message_to_user` to `send_message_via_api`
+   - ✅ Updated documentation to reference Message API service requirement
+   - ✅ Added instructions for reading user responses via API
+   - ⏳ **NEXT:** Test end-to-end: Agent sends message → User responds → Agent reads response (requires message-api service running in docker-compose)
 
 **Helper Scripts:**
 - `scripts/test_send_dms.py` - Test script to verify agent can send DMs (✅ verified working)
