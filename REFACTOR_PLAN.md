@@ -50,6 +50,9 @@
        - Requires NGC_API_KEY for full functionality (queries NGC catalog via list-nims command)
      - 📄 **Documentation:** Created `docs/NIM_AVAILABILITY.md` with detailed NIM availability status
     - ⏳ **If STT/TTS NIMs exist:** Add to home_infra/docker-compose.yml following nim-qwen3 pattern
+      - ✅ **Helper script created:** `scripts/generate_nim_compose_snippet.sh` - Generates docker-compose.yml service snippets for Riva NIMs
+      - Usage: `./scripts/generate_nim_compose_snippet.sh --stt --image nvcr.io/nim/riva/riva-asr:1.0.0` or `--tts --image nvcr.io/nim/riva/riva-tts:1.0.0`
+      - Script generates complete service definition following nim-qwen3 pattern (GPU allocation, health checks, tracing, etc.)
     - ⏳ **If STT/TTS NIMs don't exist:** Continue using custom STT/TTS services (already configured in june/docker-compose.yml)
     - ✅ Configure Telegram/Discord whitelist for direct agent-user communication (completed)
     - ✅ Start services with whitelist enabled (telegram and discord services started with whitelist configured)
