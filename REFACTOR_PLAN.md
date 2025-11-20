@@ -257,10 +257,19 @@ The agent can help with steps 2-3 once the user provides the required informatio
      - ✅ Checked if `NGC_API_KEY` is set in home_infra environment → **SET** (found in `.env` file)
      - ✅ Logged Docker into NGC registry using NGC_API_KEY → **SUCCESS**
      - ⏳ **BLOCKER:** Image name needs verification - current image `nvcr.io/nvidia/nim_qwen3_30b_instruct:latest` may be incorrect
-       - Documentation suggests verifying image name in NGC catalog: https://catalog.ngc.nvidia.com/
-       - Search for "qwen3" or "qwen" in Containers → NIM section
-       - May need to use staging image: `nvcr.io/nvstaging/nim_qwen3_30b_instruct:latest`
-       - Or may need different image name format entirely
+       - **Attempted image names (all failed with "Access Denied"):**
+         - `nvcr.io/nvidia/nim_qwen3_30b_instruct:latest` (current config)
+         - `nvcr.io/nvstaging/nim_qwen3_30b_instruct:latest` (staging)
+         - `nvcr.io/nvidia/nim-qwen3-30b-instruct:latest` (hyphenated)
+       - **Possible reasons for failure:**
+         - Qwen3 NIM container may not exist yet in NGC catalog
+         - Image name format may be completely different
+         - NGC_API_KEY may not have access to NIM containers (may need special permissions)
+         - Container may not be publicly available yet
+       - **Action Required:** User must manually verify image name in NGC catalog: https://catalog.ngc.nvidia.com/
+         - Navigate to Containers → NIM (or search for "NIM")
+         - Search for "qwen3" or "qwen"
+         - Find the correct container name and update `home_infra/docker-compose.yml`
        - See `docs/guides/NIM_SETUP.md` for detailed verification steps
      - ⏳ Start NIM service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3` (blocked on image name verification)
      - ⏳ Verify NIM is running: `docker compose ps nim-qwen3` (blocked on service start)
