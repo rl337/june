@@ -432,6 +432,7 @@ The agent can help with steps 2-3 once the user provides the required informatio
 
 5. **Test end-to-end communication:** ⏳ TODO
    - **Note:** This task references USER_REQUESTS.md, but the system now uses USER_MESSAGES.md (see Phase 21)
+   - **Prerequisites Verification:** Run `poetry run python scripts/verify_phase19_prerequisites.py` to check all prerequisites before testing
    - Send test message from owner user via Telegram/Discord
    - Verify message appears in `/var/data/USER_MESSAGES.md` with status "NEW"
    - Verify agent reads and processes message via `process-user-messages` command
@@ -439,6 +440,7 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - Verify owner receives response on Telegram/Discord
    - Verify message status updated to "RESPONDED" in USER_MESSAGES.md
    - **Helper Script:** `scripts/setup_phase19_operational.sh` - Provides step-by-step testing guidance
+   - **Verification Script:** `scripts/verify_phase19_prerequisites.py` - Comprehensive prerequisite verification
    - **See Phase 21 Task 4 for detailed test steps**
 
 6. **Verify actual exchanges happening:** ⏳ TODO (Operational task, requires services running)
