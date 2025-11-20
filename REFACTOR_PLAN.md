@@ -56,7 +56,7 @@
     - ✅ Fixed TTS service scipy/numpy compatibility - install compatible versions after inference-core
     - ✅ Fixed /var/data permission issue - made directory creation non-fatal for services that don't need it
     - ✅ Fixed TTS service missing june-grpc-api dependency (added to Dockerfile before inference-core)
-    - ⏳ TTS service build in progress - started background build with june-grpc-api fix (check /tmp/tts_build_fixed.log for progress)
+    - ⚠️ TTS service build keeps timing out - Docker buildkit issue during TTS package installation (very slow, >30 minutes). june-grpc-api fix is in Dockerfile but image hasn't been rebuilt yet. **Workaround:** Consider using pre-built TTS wheels or splitting build into multiple stages. **Status:** Build attempts keep timing out, need to investigate buildkit configuration or use alternative build approach.
     - ✅ Services status: telegram (unhealthy - STT/TTS connection timeouts), discord (healthy), message-api (healthy), stt (loading model), tts (restarting - essence import error)
     - ✅ **RADICAL REFACTOR COMPLETE:** Replaced USER_REQUESTS.md with USER_MESSAGES.md in /var/data/
     - ✅ **RADICAL REFACTOR COMPLETE:** Distinguish owner users from whitelisted users (owner = personal accounts, whitelisted = includes owners + others)
