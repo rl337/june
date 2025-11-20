@@ -957,13 +957,16 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - ✅ Updated `scripts/refactor_agent_loop.sh` documentation to use Message API
    - ⏳ **NEXT:** Test agent can send messages via API (requires message-api service running)
 
-5. **Test API endpoints:** ⏳ TODO (HIGH PRIORITY)
-   - Test GET /messages with various filters
-   - Test POST /messages to send message
-   - Test PUT /messages/{message_id} to edit message
-   - Test PATCH /messages/{message_id} to append to message
-   - Verify messages appear in Telegram/Discord
-   - Verify message history is updated correctly
+5. **Test API endpoints:** ⏳ IN PROGRESS (HIGH PRIORITY)
+   - ✅ Created test script `scripts/test_message_api.py` for comprehensive API testing
+   - ✅ Verified GET /health endpoint works
+   - ✅ Verified GET /messages endpoint works (returns empty list when no messages)
+   - ⏳ Test POST /messages to send message (requires Telegram/Discord services stopped)
+   - ⏳ Test PUT /messages/{message_id} to edit message
+   - ⏳ Test PATCH /messages/{message_id} to append to message
+   - ⏳ Verify messages appear in Telegram/Discord
+   - ⏳ Verify message history is updated correctly
+   - ⏳ **NOTE:** Port 8082 conflict - integration-test or another service using it. Use port 8085 for testing or resolve conflict.
 
 6. **Update agent loop to use API:** ⏳ TODO (HIGH PRIORITY)
    - Update `scripts/refactor_agent_loop.sh` to use Message API
