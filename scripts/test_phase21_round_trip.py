@@ -30,11 +30,16 @@ from essence.chat.user_messages_sync import (
     append_message_to_user_messages,
     update_message_status,
     get_owner_users,
+    USER_MESSAGES_FILE,
 )
 from essence.chat.message_api_client import MessageAPIClient, send_message_via_api
+from essence.commands.process_user_messages import parse_user_messages_file
 
 # Configuration
-DATA_DIR = Path("/var/data")
+# Use JUNE_DATA_DIR if set, otherwise use /var/data (for containers)
+# On host, this should match the volume mount in docker-compose.yml
+JUNE_DATA_DIR = os.getenv("JUNE_DATA_DIR", "/home/rlee/june_data")
+DATA_DIR = Path(os.getenv("USER_MESSAGES_DATA_DIR", f"{JUNE_DATA_DIR}/var-data"))
 USER_MESSAGES_FILE = DATA_DIR / "USER_MESSAGES.md"
 MESSAGE_API_URL = os.getenv("MESSAGE_API_URL", "http://localhost:8083")
 POLLING_INTERVAL = 5  # seconds to wait between checks
@@ -114,7 +119,7 @@ def check_prerequisites() -> bool:
     # Check Message API connectivity
     print("\nChecking Message API connectivity...")
     try:
-        client = MessageAPIClient(api_url=MESSAGE_API_URL)
+        client = MessageAPIClient(base_url=MESSAGE_API_URL)
         health = client.health_check()
         if health.get("status") == "healthy":
             print(f"✅ Message API is accessible at {MESSAGE_API_URL}")
@@ -156,23 +161,24 @@ def test_step1_send_message() -> Optional[str]:
     # Append message to USER_MESSAGES.md
     try:
         append_message_to_user_messages(
-            platform=platform,
             user_id=user_id,
             chat_id=user_id,
-            message=test_message,
+            platform=platform,
             message_type="text",
+            content=test_message,
         )
         print("✅ Message appended to USER_MESSAGES.md with status 'NEW'")
         
-        # Read back to get message ID
-        messages = read_user_messages()
+        # Read back to get message ID (match by content and status)
+        messages = parse_user_messages_file(USER_MESSAGES_FILE)
         for msg in messages:
-            if msg.get("status") == "NEW" and msg.get("message") == test_message:
-                message_id = msg.get("message_id")
-                print(f"✅ Message ID: {message_id}")
+            if msg.status == "NEW" and msg.content == test_message:
+                # Use timestamp as identifier if message_id is not available
+                message_id = msg.message_id or msg.timestamp
+                print(f"✅ Message found - ID: {message_id}")
                 return message_id
         
-        print("⚠️  Message appended but could not find message ID")
+        print("⚠️  Message appended but could not find it in file")
         return "unknown"
     except Exception as e:
         print(f"❌ Failed to append message: {e}")
@@ -190,21 +196,23 @@ def test_step2_verify_new_status(message_id: str) -> bool:
         return False
     
     try:
-        messages = read_user_messages()
+        messages = parse_user_messages_file(USER_MESSAGES_FILE)
         for msg in messages:
-            if msg.get("message_id") == message_id:
-                status = msg.get("status")
+            # Match by message_id or timestamp
+            msg_identifier = msg.message_id or msg.timestamp
+            if msg_identifier == message_id:
+                status = msg.status
                 if status == "NEW":
                     print(f"✅ Message found with status 'NEW'")
-                    print(f"   Message ID: {message_id}")
+                    print(f"   Identifier: {message_id}")
                     print(f"   Status: {status}")
-                    print(f"   Message: {msg.get('message', '')[:50]}...")
+                    print(f"   Message: {msg.content[:50]}...")
                     return True
                 else:
                     print(f"⚠️  Message found but status is '{status}' (expected 'NEW')")
                     return False
         
-        print(f"❌ Message with ID '{message_id}' not found in USER_MESSAGES.md")
+        print(f"❌ Message with identifier '{message_id}' not found in USER_MESSAGES.md")
         return False
     except Exception as e:
         print(f"❌ Failed to read USER_MESSAGES.md: {e}")
@@ -223,13 +231,15 @@ def test_step3_verify_processing_status(message_id: str) -> bool:
     start_time = time.time()
     while time.time() - start_time < MAX_WAIT_TIME:
         try:
-            messages = read_user_messages()
+            messages = parse_user_messages_file(USER_MESSAGES_FILE)
             for msg in messages:
-                if msg.get("message_id") == message_id:
-                    status = msg.get("status")
+                # Match by message_id or timestamp
+                msg_identifier = msg.message_id or msg.timestamp
+                if msg_identifier == message_id:
+                    status = msg.status
                     if status == "PROCESSING":
                         print(f"✅ Message status updated to 'PROCESSING'")
-                        print(f"   Message ID: {message_id}")
+                        print(f"   Identifier: {message_id}")
                         print(f"   Status: {status}")
                         return True
                     elif status in ["RESPONDED", "ERROR"]:
@@ -258,7 +268,7 @@ def test_step4_verify_response_sent(message_id: str) -> bool:
     print(f"  Checking Message API for response messages...")
     
     try:
-        client = MessageAPIClient(api_url=MESSAGE_API_URL)
+        client = MessageAPIClient(base_url=MESSAGE_API_URL)
         messages = client.list_messages(limit=10)
         
         if messages and len(messages) > 0:
@@ -301,13 +311,15 @@ def test_step5_verify_responded_status(message_id: str) -> bool:
     start_time = time.time()
     while time.time() - start_time < MAX_WAIT_TIME:
         try:
-            messages = read_user_messages()
+            messages = parse_user_messages_file(USER_MESSAGES_FILE)
             for msg in messages:
-                if msg.get("message_id") == message_id:
-                    status = msg.get("status")
+                # Match by message_id or timestamp
+                msg_identifier = msg.message_id or msg.timestamp
+                if msg_identifier == message_id:
+                    status = msg.status
                     if status == "RESPONDED":
                         print(f"✅ Message status updated to 'RESPONDED'")
-                        print(f"   Message ID: {message_id}")
+                        print(f"   Identifier: {message_id}")
                         print(f"   Status: {status}")
                         return True
                     elif status == "ERROR":

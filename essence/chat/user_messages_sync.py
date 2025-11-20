@@ -14,16 +14,21 @@ from typing import Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 # Path to USER_MESSAGES.md (in /var/data/ directory)
-DATA_DIR = Path("/var/data")
+# Support environment variable for host testing (matches volume mount in docker-compose.yml)
+# In containers: /var/data (volume mount)
+# On host: ${JUNE_DATA_DIR}/var-data (volume mount path)
+DATA_DIR_OVERRIDE = os.getenv("USER_MESSAGES_DATA_DIR")
+if DATA_DIR_OVERRIDE:
+    DATA_DIR = Path(DATA_DIR_OVERRIDE)
+else:
+    DATA_DIR = Path("/var/data")
 # Try to create directory, but handle permission errors gracefully
 # (TTS service doesn't need this directory, so it's OK if creation fails)
 try:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 except (PermissionError, OSError) as e:
     # Log warning but don't fail - some services (like TTS) don't need this directory
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.warning(f"Could not create /var/data directory: {e}. This is OK for services that don't use USER_MESSAGES.md")
+    logger.warning(f"Could not create {DATA_DIR} directory: {e}. This is OK for services that don't use USER_MESSAGES.md")
 USER_MESSAGES_FILE = DATA_DIR / "USER_MESSAGES.md"
 
 

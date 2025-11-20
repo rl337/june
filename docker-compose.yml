@@ -295,6 +295,7 @@ services:
     - ./config/cursor-mcp-config.json:/home/june/.config/cursor/mcp.json:ro
     - ${HOME}/.cursor:/home/june/.cursor:rw
     - /var/log/june/telegram:/logs
+    - ${JUNE_DATA_DIR:-/home/rlee/june_data}/var-data:/var/data
     deploy:
       resources:
         limits:
@@ -356,6 +357,7 @@ services:
     - ./config/cursor-mcp-config.json:/home/june/.config/cursor/mcp.json:ro
     - ${HOME}/.cursor:/home/june/.cursor:rw
     - /var/log/june/discord:/logs
+    - ${JUNE_DATA_DIR:-/home/rlee/june_data}/var-data:/var/data
     networks:
     - june_network
     - shared-network
@@ -393,6 +395,7 @@ services:
     - JAEGER_AGENT_PORT=6831
     volumes:
     - /var/log/june/message-api:/logs
+    - ${JUNE_DATA_DIR:-/home/rlee/june_data}/var-data:/var/data
     networks:
     - june_network
     - shared-network

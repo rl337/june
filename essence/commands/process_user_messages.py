@@ -83,9 +83,10 @@ def parse_user_messages_file(file_path: Path) -> List[UserMessage]:
         status = "NEW"
 
         # Extract fields from entry text
-        user_match = re.search(r"- \*\*User:\*\* (.+?) \(user_id: (\d+)\)", entry_text)
+        # Username is optional (format: "- **User:** @username (user_id: 123)" or "- **User:** (user_id: 123)")
+        user_match = re.search(r"- \*\*User:\*\* (?:@?(\S+)\s+)?\(user_id: (\d+)\)", entry_text)
         if user_match:
-            username = user_match.group(1).strip().replace("@", "")
+            username = user_match.group(1).strip().replace("@", "") if user_match.group(1) else None
             user_id = user_match.group(2).strip()
 
         platform_match = re.search(r"- \*\*Platform:\*\* (.+)", entry_text)
