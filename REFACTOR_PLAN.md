@@ -30,7 +30,10 @@
     - ✅ NIM access resolved - nim-qwen3 downloaded successfully
     - ✅ LLM NIM (nim-qwen3) configured in home_infra/docker-compose.yml
     - ✅ **Tool Available:** `list-nims` command exists to discover available NIM containers - use `poetry run python -m essence list-nims --dgx-spark-only --filter stt` or `--filter tts` to find SparkStation-compatible models for STT/TTS evaluation
-    - ⏳ **Operational:** Start LLM NIM service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3` (requires NGC_API_KEY)
+    - ✅ **Operational:** Start LLM NIM service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3` (requires NGC_API_KEY)
+      - ✅ **COMPLETED:** Service started successfully (2025-11-20 14:22:20)
+      - ⏳ **Status:** Service is running and downloading model files (health: starting)
+      - ⏳ **Next:** Wait for model download/initialization to complete, then verify connectivity
     - ✅ **RESOLVED:** DGX Spark NIMs support ARM64 architecture! The Qwen3-32B DGX Spark NIM is confirmed ARM64-compatible and configured in home_infra/docker-compose.yml.
      - ✅ **LLM NIM:** Qwen3-32B DGX Spark NIM confirmed ARM64-compatible (image: `nvcr.io/nim/qwen/qwen3-32b-dgx-spark:1.0.0`)
      - ⏳ **STT NIM:** Riva ASR NIM available (Parakeet ASR-CTC-1.1B-EnUS) - image path confirmed (`nvcr.io/nim/riva/riva-asr:latest`)
@@ -394,9 +397,9 @@ The agent can help with steps 2-3 once the user provides the required informatio
      - ✅ **RESOLVED:** NIM access granted - nim-qwen3 downloaded successfully
      - ⏳ **NEXT:** Deploy STT NIM (check NGC catalog for STT NIM container)
      - ⏳ **NEXT:** Deploy TTS NIM (check NGC catalog for TTS NIM container)
-     - ⏳ Start LLM NIM service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3`
-     - ⏳ Verify LLM NIM is running: `docker compose ps nim-qwen3`
-     - ⏳ Verify LLM NIM connectivity: `cd /home/rlee/dev/june && poetry run python -m essence verify-nim --nim-host nim-qwen3 --http-port 8003 --grpc-port 8001`
+     - ✅ Start LLM NIM service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3` → **COMPLETED** (2025-11-20 14:22:20)
+     - ✅ Verify LLM NIM is running: `docker compose ps nim-qwen3` → **RUNNING** (status: health: starting, downloading model files)
+     - ⏳ Verify LLM NIM connectivity: `cd /home/rlee/dev/june && poetry run python -m essence verify-nim --nim-host nim-qwen3 --http-port 8003 --grpc-port 8001` → **PENDING** (waiting for model initialization to complete)
      - ⏳ Update june services to use NIM endpoint (set `LLM_URL=grpc://nim-qwen3:8001` in docker-compose.yml or .env)
      - ⏳ Configure STT service to use STT NIM (once deployed)
      - ⏳ Configure TTS service to use TTS NIM (once deployed)
