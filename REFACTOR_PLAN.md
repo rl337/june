@@ -2,7 +2,7 @@
 
 ## Status: ✅ **ALL CODE WORK COMPLETE** → ⏳ **OPERATIONAL TASKS REMAINING**
 
-**Last Updated:** 2025-11-20 (Documented NIM image name verification attempts, all code complete, operational tasks blocked on external factors - NIM image name verification and Telegram user ID)
+**Last Updated:** 2025-11-20 (Updated NIM deployment status - image path verified as `nvcr.io/nim/qwen/qwen3-32b:1.0.0`, blocker is account NIM access/subscription, not image name. All code complete, operational tasks blocked on external factors.)
 
 **Current State:**
 - ✅ **All code implementation complete** (451 tests passing, 1 skipped)
