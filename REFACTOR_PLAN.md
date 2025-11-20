@@ -9,7 +9,7 @@
 - ✅ **All infrastructure ready** (commands, tools, documentation)
 - ✅ **GitHub Actions passing** (all workflows successful)
 - ✅ **No uncommitted changes**
-- ⏳ **Phase 19 - Direct Agent-User Communication:** Code implementation complete, polling loop integration in agent script pending
+- ✅ **Phase 19 - Direct Agent-User Communication:** All code implementation tasks complete (whitelist, routing, USER_REQUESTS.md syncing, message grouping/editing, service conflict prevention, polling loop integration)
 - ⏳ **Remaining work is operational** (requires services to be running):
   - Phase 10.1-10.2: Model download and service startup (requires HUGGINGFACE_TOKEN, model download time)
   - Phase 15: NIM gRPC connectivity testing (requires NIM service running in home_infra with NGC_API_KEY)
@@ -47,6 +47,7 @@ All major refactoring phases have been completed:
 - ✅ **Phase 19 Task 5 - Periodic Message Polling:** Created `poll-user-responses` command and `check_for_user_responses()` utility function for polling user responses to agent messages. Detects agent messages waiting for responses, checks for new user requests, automatically updates status (Responded/Timeout), handles configurable timeouts. Polling utility ready for use in looping agent script. All Phase 19 code implementation tasks complete.
 - ✅ **Phase 19 Task 6 - Service Conflict Prevention:** Created `check-service-status` command, enhanced service status checking with `verify_service_stopped_for_platform()`, improved error messages with workflow documentation, added comprehensive guide in `docs/guides/AGENT_COMMUNICATION.md`. Service conflict prevention fully implemented.
 - ✅ **Phase 19 Command Registration:** Registered Phase 19 commands (`read-user-requests`, `poll-user-responses`, `check-service-status`) in `essence/commands/__init__.py` so they're discoverable by the command system. Updated `docs/guides/COMMANDS.md` to document Phase 19 commands.
+- ✅ **Phase 19 Task 5 - Polling Loop Integration:** Integrated periodic user response polling into `scripts/refactor_agent_loop.sh`. Added background polling task that runs every 2 minutes (configurable), calls `poll-user-responses` and `read-user-requests` commands, runs in background allowing agent work to continue, includes graceful shutdown handling, and can be disabled via ENABLE_USER_POLLING=0. Polling loop integration complete.
 - ✅ **Phase 19 Unit Tests:** Created comprehensive unit tests for Phase 19 features:
   - `test_user_requests_sync.py` - 14 tests for whitelist management and message syncing
   - `test_message_grouping.py` - 16 tests for message grouping and formatting
@@ -138,13 +139,20 @@ All major refactoring phases have been completed:
 
 **Goal:** Establish direct communication channel between the looping agent and whitelisted end users via Telegram/Discord, replacing the current agentic flow in these services.
 
-**Status:** ⏳ MOSTLY COMPLETED - Code implementation complete, polling loop integration pending
-1. ✅ Whitelisted user communication
-2. ✅ Replace agentic flow with direct communication
-3. ✅ Sync messages to USER_REQUESTS.md
-4. ✅ Message grouping and editing
+**Status:** ⏳ IN PROGRESS - Code implementation complete, operational deployment and actual usage pending
+1. ✅ Whitelisted user communication (code complete)
+2. ✅ Replace agentic flow with direct communication (code complete)
+3. ✅ Sync messages to USER_REQUESTS.md (code complete)
+4. ✅ Message grouping and editing (code complete)
 5. ⏳ Periodic message polling (utility implemented, polling loop integration in agent script pending)
-6. ✅ Service conflict prevention
+6. ✅ Service conflict prevention (code complete)
+7. ⏳ **OPERATIONAL DEPLOYMENT PENDING:**
+   - ⏳ NIMs not deployed for all inference (depends on Phase 15 Task 4)
+   - ⏳ No actual exchanges happening between user and looping agent via Telegram/Discord
+   - ⏳ Whitelist configuration not set up
+   - ⏳ Telegram/Discord services not running with whitelist enabled
+   - ⏳ Polling loop not integrated into agent script
+   - ⏳ End-to-end testing not performed
 
 **Tasks:**
 1. **Establish whitelisted user communication:** ✅ COMPLETED
@@ -201,6 +209,48 @@ All major refactoring phases have been completed:
      - Process user responses when detected
      - Continue agent work while polling in background
      - This enables the agent to respond to user messages even when the user doesn't respond immediately
+
+**Operational Deployment Tasks (REQUIRED FOR COMPLETION):**
+1. **Deploy NIMs for inference:** ⏳ TODO (depends on Phase 15 Task 4)
+   - NIMs must be deployed and running in home_infra
+   - NIM service must be accessible via gRPC (nim-qwen3:8001)
+   - All inference must route through NIMs (not legacy inference-api)
+   - Verify NIM connectivity: `poetry run python -m essence verify-nim --nim-host nim-qwen3 --http-port 8003 --grpc-port 8001`
+
+2. **Configure whitelisted users:** ⏳ TODO
+   - Set `TELEGRAM_WHITELISTED_USERS` environment variable (comma-separated user IDs)
+   - Set `DISCORD_WHITELISTED_USERS` environment variable (comma-separated user IDs)
+   - Verify whitelist configuration is loaded correctly
+
+3. **Start Telegram/Discord services with whitelist:** ⏳ TODO
+   - Start Telegram service with whitelist environment variables set
+   - Start Discord service with whitelist environment variables set
+   - Verify services are routing whitelisted users correctly
+   - Verify non-whitelisted users still use existing agentic flow
+
+4. **Integrate polling loop into agent script:** ⏳ TODO
+   - Add polling loop to `scripts/refactor_agent_loop.sh`
+   - Configure polling interval (default: 30 seconds to 5 minutes)
+   - Test polling detects new user requests
+   - Test polling processes user responses
+
+5. **Test end-to-end communication:** ⏳ TODO
+   - Send test message from whitelisted user via Telegram
+   - Verify message appears in USER_REQUESTS.md
+   - Verify agent reads and responds to message
+   - Verify agent response appears in Telegram
+   - Verify agent response synced to USER_REQUESTS.md
+   - Test message grouping and editing
+   - Test periodic polling detects responses
+   - Test service conflict prevention (disable Telegram service when agent communicating)
+
+6. **Verify actual exchanges happening:** ⏳ TODO
+   - Confirm user can send messages to looping agent via Telegram/Discord
+   - Confirm agent can send messages to user via Telegram/Discord
+   - Confirm messages are synced to USER_REQUESTS.md
+   - Confirm polling loop is working
+   - Confirm message grouping/editing is working
+   - Confirm service conflict prevention is working
 
 6. **Service conflict prevention:** ✅ COMPLETED
    - ✅ **CRITICAL:** When direct agent communication is active via Telegram, the Telegram service MUST be disabled to prevent race conditions

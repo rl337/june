@@ -16,6 +16,13 @@
 # Each agent iteration has a timeout (default: 30 minutes) to prevent stuck processes.
 # Long operations (model downloads, builds, etc.) must be run in background.
 # The timeout can be configured via AGENT_TIMEOUT_SECONDS environment variable.
+#
+# User Response Polling:
+# The script also runs periodic polling for user responses in the background:
+# - Polls for user responses to agent messages (default: every 2 minutes)
+# - Checks for pending user requests from USER_REQUESTS.md
+# - Polling interval can be configured via USER_POLLING_INTERVAL_SECONDS environment variable
+# - Polling can be disabled by setting ENABLE_USER_POLLING=0
 
 set -euo pipefail
 
@@ -38,6 +45,16 @@ SESSION_ID_FILE="${PROJECT_ROOT}/.refactor_agent_session_id"
 # Long operations (model downloads, builds, etc.) must be run in background
 # Can be overridden via AGENT_TIMEOUT_SECONDS environment variable
 AGENT_TIMEOUT_SECONDS="${AGENT_TIMEOUT_SECONDS:-1800}"
+
+# Polling interval for user responses (in seconds)
+# Default: 2 minutes (120 seconds) - checks for user responses periodically
+# Can be overridden via USER_POLLING_INTERVAL_SECONDS environment variable
+USER_POLLING_INTERVAL_SECONDS="${USER_POLLING_INTERVAL_SECONDS:-120}"
+
+# Flag to enable/disable user polling
+# Set to "0" to disable user response polling
+# Can be overridden via ENABLE_USER_POLLING environment variable
+ENABLE_USER_POLLING="${ENABLE_USER_POLLING:-1}"
 
 # Function to log with timestamp
 log() {
@@ -93,6 +110,94 @@ get_session_id() {
 
 # File to track consecutive error count (non-zero exit codes)
 ERROR_COUNT_FILE="$PROJECT_ROOT/.refactor_agent_error_count"
+
+# PID file for user polling background process
+USER_POLLING_PID_FILE="$PROJECT_ROOT/.user_polling_pid"
+
+# Function to poll for user responses
+# This runs in the background and periodically checks for user responses to agent messages
+poll_user_responses() {
+    local polling_interval="$1"
+    log "Starting user response polling (interval: ${polling_interval}s)"
+    
+    while true; do
+        sleep "$polling_interval"
+        
+        # Check if polling should continue (check if PID file still exists)
+        if [[ ! -f "$USER_POLLING_PID_FILE" ]]; then
+            log "User polling PID file removed - stopping polling"
+            break
+        fi
+        
+        # Poll for user responses
+        log_file_only "Polling for user responses..."
+        if cd "$PROJECT_ROOT" && poetry run python -m essence poll-user-responses >> "$LOG_FILE" 2>&1; then
+            log_file_only "User response polling completed successfully"
+        else
+            log_file_only "User response polling encountered an error (non-fatal, will retry)"
+        fi
+        
+        # Check for pending user requests
+        log_file_only "Checking for pending user requests..."
+        if cd "$PROJECT_ROOT" && poetry run python -m essence read-user-requests >> "$LOG_FILE" 2>&1; then
+            log_file_only "Pending requests check completed"
+        else
+            log_file_only "Pending requests check encountered an error (non-fatal, will retry)"
+        fi
+    done
+    
+    log "User response polling stopped"
+}
+
+# Function to start user polling in background
+start_user_polling() {
+    if [[ "$ENABLE_USER_POLLING" != "1" ]]; then
+        log "User polling disabled (ENABLE_USER_POLLING=$ENABLE_USER_POLLING)"
+        return 0
+    fi
+    
+    # Check if polling is already running
+    if [[ -f "$USER_POLLING_PID_FILE" ]]; then
+        local existing_pid=$(cat "$USER_POLLING_PID_FILE" 2>/dev/null | tr -d '[:space:]')
+        if [[ -n "$existing_pid" ]] && kill -0 "$existing_pid" 2>/dev/null; then
+            log "User polling already running (PID: $existing_pid)"
+            return 0
+        else
+            # PID file exists but process is dead - clean up
+            log "Removing stale user polling PID file"
+            rm -f "$USER_POLLING_PID_FILE"
+        fi
+    fi
+    
+    # Start polling in background
+    poll_user_responses "$USER_POLLING_INTERVAL_SECONDS" &
+    local polling_pid=$!
+    echo "$polling_pid" > "$USER_POLLING_PID_FILE"
+    log "Started user response polling (PID: $polling_pid, interval: ${USER_POLLING_INTERVAL_SECONDS}s)"
+}
+
+# Function to stop user polling
+stop_user_polling() {
+    if [[ ! -f "$USER_POLLING_PID_FILE" ]]; then
+        return 0
+    fi
+    
+    local polling_pid=$(cat "$USER_POLLING_PID_FILE" 2>/dev/null | tr -d '[:space:]')
+    if [[ -n "$polling_pid" ]] && kill -0 "$polling_pid" 2>/dev/null; then
+        log "Stopping user response polling (PID: $polling_pid)"
+        kill "$polling_pid" 2>/dev/null || true
+        # Wait a bit for graceful shutdown
+        sleep 2
+        # Force kill if still running
+        if kill -0 "$polling_pid" 2>/dev/null; then
+            log "Force killing user polling process"
+            kill -9 "$polling_pid" 2>/dev/null || true
+        fi
+    fi
+    
+    rm -f "$USER_POLLING_PID_FILE"
+    log "User response polling stopped"
+}
 
 # Function to get current error count
 get_error_count() {
@@ -395,6 +500,9 @@ main() {
     SESSION_ID=$(get_session_id)
     log "Using session ID: $SESSION_ID"
     
+    # Start user response polling in background
+    start_user_polling
+    
     # Counter for iterations
     ITERATION=0
     
@@ -491,7 +599,12 @@ main() {
 }
 
 # Handle script interruption
-trap 'log "Script interrupted. Exiting..."; exit 0' INT TERM
+cleanup_on_exit() {
+    log "Script interrupted. Cleaning up..."
+    stop_user_polling
+    exit 0
+}
+trap cleanup_on_exit INT TERM
 
 # Run main function
 main
