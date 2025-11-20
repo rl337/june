@@ -334,6 +334,7 @@ Key environment variables for operational tasks:
 - `scripts/setup_phase19_operational.sh` - Phase 19
 - `scripts/test_phase21_round_trip.py` - Phase 21
 - `scripts/verify_nim_compatibility.sh` - Phase 19 NIM verification
+- `scripts/generate_nim_compose_snippet.sh` - Phase 19 Riva NIM deployment
 
 ### Verification Commands
 - `poetry run python -m essence check-environment` - Pre-flight checks
