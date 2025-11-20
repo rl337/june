@@ -41,6 +41,12 @@ poetry run python -m essence <command-name> [arguments]
   - `--grpc-port PORT` - NIM gRPC port (default: 8001)
   - `--check-protocol` - Check gRPC protocol compatibility (requires june_grpc_api)
   - `--json` - Output results as JSON
+- `list-nims` - List available NVIDIA NIM containers for DGX Spark with model sizes and compatibility
+  - `--format {json,table,markdown}` - Output format (default: table)
+  - `--filter {llm,stt,tts,all}` - Filter by model type (default: all)
+  - `--dgx-spark-only` - Only show DGX Spark compatible models (ARM64)
+  - `--include-sizes` - Include Docker image sizes (requires images to be pulled or NGC_API_KEY for registry query)
+  - `--ngc-api-key KEY` - NGC API key (default: from NGC_API_KEY env var)
 - `get-message-history` - Retrieve and analyze message history for debugging Telegram and Discord rendering issues
   - `--user-id ID` - Filter by user ID
   - `--chat-id ID` - Filter by chat/channel ID

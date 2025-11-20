@@ -35,8 +35,15 @@
     - ✅ LLM NIM (nim-qwen3) configured in home_infra/docker-compose.yml
     - ⏳ **Operational:** Start LLM NIM service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3` (requires NGC_API_KEY)
     - ⚠️ **BLOCKER:** NIM containers are AMD64-only, but host is ARM64. NIMs won't run on ARM64 architecture. Need ARM64-compatible NIMs or use TensorRT-LLM instead.
-    - ⏳ **Research:** Check NGC catalog for STT NIM container availability (https://catalog.ngc.nvidia.com/ → Containers → NIM → search "whisper" or "stt")
-    - ⏳ **Research:** Check NGC catalog for TTS NIM container availability (https://catalog.ngc.nvidia.com/ → Containers → NIM → search "tts" or "speech")
+     - ⏳ **Research:** Check NGC catalog for STT NIM container availability (https://catalog.ngc.nvidia.com/ → Containers → NIM → search "whisper" or "stt")
+       - ✅ **Found:** Riva ASR NIM available (Parakeet ASR-CTC-1.1B-EnUS) - different model than Whisper but same function
+       - ⚠️ **ARM64 support unclear** - needs verification in NGC catalog
+       - ⏳ **Action:** Verify Riva ASR NIM ARM64/DGX Spark compatibility and exact image path
+     - ⏳ **Research:** Check NGC catalog for TTS NIM container availability (https://catalog.ngc.nvidia.com/ → Containers → NIM → search "tts" or "speech")
+       - ✅ **Found:** Riva TTS NIM available (Magpie TTS Multilingual, FastPitch-HiFiGAN-EN) - different models than FastSpeech2 but same function
+       - ⚠️ **ARM64 support unclear** - needs verification in NGC catalog
+       - ⏳ **Action:** Verify Riva TTS NIM ARM64/DGX Spark compatibility and exact image path
+     - 📄 **Documentation:** Created `docs/NIM_AVAILABILITY.md` with detailed NIM availability status
     - ⏳ **If STT/TTS NIMs exist:** Add to home_infra/docker-compose.yml following nim-qwen3 pattern
     - ⏳ **If STT/TTS NIMs don't exist:** Continue using custom STT/TTS services (already configured in june/docker-compose.yml)
     - ✅ Configure Telegram/Discord whitelist for direct agent-user communication (completed)
@@ -328,6 +335,13 @@ The agent can help with steps 2-3 once the user provides the required informatio
      - ✅ **CRITICAL FIX:** Removed NATS dependency from STT service (was causing crashes and restarts)
      - ⏳ **NEXT:** Verify DGX Spark NIM image paths in NGC catalog
      - ⏳ **NEXT:** Verify Riva ASR/TTS NIM image paths for DGX Spark compatibility
+     - ✅ **NEW:** Created `list-nims` command for programmatic NIM discovery
+       - Lists available NIMs for DGX Spark with model sizes and compatibility
+       - Supports JSON, table, and markdown output formats
+       - Can filter by model type (llm, stt, tts) and DGX Spark compatibility
+       - Queries known DGX Spark NIMs, running NIM services, and Docker registry (with NGC_API_KEY)
+       - Can get Docker image sizes from local images or registry manifests
+       - Usage: `poetry run python -m essence list-nims --dgx-spark-only --format json`
      - ⏳ Start NIM services and verify connectivity
    - **Steps:**
      - ✅ Checked if `NGC_API_KEY` is set in home_infra environment → **SET**

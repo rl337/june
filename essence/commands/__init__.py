@@ -36,6 +36,7 @@ from . import tts_service  # noqa: F401
 from . import verify_nim  # noqa: F401
 from . import verify_qwen3  # noqa: F401
 from . import verify_tensorrt_llm  # noqa: F401
+from . import list_nims  # noqa: F401
 
 __all__ = [
     "telegram_service",
@@ -63,4 +64,5 @@ __all__ = [
     "read_user_requests",
     "poll_user_responses",
     "message_api_service",
+    "list_nims",
 ]
