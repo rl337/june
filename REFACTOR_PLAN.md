@@ -76,6 +76,7 @@ All major refactoring phases have been completed:
 - ✅ **Step Breakdown Enhancement:** Enhanced `_create_steps` method in planner to break down requests into multiple steps when possible. Supports numbered steps (first, second, third, finally, step 1, step 2, etc.), semicolon-separated steps (action1; action2; action3), and conjunction patterns (action1 and action2, action1 then action2). Each step gets appropriate tool assignment and argument extraction. Falls back to single step if no breakdown patterns found. Added comprehensive tests for all breakdown patterns. This completes the TODO in planner.py for implementing more sophisticated step breakdown.
 - ✅ **Decision Logic Test Coverage:** Created comprehensive unit tests for decision logic (`test_decision.py`) with 17 test cases covering `should_use_agentic_flow` and `estimate_request_complexity` functions. Tests cover explicit reasoning keywords, message length thresholds, tool-related keywords, conversation history complexity, tool indicators, simple requests, case-insensitive matching, length-based scoring, keyword detection, and edge cases. Improves test coverage for agentic reasoning decision-making logic.
 - ✅ **Operational Workflow Script:** Created `scripts/setup_qwen3_operational.sh` to orchestrate Phase 10.1-10.2 operational tasks. Script performs pre-flight environment checks, model download status verification, service startup guidance (TensorRT-LLM or legacy inference-api), and verification steps. Supports `--skip-check`, `--skip-download`, and `--use-legacy` options. Makes operational tasks easier to execute and reduces manual steps. Updated scripts/README.md and QWEN3_SETUP_PLAN.md to document the new script.
+- ✅ **Script Fix:** Fixed indentation issue in `scripts/setup_qwen3_operational.sh` (line 151) where echo command had incorrect indentation. Script now has consistent formatting and passes bash syntax check.
 - ✅ **NIM Operational Workflow Script:** Created `scripts/setup_nim_operational.sh` to orchestrate Phase 15 NIM operational tasks. Script performs pre-flight environment checks, NGC API key verification guidance, image name verification guidance, service startup guidance, and verification steps. Supports `--skip-check` and `--skip-verify` options. Makes NIM operational setup easier to execute. Updated scripts/README.md and REFACTOR_PLAN.md to document the new script.
 - ✅ **Benchmark Evaluation Operational Workflow Script:** Created `scripts/run_benchmarks_operational.sh` to orchestrate Phase 18 benchmark evaluation operational tasks. Script performs pre-flight environment checks, LLM service verification (TensorRT-LLM, NIM, or legacy inference-api), benchmark configuration, execution guidance (with optional --run-now flag), and results analysis guidance. Supports `--skip-check`, `--skip-verify`, `--llm-url`, `--dataset`, `--max-tasks`, `--num-attempts`, `--output-dir`, and `--run-now` options. Makes benchmark evaluation operational tasks easier to execute. Updated scripts/README.md and REFACTOR_PLAN.md to document the new script.
 - ✅ **Performance Testing Operational Workflow Script:** Created `scripts/run_performance_tests_operational.sh` to orchestrate Phase 16 Task 5 performance testing operational tasks. Script performs pre-flight environment checks, service verification (STT, TTS, LLM), performance test configuration, execution guidance (with optional --run-now flag), and results analysis guidance. Supports `--skip-check`, `--skip-verify`, `--scenario`, `--test-type`, and `--run-now` options. Makes performance testing operational tasks easier to execute. Updated scripts/README.md and REFACTOR_PLAN.md to document the new script.
@@ -1026,4 +1027,26 @@ All code changes, cleanup, and refactoring tasks have been completed:
   - Phase 18: Benchmark evaluation (requires LLM service running)
   - Message history debugging (tools ready, requires actual message data from real usage)
 - ⚠️ **Note:** Attempted to create MCP todorama tasks for operational work tracking, but encountered persistent database schema issue (table tasks has no column named priority). Operational tasks remain documented in REFACTOR_PLAN.md TODO items. MCP todorama service needs schema update to support task creation with priority field.
+
+
+## Agent Monitor Alert - 2025-11-20 03:03:53
+
+**Status:** Agent appears to be stuck: 03:53] AGENT STUCK DETECTED: No commits in last 20 minutes, Agent appears to be in a loop (low pattern diversity)
+Unknown reason
+
+**Current Task:** 
+
+**Recommendations:**
+- If stuck on a specific task, consider breaking it into smaller subtasks
+- If encountering errors, check logs and fix the underlying issue
+- If no progress is being made, consider moving to a different task
+- If blocked by external dependencies, document the blocker and move on
+
+**Action:** Agent should review this alert and either:
+1. Continue with current task if progress is being made
+2. Break down the task into smaller steps
+3. Move to a different task if blocked
+4. Ask for help if truly stuck
+
+---
 
