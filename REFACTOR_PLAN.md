@@ -35,6 +35,7 @@
     - ✅ Fixed Message API list endpoint (was using dict access on MessageHistoryEntry objects)
     - ✅ Fixed service syntax errors (rebuilt containers with latest code)
     - ✅ Fixed STT service missing torchaudio dependency (added to pyproject.toml, rebuilt container)
+    - ✅ Fixed STT Dockerfile missing june-grpc-api (added package installation)
     - ✅ Services rebuilt and starting correctly (telegram, discord, message-api healthy)
     - ⏳ Test end-to-end communication (send message → verify in USER_REQUESTS.md → agent responds)
   - Phase 15: NIM gRPC connectivity testing (requires NIM service running in home_infra with NGC_API_KEY)
