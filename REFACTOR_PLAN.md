@@ -65,18 +65,20 @@
     - ✅ **Fixed:** Made TTS import lazy in `download_models.py` to avoid scipy/numpy compatibility errors during command discovery. TTS is now only imported when actually needed (in `download_tts_model()` method), allowing TTS service to start even if TTS package has dependency issues.
     - ✅ **Fixed:** Made `inference_core` import more resilient by catching `AttributeError` (for scipy/numpy issues like `_ARRAY_API not found`) in addition to `ImportError`. This prevents `TtsGrpcApp` from being set to `None` due to scipy/numpy compatibility issues.
     - ✅ **Fixed:** Added better error handling in TTS service `main()` to provide clear error messages when `TtsGrpcApp` is None, explaining that a container rebuild is needed.
-    - ⏳ **Action Required:** Rebuild TTS container to apply scipy/numpy compatibility fixes: `docker compose build tts`
-      - **Status:** Previous build completed successfully (image: adb0b22eb27e, created 2025-11-20 12:43:23), but container still failing due to import error. Need rebuild with inference-core import fix.
-      - **Previous Build:** Build completed successfully at 2025-11-20 12:43:23 with Rust environment fix applied (sudachipy built successfully)
-      - **Current Issue:** Container logs show `cannot import name 'setup_logging' from 'inference_core.utils'` - this is because the build was done before the import fix was applied
-      - **Fix Applied (Rust):** Updated Dockerfile line 51 to source Rust environment (`. $HOME/.cargo/env`) before pip install TTS, allowing sudachipy to build successfully
-      - **Fix Applied (Import):** Fixed inference-core server imports: Changed `from ..utils import setup_logging` to `from .. import setup_logging` in llm_server.py, stt_server.py, and tts_server.py (committed: 16e4780)
-      - **Issue:** Container needs rebuild with latest code changes (lazy TTS import, resilient inference_core import, fixed cleanup method, Rust environment fix, inference-core import fix)
-      - **Current Error:** Container logs show `cannot import name 'setup_logging' from 'inference_core.utils'` - this causes `TtsGrpcApp` to be `None`, which triggers the "scipy/numpy compatibility issue" error message
-      - **Note:** Build may take >30 minutes due to TTS package installation slowness. Should be run in background to avoid timeout.
-      - **Next Step:** Rebuild container with import fix: `nohup docker compose build tts > /tmp/tts_build.log 2>&1 &`
-      - **Check Build Status:** `ps aux | grep "docker compose build tts"` or `tail -f /tmp/tts_build.log`
-      - **Workaround:** The code fixes are complete and correct. The container rebuild is an operational task that may require manual intervention or a different build approach (e.g., multi-stage build, pre-built wheels, or running build with extended timeout).
+    - ✅ **COMPLETED:** Rebuild TTS container to apply scipy/numpy compatibility fixes: `docker compose build tts`
+      - **Status:** ✅ Build completed successfully (image: 759b31e31d3e, created 2025-11-20 12:49:05). TTS service now running successfully with all fixes applied.
+      - **Build History:**
+        - First build (PID: 1048304, 12:38) - Failed: sudachipy couldn't build (Rust environment not sourced)
+        - Second build (PID: 1055129, 12:41) - Completed (image: adb0b22eb27e, 12:43:23) but had import error (build done before import fix)
+        - Third build (PID: 1073413, 12:46) - ✅ Completed successfully (image: 759b31e31d3e, 12:49:05) with all fixes
+      - **Fixes Applied:**
+        - ✅ **Rust Environment:** Updated Dockerfile line 51 to source Rust environment (`. $HOME/.cargo/env`) before pip install TTS, allowing sudachipy to build successfully
+        - ✅ **Import Fix:** Fixed inference-core server imports: Changed `from ..utils import setup_logging` to `from .. import setup_logging` in llm_server.py, stt_server.py, and tts_server.py (committed: 16e4780)
+        - ✅ **Cleanup Method:** Fixed cleanup method in tts_service.py to not access self.service
+        - ✅ **Lazy TTS Import:** Made TTS import lazy in download_models.py
+        - ✅ **Resilient inference_core Import:** Made inference_core import catch AttributeError for scipy/numpy issues
+      - **Verification:** TTS service started successfully at 2025-11-20 12:49:24. `TtsGrpcApp` is available (verified: `TtsGrpcApp available: True`). No more import errors. Service is running and healthy.
+      - **Note:** Build took ~3 minutes (much faster than expected 30+ minutes) - likely due to Docker layer caching from previous builds.
     - ✅ Services status: telegram (unhealthy - STT/TTS connection timeouts), discord (healthy), message-api (healthy), stt (loading model), tts (restarting - essence import error)
     - ✅ **RADICAL REFACTOR COMPLETE:** Replaced USER_REQUESTS.md with USER_MESSAGES.md in /var/data/
     - ✅ **RADICAL REFACTOR COMPLETE:** Distinguish owner users from whitelisted users (owner = personal accounts, whitelisted = includes owners + others)
