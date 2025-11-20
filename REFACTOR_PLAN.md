@@ -284,19 +284,17 @@ All major refactoring phases have been completed:
 5. ✅ Periodic message polling (utility implemented, polling loop integrated into refactor_agent_loop.sh)
 6. ✅ Service conflict prevention (code complete)
 7. ⏳ **OPERATIONAL DEPLOYMENT PENDING (HIGH PRIORITY - AGENT SHOULD DO THIS):**
-   - ⏳ **NIMs not deployed** - NIM service exists in home_infra/docker-compose.yml but not running
-     - **Impact:** No GPU-optimized inference available for TTS, STT, and agent efforts
-     - **Action:** Agent should deploy NIMs using `scripts/setup_nim_operational.sh` or manual steps
-   - ⏳ **No actual exchanges happening** - Telegram/Discord services not configured for direct agent-user communication
-     - **Impact:** User cannot communicate directly with looping agent via Telegram/Discord
-     - **Action:** Agent should configure whitelist and restart services
-   - ⏳ **Whitelist configuration not set up** - TELEGRAM_WHITELISTED_USERS not configured
-     - **Impact:** Messages from user are not routed to agent, they go through normal agentic flow
-     - **Action:** Agent should set whitelist env vars and restart services
-   - ⏳ **Telegram/Discord services not running with whitelist enabled** - Services running but without whitelist config
-     - **Impact:** Even if whitelist is set, services need restart to load it
-     - **Action:** Agent should restart services with whitelist configuration
-   - ⏳ **End-to-end testing not performed** - Cannot verify communication works until above steps complete
+   - ✅ **LLM NIM service started** - NIM service is running and initializing (downloading model files, recreated 2025-11-20 15:26:05 with GPU_MEMORY_UTILIZATION=0.85)
+     - **Status:** Service running, waiting for model initialization to complete
+     - **Next:** Verify connectivity once initialization completes, then switch june services to use NIM endpoint
+   - ⏳ **STT/TTS NIMs not deployed** - Riva ASR/TTS NIMs need verification and deployment
+     - **Impact:** STT/TTS services still using custom implementations instead of optimized NIMs
+     - **Action:** Verify Riva ASR/TTS NIM ARM64/DGX Spark compatibility, then deploy
+   - ✅ **Whitelist configuration set up** - TELEGRAM_WHITELISTED_USERS and DISCORD_WHITELISTED_USERS configured (verified 2025-11-20 15:29)
+     - **Status:** Services running with whitelist configuration loaded
+   - ✅ **Telegram/Discord services running with whitelist enabled** - Services verified running with whitelist config (2025-11-20 15:29)
+     - **Status:** All services healthy with whitelist and owner users configured
+   - ⏳ **End-to-end testing not performed** - Cannot verify communication works until NIM initialization completes
 
 **Tasks:**
 1. **Establish whitelisted user communication:** ✅ COMPLETED
