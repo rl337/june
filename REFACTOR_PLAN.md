@@ -1077,12 +1077,26 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - ✅ Command runs in background polling loop alongside `poll-user-responses` and `read-user-requests`
 
 4. **Test complete round trip:** ⏳ TODO
-   - Owner sends message via Telegram/Discord
-   - Verify message appears in USER_MESSAGES.md with status "NEW"
-   - Verify agent reads message and updates status to "PROCESSING"
-   - Verify agent sends response via Message API
-   - Verify owner receives response on Telegram/Discord
-   - Verify message status updated to "RESPONDED" in USER_MESSAGES.md
+   - **Prerequisites:**
+     - telegram service running (currently unhealthy - STT/TTS connection timeouts)
+     - discord service running (currently healthy)
+     - message-api service running (currently healthy)
+     - Looping agent script running (`./scripts/refactor_agent_loop.sh`) with user polling enabled
+   - **Test steps:**
+     1. Owner sends message via Telegram/Discord
+     2. Verify message appears in `/var/data/USER_MESSAGES.md` with status "NEW"
+        - Command: `cat /var/data/USER_MESSAGES.md | grep -A 10 "NEW"`
+     3. Verify agent reads message and updates status to "PROCESSING"
+        - Check looping agent logs: `tail -f refactor_agent_loop.log | grep "process-user-messages"`
+        - Check USER_MESSAGES.md: `cat /var/data/USER_MESSAGES.md | grep -A 10 "PROCESSING"`
+     4. Verify agent sends response via Message API
+        - Check message-api logs: `docker compose logs message-api | tail -20`
+        - Check Message API: `curl http://localhost:8083/messages | jq`
+     5. Verify owner receives response on Telegram/Discord
+        - Check Telegram/Discord client for response message
+     6. Verify message status updated to "RESPONDED" in USER_MESSAGES.md
+        - Command: `cat /var/data/USER_MESSAGES.md | grep -A 10 "RESPONDED"`
+   - **Note:** USER_MESSAGES.md will be created automatically when first message is appended
 
 **Implementation Notes:**
 - Command uses `essence.chat.user_messages_sync.read_user_messages()` for reading (with file locking)
