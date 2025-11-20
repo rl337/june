@@ -67,7 +67,7 @@
     - ✅ **RADICAL REFACTOR COMPLETE:** Whitelisted (non-owner) messages forwarded to owner
     - ✅ **RADICAL REFACTOR COMPLETE:** Removed all agentic flow from telegram/discord services
     - ✅ **Fixed:** Discord service syntax error - removed orphaned except blocks and old agentic flow code, implemented proper _handle_message method matching telegram service pattern
-    - ⏳ **Phase 21:** Update looping agent script to read USER_MESSAGES.md and process NEW messages (CRITICAL - needed for round trip testing)
+    - ✅ **Phase 21:** Update looping agent script to read USER_MESSAGES.md and process NEW messages - COMPLETED (command integrated into polling loop at line 151 of refactor_agent_loop.sh)
   - Phase 15: NIM gRPC connectivity testing (requires NIM service running in home_infra with NGC_API_KEY)
   - Phase 16: End-to-end pipeline testing (requires all services running)
   - Phase 18: Benchmark evaluation (requires LLM service running)
