@@ -1,6 +1,6 @@
 # June Development Plan
 
-## Status: ✅ **ALL CODE WORK COMPLETE** → ⏳ **OPERATIONAL TASKS REMAINING**
+## Status: ✅ **ALL CODE WORK COMPLETE** → ⏳ **OPERATIONAL TASKS REMAINING** (Ready for User Testing)
 
 **Last Updated:** 2025-11-20 (Phase 20 complete - Message API fully operational. Phase 19 progress - services started with whitelist, Message API tested. **CRITICAL FIX:** STT service was loading Whisper on CPU (8.7GB RAM usage, 90% system memory) - fixed to use GPU (`STT_DEVICE=cuda`). Removed NATS dependency causing crashes. **DISCOVERY:** DGX Spark-specific NIMs exist and support ARM64 - Qwen3-32B DGX Spark NIM configured in home_infra, STT/TTS NIMs added with placeholder paths.)
 
@@ -434,27 +434,40 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - ⏳ **Operational:** Test polling detects new user requests (requires services running)
    - ⏳ **Operational:** Test polling processes user responses (requires services running)
 
-5. **Test end-to-end communication:** ⏳ TODO
+5. **Test end-to-end communication:** ⏳ TODO (Operational - requires user interaction)
    - **Note:** This task references USER_REQUESTS.md, but the system now uses USER_MESSAGES.md (see Phase 21)
    - **Prerequisites Verification:** Run `poetry run python scripts/verify_phase19_prerequisites.py` to check all prerequisites before testing
-   - Send test message from owner user via Telegram/Discord
-   - Verify message appears in `/var/data/USER_MESSAGES.md` with status "NEW"
-   - Verify agent reads and processes message via `process-user-messages` command
-   - Verify agent sends response via Message API
-   - Verify owner receives response on Telegram/Discord
-   - Verify message status updated to "RESPONDED" in USER_MESSAGES.md
+   - **Status:** ✅ All services healthy, all code complete, automated test script available
+   - **Automated Testing Available:** `scripts/test_phase21_round_trip.py` - Can simulate most of the flow programmatically
+   - **Manual Steps Required:**
+     - Send test message from owner user via Telegram/Discord (actual user interaction required)
+     - Verify message appears in `/var/data/USER_MESSAGES.md` with status "NEW" (can be automated)
+     - Verify agent reads and processes message via `process-user-messages` command (can be automated - runs in polling loop)
+     - Verify agent sends response via Message API (can be automated - check API logs)
+     - Verify owner receives response on Telegram/Discord (requires checking actual client)
+     - Verify message status updated to "RESPONDED" in USER_MESSAGES.md (can be automated)
    - **Helper Script:** `scripts/setup_phase19_operational.sh` - Provides step-by-step testing guidance
    - **Verification Script:** `scripts/verify_phase19_prerequisites.py` - Comprehensive prerequisite verification
+   - **Automated Test Script:** `scripts/test_phase21_round_trip.py` - Simulates end-to-end flow programmatically
    - **See Phase 21 Task 4 for detailed test steps**
 
-6. **Verify actual exchanges happening:** ⏳ TODO (Operational task, requires services running)
+6. **Verify actual exchanges happening:** ⏳ TODO (Operational task, requires services running and user interaction)
    - **Note:** This task references USER_REQUESTS.md, but the system now uses USER_MESSAGES.md (see Phase 21)
-   - Confirm owner user can send messages via Telegram/Discord (messages append to USER_MESSAGES.md)
-   - Confirm agent processes messages via `process-user-messages` command (runs in polling loop)
-   - Confirm agent sends responses via Message API
-   - Confirm owner receives responses on Telegram/Discord
-   - Confirm messages are synced to USER_MESSAGES.md with proper status updates
-   - Confirm polling loop is working (process-user-messages runs every 2 minutes)
+   - **Status:** ✅ All services healthy, all code complete, polling loop integrated
+   - **Automated Verification Available:**
+     - Check polling loop: `docker compose logs telegram | grep -i polling` or check `scripts/refactor_agent_loop.sh` process
+     - Check message processing: `poetry run python -m essence process-user-messages` (can be run manually to test)
+     - Check USER_MESSAGES.md: `cat /home/rlee/june_data/var-data/USER_MESSAGES.md | grep -A 10 "NEW"`
+     - Check Message API logs: `docker compose logs message-api | grep -i "send"`
+   - **Manual Steps Required:**
+     - Confirm owner user can send messages via Telegram/Discord (actual user interaction required)
+     - Confirm owner receives responses on Telegram/Discord (requires checking actual client)
+   - **Automated Steps:**
+     - Confirm agent processes messages via `process-user-messages` command (runs in polling loop every 2 minutes)
+     - Confirm agent sends responses via Message API (check API logs)
+     - Confirm messages are synced to USER_MESSAGES.md with proper status updates (can be verified programmatically)
+     - Confirm polling loop is working (process-user-messages runs every 2 minutes - can be verified via logs)
+   - **Test Script:** Use `scripts/test_phase21_round_trip.py` to automate most verification steps
    - **See Phase 21 Task 4 for detailed verification steps**
 
 7. **Service conflict prevention:** ✅ COMPLETED
