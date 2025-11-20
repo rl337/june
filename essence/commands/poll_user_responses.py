@@ -12,10 +12,7 @@ from typing import List, Optional
 
 from essence.chat.user_requests_sync import update_message_status
 from essence.command import Command
-from essence.commands.read_user_requests import (
-    UserRequest,
-    parse_user_requests_file,
-)
+from essence.commands.read_user_requests import UserRequest, parse_user_requests_file
 
 logger = logging.getLogger(__name__)
 
@@ -49,8 +46,9 @@ def check_for_user_responses(
 
     # Parse all entries from USER_REQUESTS.md
     # We need to parse ALL entries (not just requests) to find agent messages
-    from essence.chat.user_requests_sync import USER_REQUESTS_FILE as SYNC_FILE
     import re
+
+    from essence.chat.user_requests_sync import USER_REQUESTS_FILE as SYNC_FILE
 
     content = SYNC_FILE.read_text(encoding="utf-8")
     all_entries = []
@@ -95,8 +93,8 @@ def check_for_user_responses(
             all_entries.append(
                 {
                     "timestamp": timestamp,
-                    "user_id": user_id,
-                    "chat_id": chat_id or "",
+                    "user_id": str(user_id),
+                    "chat_id": str(chat_id) if chat_id else "",
                     "platform": platform or "unknown",
                     "message_type": message_type,
                     "content": content_text,
@@ -108,7 +106,7 @@ def check_for_user_responses(
     # Group entries by user_id and chat_id
     user_entries: dict[tuple[str, str], List[dict]] = {}
     for entry in all_entries:
-        key = (entry["user_id"], entry["chat_id"])
+        key = (str(entry["user_id"]), str(entry["chat_id"]))
         if key not in user_entries:
             user_entries[key] = []
         user_entries[key].append(entry)
@@ -259,7 +257,7 @@ class PollUserResponsesCommand(Command):
         pass
 
     @classmethod
-    def add_args(cls, parser):
+    def add_args(cls, parser) -> None:
         """Add command-specific arguments"""
         parser.add_argument(
             "--timeout-hours",
