@@ -146,22 +146,23 @@ async def list_messages(
         if limit:
             messages = messages[:limit]
 
-        # Convert to response format
-        history_items = [
-            MessageHistoryItem(
-                platform=msg.get("platform", ""),
-                user_id=msg.get("user_id", ""),
-                chat_id=msg.get("chat_id", ""),
-                message_content=msg.get("message_content", ""),
-                message_type=msg.get("message_type", "text"),
-                message_id=msg.get("message_id"),
-                timestamp=msg.get("timestamp"),
-                raw_text=msg.get("raw_text"),
-                formatted_text=msg.get("formatted_text"),
-                rendering_metadata=msg.get("rendering_metadata"),
+        # Convert to response format (messages are MessageHistoryEntry objects, not dicts)
+        history_items = []
+        for msg in messages:
+            history_items.append(
+                MessageHistoryItem(
+                    platform=msg.platform,
+                    user_id=msg.user_id,
+                    chat_id=msg.chat_id,
+                    message_content=msg.message_content,
+                    message_type=msg.message_type,
+                    message_id=str(msg.message_id) if msg.message_id is not None else None,
+                    timestamp=msg.timestamp.isoformat() if msg.timestamp else None,
+                    raw_text=msg.raw_text,
+                    formatted_text=msg.formatted_text,
+                    rendering_metadata=msg.rendering_metadata,
+                )
             )
-            for msg in messages
-        ]
 
         # Get total count (approximate, may be limited by history size)
         total_messages = history.get_messages(
