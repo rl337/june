@@ -5,6 +5,7 @@ Reads messages with status "NEW", processes them, generates responses,
 sends via Message API, and updates status accordingly.
 """
 import logging
+import os
 import re
 from dataclasses import dataclass
 from datetime import datetime
@@ -214,6 +215,8 @@ class ProcessUserMessagesCommand(Command):
                 )
 
                 # Send response via Message API
+                # Use MESSAGE_API_URL env var or default to localhost:8083 (host port mapping)
+                api_url = os.getenv("MESSAGE_API_URL", "http://localhost:8083")
                 try:
                     result = send_message_via_api(
                         user_id=message.user_id,
@@ -221,6 +224,7 @@ class ProcessUserMessagesCommand(Command):
                         message=response_text,
                         platform=message.platform.lower(),
                         message_type="text",
+                        api_url=api_url,
                     )
 
                     if result.get("success"):
