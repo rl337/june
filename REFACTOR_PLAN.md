@@ -127,7 +127,7 @@ All major refactoring phases have been completed:
 
 **Goal:** Establish direct communication channel between the looping agent and whitelisted end users via Telegram/Discord, replacing the current agentic flow in these services.
 
-**Status:** ⏳ IN PROGRESS - Core functionality and service conflict prevention complete, remaining tasks are operational enhancements (message grouping, polling)
+**Status:** ⏳ IN PROGRESS - Core functionality, service conflict prevention, and message grouping complete, remaining task is operational (periodic polling)
 
 **Tasks:**
 1. **Establish whitelisted user communication:** ✅ COMPLETED
@@ -151,14 +151,19 @@ All major refactoring phases have been completed:
    - ✅ Agent responses synced automatically via `agent_communication.py` when user is whitelisted
    - ✅ Created `read-user-requests` command for looping agent to read pending requests
 
-4. **Message grouping and editing:** ⏳ TODO
-   - ⏳ Group multiple requests into a single message when possible
-   - ⏳ Use message editing (edit_text/edit_message) to update grouped messages
-   - ⏳ If grouping is not possible, send small groups of messages (2-3 max)
-   - ⏳ Implement message grouping logic based on:
-     - Time window (group requests within X seconds)
-     - Message length (group if total length is reasonable)
-     - Message type (group similar types together)
+4. **Message grouping and editing:** ✅ COMPLETED
+   - ✅ Created message grouping module (`essence/chat/message_grouping.py`) with grouping logic
+   - ✅ Implemented `group_messages()` function with time window, length, and count-based grouping
+   - ✅ Added `edit_message_to_user()` function for editing messages via Telegram/Discord HTTP API
+   - ✅ Implemented `_edit_telegram_message()` and `_edit_discord_message()` for platform-specific editing
+   - ✅ Created `send_grouped_messages()` function that automatically groups messages when possible
+   - ✅ If grouping is not possible, sends messages in small groups (2-3 max) or individually
+   - ✅ Message grouping logic based on:
+     - Time window (default: 30 seconds, configurable)
+     - Message length (default: 3500 chars, configurable)
+     - Message count (default: max 5 messages, configurable)
+   - ✅ Automatic message splitting if grouped message exceeds platform limits
+   - ✅ Platform-specific formatting (HTML for Telegram, Markdown for Discord)
 
 5. **Periodic message polling:** ⏳ TODO (Operational - can be implemented in looping agent script)
    - ⏳ Implement periodic polling to check for user responses
