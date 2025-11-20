@@ -2,7 +2,7 @@
 
 ## Status: ✅ **ALL CODE WORK COMPLETE** → ⏳ **OPERATIONAL TASKS REMAINING**
 
-**Last Updated:** 2025-11-20 (Updated NIM deployment status - image path verified as `nvcr.io/nim/qwen/qwen3-32b:1.0.0`, blocker is account NIM access/subscription, not image name. All code complete, operational tasks blocked on external factors.)
+**Last Updated:** 2025-11-20 (Added Phase 20: Message API for bi-directional communication - TOP PRIORITY. Verified agent can send DMs on both Telegram and Discord. NIM access resolved - nim-qwen3 downloaded successfully, STT and TTS NIMs now available.)
 
 **Current State:**
 - ✅ **All code implementation complete** (451 tests passing, 8 skipped)
@@ -10,19 +10,35 @@
 - ✅ **GitHub Actions passing** (all workflows successful)
 - ✅ **No uncommitted changes**
 - ✅ **Phase 19 - Direct Agent-User Communication:** All code implementation tasks complete (whitelist, routing, USER_REQUESTS.md syncing, message grouping/editing, service conflict prevention, polling loop integration)
-- ⏳ **HIGH PRIORITY OPERATIONAL TASKS (AGENT SHOULD WORK ON THESE):**
-  - 🚨 **Phase 19: Deploy NIMs and enable Telegram/Discord communication** (IMMEDIATE PRIORITY)
-    - Deploy NIMs in home_infra for inference (TTS, STT, agent efforts)
-    - Configure Telegram/Discord whitelist for direct agent-user communication
-    - Start services with whitelist enabled
-    - Test end-to-end communication
+- ✅ **DM Verification:** Agent verified can send DMs on both Telegram and Discord (test script successful)
+- ✅ **NIM Access Resolved:** NGC API token updated with correct permissions, nim-qwen3 downloaded successfully. STT and TTS NIMs now available for deployment.
+- ⏳ **🚨 TOP PRIORITY - BI-DIRECTIONAL COMMUNICATION (AGENT MUST WORK ON THIS FIRST):**
+  - 🚨 **Phase 20: Message API Service** (IMMEDIATE PRIORITY - Blocks all future agent-user communication)
+    - Create Message API service with GET/POST/PUT/PATCH endpoints
+    - Replace direct function calls with API calls
+    - Create command to run Message API service
+    - Add service to docker-compose.yml
+    - Test API endpoints work correctly
+    - Update agent loop to use API instead of direct calls
+  - 🚨 **Phase 19: Deploy NIMs and enable Telegram/Discord communication** (HIGH PRIORITY - NOW UNBLOCKED)
+    - ✅ NIM access resolved - nim-qwen3 downloaded successfully
+    - ⏳ Deploy LLM NIM (nim-qwen3) in home_infra
+    - ⏳ Deploy STT NIM in home_infra (check NGC catalog for STT NIM container)
+    - ⏳ Deploy TTS NIM in home_infra (check NGC catalog for TTS NIM container)
+    - ✅ Configure Telegram/Discord whitelist for direct agent-user communication (completed)
+    - ⏳ Start services with whitelist enabled
+    - ⏳ Test end-to-end communication
   - Phase 15: NIM gRPC connectivity testing (requires NIM service running in home_infra with NGC_API_KEY)
   - Phase 16: End-to-end pipeline testing (requires all services running)
   - Phase 18: Benchmark evaluation (requires LLM service running)
   - Phase 10.1-10.2: Model download and service startup (requires HUGGINGFACE_TOKEN, model download time)
   - Message history debugging (tools ready, requires actual message data from real usage)
 
-**For agents:** All code-related refactoring tasks are complete. The project is ready for operational work. See operational tasks in REFACTOR_PLAN.md for details on starting services and running tests. See `docs/OPERATIONAL_READINESS.md` for a comprehensive operational readiness checklist.
+**For agents:** 
+- 🚨 **TOP PRIORITY:** Phase 20 (Message API Service) - Establish bi-directional communication. Agent must be able to send/receive messages via API before proceeding with other tasks.
+- All code-related refactoring tasks are complete. The project is ready for operational work. 
+- See operational tasks in REFACTOR_PLAN.md for details on starting services and running tests. 
+- See `docs/OPERATIONAL_READINESS.md` for a comprehensive operational readiness checklist.
 
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
@@ -44,7 +60,7 @@
 - `feature/phase-19-whitelist-config` - ⏳ IN PROGRESS
   - Task: Configure Telegram/Discord whitelist user IDs
   - Started: 2025-11-20
-  - Status: Extracted Telegram ID (39833618), need Discord numeric user ID
+  - Status: ✅ COMPLETED - Both Telegram and Discord user IDs extracted and added to .env file
   - Related: Phase 19 Task 2
   - Last Updated: 2025-11-20
 ```
@@ -268,58 +284,54 @@ All major refactoring phases have been completed:
 
 The agent can help with steps 2-3 once the user provides the required information (NGC_API_KEY, Telegram user ID).
 
-1. **Deploy NIMs for inference:** ⏳ IN PROGRESS (HIGH PRIORITY - Agent working on this)
-   - **Why:** NIMs provide GPU-optimized inference for TTS, STT, and agent efforts. Hardware is designed for this.
+1. **Deploy NIMs for inference:** ⏳ IN PROGRESS (HIGH PRIORITY - Agent should work on this)
+   - **Why:** NIMs provide GPU-optimized inference for LLM, TTS, and STT. Hardware is designed for this.
    - **Current Status (2025-11-20):**
+     - ✅ NIM access resolved - NGC API token updated with correct permissions
+     - ✅ `nim-qwen3` NIM successfully downloaded and verified working by IDE agent
      - ✅ NIM service configured in `home_infra/docker-compose.yml` (nim-qwen3 service exists)
      - ✅ `NGC_API_KEY` environment variable is set in `/home/rlee/dev/home_infra/.env`
      - ✅ Docker logged in to NGC registry (`nvcr.io`) successfully
-     - ✅ Image path updated to correct path: `nvcr.io/nim/qwen/qwen3-32b:1.0.0` (from NGC catalog)
-     - ⏳ **BLOCKER:** Docker pull fails with "Payment Required" - account needs NIM access/subscription
-     - ❌ NIM service not running (cannot start due to account access requirement)
+     - ✅ Image path verified: `nvcr.io/nim/qwen/qwen3-32b:1.0.0`
+     - ⏳ **NEXT:** Deploy STT and TTS NIMs (now that access is resolved)
+     - ⏳ Start NIM services and verify connectivity
    - **Steps:**
-     - ✅ Checked if `NGC_API_KEY` is set in home_infra environment → **SET** (found in `.env` file)
+     - ✅ Checked if `NGC_API_KEY` is set in home_infra environment → **SET**
      - ✅ Logged Docker into NGC registry using NGC_API_KEY → **SUCCESS**
-     - ✅ Image path verified and updated: `nvcr.io/nim/qwen/qwen3-32b:1.0.0` (from NGC catalog: https://catalog.ngc.nvidia.com/orgs/nim/teams/qwen/containers/qwen3-32b)
-     - ⏳ **BLOCKER:** Docker pull fails with "Payment Required" error
-       - **Status:** Image path is correct, API key is working, but account needs NIM access
-       - **Action Required:** User must check NGC account for NIM access/subscription:
-         - Go to https://catalog.ngc.nvidia.com/
-         - Check account subscription/access status
-         - Some NIM containers require:
-           - Enterprise subscription
-           - Special access permissions
-           - Account activation for NIM services
-         - Verify if there's a trial/development access option
-       - Once account has NIM access, the image should pull successfully
-     - ⏳ Start NIM service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3` (blocked on account NIM access/subscription)
-     - ⏳ Verify NIM is running: `docker compose ps nim-qwen3` (blocked on service start)
-     - ⏳ Verify NIM connectivity: `cd /home/rlee/dev/june && poetry run python -m essence verify-nim --nim-host nim-qwen3 --http-port 8003 --grpc-port 8001` (blocked on service start)
-     - ⏳ Update june services to use NIM endpoint (set `LLM_URL=grpc://nim-qwen3:8001` in docker-compose.yml or .env) (blocked on service verification)
+     - ✅ Image path verified: `nvcr.io/nim/qwen/qwen3-32b:1.0.0`
+     - ✅ **RESOLVED:** NIM access granted - nim-qwen3 downloaded successfully
+     - ⏳ **NEXT:** Deploy STT NIM (check NGC catalog for STT NIM container)
+     - ⏳ **NEXT:** Deploy TTS NIM (check NGC catalog for TTS NIM container)
+     - ⏳ Start LLM NIM service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3`
+     - ⏳ Verify LLM NIM is running: `docker compose ps nim-qwen3`
+     - ⏳ Verify LLM NIM connectivity: `cd /home/rlee/dev/june && poetry run python -m essence verify-nim --nim-host nim-qwen3 --http-port 8003 --grpc-port 8001`
+     - ⏳ Update june services to use NIM endpoint (set `LLM_URL=grpc://nim-qwen3:8001` in docker-compose.yml or .env)
+     - ⏳ Configure STT service to use STT NIM (once deployed)
+     - ⏳ Configure TTS service to use TTS NIM (once deployed)
    - **Helper Script:** `scripts/setup_nim_operational.sh` - Orchestrates NIM deployment
-   - **Note:** This is operational work (starting Docker services), not code changes. Code is already complete.
-   - **Action Required:** Image path is correct (`nvcr.io/nim/qwen/qwen3-32b:1.0.0`), NGC_API_KEY is set, Docker is authenticated. Account needs NIM access/subscription to pull the image. User must check NGC account subscription status and enable NIM access.
+   - **Note:** This is operational work (starting Docker services, configuring endpoints). Code is already complete. NIM access is now resolved, agent can proceed with deployment.
 
-2. **Configure whitelisted users and enable Telegram/Discord communication:** ⏳ IN PROGRESS (HIGH PRIORITY - Agent working on this)
+2. **Configure whitelisted users and enable Telegram/Discord communication:** ✅ COMPLETED (2025-11-20)
    - **Why:** This enables direct communication between the user and the looping agent via Telegram/Discord. Code is complete, just needs operational setup.
    - **Current Status (2025-11-20):**
      - ✅ Added `TELEGRAM_WHITELISTED_USERS` environment variable to telegram service in docker-compose.yml
      - ✅ Added `DISCORD_WHITELISTED_USERS` environment variable to discord service in docker-compose.yml
      - ✅ Environment variables configured with default empty value (can be set via .env file or docker compose)
      - ✅ Updated `docs/OPERATIONAL_READINESS.md` with improved whitelist configuration instructions (multiple options: .env file, environment variables, helper script)
-     - ⏳ **BLOCKER:** User needs to provide Telegram user ID(s) to configure whitelist
+     - ✅ **COMPLETED:** Telegram and Discord user IDs extracted and added to `.env` file (not committed to git)
+     - ✅ Created helper scripts: `scripts/verify_user_ids.py`, `scripts/get_discord_user_id.py`, `scripts/capture_discord_user_id.py`
    - **Steps:**
      - ✅ Added whitelist environment variables to docker-compose.yml (telegram and discord services)
      - ✅ Updated operational readiness documentation with configuration options
-     - ⏳ **BLOCKER:** Get user's Telegram user ID (can query Telegram API or ask user)
-     - ⏳ Set `TELEGRAM_WHITELISTED_USERS` in .env file (recommended) or as environment variable (comma-separated user IDs)
-     - ⏳ Set `DISCORD_WHITELISTED_USERS` in .env file or as environment variable if using Discord (comma-separated user IDs)
-     - ⏳ Restart services to load whitelist configuration: `docker compose up -d telegram discord`
+     - ✅ Extracted Telegram user ID from docker-compose.yml default value and added to `.env` file
+     - ✅ Captured Discord user ID via message and added to `.env` file
+     - ✅ Both user IDs configured in `.env` file (not committed to git)
+     - ⏳ **NEXT:** Restart services to load whitelist configuration: `docker compose up -d telegram discord` (agent can do this)
      - Or use helper script: `./scripts/setup_phase19_operational.sh --telegram-users USER_ID`
    - **Helper Script:** `scripts/setup_phase19_operational.sh` - Orchestrates whitelist configuration and service startup
    - **Note:** Infrastructure changes complete (docker-compose.yml updated, documentation improved). Remaining work is operational (setting user IDs and restarting services).
 
-3. **Start Telegram/Discord services with whitelist:** ⏳ TODO (HIGH PRIORITY - Agent should do this)
+3. **Start Telegram/Discord services with whitelist:** ⏳ TODO (HIGH PRIORITY - Agent should do this now that whitelist is configured)
    - **Why:** Services need to be restarted with whitelist configuration to enable direct agent-user communication.
    - **Steps:**
      - Stop Telegram service: `cd /home/rlee/dev/june && docker compose stop telegram`
@@ -897,6 +909,83 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - ✅ Graceful error handling - agentic flow failures fall back to direct flow
    - ✅ OpenTelemetry tracing integrated for agentic flow decisions and execution
    - ✅ All existing tests still passing (153/153)
+
+### Phase 20: Message API Service 🚨 TOP PRIORITY
+
+**Goal:** Establish bi-directional communication between agent and user via REST API. This replaces direct function calls with a proper API interface that allows programmatic access to message histories (GET/list) and sending/editing messages (POST/PUT/PATCH).
+
+**Status:** ⏳ IN PROGRESS - API service code created, needs integration and deployment
+
+**Why This Is Top Priority:**
+- Enables agent to communicate with user via instant messages (Telegram/Discord)
+- Allows user to provide input/feedback to agent in real-time
+- Replaces file-based USER_REQUESTS.md approach with proper API
+- Agent can ask for help/clarification when blocked instead of waiting indefinitely
+- Critical for autonomous agent operation
+
+**Tasks:**
+1. **Create Message API service:** ✅ COMPLETED (2025-11-20)
+   - ✅ Created `essence/services/message_api/main.py` with FastAPI service
+   - ✅ Implemented GET /messages - List message history with filters
+   - ✅ Implemented GET /messages/{message_id} - Get specific message
+   - ✅ Implemented POST /messages - Send new message
+   - ✅ Implemented PUT /messages/{message_id} - Edit/replace message
+   - ✅ Implemented PATCH /messages/{message_id} - Append to message (supports PREPEND:/REPLACE:)
+   - ✅ Verified agent can send DMs on both Telegram and Discord (test script successful)
+
+2. **Create command to run Message API service:** ⏳ TODO (HIGH PRIORITY)
+   - Create `essence/commands/message_api_service.py` command
+   - Register command in `essence/commands/__init__.py`
+   - Command should start FastAPI service on configurable port (default: 8082)
+   - Add health check endpoint verification
+   - Test command works: `poetry run python -m essence message-api-service`
+
+3. **Add Message API service to docker-compose.yml:** ⏳ TODO (HIGH PRIORITY)
+   - Add `message-api` service to docker-compose.yml
+   - Configure port mapping (8082:8082)
+   - Set environment variables (MESSAGE_API_PORT, MESSAGE_API_HOST)
+   - Add to june_network
+   - Test service starts: `docker compose up -d message-api`
+
+4. **Update agent code to use API instead of direct calls:** ⏳ TODO (HIGH PRIORITY)
+   - Replace `essence.chat.agent_communication.send_message_to_user()` calls with HTTP API calls
+   - Replace `essence.chat.agent_communication.edit_message_to_user()` calls with HTTP API calls
+   - Update `essence/agents/reasoning.py` to use API
+   - Update `scripts/refactor_agent_loop.sh` to use API
+   - Create helper module `essence/chat/message_api_client.py` for API client
+   - Test agent can send messages via API
+
+5. **Test API endpoints:** ⏳ TODO (HIGH PRIORITY)
+   - Test GET /messages with various filters
+   - Test POST /messages to send message
+   - Test PUT /messages/{message_id} to edit message
+   - Test PATCH /messages/{message_id} to append to message
+   - Verify messages appear in Telegram/Discord
+   - Verify message history is updated correctly
+
+6. **Update agent loop to use API:** ⏳ TODO (HIGH PRIORITY)
+   - Update `scripts/refactor_agent_loop.sh` to use Message API
+   - Ensure agent can send help requests via API
+   - Ensure agent can read user responses via API
+   - Test end-to-end: Agent sends message → User responds → Agent reads response
+
+**Helper Scripts:**
+- `scripts/test_send_dms.py` - Test script to verify agent can send DMs (✅ verified working)
+
+**API Endpoints:**
+- `GET /messages` - List message history (filters: platform, user_id, chat_id, message_type, limit, offset)
+- `GET /messages/{message_id}` - Get specific message
+- `POST /messages` - Send new message (body: user_id, chat_id, message, platform, message_type)
+- `PUT /messages/{message_id}` - Edit/replace entire message (body: new_message, message_type)
+- `PATCH /messages/{message_id}` - Append to message (body: new_message, supports PREPEND:/REPLACE: prefixes)
+
+**Integration Points:**
+- Agent loop script (`scripts/refactor_agent_loop.sh`)
+- Agentic reasoning system (`essence/agents/reasoning.py`)
+- Message history system (`essence/chat/message_history.py`)
+- Agent communication (`essence/chat/agent_communication.py`)
+
+**Note:** This is operational work (creating service, integrating API, testing). Code for API service is complete, needs deployment and integration.
 
 ### Phase 18: Model Evaluation and Benchmarking ⏳ TODO
 

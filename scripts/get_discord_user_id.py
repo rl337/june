@@ -17,11 +17,15 @@ def get_discord_user_id_from_username(username: str) -> None:
     """
     Attempt to get Discord user ID from username using the bot.
     
-    Note: This requires the bot to be in a server with the user.
+    Tries multiple methods:
+    1. Search in servers the bot is in
+    2. Check DM channels
+    3. Use Discord HTTP API to fetch user info
     """
     try:
         import discord
         from discord.ext import commands
+        import httpx
         
         bot_token = os.getenv("DISCORD_BOT_TOKEN")
         if not bot_token:
@@ -31,6 +35,7 @@ def get_discord_user_id_from_username(username: str) -> None:
         
         intents = discord.Intents.default()
         intents.members = True
+        intents.message_content = True
         
         bot = commands.Bot(command_prefix="!", intents=intents)
         
@@ -40,26 +45,118 @@ def get_discord_user_id_from_username(username: str) -> None:
             print(f"   Searching for user: {username}")
             print()
             
-            # Search through all guilds the bot is in
             found = False
+            user_id = None
+            found_name = None
+            
+            # First, search through all guilds the bot is in
             for guild in bot.guilds:
                 try:
                     # Try to find user by username
                     member = discord.utils.get(guild.members, name=username)
                     if member:
-                        print(f"✅ Found user: {member.name}")
-                        print(f"   User ID: {member.id}")
-                        print(f"   Display Name: {member.display_name}")
-                        print()
-                        print(f"Add this to .env:")
-                        print(f"DISCORD_WHITELISTED_USERS={member.id}")
+                        user_id = member.id
+                        found_name = member.name
                         found = True
                         break
                 except Exception as e:
                     print(f"⚠️  Error searching in guild {guild.name}: {e}")
             
+            # If not found in servers, check DM channels
             if not found:
-                print(f"❌ Could not find user '{username}' in any server the bot is in")
+                print("   Not found in servers, checking DM channels...")
+                try:
+                    print(f"   Found {len(bot.private_channels)} private channel(s)")
+                    for channel in bot.private_channels:
+                        if isinstance(channel, discord.DMChannel):
+                            recipient = channel.recipient
+                            if recipient:
+                                print(f"   - DM with: {recipient.name} (ID: {recipient.id})")
+                                # Check if the recipient matches the username (case-insensitive)
+                                if recipient.name.lower() == username.lower():
+                                    user_id = recipient.id
+                                    found_name = recipient.name
+                                    found = True
+                                    print(f"   ✅ Match found!")
+                                    break
+                except Exception as e:
+                    print(f"⚠️  Error checking DM channels: {e}")
+            
+            # If still not found, try fetching DM channels via HTTP API
+            if not found:
+                print("   Not found in cached channels, fetching DM channels via API...")
+                try:
+                    # Fetch DM channels via HTTP API (synchronous)
+                    headers = {
+                        "Authorization": f"Bot {bot_token}",
+                        "Content-Type": "application/json"
+                    }
+                    with httpx.Client(timeout=10.0) as client:
+                        # Get all DM channels for the bot
+                        response = client.get(
+                            "https://discord.com/api/v10/users/@me/channels",
+                            headers=headers
+                        )
+                        if response.status_code == 200:
+                            channels = response.json()
+                            print(f"   Found {len(channels)} channel(s) via API")
+                            if len(channels) == 0:
+                                print("   ⚠️  No channels found. The bot may not have any DM channels yet.")
+                                print("   💡 Try sending a message to the bot first to create a DM channel.")
+                            for channel_data in channels:
+                                if channel_data.get("type") == 1:  # DM channel (type 1)
+                                    recipients = channel_data.get("recipients", [])
+                                    for recipient in recipients:
+                                        recipient_username = recipient.get("username", "")
+                                        recipient_id = recipient.get("id", "")
+                                        recipient_discriminator = recipient.get("discriminator", "")
+                                        full_username = f"{recipient_username}#{recipient_discriminator}" if recipient_discriminator and recipient_discriminator != "0" else recipient_username
+                                        print(f"   - DM with: {full_username} (ID: {recipient_id})")
+                                        # Check if the recipient matches the username (case-insensitive)
+                                        if recipient_username.lower() == username.lower():
+                                            user_id = recipient_id
+                                            found_name = recipient_username
+                                            found = True
+                                            print(f"   ✅ Match found!")
+                                            break
+                                    if found:
+                                        break
+                                elif channel_data.get("type") == 3:  # Group DM
+                                    recipients = channel_data.get("recipients", [])
+                                    print(f"   - Group DM with {len(recipients)} recipient(s)")
+                                    for recipient in recipients:
+                                        recipient_username = recipient.get("username", "")
+                                        recipient_id = recipient.get("id", "")
+                                        print(f"     - {recipient_username} (ID: {recipient_id})")
+                                        if recipient_username.lower() == username.lower():
+                                            user_id = recipient_id
+                                            found_name = recipient_username
+                                            found = True
+                                            print(f"     ✅ Match found!")
+                                            break
+                                    if found:
+                                        break
+                        else:
+                            print(f"   ⚠️  API returned status {response.status_code}")
+                            try:
+                                error_data = response.json()
+                                print(f"   Error: {error_data}")
+                            except:
+                                print(f"   Error text: {response.text[:200]}")
+                except Exception as e:
+                    print(f"⚠️  Error fetching DM channels via API: {e}")
+                    import traceback
+                    traceback.print_exc()
+            
+            if found and user_id:
+                print()
+                print(f"✅ Found user: {found_name}")
+                print(f"   User ID: {user_id}")
+                print()
+                print(f"Add this to .env:")
+                print(f"DISCORD_WHITELISTED_USERS={user_id}")
+            else:
+                print(f"❌ Could not find user '{username}' in servers or DMs")
                 print()
                 print("Alternative method:")
                 print("1. Enable Developer Mode in Discord:")
