@@ -297,11 +297,13 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - **Why:** NIMs provide GPU-optimized inference for LLM, TTS, and STT. Hardware is designed for this.
    - **Current Status (2025-11-20):**
      - ✅ NIM access resolved - NGC API token updated with correct permissions
-     - ✅ `nim-qwen3` NIM successfully downloaded and verified working by IDE agent
+     - ✅ `nim-qwen3` NIM successfully downloaded (`nvcr.io/nim/qwen/qwen3-32b:1.0.0`)
      - ✅ NIM service configured in `home_infra/docker-compose.yml` (nim-qwen3 service exists)
      - ✅ `NGC_API_KEY` environment variable is set in `/home/rlee/dev/home_infra/.env`
      - ✅ Docker logged in to NGC registry (`nvcr.io`) successfully
      - ✅ Image path verified: `nvcr.io/nim/qwen/qwen3-32b:1.0.0`
+     - ❌ **BLOCKER:** NIM models are AMD64-only, system is ARM64 (aarch64) - architecture incompatibility
+     - ❌ NIM service disabled in docker-compose.yml (cannot run on ARM64 system)
      - ⏳ **NEXT:** Deploy STT and TTS NIMs (now that access is resolved)
      - ⏳ Start NIM services and verify connectivity
    - **Steps:**
