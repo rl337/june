@@ -2,10 +2,10 @@
 TensorRT-LLM model management command - Load/unload models in Triton Inference Server.
 
 Usage:
-    poetry run -m essence manage-tensorrt-llm --action load --model qwen3-30b
-    poetry run -m essence manage-tensorrt-llm --action unload --model qwen3-30b
-    poetry run -m essence manage-tensorrt-llm --action list
-    poetry run -m essence manage-tensorrt-llm --action status --model qwen3-30b
+    poetry run python -m essence manage-tensorrt-llm --action load --model qwen3-30b
+    poetry run python -m essence manage-tensorrt-llm --action unload --model qwen3-30b
+    poetry run python -m essence manage-tensorrt-llm --action list
+    poetry run python -m essence manage-tensorrt-llm --action status --model qwen3-30b
 
 This command provides an interface for managing models in the TensorRT-LLM container
 (Triton Inference Server). It interacts with Triton's model repository API to:
@@ -363,7 +363,7 @@ class ManageTensorRTLLMCommand(Command):
                 print(f"✅ {message}")
                 print(f"\n💡 Tip: Check model status with:")
                 print(
-                    f"   poetry run -m essence manage-tensorrt-llm --action status --model {self.args.model}"
+                    f"   poetry run python -m essence manage-tensorrt-llm --action status --model {self.args.model}"
                 )
                 sys.exit(0)
             else:
@@ -371,13 +371,13 @@ class ManageTensorRTLLMCommand(Command):
                 print(f"\n💡 Troubleshooting tips:")
                 print(f"   1. Verify model is ready for loading:")
                 print(
-                    f"      poetry run -m essence compile-model --model {self.args.model} --check-readiness"
+                    f"      poetry run python -m essence compile-model --model {self.args.model} --check-readiness"
                 )
                 print(f"   2. Check if TensorRT-LLM service is running:")
-                print(f"      poetry run -m essence verify-tensorrt-llm")
+                print(f"      poetry run python -m essence verify-tensorrt-llm")
                 print(f"   3. Verify model files are in repository:")
                 print(
-                    f"      poetry run -m essence setup-triton-repository --action validate --model {self.args.model}"
+                    f"      poetry run python -m essence setup-triton-repository --action validate --model {self.args.model}"
                 )
                 sys.exit(1)
 
@@ -412,25 +412,25 @@ class ManageTensorRTLLMCommand(Command):
                         )
                     print(f"\n💡 Tip: Load a model with:")
                     print(
-                        f"   poetry run -m essence manage-tensorrt-llm --action load --model <model_name>"
+                        f"   poetry run python -m essence manage-tensorrt-llm --action load --model <model_name>"
                     )
                 else:
                     print("  (no models found)")
                     print(f"\n💡 Tip: Add models to the repository first:")
                     print(
-                        f"   1. Create repository structure: poetry run -m essence setup-triton-repository --action create --model <name>"
+                        f"   1. Create repository structure: poetry run python -m essence setup-triton-repository --action create --model <name>"
                     )
                     print(
-                        f"   2. Compile model: poetry run -m essence compile-model --model <name> --generate-template"
+                        f"   2. Compile model: poetry run python -m essence compile-model --model <name> --generate-template"
                     )
                     print(
-                        f"   3. Check readiness: poetry run -m essence compile-model --model <name> --check-readiness"
+                        f"   3. Check readiness: poetry run python -m essence compile-model --model <name> --check-readiness"
                     )
                 sys.exit(0)
             else:
                 print(f"❌ {message}")
                 print(f"\n💡 Tip: Check if TensorRT-LLM service is running:")
-                print(f"   poetry run -m essence verify-tensorrt-llm")
+                print(f"   poetry run python -m essence verify-tensorrt-llm")
                 sys.exit(1)
 
         elif action == "status":
@@ -444,26 +444,26 @@ class ManageTensorRTLLMCommand(Command):
                     print(f"⚠️  {message}")
                     print(f"\n💡 Model is not loaded. Load it with:")
                     print(
-                        f"   poetry run -m essence manage-tensorrt-llm --action load --model {self.args.model}"
+                        f"   poetry run python -m essence manage-tensorrt-llm --action load --model {self.args.model}"
                     )
                 else:
                     print(f"❌ {message}")
                     print(f"\n💡 Troubleshooting:")
                     print(
-                        f"   1. Check if model files are ready: poetry run -m essence compile-model --model {self.args.model} --check-readiness"
+                        f"   1. Check if model files are ready: poetry run python -m essence compile-model --model {self.args.model} --check-readiness"
                     )
                     print(
-                        f"   2. Verify repository structure: poetry run -m essence setup-triton-repository --action validate --model {self.args.model}"
+                        f"   2. Verify repository structure: poetry run python -m essence setup-triton-repository --action validate --model {self.args.model}"
                     )
                 sys.exit(0)
             else:
                 print(f"❌ {message}")
                 print(f"\n💡 Troubleshooting:")
                 print(
-                    f"   1. Check if TensorRT-LLM service is accessible: poetry run -m essence verify-tensorrt-llm"
+                    f"   1. Check if TensorRT-LLM service is accessible: poetry run python -m essence verify-tensorrt-llm"
                 )
                 print(
-                    f"   2. Verify model exists in repository: poetry run -m essence manage-tensorrt-llm --action list"
+                    f"   2. Verify model exists in repository: poetry run python -m essence manage-tensorrt-llm --action list"
                 )
                 sys.exit(1)
 

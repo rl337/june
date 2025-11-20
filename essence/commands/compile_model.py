@@ -2,7 +2,7 @@
 Model compilation helper command - Validates prerequisites and provides guidance for TensorRT-LLM model compilation.
 
 Usage:
-    poetry run -m essence compile-model --model qwen3-30b [--check-prerequisites] [--generate-template]
+    poetry run python -m essence compile-model --model qwen3-30b [--check-prerequisites] [--generate-template]
 
 This command helps with Phase 15 Task 4: Model compilation for TensorRT-LLM.
 It validates prerequisites, checks model repository structure, and provides compilation guidance.
@@ -457,8 +457,8 @@ trtllm-build \\
 
 1. **Create config.pbtxt** in the model directory (see setup-triton-repository README.md)
 2. **Copy tokenizer files** from HuggingFace model to model directory
-3. **Validate structure**: `poetry run -m essence setup-triton-repository --action validate --model {model_name}`
-4. **Load model**: `poetry run -m essence manage-tensorrt-llm --action load --model {model_name}`
+3. **Validate structure**: `poetry run python -m essence setup-triton-repository --action validate --model {model_name}`
+4. **Load model**: `poetry run python -m essence manage-tensorrt-llm --action load --model {model_name}`
 
 ## Notes
 
@@ -879,7 +879,7 @@ class CompileModelCommand(Command):
                         print(f"   2. Compile the model using TensorRT-LLM build tools")
                         print(f"   3. Copy tokenizer files to the model directory")
                         print(
-                            f"   4. Load the model: poetry run -m essence manage-tensorrt-llm --action load --model {model_name}"
+                            f"   4. Load the model: poetry run python -m essence manage-tensorrt-llm --action load --model {model_name}"
                         )
                     except Exception as e:
                         print(f"⚠️  Could not save config.pbtxt to {config_path}: {e}")
@@ -890,7 +890,7 @@ class CompileModelCommand(Command):
                     print(f"⚠️  Model directory does not exist: {config_path.parent}")
                     print("   Please create the repository structure first:")
                     print(
-                        f"   poetry run -m essence setup-triton-repository --action create --model {model_name}"
+                        f"   poetry run python -m essence setup-triton-repository --action create --model {model_name}"
                     )
                     print("\n   Then save the config.pbtxt content above to:")
                     print(f"   {config_path}")
@@ -968,7 +968,7 @@ class CompileModelCommand(Command):
                 elif ready:
                     print("\n🚀 Ready to load! Use:")
                     print(
-                        f"   poetry run -m essence manage-tensorrt-llm --action load --model {model_name}"
+                        f"   poetry run python -m essence manage-tensorrt-llm --action load --model {model_name}"
                     )
             else:
                 results["readiness"] = readiness_details
@@ -992,10 +992,10 @@ class CompileModelCommand(Command):
             print("Use --check-readiness to verify model is ready for loading")
             print("\nExample:")
             print(
-                f"  poetry run -m essence compile-model --model {model_name} --check-prerequisites --generate-template --generate-config --generate-tokenizer-commands"
+                f"  poetry run python -m essence compile-model --model {model_name} --check-prerequisites --generate-template --generate-config --generate-tokenizer-commands"
             )
             print(
-                f"  poetry run -m essence compile-model --model {model_name} --check-readiness  # After compilation"
+                f"  poetry run python -m essence compile-model --model {model_name} --check-readiness  # After compilation"
             )
 
     def cleanup(self) -> None:

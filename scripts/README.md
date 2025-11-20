@@ -18,7 +18,7 @@ The `scripts/` directory is for:
 
 ### Commands (`essence/commands/`)
 - **All reusable Python tools** that users/agents might run
-- Run via: `poetry run -m essence <command-name>`
+- Run via: `poetry run python -m essence <command-name>`
 - Examples: `download-models`, `monitor-gpu`, `review-sandbox`, `benchmark-qwen3`, `verify-qwen3`
 
 ### Tests (`tests/`)
@@ -29,13 +29,13 @@ The `scripts/` directory is for:
 
 Reusable tools have been migrated to commands. Use these instead of scripts:
 
-- **`poetry run -m essence download-models`** - Download models (replaces `scripts/download_models.py`)
-- **`poetry run -m essence monitor-gpu`** - Monitor GPU metrics (replaces `scripts/monitor_gpu.py`)
-- **`poetry run -m essence review-sandbox`** - Review sandbox snapshots (replaces `scripts/review_sandbox.py`)
-- **`poetry run -m essence verify-qwen3`** - Verify Qwen3 quantization (replaces `scripts/verify_qwen3_quantization.py`)
-- **`poetry run -m essence benchmark-qwen3`** - Benchmark Qwen3 performance (replaces `scripts/benchmark_qwen3_performance.py`)
-- **`poetry run -m essence run-benchmarks`** - Run benchmark evaluations with sandboxed execution (replaces `scripts/run_benchmarks.py`)
-- **`poetry run -m essence generate-alice-dataset`** - Generate Alice's Adventures in Wonderland dataset (replaces `scripts/generate_alice_dataset.py`)
+- **`poetry run python -m essence download-models`** - Download models (replaces `scripts/download_models.py`)
+- **`poetry run python -m essence monitor-gpu`** - Monitor GPU metrics (replaces `scripts/monitor_gpu.py`)
+- **`poetry run python -m essence review-sandbox`** - Review sandbox snapshots (replaces `scripts/review_sandbox.py`)
+- **`poetry run python -m essence verify-qwen3`** - Verify Qwen3 quantization (replaces `scripts/verify_qwen3_quantization.py`)
+- **`poetry run python -m essence benchmark-qwen3`** - Benchmark Qwen3 performance (replaces `scripts/benchmark_qwen3_performance.py`)
+- **`poetry run python -m essence run-benchmarks`** - Run benchmark evaluations with sandboxed execution (replaces `scripts/run_benchmarks.py`)
+- **`poetry run python -m essence generate-alice-dataset`** - Generate Alice's Adventures in Wonderland dataset (replaces `scripts/generate_alice_dataset.py`)
 
 ## Remaining Scripts
 

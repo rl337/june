@@ -2,7 +2,7 @@
 Service command implementations.
 
 Each service is implemented as a command that can be run via:
-    poetry run -m essence <service-name>
+    poetry run python -m essence <service-name>
     
 Commands are discovered via reflection - they must be:
 1. Subclasses of essence.command.Command

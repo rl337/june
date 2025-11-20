@@ -2,7 +2,7 @@
 Run benchmark evaluations command - Orchestrates benchmark evaluation with sandboxed execution.
 
 Usage:
-    poetry run -m essence run-benchmarks [--dataset DATASET] [--max-tasks N] [--output-dir DIR]
+    poetry run python -m essence run-benchmarks [--dataset DATASET] [--max-tasks N] [--output-dir DIR]
 
 This command runs coding agent evaluations on benchmark datasets (HumanEval, MBPP) with
 sandboxed execution. All operations run in containers - no host system pollution.

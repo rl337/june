@@ -2,7 +2,7 @@
 Pre-flight environment check command - Validates environment readiness for Phase 10 operational tasks.
 
 Usage:
-    poetry run -m essence check-environment
+    poetry run python -m essence check-environment
 
 This command performs comprehensive pre-flight checks to ensure the environment is ready
 for Phase 10 operational tasks (model download, service startup, etc.):

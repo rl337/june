@@ -2,8 +2,8 @@
 Review sandbox command - Inspect sandbox snapshots from benchmark evaluations.
 
 Usage:
-    poetry run -m essence review-sandbox <sandbox_snapshot_dir>
-    poetry run -m essence review-sandbox <output_dir> <task_id>
+    poetry run python -m essence review-sandbox <sandbox_snapshot_dir>
+    poetry run python -m essence review-sandbox <output_dir> <task_id>
 """
 import argparse
 import json

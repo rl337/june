@@ -219,7 +219,7 @@ This script orchestrates all setup steps: pre-flight checks, model download, ser
 0. **Pre-flight environment check (recommended):**
    ```bash
    # Validate environment readiness before proceeding
-   poetry run -m essence check-environment
+   poetry run python -m essence check-environment
    ```
    **Note:** This checks Docker, GPU, NVIDIA Container Toolkit, HUGGINGFACE_TOKEN, and other prerequisites. Fix any issues before proceeding.
 
@@ -227,19 +227,19 @@ This script orchestrates all setup steps: pre-flight checks, model download, ser
    ```bash
    # Download model in container (no host pollution)
    docker compose run --rm cli-tools \
-     poetry run -m essence download-models --model Qwen/Qwen3-30B-A3B-Thinking-2507
+     poetry run python -m essence download-models --model Qwen/Qwen3-30B-A3B-Thinking-2507
    ```
 
 2. **Set up model repository structure:**
    ```bash
    # Create Triton model repository structure
-   poetry run -m essence setup-triton-repository --action create --model qwen3-30b
+   poetry run python -m essence setup-triton-repository --action create --model qwen3-30b
    ```
 
 3. **Validate compilation prerequisites:**
    ```bash
    # Check GPU, repository structure, and get compilation guidance
-   poetry run -m essence compile-model --model qwen3-30b --check-prerequisites --generate-template
+   poetry run python -m essence compile-model --model qwen3-30b --check-prerequisites --generate-template
    ```
 
 4. **Compile the model** (requires TensorRT-LLM build tools):
@@ -256,16 +256,16 @@ This script orchestrates all setup steps: pre-flight checks, model download, ser
 6. **Load the compiled model:**
    ```bash
    # Load model into TensorRT-LLM
-   poetry run -m essence manage-tensorrt-llm --action load --model qwen3-30b
+   poetry run python -m essence manage-tensorrt-llm --action load --model qwen3-30b
    
    # Verify model is loaded
-   poetry run -m essence manage-tensorrt-llm --action status --model qwen3-30b
+   poetry run python -m essence manage-tensorrt-llm --action status --model qwen3-30b
    ```
 
 7. **Verify TensorRT-LLM is accessible:**
    ```bash
    # Check that TensorRT-LLM is running and ready
-   poetry run -m essence verify-tensorrt-llm
+   poetry run python -m essence verify-tensorrt-llm
    
    # Legacy inference-api service available via: docker compose --profile legacy up -d inference-api
    ```
@@ -312,13 +312,13 @@ The coding agent provides an interface for sending coding tasks to the Qwen3 mod
 
 ```bash
 # Run a single task
-poetry run -m essence coding-agent --task "Write a function to calculate fibonacci numbers"
+poetry run python -m essence coding-agent --task "Write a function to calculate fibonacci numbers"
 
 # Run in interactive mode
-poetry run -m essence coding-agent --interactive
+poetry run python -m essence coding-agent --interactive
 
 # Specify workspace directory
-poetry run -m essence coding-agent --task "Your task here" --workspace-dir /path/to/workspace
+poetry run python -m essence coding-agent --task "Your task here" --workspace-dir /path/to/workspace
 ```
 
 **Option 2: Python API (For programmatic use)**
@@ -360,17 +360,17 @@ Run coding benchmarks to evaluate the agent (requires TensorRT-LLM service runni
 
 ```bash
 # Ensure TensorRT-LLM is running with model loaded
-poetry run -m essence manage-tensorrt-llm --action status --model qwen3-30b
+poetry run python -m essence manage-tensorrt-llm --action status --model qwen3-30b
 
 # Run benchmarks (defaults to tensorrt-llm:8000)
-poetry run -m essence run-benchmarks --dataset humaneval --max-tasks 10
+poetry run python -m essence run-benchmarks --dataset humaneval --max-tasks 10
 
 # Or run in container
 docker compose run --rm cli-tools \
-  poetry run -m essence run-benchmarks --dataset humaneval --max-tasks 10
+  poetry run python -m essence run-benchmarks --dataset humaneval --max-tasks 10
 
 # Review results
-poetry run -m essence review-sandbox /tmp/benchmarks/results humaneval_0
+poetry run python -m essence review-sandbox /tmp/benchmarks/results humaneval_0
 ```
 
 **Note:** The `run-benchmarks` command defaults to `tensorrt-llm:8000` for TensorRT-LLM. Use `--llm-url inference-api:50051` for the legacy service.

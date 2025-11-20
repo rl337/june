@@ -143,7 +143,7 @@ if [[ -f /.dockerenv ]] || [[ -n "${DOCKER_CONTAINER:-}" ]]; then
     # Running in container - use command directly
     echo "Running benchmarks in container..."
     cd "$PROJECT_ROOT"
-    poetry run -m essence run-benchmarks "${ARGS[@]}"
+    poetry run python -m essence run-benchmarks "${ARGS[@]}"
 else
     # Running on host - use docker compose
     echo "Running benchmarks via docker compose..."
@@ -204,7 +204,7 @@ else
         -e BENCHMARK_NUM_ATTEMPTS="$NUM_ATTEMPTS" \
         -e ENABLE_NETWORK="$ENABLE_NETWORK" \
         cli-tools \
-        bash -c "cd /workspace && poetry run -m essence run-benchmarks ${ARGS[*]}"
+        bash -c "cd /workspace && poetry run python -m essence run-benchmarks ${ARGS[*]}"
 fi
 
 echo "Benchmark evaluation completed!"

@@ -2,10 +2,10 @@
 Download models command - The ONLY authorized way to download models for June Agent.
 
 Usage:
-    poetry run -m essence download-models --model Qwen/Qwen3-30B-A3B-Thinking-2507
-    poetry run -m essence download-models --all
-    poetry run -m essence download-models --list
-    poetry run -m essence download-models --status
+    poetry run python -m essence download-models --model Qwen/Qwen3-30B-A3B-Thinking-2507
+    poetry run python -m essence download-models --all
+    poetry run python -m essence download-models --list
+    poetry run python -m essence download-models --status
 
 This script is the single point of model acquisition and must be run independently
 of the main infrastructure to prevent accidental downloads during runtime.

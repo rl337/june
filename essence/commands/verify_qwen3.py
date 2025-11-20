@@ -2,7 +2,7 @@
 Verify Qwen3 quantization command - Verifies quantization settings and monitors model performance.
 
 Usage:
-    poetry run -m essence verify-qwen3 [--json]
+    poetry run python -m essence verify-qwen3 [--json]
 
 This command verifies quantization settings and monitors model performance:
 - Checks quantization configuration from environment variables

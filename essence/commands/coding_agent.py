@@ -2,7 +2,7 @@
 Coding Agent command - Interactive interface for coding tasks with Qwen3 model.
 
 Usage:
-    poetry run -m essence coding-agent [--task TASK] [--interactive] [--workspace-dir DIR]
+    poetry run python -m essence coding-agent [--task TASK] [--interactive] [--workspace-dir DIR]
 
 This command provides an interface for sending coding tasks to the Qwen3 model.
 All operations run in containers - no host system pollution.

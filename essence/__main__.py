@@ -2,12 +2,12 @@
 Main entry point for essence commands.
 
 Usage:
-    poetry run -m essence <subcommand> [args...]
+    poetry run python -m essence <subcommand> [args...]
 
 Examples:
-    poetry run -m essence telegram-service
-    poetry run -m essence tts
-    poetry run -m essence stt
+    poetry run python -m essence telegram-service
+    poetry run python -m essence tts
+    poetry run python -m essence stt
 """
 import argparse
 import importlib

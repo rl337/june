@@ -2,7 +2,7 @@
 GPU monitoring command - Collects GPU metrics and exports to Prometheus.
 
 Usage:
-    poetry run -m essence monitor-gpu [--port PORT] [--interval INTERVAL]
+    poetry run python -m essence monitor-gpu [--port PORT] [--interval INTERVAL]
 
 This command monitors GPU utilization, memory, temperature, and power usage
 and updates Prometheus metrics for bottleneck identification.

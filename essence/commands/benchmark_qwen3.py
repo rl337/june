@@ -2,7 +2,7 @@
 Benchmark Qwen3 performance command - Performance benchmarking suite for Qwen3-30B-A3B model.
 
 Usage:
-    poetry run -m essence benchmark-qwen3 [--output-dir OUTPUT_DIR] [--iterations ITERATIONS]
+    poetry run python -m essence benchmark-qwen3 [--output-dir OUTPUT_DIR] [--iterations ITERATIONS]
 
 This command measures:
 - Tokens/second for text generation

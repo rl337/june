@@ -5,7 +5,7 @@ This command verifies that TensorRT-LLM is properly set up and can replace the l
 It checks container status, model repository, model loading, gRPC connectivity, and GPU usage.
 
 Usage:
-    poetry run -m essence verify-tensorrt-llm [--tensorrt-llm-url URL] [--grpc-port PORT] [--json]
+    poetry run python -m essence verify-tensorrt-llm [--tensorrt-llm-url URL] [--grpc-port PORT] [--json]
 
 This command performs comprehensive verification:
 - Checks if TensorRT-LLM container is running and accessible

@@ -22,7 +22,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 if command -v poetry &> /dev/null; then
     # Use command for better JSON parsing and formatting
     cd "$PROJECT_ROOT"
-    exec poetry run -m essence review-sandbox "$@"
+    exec poetry run python -m essence review-sandbox "$@"
 fi
 
 # Fallback to shell-based review
@@ -200,6 +200,6 @@ echo "Review complete. Sandbox data at: $SANDBOX_DIR"
 echo "=========================================="
 echo ""
 echo "For more detailed analysis, use:"
-echo "  poetry run -m essence review-sandbox \"$SANDBOX_DIR\""
+echo "  poetry run python -m essence review-sandbox \"$SANDBOX_DIR\""
 
 

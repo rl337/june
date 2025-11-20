@@ -5,7 +5,7 @@ This command verifies that a NIM service is properly set up and accessible.
 It checks HTTP health endpoint, gRPC connectivity, and optionally tests gRPC protocol compatibility.
 
 Usage:
-    poetry run -m essence verify-nim [--nim-host HOST] [--http-port PORT] [--grpc-port PORT] [--json]
+    poetry run python -m essence verify-nim [--nim-host HOST] [--http-port PORT] [--grpc-port PORT] [--json]
 
 This command performs comprehensive verification:
 - Checks if NIM HTTP health endpoint is accessible

@@ -2,7 +2,7 @@
 Generate Alice's Adventures in Wonderland dataset command.
 
 Usage:
-    poetry run -m essence generate-alice-dataset [--output-dir DIR] [--num-passages N]
+    poetry run python -m essence generate-alice-dataset [--output-dir DIR] [--num-passages N]
 
 This command generates a dataset of random 2-3 sentence passages from Alice's Adventures
 in Wonderland for audio testing purposes.

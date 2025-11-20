@@ -87,7 +87,7 @@ services:
   # For now, kept for backward compatibility during migration.
   #
   # To verify TensorRT-LLM is ready to replace this service:
-  #   poetry run -m essence verify-tensorrt-llm
+  #   poetry run python -m essence verify-tensorrt-llm
   # Once verification passes, this service can be safely removed from docker-compose.yml.
   inference-api:
     build:

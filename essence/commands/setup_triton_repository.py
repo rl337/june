@@ -2,9 +2,9 @@
 Triton model repository setup command - Create and validate Triton Inference Server model repository structure.
 
 Usage:
-    poetry run -m essence setup-triton-repository --model qwen3-30b --version 1
-    poetry run -m essence setup-triton-repository --validate --model qwen3-30b
-    poetry run -m essence setup-triton-repository --list
+    poetry run python -m essence setup-triton-repository --model qwen3-30b --version 1
+    poetry run python -m essence setup-triton-repository --validate --model qwen3-30b
+    poetry run python -m essence setup-triton-repository --list
 
 This command helps set up the Triton Inference Server model repository structure
 required for TensorRT-LLM models. It creates the directory structure and provides
@@ -114,14 +114,14 @@ See REFACTOR_PLAN.md Phase 15 Task 4 for compilation instructions.
 
 Once files are in place, load the model using:
 ```bash
-poetry run -m essence manage-tensorrt-llm --action load --model {model_name}
+poetry run python -m essence manage-tensorrt-llm --action load --model {model_name}
 ```
 
 ## Verification:
 
 Check model status:
 ```bash
-poetry run -m essence manage-tensorrt-llm --action status --model {model_name}
+poetry run python -m essence manage-tensorrt-llm --action status --model {model_name}
 ```
 """
                 readme_path.write_text(readme_content)
@@ -346,7 +346,7 @@ class SetupTritonRepositoryCommand(Command):
                 print(f"   2. Place compiled files in the model directory")
                 print(f"   3. Create config.pbtxt with model configuration")
                 print(
-                    f"   4. Load the model: poetry run -m essence manage-tensorrt-llm --action load --model {self.args.model}"
+                    f"   4. Load the model: poetry run python -m essence manage-tensorrt-llm --action load --model {self.args.model}"
                 )
                 sys.exit(0)
             else:
@@ -385,7 +385,7 @@ class SetupTritonRepositoryCommand(Command):
                     print("  (no models found)")
                     print(f"\n💡 Create a model structure:")
                     print(
-                        f"   poetry run -m essence setup-triton-repository --action create --model <name>"
+                        f"   poetry run python -m essence setup-triton-repository --action create --model <name>"
                     )
                 sys.exit(0)
             else:
