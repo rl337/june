@@ -22,8 +22,18 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 
 # Add project root to path
-project_root = Path(__file__).parent.parent
+project_root = Path(__file__).parent.parent.parent  # tests/scripts -> tests -> project root
 sys.path.insert(0, str(project_root))
+
+# Load .env file if it exists
+env_path = project_root / ".env"
+if env_path.exists():
+    with open(env_path) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, value = line.split("=", 1)
+                os.environ[key.strip()] = value.strip()
 
 from essence.chat.user_messages_sync import (
     read_user_messages,
