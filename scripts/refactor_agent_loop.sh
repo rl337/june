@@ -372,6 +372,10 @@ You are working on refactoring the june project. Your task is to:
 - If a task is too large, break it down and update the plan
 - Always verify your changes work before marking tasks complete
 - All operations must run as the rlee user on the host. There is no sudo access or running as root.
+  - **CRITICAL:** NEVER use `sudo` - not even in defensive patterns like `sudo cmd || cmd`
+  - If you encounter permission errors, check file/directory ownership and permissions first
+  - Create directories/files only in locations owned by the rlee user (e.g., `/var/data/june/*`, `/home/rlee/*`)
+  - For Docker volume mounts, ensure host directories exist with proper permissions (775 or 755) before mounting
 - **Container-first:** For Phase 10 tasks (Qwen3 setup), all model operations must happen in Docker containers - use `docker compose run` or `docker compose exec` for all model-related work
 - **Sandbox isolation:** For benchmark tasks (Phase 10.5), ensure each task runs in an isolated sandbox (container/chroot) with full activity logging and reviewability
 - **Efficiency evaluation:** When working on benchmarks, capture not just correctness but also efficiency metrics (commands executed, time to solution, resource usage)
