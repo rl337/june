@@ -113,6 +113,84 @@ class DiscordBotService:
 
         logger.info("Discord bot service initialization complete")
 
+    def _setup_tracing_middleware(self):
+        """Setup tracing and metrics middleware for HTTP requests."""
+        from essence.services.http_middleware import (
+            create_tracing_and_metrics_middleware,
+        )
+
+        middleware = create_tracing_and_metrics_middleware(tracer, trace)
+
+        @self.health_app.middleware("http")
+        async def tracing_and_metrics_middleware(request: Request, call_next):
+            return await middleware(request, call_next)
+
+    def _setup_health_endpoint(self):
+        """Setup health check endpoint."""
+
+        @self.health_app.get("/health")
+        async def health_check():
+            """Health check endpoint for Docker health checks.
+
+            Checks:
+            - Service is running
+            - Required environment variables are set
+            """
+            health_status = {
+                "status": "healthy",
+                "service": "discord-bot",
+                "checks": {},
+            }
+            overall_healthy = True
+            http_status = 200
+
+            # Check required environment variables
+            required_env_vars = ["DISCORD_BOT_TOKEN"]
+            missing_vars = []
+            for var in required_env_vars:
+                if not os.getenv(var):
+                    missing_vars.append(var)
+
+            if missing_vars:
+                health_status["checks"]["environment"] = {
+                    "status": "unhealthy",
+                    "missing_variables": missing_vars,
+                }
+                overall_healthy = False
+                http_status = 503
+                logger.warning(
+                    f"Health check: Missing environment variables: {missing_vars}"
+                )
+            else:
+                health_status["checks"]["environment"] = {"status": "healthy"}
+
+            # Update overall status
+            if not overall_healthy:
+                health_status["status"] = "unhealthy"
+
+            # Update service health metric
+            SERVICE_HEALTH.labels(service=SERVICE_NAME).set(1 if overall_healthy else 0)
+
+            return JSONResponse(content=health_status, status_code=http_status)
+
+        @self.health_app.get("/metrics")
+        async def metrics():
+            """Prometheus metrics endpoint."""
+            return Response(
+                content=generate_latest(REGISTRY), media_type=CONTENT_TYPE_LATEST
+            )
+
+    def _setup_signal_handlers(self):
+        """Setup signal handlers for graceful shutdown."""
+
+        def signal_handler(signum, frame):
+            logger.info(f"Received signal {signum}, initiating graceful shutdown...")
+            # Set shutdown event to trigger graceful shutdown in async loop
+            self._shutdown_event.set()
+
+        signal.signal(signal.SIGTERM, signal_handler)
+        signal.signal(signal.SIGINT, signal_handler)
+
     def _register_handlers(self):
         """Register Discord event handlers."""
 
@@ -295,3 +373,62 @@ class DiscordBotService:
             if span:
                 span.set_status(trace.Status(trace.StatusCode.OK))
             return
+
+    def _run_health_server(self):
+        """Run health check HTTP server in a separate thread."""
+        port = int(os.getenv("DISCORD_SERVICE_PORT", "8081"))
+        logger.info(f"Starting health check server on port {port}")
+        uvicorn.run(self.health_app, host="0.0.0.0", port=port, log_level="error")
+
+    async def _run_async(self):
+        """Run the Discord bot asynchronously."""
+        logger.info("Starting Discord bot...")
+        try:
+            await self.bot.start(self.bot_token)
+        except Exception as e:
+            logger.error(f"Error starting Discord bot: {e}", exc_info=True)
+            raise
+        finally:
+            logger.info("Discord bot stopped")
+
+    def run(self):
+        """Run the Discord bot and health check server."""
+        # Start health check server in a separate thread
+        import threading
+        health_thread = threading.Thread(target=self._run_health_server, daemon=True)
+        health_thread.start()
+        logger.info("Health check server started")
+
+        # Run Discord bot in async event loop
+        try:
+            asyncio.run(self._run_async())
+        except KeyboardInterrupt:
+            logger.info("Received keyboard interrupt, shutting down...")
+            asyncio.run(self._graceful_shutdown())
+        except Exception as e:
+            logger.error(f"Error running bot: {e}", exc_info=True)
+            # Attempt graceful shutdown even on error
+            try:
+                asyncio.run(self._graceful_shutdown())
+            except Exception as shutdown_error:
+                logger.error(
+                    f"Error during graceful shutdown: {shutdown_error}", exc_info=True
+                )
+            raise
+
+    async def _graceful_shutdown(self):
+        """Perform graceful shutdown: stop accepting new requests, complete in-flight requests."""
+        if self._shutdown_complete:
+            return
+
+        logger.info("Initiating graceful shutdown...")
+        self._shutdown_event.set()
+
+        # Stop the bot
+        if self.bot and not self.bot.is_closed():
+            logger.info("Closing Discord bot connection...")
+            await self.bot.close()
+            logger.info("Discord bot connection closed")
+
+        self._shutdown_complete = True
+        logger.info("Graceful shutdown complete")
