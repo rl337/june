@@ -249,13 +249,22 @@ class BenchmarkEvaluator:
                 workspace_dir = self.sandbox_workspace_base / task.task_id
                 workspace_dir.mkdir(parents=True, exist_ok=True)
 
+                # Enable network if using HTTP/NIM (needed to access LLM service)
+                # For gRPC, network can be disabled (LLM requests made from host process)
+                # For HTTP, network must be enabled (sandbox needs to access LLM service)
+                use_network = not self.network_disabled
+                if "://" in self.llm_url and self.llm_url.startswith("http"):
+                    # HTTP/NIM: Enable network so sandbox can access LLM service
+                    use_network = True
+                    logger.info(f"Enabling network for sandbox (HTTP LLM service requires network access)")
+                
                 sandbox = Sandbox(
                     task_id=task.task_id,
                     base_image=self.sandbox_base_image,
                     workspace_dir=workspace_dir,
                     max_memory=self.max_sandbox_memory,
                     max_cpu=self.max_sandbox_cpu,
-                    network_disabled=self.network_disabled,
+                    network_disabled=not use_network,
                 )
 
                 sandbox.start()
