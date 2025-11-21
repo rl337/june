@@ -62,9 +62,9 @@ Reusable tools have been migrated to commands. Use these instead of scripts:
   - `test_message_api.py` - Test script for Message API endpoints
   - `test_phase21_round_trip.py` - Automated test script for Phase 21 USER_MESSAGES.md round trip verification
   - `test_send_dms.py` - Test script for sending direct messages
-- ⏳ **Remaining:** Shell scripts that should be moved to `tests/scripts/` or converted to pytest:
-  - `run_audio_tests.sh` - Should be moved to `tests/scripts/` or converted to pytest
-  - `test_artifact_collection.sh` - Should be moved to `tests/scripts/` or converted to pytest
+- ✅ **COMPLETED:** All test Python files moved to `tests/scripts/`
+- ⏳ **Remaining:** Shell scripts that should be moved to `tests/scripts/` or converted to pytest (if they exist):
+  - Note: `run_audio_tests.sh` and `test_artifact_collection.sh` mentioned in previous TODO but do not exist in scripts/ directory
 
 ### Dataset/Data Scripts
 - All dataset generation tools have been converted to commands (see Available Commands above)
