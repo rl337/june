@@ -1311,7 +1311,7 @@ The agent can help with steps 2-3 once the user provides the required informatio
 ### Phase 18: Model Evaluation and Benchmarking ✅ COMPLETED (Code Changes)
 
 **✅ COMPLETED (2025-11-21):** Added HTTP/NIM support to benchmark evaluation framework:
-- **CodingAgent HTTP Support:** Updated `essence/agents/coding_agent.py` to detect HTTP URLs and use LLMClient for HTTP/NIM inference. Tool calling not yet supported for HTTP (TODO for future enhancement).
+- **CodingAgent HTTP Support:** Updated `essence/agents/coding_agent.py` to detect HTTP URLs and use LLMClient for HTTP/NIM inference. ✅ **OpenAI-compatible function calling implemented** - converts ToolDefinition to OpenAI format, handles streaming function calls incrementally, and executes function calls with results.
 - **Sandbox Network Configuration:** Updated `essence/agents/sandbox.py` to connect sandboxes to shared-network when network is enabled, allowing sandboxes to access LLM services like nim-qwen3.
 - **Evaluator Network Auto-Enable:** Updated `essence/agents/evaluator.py` to automatically enable network for sandboxes when using HTTP LLM services (required for NIM access).
 
