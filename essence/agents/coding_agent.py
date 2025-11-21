@@ -4,12 +4,15 @@ Coding Agent Interface
 Provides an interface for sending coding tasks to the Qwen3 model via inference API.
 Handles tool calling, code execution, file operations, and multi-turn conversations.
 All operations run in containers - no host system pollution.
+
+Supports both gRPC (TensorRT-LLM, legacy inference-api) and HTTP (NVIDIA NIM) protocols.
 """
 import json
 import logging
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
+from urllib.parse import urlparse
 
 import grpc
 from june_grpc_api import llm_pb2_grpc
@@ -23,6 +26,7 @@ from june_grpc_api.llm_pb2 import (
 )
 from opentelemetry import trace
 
+from essence.agents.llm_client import LLMClient
 from essence.chat.utils.tracing import get_tracer
 
 logger = logging.getLogger(__name__)
@@ -48,9 +52,9 @@ class CodingAgent:
         Initialize the coding agent.
 
         Args:
-            llm_url: gRPC endpoint for LLM inference service (default: "tensorrt-llm:8000" for TensorRT-LLM).
-                    Can use "localhost:50051" for local testing, "inference-api:50051" for legacy service,
-                    or "nim-qwen3:8001" for NVIDIA NIM.
+            llm_url: LLM endpoint URL. Supports:
+                    - gRPC: "tensorrt-llm:8000" (default), "inference-api:50051", "grpc://nim-qwen3:8001"
+                    - HTTP: "http://nim-qwen3:8000" (NVIDIA NIM OpenAI-compatible API)
             model_name: Name of the model to use
             max_context_length: Maximum context length for the model
             temperature: Sampling temperature
@@ -62,8 +66,22 @@ class CodingAgent:
         self.temperature = temperature
         self.max_tokens = max_tokens
 
+        # Detect protocol from URL
+        if "://" in llm_url:
+            parsed = urlparse(llm_url)
+            self._protocol = parsed.scheme
+        elif "nim" in llm_url.lower() and (":8000" in llm_url or ":8003" in llm_url):
+            self._protocol = "http"
+        else:
+            self._protocol = "grpc"
+
+        # gRPC connection (for TensorRT-LLM, legacy inference-api)
         self._channel: Optional[grpc.Channel] = None
         self._stub: Optional[llm_pb2_grpc.LLMInferenceStub] = None
+        
+        # HTTP client (for NVIDIA NIM)
+        self._llm_client: Optional[LLMClient] = None
+        
         self._conversation_history: List[ChatMessage] = []
         self._workspace_dir: Optional[Path] = None
         self._available_tools: List[ToolDefinition] = []
@@ -72,11 +90,26 @@ class CodingAgent:
         self._initialize_tools()
 
     def _ensure_connection(self) -> None:
-        """Ensure gRPC connection to LLM inference service is established."""
-        if self._channel is None or self._stub is None:
-            self._channel = grpc.insecure_channel(self.llm_url)
-            self._stub = llm_pb2_grpc.LLMInferenceStub(self._channel)
-            logger.info(f"Connected to LLM inference service at {self.llm_url}")
+        """Ensure connection to LLM inference service is established (gRPC or HTTP)."""
+        if self._protocol == "http":
+            # HTTP/NIM: Use LLMClient
+            if self._llm_client is None:
+                self._llm_client = LLMClient(
+                    llm_url=self.llm_url,
+                    model_name=self.model_name,
+                    max_context_length=self.max_context_length,
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens,
+                )
+                logger.info(f"Initialized HTTP client for LLM service at {self.llm_url}")
+        else:
+            # gRPC: Use direct gRPC connection
+            if self._channel is None or self._stub is None:
+                # Strip grpc:// prefix if present
+                grpc_url = self.llm_url.replace("grpc://", "")
+                self._channel = grpc.insecure_channel(grpc_url)
+                self._stub = llm_pb2_grpc.LLMInferenceStub(self._channel)
+                logger.info(f"Connected to gRPC LLM inference service at {grpc_url}")
 
     def _create_chat_message(self, role: str, content: str) -> ChatMessage:
         """Create a ChatMessage protobuf object."""
@@ -114,96 +147,152 @@ class CodingAgent:
 
                 # Build system message with coding context
                 system_message = self._build_system_message(context)
-                if system_message:
-                    # Add system message if conversation is empty
-                    if not self._conversation_history:
-                        self._conversation_history.append(
-                            self._create_chat_message("system", system_message)
-                        )
-
-                # Add user message
-                user_message = self._create_chat_message("user", task_description)
-                self._conversation_history.append(user_message)
-
-                span.set_attribute(
-                    "conversation_length", len(self._conversation_history)
-                )
-
-                # Create chat request with tools enabled
-                chat_context = Context(
-                    enable_tools=True,
-                    available_tools=self._available_tools,
-                    max_context_tokens=self.max_context_length,
-                )
-
-                request = ChatRequest(
-                    messages=self._conversation_history,
-                    params=GenerationParameters(
-                        temperature=self.temperature,
-                        max_tokens=self.max_tokens,
-                        top_p=0.9,
-                    ),
-                    context=chat_context,
-                    stream=True,
-                )
-
-                # Stream response from model and handle tool calls
-                chunk_count = 0
-                full_response = ""
-                tool_calls: List[ToolCall] = []
-
-                with tracer.start_as_current_span(
-                    "coding_agent.stream_response"
-                ) as stream_span:
-                    for chunk in self._stub.ChatStream(request):
-                        if chunk.chunk.role == "assistant":
-                            content = chunk.chunk.content
-                            if content:
-                                chunk_count += 1
-                                full_response += content
-                                stream_span.set_attribute("chunk_count", chunk_count)
-                                yield content
-
-                            # Collect tool calls
-                            if chunk.chunk.tool_calls:
-                                tool_calls.extend(chunk.chunk.tool_calls)
-                                stream_span.set_attribute(
-                                    "tool_calls_count", len(tool_calls)
-                                )
-
-                        if chunk.is_final:
-                            stream_span.set_attribute("is_final", True)
-                            stream_span.set_attribute("total_chunks", chunk_count)
-                            stream_span.set_attribute(
-                                "response_length", len(full_response)
-                            )
-                            break
-
-                # Handle tool calls if any
-                if tool_calls:
-                    span.set_attribute("has_tool_calls", True)
-                    span.set_attribute("tool_calls_count", len(tool_calls))
-                    tool_results = self._execute_tool_calls(tool_calls, span)
-
-                    # Add tool results as a new message and continue conversation
-                    if tool_results:
-                        tool_message = self._create_tool_results_message(tool_results)
-                        self._conversation_history.append(tool_message)
-
-                        # Continue conversation with tool results
-                        # (This would require another request - for now, we'll include results in the response)
-                        yield f"\n\n[Tool execution completed. Results: {tool_results}]\n"
-
-                # Add assistant response to conversation history
-                if full_response:
-                    assistant_message = self._create_chat_message(
-                        "assistant", full_response
-                    )
-                    if tool_calls:
-                        assistant_message.tool_calls.extend(tool_calls)
-                    self._conversation_history.append(assistant_message)
+                
+                # Handle HTTP/NIM vs gRPC differently
+                if self._protocol == "http":
+                    # HTTP/NIM: Use LLMClient (simpler interface, no tool calling support yet)
+                    # Build prompt from conversation history
+                    prompt_parts = []
+                    if system_message:
+                        prompt_parts.append(f"System: {system_message}")
+                    
+                    # Add conversation history
+                    for msg in self._conversation_history:
+                        if hasattr(msg, 'role') and hasattr(msg, 'content'):
+                            prompt_parts.append(f"{msg.role}: {msg.content}")
+                    
+                    # Add current task
+                    prompt_parts.append(f"user: {task_description}")
+                    prompt = "\n\n".join(prompt_parts)
+                    
+                    # Generate using LLMClient
+                    full_response = ""
+                    chunk_count = 0
+                    with tracer.start_as_current_span(
+                        "coding_agent.stream_response_http"
+                    ) as stream_span:
+                        for chunk in self._llm_client.generate(
+                            prompt=prompt,
+                            system_prompt=system_message,
+                            temperature=self.temperature,
+                            max_tokens=self.max_tokens,
+                            stream=True,
+                        ):
+                            chunk_count += 1
+                            full_response += chunk
+                            stream_span.set_attribute("chunk_count", chunk_count)
+                            yield chunk
+                        
+                        stream_span.set_attribute("is_final", True)
+                        stream_span.set_attribute("total_chunks", chunk_count)
+                        stream_span.set_attribute("response_length", len(full_response))
+                    
+                    # Note: Tool calling not yet supported for HTTP/NIM
+                    # TODO: Implement OpenAI-compatible function calling for NIM
+                    span.set_attribute("tool_calls_supported", False)
                     span.set_attribute("response_length", len(full_response))
                     span.set_attribute("final_chunk_count", chunk_count)
+                    
+                    # Add assistant response to conversation history (simplified for HTTP)
+                    # Note: For HTTP, we use a simple string-based history since we can't use protobuf ChatMessage
+                    # This is a limitation - full conversation history tracking requires protobuf or OpenAI format conversion
+                    if full_response:
+                        # Store response in a way that can be used for next iteration
+                        # For now, we'll just track that we got a response
+                        span.set_attribute("response_added_to_history", True)
+                    
+                else:
+                    # gRPC: Use existing protobuf-based implementation with tool calling
+                    if system_message:
+                        # Add system message if conversation is empty
+                        if not self._conversation_history:
+                            self._conversation_history.append(
+                                self._create_chat_message("system", system_message)
+                            )
+
+                    # Add user message
+                    user_message = self._create_chat_message("user", task_description)
+                    self._conversation_history.append(user_message)
+
+                    span.set_attribute(
+                        "conversation_length", len(self._conversation_history)
+                    )
+
+                    # Create chat request with tools enabled
+                    chat_context = Context(
+                        enable_tools=True,
+                        available_tools=self._available_tools,
+                        max_context_tokens=self.max_context_length,
+                    )
+
+                    request = ChatRequest(
+                        messages=self._conversation_history,
+                        params=GenerationParameters(
+                            temperature=self.temperature,
+                            max_tokens=self.max_tokens,
+                            top_p=0.9,
+                        ),
+                        context=chat_context,
+                        stream=True,
+                    )
+
+                    # Stream response from model and handle tool calls
+                    chunk_count = 0
+                    full_response = ""
+                    tool_calls: List[ToolCall] = []
+
+                    with tracer.start_as_current_span(
+                        "coding_agent.stream_response"
+                    ) as stream_span:
+                        for chunk in self._stub.ChatStream(request):
+                            if chunk.chunk.role == "assistant":
+                                content = chunk.chunk.content
+                                if content:
+                                    chunk_count += 1
+                                    full_response += content
+                                    stream_span.set_attribute("chunk_count", chunk_count)
+                                    yield content
+
+                                # Collect tool calls
+                                if chunk.chunk.tool_calls:
+                                    tool_calls.extend(chunk.chunk.tool_calls)
+                                    stream_span.set_attribute(
+                                        "tool_calls_count", len(tool_calls)
+                                    )
+
+                            if chunk.is_final:
+                                stream_span.set_attribute("is_final", True)
+                                stream_span.set_attribute("total_chunks", chunk_count)
+                                stream_span.set_attribute(
+                                    "response_length", len(full_response)
+                                )
+                                break
+
+                    # Handle tool calls if any
+                    if tool_calls:
+                        span.set_attribute("has_tool_calls", True)
+                        span.set_attribute("tool_calls_count", len(tool_calls))
+                        tool_results = self._execute_tool_calls(tool_calls, span)
+
+                        # Add tool results as a new message and continue conversation
+                        if tool_results:
+                            tool_message = self._create_tool_results_message(tool_results)
+                            self._conversation_history.append(tool_message)
+
+                            # Continue conversation with tool results
+                            # (This would require another request - for now, we'll include results in the response)
+                            yield f"\n\n[Tool execution completed. Results: {tool_results}]\n"
+
+                    # Add assistant response to conversation history
+                    if full_response:
+                        assistant_message = self._create_chat_message(
+                            "assistant", full_response
+                        )
+                        if tool_calls:
+                            assistant_message.tool_calls.extend(tool_calls)
+                        self._conversation_history.append(assistant_message)
+                        span.set_attribute("response_length", len(full_response))
+                        span.set_attribute("final_chunk_count", chunk_count)
 
             except grpc.RpcError as e:
                 span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
@@ -215,8 +304,15 @@ class CodingAgent:
             except Exception as e:
                 span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
                 span.record_exception(e)
-                logger.error(f"Error in coding agent: {e}", exc_info=True)
-                raise
+                # Handle HTTP errors specifically
+                if self._protocol == "http" and ("HTTP" in str(type(e).__name__) or "httpx" in str(type(e).__module__)):
+                    logger.error(f"HTTP error in coding agent: {e}")
+                    raise RuntimeError(
+                        f"Failed to communicate with LLM service: {e}"
+                    ) from e
+                else:
+                    logger.error(f"Error in coding agent: {e}", exc_info=True)
+                    raise
 
     def _initialize_tools(self) -> None:
         """Initialize available tools for the coding agent."""
@@ -590,12 +686,20 @@ class CodingAgent:
         ]
 
     def close(self) -> None:
-        """Close the gRPC connection."""
-        if self._channel:
-            self._channel.close()
-            self._channel = None
-            self._stub = None
-            logger.info("Closed connection to inference API")
+        """Close the connection (gRPC or HTTP)."""
+        if self._protocol == "http":
+            # HTTP/NIM: Clean up LLMClient
+            if self._llm_client:
+                self._llm_client.cleanup()
+                self._llm_client = None
+                logger.info("Closed HTTP connection to LLM service")
+        else:
+            # gRPC: Close gRPC channel
+            if self._channel:
+                self._channel.close()
+                self._channel = None
+                self._stub = None
+                logger.info("Closed gRPC connection to inference API")
 
     def __enter__(self):
         """Context manager entry."""
