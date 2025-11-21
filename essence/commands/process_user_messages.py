@@ -187,10 +187,14 @@ class ProcessUserMessagesCommand(Command):
         self.llm_client: Optional[LLMClient] = None
         if LLM_AVAILABLE:
             # Get LLM URL from environment (supports TensorRT-LLM, NIM, or legacy inference-api)
+            # Preserve HTTP scheme for NIM, strip grpc:// for gRPC (LLMClient handles both)
             llm_url = os.getenv(
                 "LLM_URL",
                 os.getenv("INFERENCE_API_URL", "tensorrt-llm:8000")
-            ).replace("grpc://", "").replace("http://", "").replace("https://", "")
+            )
+            # Only strip grpc:// scheme (keep http:// and https:// for NIM)
+            if llm_url.startswith("grpc://"):
+                llm_url = llm_url.replace("grpc://", "")
             
             try:
                 self.llm_client = LLMClient(
@@ -367,10 +371,10 @@ class ProcessUserMessagesCommand(Command):
         logger.info("Cleaning up process-user-messages command")
         
         # Cleanup LLM client if it was initialized
-        if self.llm_client is not None and hasattr(self.llm_client, "_channel"):
+        if self.llm_client is not None:
             try:
-                if self.llm_client._channel is not None:
-                    self.llm_client._channel.close()
-                    logger.info("Closed LLM client gRPC channel")
+                if hasattr(self.llm_client, "cleanup"):
+                    self.llm_client.cleanup()
+                    logger.info("Closed LLM client connections")
             except Exception as e:
                 logger.warning(f"Error closing LLM client channel: {e}")

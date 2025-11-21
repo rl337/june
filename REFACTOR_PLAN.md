@@ -403,12 +403,22 @@ The agent can help with steps 2-3 once the user provides the required informatio
      - ✅ Start LLM NIM service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3` → **COMPLETED** (2025-11-20 14:22:20)
      - ✅ Verify LLM NIM is running: `docker compose ps nim-qwen3` → **RUNNING** (status: health: starting, downloading model files)
      - ✅ Verify LLM NIM connectivity: `cd /home/rlee/dev/june && poetry run python -m essence verify-nim --nim-host nim-qwen3 --http-port 8000 --grpc-port 8001` → **COMPLETED (2025-11-20 18:22)** (Service fully initialized and ready! **FIXED (2025-11-20 17:46):** Found root cause: NIM container's inference.py uses `NIM_GPU_MEM_FRACTION` environment variable (defaults to 0.9), not `GPU_MEMORY_UTILIZATION` or `VLLM_GPU_MEMORY_UTILIZATION`. **FIX APPLIED:** Updated home_infra/docker-compose.yml to use `NIM_GPU_MEM_FRACTION=${NIM_GPU_MEMORY_UTILIZATION:-0.60}`. **VERIFIED:** Environment variable `NIM_GPU_MEM_FRACTION=0.60` is correctly set inside container. **INITIALIZATION COMPLETE:** Service started (2025-11-20 17:46:25), engine initialization completed at 02:20:05. All 5 model safetensors loaded (21.28 GiB, 121.94 seconds). Model compilation completed. Application startup complete. **HTTP ENDPOINT VERIFIED:** HTTP health endpoint accessible at `http://nim-qwen3:8000/v1/health/ready` (Status: 200, Response: "Service is ready"). Verified from telegram container on shared-network. **gRPC STATUS:** gRPC endpoint (port 8001) connectivity check timing out - may need additional configuration or service may be HTTP-only. HTTP endpoint is sufficient for OpenAI-compatible API access. **UPDATED:** Fixed verify-nim command to use `/v1/health/ready` endpoint instead of `/health`, and default HTTP port to 8000 (internal port). Previous failures: (1) Reduced GPU_MEMORY_UTILIZATION from 0.80 to 0.70 to 0.60 - wrong variable name, (2) Added VLLM_GPU_MEMORY_UTILIZATION - also wrong variable name, (3) Stopped TensorRT-LLM service - didn't help because wrong variable was being used. **SOLUTION:** Use `NIM_GPU_MEM_FRACTION` environment variable (NIM-specific, read by inference.py).)
-     - ⏳ Update june services to use NIM endpoint (set `LLM_URL=grpc://nim-qwen3:8001` in docker-compose.yml or .env)
-      - ⚠️ **BLOCKER:** LLMClient requires gRPC, but NIM gRPC endpoint (port 8001) is not responding. HTTP endpoint (port 8000) is working. Need to either: (1) Wait for gRPC server to start, (2) Create HTTP-based LLM client, or (3) Verify NIM actually provides gRPC endpoint.
+     - ✅ **COMPLETED (2025-11-21):** Update june services to use NIM endpoint - **HTTP SUPPORT ADDED**
+      - **FIXED:** LLMClient now supports both gRPC (TensorRT-LLM, legacy inference-api) and HTTP (NVIDIA NIM) protocols
+      - **Implementation:** Enhanced `essence/agents/llm_client.py` to:
+        - Detect protocol from URL (http:// for NIM, grpc:// or host:port for gRPC)
+        - Use httpx for HTTP/OpenAI-compatible API calls to NIM
+        - Use existing gRPC code for TensorRT-LLM and legacy inference-api
+        - Automatically detect NIM services (hostname contains "nim" and port 8000/8003) and use HTTP
+      - **Updated:** `essence/commands/process_user_messages.py` to preserve HTTP scheme in LLM_URL
+      - **Updated:** `scripts/switch_to_nim.sh` to use `http://nim-qwen3:8000` instead of `grpc://nim-qwen3:8001`
+      - **Usage:** Set `LLM_URL=http://nim-qwen3:8000` in docker-compose.yml or .env, or use `./scripts/switch_to_nim.sh`
+      - **Status:** Ready to use! NIM HTTP endpoint is fully functional and LLMClient now supports it.
        - ✅ **Helper script created:** `scripts/switch_to_nim.sh` - Automated script to switch june services to NIM endpoint
        - Usage: `./scripts/switch_to_nim.sh [--verify-only] [--use-env] [--no-restart]`
        - Verifies NIM is ready, updates LLM_URL configuration, and restarts services
        - Supports both docker-compose.yml and .env file configuration
+       - **UPDATED:** Now uses HTTP endpoint (`http://nim-qwen3:8000`) instead of gRPC
      - ⏳ Configure STT service to use STT NIM (once deployed)
      - ⏳ Configure TTS service to use TTS NIM (once deployed)
    - **Helper Script:** `scripts/setup_nim_operational.sh` - Orchestrates NIM deployment

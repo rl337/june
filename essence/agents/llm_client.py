@@ -2,12 +2,14 @@
 LLM Client for Agentic Reasoning
 
 Provides a unified interface for LLM interactions used by reasoning components.
-Wraps the gRPC LLM inference service (TensorRT-LLM) for use in reasoning phases.
+Supports both gRPC (TensorRT-LLM, legacy inference-api) and HTTP (NVIDIA NIM) protocols.
 """
 import logging
 from typing import Any, Dict, Iterator, List, Optional
+from urllib.parse import urlparse
 
 import grpc
+import httpx
 from june_grpc_api import llm_pb2_grpc
 from june_grpc_api.llm_pb2 import (
     ChatMessage,
@@ -42,8 +44,9 @@ class LLMClient:
         Initialize the LLM client.
 
         Args:
-            llm_url: gRPC endpoint for LLM inference service (default: "tensorrt-llm:8000" for TensorRT-LLM).
-                    Can use "inference-api:50051" for legacy service or "nim-qwen3:8001" for NVIDIA NIM.
+            llm_url: LLM endpoint URL. Supports:
+                    - gRPC: "tensorrt-llm:8000" (default), "inference-api:50051", "grpc://nim-qwen3:8001"
+                    - HTTP: "http://nim-qwen3:8000" (NVIDIA NIM OpenAI-compatible API)
             model_name: Name of the model to use
             max_context_length: Maximum context length for the model
             temperature: Sampling temperature
@@ -55,15 +58,59 @@ class LLMClient:
         self.temperature = temperature
         self.max_tokens = max_tokens
 
+        # Detect protocol from URL
+        if "://" in llm_url:
+            # URL has explicit scheme
+            parsed = urlparse(llm_url)
+            self._protocol = parsed.scheme
+            self._host = parsed.hostname or parsed.netloc.split(":")[0]
+            self._port = parsed.port or (8000 if self._protocol == "http" else 8001)
+        else:
+            # No scheme - parse as host:port
+            if ":" in llm_url:
+                parts = llm_url.split(":")
+                self._host = parts[0]
+                try:
+                    self._port = int(parts[1])
+                except (ValueError, IndexError):
+                    self._port = 8001  # Default gRPC port
+            else:
+                self._host = llm_url
+                self._port = 8001  # Default gRPC port
+            
+            # Detect protocol based on hostname and port
+            if "nim" in self._host.lower() and self._port in [8000, 8003]:
+                self._protocol = "http"
+                logger.info(f"Detected NIM service ({self._host}:{self._port}) - using HTTP protocol")
+            else:
+                self._protocol = "grpc"
+        
+        # gRPC connection (for TensorRT-LLM, legacy inference-api)
         self._channel: Optional[grpc.Channel] = None
         self._stub: Optional[llm_pb2_grpc.LLMInferenceStub] = None
+        
+        # HTTP client (for NVIDIA NIM OpenAI-compatible API)
+        self._http_client: Optional[httpx.Client] = None
+        self._http_base_url: Optional[str] = None
 
     def _ensure_connection(self) -> None:
-        """Ensure gRPC connection to LLM inference service is established."""
-        if self._channel is None or self._stub is None:
-            self._channel = grpc.insecure_channel(self.llm_url)
-            self._stub = llm_pb2_grpc.LLMInferenceStub(self._channel)
-            logger.info(f"Connected to LLM inference service at {self.llm_url}")
+        """Ensure connection to LLM inference service is established (gRPC or HTTP)."""
+        if self._protocol == "http":
+            # HTTP connection (NVIDIA NIM OpenAI-compatible API)
+            if self._http_client is None:
+                # Build base URL
+                if not self._http_base_url:
+                    self._http_base_url = f"http://{self._host}:{self._port}"
+                self._http_client = httpx.Client(timeout=120.0)  # Longer timeout for LLM inference
+                logger.info(f"Initialized HTTP client for LLM service at {self._http_base_url}")
+        else:
+            # gRPC connection (TensorRT-LLM, legacy inference-api)
+            if self._channel is None or self._stub is None:
+                # Build gRPC address (host:port format)
+                grpc_address = f"{self._host}:{self._port}"
+                self._channel = grpc.insecure_channel(grpc_address)
+                self._stub = llm_pb2_grpc.LLMInferenceStub(self._channel)
+                logger.info(f"Connected to LLM inference service via gRPC at {grpc_address}")
 
     def _create_chat_message(self, role: str, content: str) -> ChatMessage:
         """Create a ChatMessage protobuf object."""
@@ -94,52 +141,144 @@ class LLMClient:
             try:
                 span.set_attribute("prompt_length", len(prompt))
                 span.set_attribute("stream", stream)
+                span.set_attribute("protocol", self._protocol)
 
                 self._ensure_connection()
 
-                # Build messages
-                messages: List[ChatMessage] = []
-                if system_prompt:
-                    messages.append(self._create_chat_message("system", system_prompt))
-                messages.append(self._create_chat_message("user", prompt))
-
-                # Create request
-                request = ChatRequest(
-                    messages=messages,
-                    params=GenerationParameters(
-                        temperature=temperature or self.temperature,
-                        max_tokens=max_tokens or self.max_tokens,
-                        top_p=0.9,
-                    ),
-                    context=Context(
-                        enable_tools=False,
-                        max_context_tokens=self.max_context_length,
-                    ),
-                    stream=stream,
-                )
-
-                # Generate response
-                if stream:
-                    for chunk in self._stub.ChatStream(request):
-                        if chunk.chunk.role == "assistant":
-                            content = chunk.chunk.content
-                            if content:
-                                yield content
+                if self._protocol == "http":
+                    # HTTP/OpenAI-compatible API (NVIDIA NIM)
+                    yield from self._generate_http(
+                        prompt=prompt,
+                        system_prompt=system_prompt,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        stream=stream,
+                        span=span,
+                    )
                 else:
-                    # Non-streaming: collect all chunks
-                    response = ""
-                    for chunk in self._stub.ChatStream(request):
-                        if chunk.chunk.role == "assistant":
-                            content = chunk.chunk.content
-                            if content:
-                                response += content
-                    yield response
+                    # gRPC API (TensorRT-LLM, legacy inference-api)
+                    # Build messages
+                    messages: List[ChatMessage] = []
+                    if system_prompt:
+                        messages.append(self._create_chat_message("system", system_prompt))
+                    messages.append(self._create_chat_message("user", prompt))
+
+                    # Create request
+                    request = ChatRequest(
+                        messages=messages,
+                        params=GenerationParameters(
+                            temperature=temperature or self.temperature,
+                            max_tokens=max_tokens or self.max_tokens,
+                            top_p=0.9,
+                        ),
+                        context=Context(
+                            enable_tools=False,
+                            max_context_tokens=self.max_context_length,
+                        ),
+                        stream=stream,
+                    )
+
+                    # Generate response
+                    if stream:
+                        for chunk in self._stub.ChatStream(request):
+                            if chunk.chunk.role == "assistant":
+                                content = chunk.chunk.content
+                                if content:
+                                    yield content
+                    else:
+                        # Non-streaming: collect all chunks
+                        response = ""
+                        for chunk in self._stub.ChatStream(request):
+                            if chunk.chunk.role == "assistant":
+                                content = chunk.chunk.content
+                                if content:
+                                    response += content
+                        yield response
 
             except Exception as e:
                 logger.error(f"Error generating text: {e}", exc_info=True)
                 span.record_exception(e)
                 span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
                 raise
+
+    def _generate_http(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        stream: bool = False,
+        span: Optional[trace.Span] = None,
+    ) -> Iterator[str]:
+        """
+        Generate text using HTTP/OpenAI-compatible API (NVIDIA NIM).
+
+        Args:
+            prompt: The input prompt
+            system_prompt: Optional system prompt
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            stream: Whether to stream the response
+            span: OpenTelemetry span for tracing
+
+        Yields:
+            Response chunks as they arrive
+        """
+        # Build messages in OpenAI format
+        messages: List[Dict[str, str]] = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        # Build request payload
+        payload = {
+            "model": self.model_name,
+            "messages": messages,
+            "temperature": temperature or self.temperature,
+            "max_tokens": max_tokens or self.max_tokens,
+            "stream": stream,
+        }
+
+        url = f"{self._http_base_url}/v1/chat/completions"
+        
+        try:
+            if stream:
+                # Streaming response
+                with self._http_client.stream(
+                    "POST", url, json=payload, timeout=120.0
+                ) as response:
+                    response.raise_for_status()
+                    for line in response.iter_lines():
+                        if line.startswith("data: "):
+                            data_str = line[6:]  # Remove "data: " prefix
+                            if data_str == "[DONE]":
+                                break
+                            try:
+                                import json
+                                data = json.loads(data_str)
+                                if "choices" in data and len(data["choices"]) > 0:
+                                    delta = data["choices"][0].get("delta", {})
+                                    content = delta.get("content", "")
+                                    if content:
+                                        yield content
+                            except json.JSONDecodeError:
+                                logger.warning(f"Failed to parse streaming chunk: {data_str}")
+                                continue
+            else:
+                # Non-streaming response
+                response = self._http_client.post(url, json=payload, timeout=120.0)
+                response.raise_for_status()
+                result = response.json()
+                if "choices" in result and len(result["choices"]) > 0:
+                    content = result["choices"][0].get("message", {}).get("content", "")
+                    if content:
+                        yield content
+        except httpx.HTTPError as e:
+            logger.error(f"HTTP request to LLM service failed: {e}")
+            if span:
+                span.record_exception(e)
+                span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+            raise
 
     def generate_text(
         self,
@@ -371,3 +510,22 @@ Evaluate:
                 logger.error(f"Error in reflect phase: {e}", exc_info=True)
                 span.record_exception(e)
                 raise
+
+    def cleanup(self) -> None:
+        """Clean up connections (close HTTP client and gRPC channel)."""
+        if self._http_client is not None:
+            try:
+                self._http_client.close()
+                self._http_client = None
+                logger.debug("Closed HTTP client connection")
+            except Exception as e:
+                logger.warning(f"Error closing HTTP client: {e}")
+        
+        if self._channel is not None:
+            try:
+                self._channel.close()
+                self._channel = None
+                self._stub = None
+                logger.debug("Closed gRPC channel connection")
+            except Exception as e:
+                logger.warning(f"Error closing gRPC channel: {e}")

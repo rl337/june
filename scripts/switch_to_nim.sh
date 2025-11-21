@@ -90,7 +90,8 @@ fi
 echo "Step 2: Updating LLM_URL configuration..."
 echo "-----------------------------------"
 
-NIM_ENDPOINT="grpc://nim-qwen3:8001"
+# NIM uses HTTP/OpenAI-compatible API, not gRPC
+NIM_ENDPOINT="http://nim-qwen3:8000"
 
 if [ "$USE_ENV" = true ]; then
     # Update .env file
