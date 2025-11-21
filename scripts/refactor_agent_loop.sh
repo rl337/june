@@ -479,12 +479,6 @@ main() {
     CURSOR_AGENT_CMD=$(get_cursor_agent_cmd)
     log "Using cursor-agent command: $CURSOR_AGENT_CMD"
     
-    # Check if REFACTOR_PLAN.md exists
-    if [[ ! -f "$REFACTOR_PLAN" ]]; then
-        log "ERROR: REFACTOR_PLAN.md not found at $REFACTOR_PLAN"
-        exit 1
-    fi
-    
     # Create the prompt
     PROMPT=$(create_prompt)
     
