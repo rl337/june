@@ -49,7 +49,14 @@
       - ✅ **NGC_API_KEY found** - Located in home_infra/.env file (2025-11-21)
       - **STATUS (2025-11-21):** Task 4 completed (nvcr.io verification failed). Task 9 created for build.nvidia.com alternative. Custom STT service continues to work as fallback.
     - ⏳ **TTS NIM:** Multiple alternatives available
-      - **Option 1: Riva TTS NIM** (nvcr.io/nim/riva/riva-tts:latest) - ⏳ **Task 5 available** (Magpie TTS Multilingual, FastPitch-HiFiGAN-EN)
+      - **Option 1: Riva TTS NIM** (nvcr.io/nim/riva/riva-tts:latest) - ✅ **Task 5 completed** (2025-11-21)
+        - Models: Magpie TTS Multilingual, FastPitch-HiFiGAN-EN
+        - ✅ **Verification attempted (2025-11-21):**
+          - ✅ Found NGC_API_KEY in home_infra/.env
+          - ❌ NGC catalog API queries failed (404 errors from nvcr.io/v2/nim/*/_catalog endpoints)
+          - ❌ Docker pull test failed (Access Denied for nvcr.io/nim/riva/riva-tts:latest - image path may be incorrect or requires different permissions)
+          - ⏳ **Manual verification required:** Check NGC catalog website directly: https://catalog.ngc.nvidia.com/orgs/nim/teams/riva/containers/riva-tts
+        - Status: Verification attempted, manual check needed (same pattern as STT NIM)
       - **Option 2: Whisper TTS NIM** (build.nvidia.com) - ✅ **Task 10 completed** (2025-11-21)
         - Model card: https://build.nvidia.com/openai/whisper-large-v3/modelcard
         - ✅ **Verification completed (2025-11-21):**
