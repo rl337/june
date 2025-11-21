@@ -60,11 +60,32 @@ class ListNIMsCommand(Command):
 
     def init(self) -> None:
         """Initialize command."""
+        # Try to get NGC_API_KEY from multiple sources
         self.ngc_api_key = self.args.ngc_api_key or os.getenv("NGC_API_KEY")
+        
+        # If not found, try reading from home_infra/.env file
+        if not self.ngc_api_key:
+            home_infra_env = "/home/rlee/dev/home_infra/.env"
+            if os.path.exists(home_infra_env):
+                try:
+                    with open(home_infra_env, "r") as f:
+                        for line in f:
+                            line = line.strip()
+                            if line.startswith("NGC_API_KEY="):
+                                self.ngc_api_key = line.split("=", 1)[1].strip()
+                                # Remove quotes if present
+                                if self.ngc_api_key.startswith('"') and self.ngc_api_key.endswith('"'):
+                                    self.ngc_api_key = self.ngc_api_key[1:-1]
+                                elif self.ngc_api_key.startswith("'") and self.ngc_api_key.endswith("'"):
+                                    self.ngc_api_key = self.ngc_api_key[1:-1]
+                                break
+                except Exception as e:
+                    logger.debug(f"Failed to read NGC_API_KEY from {home_infra_env}: {e}")
+        
         if not self.ngc_api_key:
             logger.warning(
                 "NGC_API_KEY not set. Some features may be limited. "
-                "Set NGC_API_KEY environment variable or use --ngc-api-key"
+                "Set NGC_API_KEY environment variable, use --ngc-api-key, or ensure it's in /home/rlee/dev/home_infra/.env"
             )
 
     def run(self) -> None:
