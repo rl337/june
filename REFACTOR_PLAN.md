@@ -32,8 +32,8 @@
     - ✅ **Tool Available:** `list-nims` command exists to discover available NIM containers - use `poetry run python -m essence list-nims --dgx-spark-only --filter stt` or `--filter tts` to find SparkStation-compatible models for STT/TTS evaluation
     - ✅ **Operational:** Start LLM NIM service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3` (requires NGC_API_KEY)
       - ✅ **COMPLETED:** Service started successfully (2025-11-20 14:22:20)
-      - ⏳ **Status:** Service is running and downloading model files (health: starting)
-      - ⏳ **Next:** Wait for model download/initialization to complete, then verify connectivity
+      - ✅ **Status:** Service fully operational - model loaded, compiled, and tested (health: healthy)
+      - ✅ **Verified:** LLM inference test successful - service responding correctly to HTTP API requests
     - ✅ **RESOLVED:** DGX Spark NIMs support ARM64 architecture! The Qwen3-32B DGX Spark NIM is confirmed ARM64-compatible and configured in home_infra/docker-compose.yml.
      - ✅ **LLM NIM:** Qwen3-32B DGX Spark NIM confirmed ARM64-compatible (image: `nvcr.io/nim/qwen/qwen3-32b-dgx-spark:1.0.0`)
     - ⏳ **STT NIM:** Riva ASR NIM available (Parakeet ASR-CTC-1.1B-EnUS) - image path placeholder (`nvcr.io/nim/riva/riva-asr:latest`)
@@ -292,12 +292,14 @@ All major refactoring phases have been completed:
 5. ✅ Periodic message polling (utility implemented, polling loop integrated into refactor_agent_loop.sh)
 6. ✅ Service conflict prevention (code complete)
 7. ⏳ **OPERATIONAL DEPLOYMENT PENDING (HIGH PRIORITY - AGENT SHOULD DO THIS):**
-   - ✅ **LLM NIM service fully operational** - COMPLETED (2025-11-21)
+   - ✅ **LLM NIM service fully operational and tested** - COMPLETED (2025-11-21)
      - **Status:** Service is healthy and ready for use
      - **Initialization:** Model loaded (21.28 GiB), compiled, and KV cache configured
      - **Health:** HTTP endpoint `http://nim-qwen3:8000/v1/health/ready` responding correctly
      - **Connectivity:** Verified from telegram container - health checks passing
-     - **Next:** Test LLM inference via HTTP API, then switch june services to use NIM endpoint (if not already configured)
+     - **Inference Test:** ✅ Verified LLM inference via HTTP API - successful response from Qwen3-32B model
+     - **Configuration:** Services already configured with `LLM_URL=http://nim-qwen3:8000` in docker-compose.yml
+     - **Status:** ✅ **FULLY OPERATIONAL** - Ready for production use
    - ⏳ **STT/TTS NIMs not deployed** - Riva ASR/TTS NIMs need verification and deployment (OPTIONAL - custom services working)
      - **Impact:** STT/TTS services still using custom implementations instead of optimized NIMs
      - **Status (2025-11-21):** Placeholder image paths (`nvcr.io/nim/riva/riva-asr:latest`, `nvcr.io/nim/riva/riva-tts:latest`) do not exist or are not accessible
