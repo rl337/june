@@ -414,8 +414,12 @@ The agent can help with steps 2-3 once the user provides the required informatio
       - **Updated:** `essence/commands/process_user_messages.py` to preserve HTTP scheme in LLM_URL
       - **Updated:** `scripts/switch_to_nim.sh` to use `http://nim-qwen3:8000` instead of `grpc://nim-qwen3:8001`
       - **Usage:** Set `LLM_URL=http://nim-qwen3:8000` in docker-compose.yml or .env, or use `./scripts/switch_to_nim.sh`
-      - **Status:** Code complete and committed. Services need to be rebuilt to use updated LLMClient code. Once rebuilt, NIM HTTP endpoint will be fully functional.
-      - **Next:** Rebuild telegram/discord services to test HTTP integration: `docker compose build telegram discord && docker compose up -d telegram discord`
+      - **Status:** ✅ **COMPLETED AND TESTED (2025-11-21)** - HTTP integration fully functional!
+      - **FIXED:** Added automatic model name mapping for NIM services - maps Qwen3-32B variants to "Qwen/Qwen3-32B" (NIM's expected model name)
+      - **VERIFIED:** LLMClient successfully connects to NIM HTTP endpoint and generates responses
+      - **Test Results:** Protocol detection works, model name mapping works, HTTP requests succeed, responses received
+      - **Services Rebuilt:** telegram and discord services rebuilt with updated LLMClient code
+      - **Ready to Use:** Set `LLM_URL=http://nim-qwen3:8000` in docker-compose.yml or .env to use NIM
        - ✅ **Helper script created:** `scripts/switch_to_nim.sh` - Automated script to switch june services to NIM endpoint
        - Usage: `./scripts/switch_to_nim.sh [--verify-only] [--use-env] [--no-restart]`
        - Verifies NIM is ready, updates LLM_URL configuration, and restarts services
