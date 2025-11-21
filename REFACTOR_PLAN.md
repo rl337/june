@@ -441,8 +441,9 @@ The agent can help with steps 2-3 once the user provides the required informatio
        - **Root cause:** NIM container runs as `ubuntu` user (uid=1000) but couldn't write to `/data/huggingface` directory
        - **Fix 1:** Added HuggingFace cache environment variables (HF_HOME, TRANSFORMERS_CACHE, HF_MODULES_CACHE) pointing to `/data/huggingface` (writable volume mount)
        - **Fix 2:** Added `user: "1000:1000"` to docker-compose.yml to ensure container user matches host user (rlee, uid=1000) for write permissions
-       - **Status:** Permission error should be resolved with user mapping. Service restarting to apply fix.
-       - **Note:** Service may need additional time to fully initialize (model loading, engine startup). Healthcheck will report healthy once initialization completes.
+       - **Status:** ✅ Permission error resolved! Service is now starting successfully.
+       - **Progress (2025-11-21 21:52):** Model loading completed (21.28 GiB, 119.5 seconds). Currently compiling model with torch.compile (cache directory created, Dynamo bytecode transform completed in 7.26s). Service status: "starting" (expected during model compilation).
+       - **Next:** Wait for model compilation to complete, then verify HTTP health endpoint is accessible.
      - ✅ **COMPLETED (2025-11-21):** Update june services to use NIM endpoint - **HTTP SUPPORT ADDED**
       - **FIXED:** LLMClient now supports both gRPC (TensorRT-LLM, legacy inference-api) and HTTP (NVIDIA NIM) protocols
       - **Implementation:** Enhanced `essence/agents/llm_client.py` to:
