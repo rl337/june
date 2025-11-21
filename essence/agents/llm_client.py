@@ -94,6 +94,19 @@ class LLMClient:
             else:
                 self._protocol = "grpc"
         
+        # Map model name for NIM (NIM expects "Qwen/Qwen3-32B", not full HuggingFace path)
+        if self._protocol == "http" and "nim" in self._host.lower():
+            # NIM model name mapping
+            if "qwen3" in self.model_name.lower() and "32b" in self.model_name.lower():
+                # Map any Qwen3-32B variant to the NIM model name
+                self._nim_model_name = "Qwen/Qwen3-32B"
+                logger.debug(f"Mapped model name '{self.model_name}' to NIM model '{self._nim_model_name}'")
+            else:
+                # Use model name as-is (may need adjustment for other models)
+                self._nim_model_name = self.model_name
+        else:
+            self._nim_model_name = None  # Not using NIM
+        
         # gRPC connection (for TensorRT-LLM, legacy inference-api)
         self._channel: Optional[grpc.Channel] = None
         self._stub: Optional[llm_pb2_grpc.LLMInferenceStub] = None
@@ -240,8 +253,10 @@ class LLMClient:
         messages.append({"role": "user", "content": prompt})
 
         # Build request payload
+        # Use NIM-specific model name if available, otherwise use default
+        model_name_for_request = self._nim_model_name if self._nim_model_name else self.model_name
         payload = {
-            "model": self.model_name,
+            "model": model_name_for_request,
             "messages": messages,
             "temperature": temperature or self.temperature,
             "max_tokens": max_tokens or self.max_tokens,
