@@ -1136,8 +1136,10 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - ✅ **NEXT:** Test end-to-end: Agent sends message → User responds → Agent reads response - COMPLETED (2025-11-21)
      - Test script `tests/scripts/test_phase21_round_trip.py` created and verified working
      - Script automates complete round trip testing
-     - **Prerequisites:** Owner users must be configured in .env file
-     - **Status:** Script ready, requires owner user configuration to run full test
+     - **FIXED:** Added .env file loading to test script (reads owner user configuration)
+     - **FIXED:** Fixed project root path calculation (was pointing to tests/ instead of project root)
+     - **Prerequisites:** Owner users must be configured in .env file (already configured)
+     - **Status:** Script ready and fixed, can run full test with owner users configured
 
 **Helper Scripts:**
 - `scripts/test_send_dms.py` - Test script to verify agent can send DMs (✅ verified working)
