@@ -292,9 +292,12 @@ All major refactoring phases have been completed:
 5. ✅ Periodic message polling (utility implemented, polling loop integrated into refactor_agent_loop.sh)
 6. ✅ Service conflict prevention (code complete)
 7. ⏳ **OPERATIONAL DEPLOYMENT PENDING (HIGH PRIORITY - AGENT SHOULD DO THIS):**
-   - ✅ **LLM NIM service started** - NIM service is running and initializing (downloading model files, recreated 2025-11-20 15:26:05 with GPU_MEMORY_UTILIZATION=0.85)
-     - **Status:** Service running, waiting for model initialization to complete
-     - **Next:** Verify connectivity once initialization completes, then switch june services to use NIM endpoint
+   - ✅ **LLM NIM service fully operational** - COMPLETED (2025-11-21)
+     - **Status:** Service is healthy and ready for use
+     - **Initialization:** Model loaded (21.28 GiB), compiled, and KV cache configured
+     - **Health:** HTTP endpoint `http://nim-qwen3:8000/v1/health/ready` responding correctly
+     - **Connectivity:** Verified from telegram container - health checks passing
+     - **Next:** Test LLM inference via HTTP API, then switch june services to use NIM endpoint (if not already configured)
    - ⏳ **STT/TTS NIMs not deployed** - Riva ASR/TTS NIMs need verification and deployment (OPTIONAL - custom services working)
      - **Impact:** STT/TTS services still using custom implementations instead of optimized NIMs
      - **Status (2025-11-21):** Placeholder image paths (`nvcr.io/nim/riva/riva-asr:latest`, `nvcr.io/nim/riva/riva-tts:latest`) do not exist or are not accessible
@@ -436,14 +439,21 @@ The agent can help with steps 2-3 once the user provides the required informatio
        - **Fix:** Updated exposed ports to include 8000 for HTTP endpoint
        - **Status:** Healthcheck configuration corrected in `home_infra/docker-compose.yml`
        - **Note:** Service may need time to fully initialize after container recreation
-     - ✅ **NIM permission error fixed** - COMPLETED (2025-11-21)
+     - ✅ **NIM service fully operational** - COMPLETED (2025-11-21)
        - **Issue:** PermissionError: [Errno 13] Permission denied: '/data/huggingface'
        - **Root cause:** NIM container runs as `ubuntu` user (uid=1000) but couldn't write to `/data/huggingface` directory
        - **Fix 1:** Added HuggingFace cache environment variables (HF_HOME, TRANSFORMERS_CACHE, HF_MODULES_CACHE) pointing to `/data/huggingface` (writable volume mount)
        - **Fix 2:** Added `user: "1000:1000"` to docker-compose.yml to ensure container user matches host user (rlee, uid=1000) for write permissions
-       - **Status:** ✅ Permission error resolved! Service is now starting successfully.
-       - **Progress (2025-11-21 21:52):** Model loading completed (21.28 GiB, 119.5 seconds). Currently compiling model with torch.compile (cache directory created, Dynamo bytecode transform completed in 7.26s). Service status: "starting" (expected during model compilation).
-       - **Next:** Wait for model compilation to complete, then verify HTTP health endpoint is accessible.
+       - **Initialization Progress:**
+         - Model loading: Completed (21.28 GiB, 119.5 seconds)
+         - Model compilation: Completed (torch.compile took 20.83 seconds)
+         - KV cache setup: Completed (45.72 GiB available, 187,280 tokens capacity, 22.86x max concurrency)
+       - **Status:** ✅ **SERVICE FULLY OPERATIONAL!**
+         - Health status: "healthy" (verified 2025-11-21 21:57)
+         - HTTP endpoint: `http://nim-qwen3:8000/v1/health/ready` responding with "Service is ready"
+         - Telegram service: Now healthy (was unhealthy due to NIM not being ready)
+         - Connectivity: Verified from telegram container - health checks passing
+       - **Next:** Service is ready for use! Can now test LLM inference via HTTP API.
      - ✅ **COMPLETED (2025-11-21):** Update june services to use NIM endpoint - **HTTP SUPPORT ADDED**
       - **FIXED:** LLMClient now supports both gRPC (TensorRT-LLM, legacy inference-api) and HTTP (NVIDIA NIM) protocols
       - **Implementation:** Enhanced `essence/agents/llm_client.py` to:
