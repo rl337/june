@@ -292,12 +292,14 @@ All major refactoring phases have been completed:
    - ✅ **LLM NIM service started** - NIM service is running and initializing (downloading model files, recreated 2025-11-20 15:26:05 with GPU_MEMORY_UTILIZATION=0.85)
      - **Status:** Service running, waiting for model initialization to complete
      - **Next:** Verify connectivity once initialization completes, then switch june services to use NIM endpoint
-   - ⏳ **STT/TTS NIMs not deployed** - Riva ASR/TTS NIMs need verification and deployment
+   - ⏳ **STT/TTS NIMs not deployed** - Riva ASR/TTS NIMs need verification and deployment (OPTIONAL - custom services working)
      - **Impact:** STT/TTS services still using custom implementations instead of optimized NIMs
-     - **Status (2025-11-21):** Attempted to verify Riva NIM image paths - placeholder paths (`nvcr.io/nim/riva/riva-asr:latest`, `nvcr.io/nim/riva/riva-tts:latest`) do not exist or are not accessible
-     - **Action:** Verify correct Riva ASR/TTS NIM image paths in NGC catalog, then update `home_infra/docker-compose.yml` with verified paths
+     - **Status (2025-11-21):** Placeholder image paths (`nvcr.io/nim/riva/riva-asr:latest`, `nvcr.io/nim/riva/riva-tts:latest`) do not exist or are not accessible
+     - **Current State:** Custom STT/TTS services are fully functional and working correctly
+     - **Action:** Verify correct Riva ASR/TTS NIM image paths in NGC catalog (requires NGC_API_KEY), then update `home_infra/docker-compose.yml` with verified paths
      - **Note:** Services are already configured in `home_infra/docker-compose.yml` with placeholder paths - need to update with correct image paths once verified
-     - **Alternative:** Continue using custom STT/TTS services (already configured and working)
+     - **Priority:** LOW - Custom STT/TTS services are working, NIMs are optimization, not required for MVP
+     - **Alternative:** Continue using custom STT/TTS services (already configured and working) - this is acceptable for MVP
    - ✅ **Whitelist configuration set up** - TELEGRAM_WHITELISTED_USERS and DISCORD_WHITELISTED_USERS configured (verified 2025-11-20 15:29)
      - **Status:** Services running with whitelist configuration loaded
    - ✅ **Telegram/Discord services running with whitelist enabled** - Services verified running with whitelist config (2025-11-20 15:29)
