@@ -84,6 +84,8 @@ class CodingAgent:
         self._llm_client: Optional[LLMClient] = None
         
         self._conversation_history: List[ChatMessage] = []
+        # For HTTP/NIM: Store OpenAI-format messages for better context
+        self._openai_messages: List[Dict[str, Any]] = []
         self._workspace_dir: Optional[Path] = None
         self._available_tools: List[ToolDefinition] = []
 
@@ -155,22 +157,10 @@ class CodingAgent:
                     # Convert tools to OpenAI format
                     openai_tools = self._convert_tools_to_openai_format()
                     
-                    # Build prompt from conversation history (simplified for now)
-                    # TODO: Convert conversation history to OpenAI message format for better context
-                    prompt_parts = []
-                    if system_message:
-                        prompt_parts.append(f"System: {system_message}")
+                    # Build OpenAI-format messages from conversation history
+                    openai_messages = self._build_openai_messages(system_message, task_description)
                     
-                    # Add conversation history
-                    for msg in self._conversation_history:
-                        if hasattr(msg, 'role') and hasattr(msg, 'content'):
-                            prompt_parts.append(f"{msg.role}: {msg.content}")
-                    
-                    # Add current task
-                    prompt_parts.append(f"user: {task_description}")
-                    prompt = "\n\n".join(prompt_parts)
-                    
-                    # Generate using LLMClient with tools
+                    # Generate using LLMClient with messages format (better OpenAI compatibility)
                     full_response = ""
                     chunk_count = 0
                     function_calls_data: List[Dict[str, Any]] = []
@@ -178,10 +168,9 @@ class CodingAgent:
                     with tracer.start_as_current_span(
                         "coding_agent.stream_response_http"
                     ) as stream_span:
-                        # First generation attempt with tools
-                        for chunk in self._llm_client.generate(
-                            prompt=prompt,
-                            system_prompt=system_message,
+                        # Use generate_from_messages for proper OpenAI message format
+                        for chunk in self._llm_client.generate_from_messages(
+                            messages=openai_messages,
                             temperature=self.temperature,
                             max_tokens=self.max_tokens,
                             stream=True,
@@ -233,8 +222,14 @@ class CodingAgent:
                         # Add tool results as a new message and continue conversation
                         if tool_results:
                             tool_message_text = json.dumps(tool_results, indent=2)
-                            # For HTTP, we'll add tool results to the prompt for next iteration
-                            # TODO: Implement proper message format for HTTP conversation history
+                            # Add tool results to conversation history as tool role messages
+                            for tool_call_id, result in tool_results.items():
+                                tool_msg = self._create_chat_message(
+                                    "tool", tool_message_text
+                                )
+                                tool_msg.name = tool_call_id  # Store tool_call_id in name field
+                                self._conversation_history.append(tool_msg)
+                            
                             yield f"\n\n[Tool execution completed. Results: {tool_message_text}]\n"
                     
                     span.set_attribute("tool_calls_supported", True)
@@ -242,12 +237,15 @@ class CodingAgent:
                     span.set_attribute("response_length", len(full_response))
                     span.set_attribute("final_chunk_count", chunk_count)
                     
-                    # Add assistant response to conversation history (simplified for HTTP)
-                    # Note: For HTTP, we use a simple string-based history since we can't use protobuf ChatMessage
-                    # This is a limitation - full conversation history tracking requires protobuf or OpenAI format conversion
+                    # Add assistant response to conversation history
                     if full_response:
-                        # Store response in a way that can be used for next iteration
-                        # For now, we'll just track that we got a response
+                        assistant_message = self._create_chat_message(
+                            "assistant", full_response
+                        )
+                        # Add tool calls if any were executed
+                        if tool_calls:
+                            assistant_message.tool_calls.extend(tool_calls)
+                        self._conversation_history.append(assistant_message)
                         span.set_attribute("response_added_to_history", True)
                     
                 else:
@@ -388,6 +386,70 @@ class CodingAgent:
                 }
             })
         return functions
+
+    def _convert_chat_message_to_openai(self, msg: ChatMessage) -> Dict[str, Any]:
+        """
+        Convert ChatMessage protobuf to OpenAI message format.
+        
+        Args:
+            msg: ChatMessage protobuf object
+            
+        Returns:
+            OpenAI-format message dict
+        """
+        openai_msg: Dict[str, Any] = {
+            "role": msg.role,
+            "content": msg.content,
+        }
+        
+        # Add tool calls if present
+        if msg.tool_calls:
+            openai_msg["tool_calls"] = []
+            for tool_call in msg.tool_calls:
+                openai_msg["tool_calls"].append({
+                    "id": tool_call.id,
+                    "type": tool_call.type,
+                    "function": {
+                        "name": tool_call.function.name,
+                        "arguments": tool_call.function.arguments,
+                    }
+                })
+        
+        # Add tool role messages (for function results)
+        if msg.role == "tool" and msg.name:
+            openai_msg["role"] = "tool"
+            openai_msg["tool_call_id"] = msg.name  # Use name field for tool_call_id
+        
+        return openai_msg
+
+    def _build_openai_messages(
+        self, system_message: Optional[str], task_description: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Build OpenAI-format messages from conversation history.
+        
+        Args:
+            system_message: Optional system message
+            task_description: Current task description
+            
+        Returns:
+            List of OpenAI-format messages
+        """
+        messages: List[Dict[str, Any]] = []
+        
+        # Add system message if provided
+        if system_message:
+            messages.append({"role": "system", "content": system_message})
+        
+        # Convert conversation history to OpenAI format
+        for msg in self._conversation_history:
+            openai_msg = self._convert_chat_message_to_openai(msg)
+            messages.append(openai_msg)
+        
+        # Add current task as user message
+        messages.append({"role": "user", "content": task_description})
+        
+        return messages
 
     def _initialize_tools(self) -> None:
         """Initialize available tools for the coding agent."""

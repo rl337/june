@@ -15,7 +15,9 @@ from june_grpc_api.llm_pb2 import (
     ChatMessage,
     ChatRequest,
     Context,
+    FunctionCall,
     GenerationParameters,
+    ToolCall,
 )
 from opentelemetry import trace
 
@@ -178,6 +180,7 @@ class LLMClient:
                         stream=stream,
                         span=span,
                         tools=tools,
+                        messages=None,  # LLMClient.generate() doesn't support messages yet
                     )
                 else:
                     # gRPC API (TensorRT-LLM, legacy inference-api)
@@ -234,34 +237,41 @@ class LLMClient:
         stream: bool = False,
         span: Optional[trace.Span] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
+        messages: Optional[List[Dict[str, Any]]] = None,
     ) -> Iterator[str]:
         """
         Generate text using HTTP/OpenAI-compatible API (NVIDIA NIM).
 
         Args:
-            prompt: The input prompt
-            system_prompt: Optional system prompt
+            prompt: The input prompt (used if messages is None)
+            system_prompt: Optional system prompt (used if messages is None)
             temperature: Sampling temperature
             max_tokens: Maximum tokens to generate
             stream: Whether to stream the response
             span: OpenTelemetry span for tracing
             tools: Optional list of OpenAI-format tool definitions for function calling
+            messages: Optional list of OpenAI-format messages (if provided, prompt and system_prompt are ignored)
 
         Yields:
             Response chunks as they arrive
         """
         # Build messages in OpenAI format
-        messages: List[Dict[str, str]] = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": prompt})
+        if messages is not None:
+            # Use provided messages directly
+            openai_messages = messages
+        else:
+            # Build messages from prompt/system_prompt (backward compatibility)
+            openai_messages: List[Dict[str, Any]] = []
+            if system_prompt:
+                openai_messages.append({"role": "system", "content": system_prompt})
+            openai_messages.append({"role": "user", "content": prompt})
 
         # Build request payload
         # Use NIM-specific model name if available, otherwise use default
         model_name_for_request = self._nim_model_name if self._nim_model_name else self.model_name
         payload = {
             "model": model_name_for_request,
-            "messages": messages,
+            "messages": openai_messages,
             "temperature": temperature or self.temperature,
             "max_tokens": max_tokens or self.max_tokens,
             "stream": stream,
@@ -357,6 +367,103 @@ class LLMClient:
                 span.record_exception(e)
                 span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
             raise
+
+    def generate_from_messages(
+        self,
+        messages: List[Dict[str, Any]],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        stream: bool = False,
+        tools: Optional[List[Dict[str, Any]]] = None,
+    ) -> Iterator[str]:
+        """
+        Generate text from OpenAI-format messages.
+
+        Args:
+            messages: List of OpenAI-format messages (role, content, etc.)
+            temperature: Sampling temperature (overrides default)
+            max_tokens: Maximum tokens to generate (overrides default)
+            stream: Whether to stream the response
+            tools: Optional list of OpenAI-format tool definitions for function calling
+
+        Yields:
+            Response chunks as they arrive (if stream=True)
+        """
+        with tracer.start_as_current_span("llm_client.generate_from_messages") as span:
+            try:
+                span.set_attribute("messages_count", len(messages))
+                span.set_attribute("stream", stream)
+                span.set_attribute("protocol", self._protocol)
+
+                self._ensure_connection()
+
+                if self._protocol == "http":
+                    # HTTP/OpenAI-compatible API (NVIDIA NIM)
+                    yield from self._generate_http(
+                        prompt="",  # Not used when messages is provided
+                        system_prompt=None,  # Not used when messages is provided
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        stream=stream,
+                        span=span,
+                        tools=tools,
+                        messages=messages,
+                    )
+                else:
+                    # gRPC: Convert messages to ChatMessage protobuf
+                    chat_messages: List[ChatMessage] = []
+                    for msg in messages:
+                        role = msg.get("role", "user")
+                        content = msg.get("content", "")
+                        chat_msg = self._create_chat_message(role, content)
+                        
+                        # Handle tool calls if present
+                        if "tool_calls" in msg:
+                            for tool_call_dict in msg["tool_calls"]:
+                                tool_call = ToolCall(
+                                    id=tool_call_dict.get("id", ""),
+                                    type=tool_call_dict.get("type", "function"),
+                                    function=FunctionCall(
+                                        name=tool_call_dict.get("function", {}).get("name", ""),
+                                        arguments=tool_call_dict.get("function", {}).get("arguments", "{}")
+                                    )
+                                )
+                                chat_msg.tool_calls.append(tool_call)
+                        
+                        chat_messages.append(chat_msg)
+                    
+                    # Create request
+                    request = ChatRequest(
+                        messages=chat_messages,
+                        params=GenerationParameters(
+                            temperature=temperature or self.temperature,
+                            max_tokens=max_tokens or self.max_tokens,
+                        ),
+                        stream=stream,
+                    )
+
+                    # Generate response
+                    if stream:
+                        for chunk in self._stub.ChatStream(request):
+                            if chunk.chunk.role == "assistant":
+                                content = chunk.chunk.content
+                                if content:
+                                    yield content
+                    else:
+                        # Non-streaming: collect all chunks
+                        response = ""
+                        for chunk in self._stub.ChatStream(request):
+                            if chunk.chunk.role == "assistant":
+                                content = chunk.chunk.content
+                                if content:
+                                    response += content
+                        yield response
+
+            except Exception as e:
+                logger.error(f"Error generating text from messages: {e}", exc_info=True)
+                span.record_exception(e)
+                span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                raise
 
     def generate_text(
         self,
