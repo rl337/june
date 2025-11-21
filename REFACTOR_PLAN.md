@@ -50,11 +50,15 @@
       - **STATUS (2025-11-21):** Task 4 completed (nvcr.io verification failed). Task 9 created for build.nvidia.com alternative. Custom STT service continues to work as fallback.
     - ⏳ **TTS NIM:** Multiple alternatives available
       - **Option 1: Riva TTS NIM** (nvcr.io/nim/riva/riva-tts:latest) - ⏳ **Task 5 available** (Magpie TTS Multilingual, FastPitch-HiFiGAN-EN)
-      - **Option 2: Whisper TTS NIM** (build.nvidia.com) - ⏳ **Task 10 created** (2025-11-21)
+      - **Option 2: Whisper TTS NIM** (build.nvidia.com) - ✅ **Task 10 completed** (2025-11-21)
         - Model card: https://build.nvidia.com/openai/whisper-large-v3/modelcard
-        - ⚠️ **Note:** Model card shows "whisper-large-v3" which is typically STT, need to verify if TTS variant exists
-        - Alternative source to nvcr.io/nim - may have different container registry paths
-        - Status: Verification pending (need to clarify if whisper-large-v3 is TTS or STT)
+        - ✅ **Verification completed (2025-11-21):**
+          - **Confirmed:** whisper-large-v3 is STT (Speech Recognition), NOT TTS
+          - Model description: "Robust Speech Recognition via Large-Scale Weak Supervision"
+          - This model is for speech-to-text conversion, not text-to-speech
+          - No TTS variant found for whisper-large-v3
+        - ❌ **Result:** This is not a TTS model - user's indication appears to be incorrect
+        - Status: Verification complete - whisper-large-v3 is STT, not TTS. No TTS alternative found at this URL.
       - ✅ **NGC_API_KEY found** - Located in home_infra/.env file (2025-11-21)
       - **STATUS (2025-11-21):** Task 5 available for Riva TTS. Task 10 created for build.nvidia.com alternative (note: need to verify if whisper-large-v3 is actually TTS). Custom TTS service continues to work as fallback.
      - 📄 **Documentation:** Created `docs/NIM_AVAILABILITY.md` with detailed NIM availability status
