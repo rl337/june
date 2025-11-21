@@ -145,6 +145,7 @@ class LLMClient:
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
         stream: bool = False,
+        tools: Optional[List[Dict[str, Any]]] = None,
     ) -> Iterator[str]:
         """
         Generate text from a prompt.
@@ -176,6 +177,7 @@ class LLMClient:
                         max_tokens=max_tokens,
                         stream=stream,
                         span=span,
+                        tools=tools,
                     )
                 else:
                     # gRPC API (TensorRT-LLM, legacy inference-api)
@@ -231,6 +233,7 @@ class LLMClient:
         max_tokens: Optional[int] = None,
         stream: bool = False,
         span: Optional[trace.Span] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
     ) -> Iterator[str]:
         """
         Generate text using HTTP/OpenAI-compatible API (NVIDIA NIM).
@@ -242,6 +245,7 @@ class LLMClient:
             max_tokens: Maximum tokens to generate
             stream: Whether to stream the response
             span: OpenTelemetry span for tracing
+            tools: Optional list of OpenAI-format tool definitions for function calling
 
         Yields:
             Response chunks as they arrive
@@ -262,12 +266,20 @@ class LLMClient:
             "max_tokens": max_tokens or self.max_tokens,
             "stream": stream,
         }
+        
+        # Add tools if provided (for function calling)
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"  # Let model decide when to call functions
 
         url = f"{self._http_base_url}/v1/chat/completions"
         
         try:
             if stream:
                 # Streaming response
+                # Collect function calls incrementally (OpenAI streams them in parts)
+                accumulated_tool_calls: Dict[int, Dict[str, Any]] = {}  # Index -> tool call
+                
                 with self._http_client.stream(
                     "POST", url, json=payload, timeout=120.0
                 ) as response:
@@ -276,6 +288,10 @@ class LLMClient:
                         if line.startswith("data: "):
                             data_str = line[6:]  # Remove "data: " prefix
                             if data_str == "[DONE]":
+                                # Finalize any accumulated function calls
+                                if accumulated_tool_calls:
+                                    final_tool_calls = [tc for idx, tc in sorted(accumulated_tool_calls.items())]
+                                    yield f"\n[FUNCTION_CALLS:{json.dumps(final_tool_calls)}]"
                                 break
                             try:
                                 import json
@@ -285,18 +301,56 @@ class LLMClient:
                                     content = delta.get("content", "")
                                     if content:
                                         yield content
+                                    
+                                    # Handle function calls (streamed incrementally)
+                                    if "tool_calls" in delta:
+                                        for tool_call_delta in delta["tool_calls"]:
+                                            index = tool_call_delta.get("index")
+                                            if index is not None:
+                                                # Initialize or update accumulated tool call
+                                                if index not in accumulated_tool_calls:
+                                                    accumulated_tool_calls[index] = {
+                                                        "id": tool_call_delta.get("id", ""),
+                                                        "type": tool_call_delta.get("type", "function"),
+                                                        "function": {"name": "", "arguments": ""}
+                                                    }
+                                                
+                                                # Update function name if present
+                                                if "function" in tool_call_delta:
+                                                    func_delta = tool_call_delta["function"]
+                                                    if "name" in func_delta:
+                                                        accumulated_tool_calls[index]["function"]["name"] = func_delta["name"]
+                                                    if "arguments" in func_delta:
+                                                        # Arguments are streamed incrementally
+                                                        accumulated_tool_calls[index]["function"]["arguments"] += func_delta["arguments"]
+                                                
+                                                # Update ID and type if present
+                                                if "id" in tool_call_delta:
+                                                    accumulated_tool_calls[index]["id"] = tool_call_delta["id"]
+                                                if "type" in tool_call_delta:
+                                                    accumulated_tool_calls[index]["type"] = tool_call_delta["type"]
                             except json.JSONDecodeError:
                                 logger.warning(f"Failed to parse streaming chunk: {data_str}")
                                 continue
+                    
+                    # After stream ends, yield accumulated function calls if any
+                    if accumulated_tool_calls:
+                        final_tool_calls = [tc for idx, tc in sorted(accumulated_tool_calls.items())]
+                        yield f"\n[FUNCTION_CALLS:{json.dumps(final_tool_calls)}]"
             else:
                 # Non-streaming response
                 response = self._http_client.post(url, json=payload, timeout=120.0)
                 response.raise_for_status()
                 result = response.json()
                 if "choices" in result and len(result["choices"]) > 0:
-                    content = result["choices"][0].get("message", {}).get("content", "")
+                    message = result["choices"][0].get("message", {})
+                    content = message.get("content", "")
                     if content:
                         yield content
+                    # Check for function calls in non-streaming response
+                    if "tool_calls" in message:
+                        # Function calls present - yield special marker
+                        yield f"\n[FUNCTION_CALLS:{json.dumps(message['tool_calls'])}]"
         except httpx.HTTPError as e:
             logger.error(f"HTTP request to LLM service failed: {e}")
             if span:

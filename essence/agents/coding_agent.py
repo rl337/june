@@ -20,6 +20,7 @@ from june_grpc_api.llm_pb2 import (
     ChatMessage,
     ChatRequest,
     Context,
+    FunctionCall,
     GenerationParameters,
     ToolCall,
     ToolDefinition,
@@ -150,8 +151,12 @@ class CodingAgent:
                 
                 # Handle HTTP/NIM vs gRPC differently
                 if self._protocol == "http":
-                    # HTTP/NIM: Use LLMClient (simpler interface, no tool calling support yet)
-                    # Build prompt from conversation history
+                    # HTTP/NIM: Use LLMClient with OpenAI-compatible function calling
+                    # Convert tools to OpenAI format
+                    openai_tools = self._convert_tools_to_openai_format()
+                    
+                    # Build prompt from conversation history (simplified for now)
+                    # TODO: Convert conversation history to OpenAI message format for better context
                     prompt_parts = []
                     if system_message:
                         prompt_parts.append(f"System: {system_message}")
@@ -165,19 +170,35 @@ class CodingAgent:
                     prompt_parts.append(f"user: {task_description}")
                     prompt = "\n\n".join(prompt_parts)
                     
-                    # Generate using LLMClient
+                    # Generate using LLMClient with tools
                     full_response = ""
                     chunk_count = 0
+                    function_calls_data: List[Dict[str, Any]] = []
+                    
                     with tracer.start_as_current_span(
                         "coding_agent.stream_response_http"
                     ) as stream_span:
+                        # First generation attempt with tools
                         for chunk in self._llm_client.generate(
                             prompt=prompt,
                             system_prompt=system_message,
                             temperature=self.temperature,
                             max_tokens=self.max_tokens,
                             stream=True,
+                            tools=openai_tools if openai_tools else None,
                         ):
+                            # Check if chunk contains function call marker
+                            if chunk.startswith("\n[FUNCTION_CALLS:"):
+                                # Extract function calls from marker
+                                try:
+                                    func_calls_str = chunk[len("\n[FUNCTION_CALLS:"):].rstrip("]")
+                                    function_calls_data = json.loads(func_calls_str)
+                                    stream_span.set_attribute("function_calls_detected", True)
+                                    stream_span.set_attribute("function_calls_count", len(function_calls_data))
+                                except (json.JSONDecodeError, ValueError) as e:
+                                    logger.warning(f"Failed to parse function calls from chunk: {e}")
+                                continue  # Don't yield function call markers
+                            
                             chunk_count += 1
                             full_response += chunk
                             stream_span.set_attribute("chunk_count", chunk_count)
@@ -187,9 +208,37 @@ class CodingAgent:
                         stream_span.set_attribute("total_chunks", chunk_count)
                         stream_span.set_attribute("response_length", len(full_response))
                     
-                    # Note: Tool calling not yet supported for HTTP/NIM
-                    # TODO: Implement OpenAI-compatible function calling for NIM
-                    span.set_attribute("tool_calls_supported", False)
+                    # Handle function calls if any were detected
+                    if function_calls_data:
+                        span.set_attribute("has_function_calls", True)
+                        span.set_attribute("function_calls_count", len(function_calls_data))
+                        
+                        # Convert OpenAI function calls to ToolCall format for execution
+                        tool_calls: List[ToolCall] = []
+                        for func_call in function_calls_data:
+                            func = func_call.get("function", {})
+                            tool_call = ToolCall(
+                                id=func_call.get("id", ""),
+                                type=func_call.get("type", "function"),
+                                function=FunctionCall(
+                                    name=func.get("name", ""),
+                                    arguments=func.get("arguments", "{}")
+                                )
+                            )
+                            tool_calls.append(tool_call)
+                        
+                        # Execute tool calls
+                        tool_results = self._execute_tool_calls(tool_calls, span)
+                        
+                        # Add tool results as a new message and continue conversation
+                        if tool_results:
+                            tool_message_text = json.dumps(tool_results, indent=2)
+                            # For HTTP, we'll add tool results to the prompt for next iteration
+                            # TODO: Implement proper message format for HTTP conversation history
+                            yield f"\n\n[Tool execution completed. Results: {tool_message_text}]\n"
+                    
+                    span.set_attribute("tool_calls_supported", True)
+                    span.set_attribute("tools_count", len(openai_tools))
                     span.set_attribute("response_length", len(full_response))
                     span.set_attribute("final_chunk_count", chunk_count)
                     
@@ -313,6 +362,32 @@ class CodingAgent:
                 else:
                     logger.error(f"Error in coding agent: {e}", exc_info=True)
                     raise
+
+    def _convert_tools_to_openai_format(self) -> List[Dict[str, Any]]:
+        """
+        Convert ToolDefinition protobuf messages to OpenAI function format.
+        
+        Returns:
+            List of OpenAI function definitions
+        """
+        functions = []
+        for tool in self._available_tools:
+            try:
+                # Parse parameters schema from JSON string
+                params_schema = json.loads(tool.parameters_schema)
+            except (json.JSONDecodeError, AttributeError):
+                # If parsing fails, create a minimal schema
+                params_schema = {"type": "object", "properties": {}}
+            
+            functions.append({
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": params_schema,
+                }
+            })
+        return functions
 
     def _initialize_tools(self) -> None:
         """Initialize available tools for the coding agent."""
