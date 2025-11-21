@@ -64,7 +64,16 @@ class LLMClient:
             parsed = urlparse(llm_url)
             self._protocol = parsed.scheme
             self._host = parsed.hostname or parsed.netloc.split(":")[0]
-            self._port = parsed.port or (8000 if self._protocol == "http" else 8001)
+            self._port = parsed.port or (8000 if self._protocol in ["http", "https"] else 8001)
+            # Ensure protocol is valid
+            if self._protocol not in ["http", "https", "grpc"]:
+                # If unknown scheme, default based on port
+                if self._port in [8000, 8003] and "nim" in self._host.lower():
+                    self._protocol = "http"
+                    logger.warning(f"Unknown scheme '{parsed.scheme}', defaulting to HTTP for NIM service")
+                else:
+                    self._protocol = "grpc"
+                    logger.warning(f"Unknown scheme '{parsed.scheme}', defaulting to gRPC")
         else:
             # No scheme - parse as host:port
             if ":" in llm_url:
