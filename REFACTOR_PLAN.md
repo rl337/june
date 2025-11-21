@@ -410,10 +410,12 @@ The agent can help with steps 2-3 once the user provides the required informatio
         - Use httpx for HTTP/OpenAI-compatible API calls to NIM
         - Use existing gRPC code for TensorRT-LLM and legacy inference-api
         - Automatically detect NIM services (hostname contains "nim" and port 8000/8003) and use HTTP
+      - **FIXED (2025-11-21):** Protocol detection bug - improved URL parsing to correctly handle http:// and https:// schemes, added validation to ensure protocol is set correctly
       - **Updated:** `essence/commands/process_user_messages.py` to preserve HTTP scheme in LLM_URL
       - **Updated:** `scripts/switch_to_nim.sh` to use `http://nim-qwen3:8000` instead of `grpc://nim-qwen3:8001`
       - **Usage:** Set `LLM_URL=http://nim-qwen3:8000` in docker-compose.yml or .env, or use `./scripts/switch_to_nim.sh`
-      - **Status:** Ready to use! NIM HTTP endpoint is fully functional and LLMClient now supports it.
+      - **Status:** Code complete and committed. Services need to be rebuilt to use updated LLMClient code. Once rebuilt, NIM HTTP endpoint will be fully functional.
+      - **Next:** Rebuild telegram/discord services to test HTTP integration: `docker compose build telegram discord && docker compose up -d telegram discord`
        - ✅ **Helper script created:** `scripts/switch_to_nim.sh` - Automated script to switch june services to NIM endpoint
        - Usage: `./scripts/switch_to_nim.sh [--verify-only] [--use-env] [--no-restart]`
        - Verifies NIM is ready, updates LLM_URL configuration, and restarts services
