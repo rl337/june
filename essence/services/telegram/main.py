@@ -253,6 +253,8 @@ class TelegramBotService:
 
             # Check service connectivity (STT, TTS, LLM)
             import grpc
+            import httpx
+            from urllib.parse import urlparse
             from essence.services.telegram.dependencies.config import (
                 get_llm_address,
                 get_stt_address,
@@ -269,72 +271,123 @@ class TelegramBotService:
             pool = get_grpc_pool()
 
             for service_name, address in services_to_check.items():
-                # Try to get a channel with timeout (health checks should be fast)
-                # If we can get a channel, the service is reachable
-                # Use asyncio.wait_for for compatibility
-                async def check_service(service_name, pool):
-                    if service_name == "stt":
-                        async with pool.get_stt_channel() as channel:
-                            return channel.get_state()
-                    elif service_name == "tts":
-                        async with pool.get_tts_channel() as channel:
-                            return channel.get_state()
-                    elif service_name == "llm":
-                        async with pool.get_llm_channel() as channel:
-                            return channel.get_state()
+                # Check if LLM uses HTTP (NIM) or gRPC
+                is_http = False
+                if service_name == "llm":
+                    parsed = urlparse(address if "://" in address else f"grpc://{address}")
+                    is_http = parsed.scheme in ["http", "https"]
+                
+                if is_http:
+                    # HTTP health check for NIM
+                    try:
+                        # NIM health endpoint - ensure proper URL format
+                        if address.endswith("/"):
+                            health_url = f"{address}v1/health/ready"
+                        else:
+                            health_url = f"{address}/v1/health/ready"
+                        async with httpx.AsyncClient(timeout=5.0) as client:
+                            response = await client.get(health_url)
+                            if response.status_code == 200:
+                                health_status["checks"][service_name] = {
+                                    "status": "healthy",
+                                    "address": address,
+                                }
+                            else:
+                                health_status["checks"][service_name] = {
+                                    "status": "unhealthy",
+                                    "address": address,
+                                    "error": f"HTTP {response.status_code}",
+                                }
+                                overall_healthy = False
+                                http_status = 503
+                    except asyncio.TimeoutError:
+                        health_status["checks"][service_name] = {
+                            "status": "unhealthy",
+                            "address": address,
+                            "error": "Connection timeout",
+                        }
+                        overall_healthy = False
+                        http_status = 503
+                        logger.warning(
+                            f"Health check: {service_name} service connection timeout"
+                        )
+                    except Exception as e:
+                        health_status["checks"][service_name] = {
+                            "status": "unhealthy",
+                            "address": address,
+                            "error": str(e),
+                        }
+                        overall_healthy = False
+                        http_status = 503
+                        logger.error(
+                            f"Health check: {service_name} service check failed: {e}",
+                            exc_info=True,
+                        )
+                else:
+                    # gRPC health check for STT/TTS/legacy LLM
+                    async def check_service(service_name, pool):
+                        if service_name == "stt":
+                            async with pool.get_stt_channel() as channel:
+                                return channel.get_state()
+                        elif service_name == "tts":
+                            async with pool.get_tts_channel() as channel:
+                                return channel.get_state()
+                        elif service_name == "llm":
+                            async with pool.get_llm_channel() as channel:
+                                return channel.get_state()
 
-                try:
-                    state = await asyncio.wait_for(
-                        check_service(service_name, pool), timeout=3.0
-                    )
-                    if state == grpc.ChannelConnectivity.READY:
+                    try:
+                        state = await asyncio.wait_for(
+                            check_service(service_name, pool), timeout=3.0
+                        )
+                        if state == grpc.ChannelConnectivity.READY:
+                            health_status["checks"][service_name] = {
+                                "status": "healthy",
+                                "address": address,
+                            }
+                        else:
+                            # Channel exists but not ready - might be transient
+                            health_status["checks"][service_name] = {
+                                "status": "degraded",
+                                "address": address,
+                                "state": str(state),
+                            }
+                            # Don't mark as unhealthy for transient states
+                    except asyncio.TimeoutError:
                         health_status["checks"][service_name] = {
-                            "status": "healthy",
+                            "status": "unhealthy",
                             "address": address,
+                            "error": "Connection timeout",
                         }
-                    else:
-                        # Channel exists but not ready - might be transient
+                        overall_healthy = False
+                        http_status = 503
+                        logger.warning(
+                            f"Health check: {service_name} service connection timeout"
+                        )
+                    except grpc.aio.AioRpcError as e:
                         health_status["checks"][service_name] = {
-                            "status": "degraded",
+                            "status": "unhealthy",
                             "address": address,
-                            "state": str(state),
+                            "error": f"gRPC error: {e.code()}",
                         }
-                        # Don't mark as unhealthy for transient states
-                except asyncio.TimeoutError:
-                    health_status["checks"][service_name] = {
-                        "status": "unhealthy",
-                        "address": address,
-                        "error": "Connection timeout",
-                    }
-                    overall_healthy = False
-                    http_status = 503
-                    logger.warning(
-                        f"Health check: {service_name} service connection timeout"
-                    )
-                except grpc.aio.AioRpcError as e:
-                    health_status["checks"][service_name] = {
-                        "status": "unhealthy",
-                        "address": address,
-                        "error": f"gRPC error: {e.code()}",
-                    }
-                    overall_healthy = False
-                    http_status = 503
-                    logger.error(
-                        f"Health check: {service_name} service gRPC error: {e.code()}",
-                        exc_info=True,
-                    )
-                except Exception as e:
-                    health_status["checks"][service_name] = {
-                        "status": "unhealthy",
-                        "address": address,
-                        "error": str(e),
-                    }
-                    overall_healthy = False
-                    http_status = 503
-                    logger.error(
-                        f"Health check: {service_name} service check failed: {e}",
-                        exc_info=True,
-                    )
+                        overall_healthy = False
+                        http_status = 503
+                        logger.error(
+                            f"Health check: {service_name} service gRPC error: {e.code()}",
+                            exc_info=True,
+                        )
+                    except Exception as e:
+                        health_status["checks"][service_name] = {
+                            "status": "unhealthy",
+                            "address": address,
+                            "error": str(e),
+                        }
+                        overall_healthy = False
+                        http_status = 503
+                        logger.error(
+                            f"Health check: {service_name} service check failed: {e}",
+                            exc_info=True,
+                        )
 
             # Update overall status
             if not overall_healthy:

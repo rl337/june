@@ -42,17 +42,21 @@ def get_llm_address() -> str:
     Get LLM service address.
 
     Returns:
-        LLM service address as a string (host:port format)
+        LLM service address as a string (preserves http:// or https://, strips grpc://)
 
     Note:
         Defaults to TensorRT-LLM service (tensorrt-llm:8000) for optimized GPU inference.
         Can be overridden via LLM_URL environment variable.
         Options:
         - TensorRT-LLM: tensorrt-llm:8000 (default, requires model compilation)
-        - NVIDIA NIM: nim-qwen3:8001 (pre-built, no compilation needed, requires NGC_API_KEY)
+        - NVIDIA NIM: http://nim-qwen3:8000 (pre-built, no compilation needed, requires NGC_API_KEY)
         - Legacy inference-api: inference-api:50051 (legacy service, use --profile legacy)
     """
-    return os.getenv("LLM_URL", "tensorrt-llm:8000").replace("grpc://", "")
+    url = os.getenv("LLM_URL", "tensorrt-llm:8000")
+    # Only strip grpc:// prefix, preserve http:// and https://
+    if url.startswith("grpc://"):
+        return url.replace("grpc://", "")
+    return url
 
 
 def get_metrics_storage() -> Any:

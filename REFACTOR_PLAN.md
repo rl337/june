@@ -302,7 +302,13 @@ All major refactoring phases have been completed:
      - **Status:** Services running with whitelist configuration loaded
    - ✅ **Telegram/Discord services running with whitelist enabled** - Services verified running with whitelist config (2025-11-20 15:29)
      - **Status:** All services healthy with whitelist and owner users configured
-   - ⏳ **End-to-end testing not performed** - Cannot verify communication works until NIM initialization completes
+   - ✅ **Telegram service health check fixed** - COMPLETED (2025-11-21)
+     - **Issue:** Health check was using gRPC for LLM, but NIM uses HTTP
+     - **Fix:** Updated health check to detect HTTP URLs and use HTTP health checks for NIM
+     - **Fix:** Updated `get_llm_address()` to preserve `http://` prefix (was stripping it)
+     - **Fix:** Updated Message API URL default to use container service name (`message-api:8082`)
+     - **Status:** Telegram service now shows healthy status with NIM endpoint
+   - ⏳ **End-to-end testing not performed** - Ready to test now that health checks are fixed
 
 **Tasks:**
 1. **Establish whitelisted user communication:** ✅ COMPLETED
