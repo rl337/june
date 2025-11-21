@@ -136,9 +136,12 @@ class DiscordBotService:
             - Service is running
             - Required environment variables are set
             """
+            from essence.utils.version import get_service_version
+            
             health_status = {
                 "status": "healthy",
                 "service": "discord-bot",
+                "version": get_service_version("discord"),
                 "checks": {},
             }
             overall_healthy = True

@@ -58,6 +58,12 @@ RUN mkdir -p /app/services/tts
 COPY services/tts/main.py /app/services/tts/main.py
 COPY services/tts/model_artifacts /app/services/tts/model_artifacts
 
+# Copy VERSION file and set version label
+ARG SERVICE_VERSION=1.0.0
+COPY services/tts/VERSION /app/VERSION
+LABEL org.opencontainers.image.version="${SERVICE_VERSION}"
+LABEL june.service.version="${SERVICE_VERSION}"
+
 # Re-copy pyproject.toml and essence to ensure they're definitely present
 # (they should be from earlier, but this ensures they're there after all COPY operations)
 COPY pyproject.toml poetry.lock /app/

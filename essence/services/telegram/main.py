@@ -223,9 +223,12 @@ class TelegramBotService:
             - LLM service connectivity
             - Required environment variables are set
             """
+            from essence.utils.version import get_service_version
+            
             health_status = {
                 "status": "healthy",
                 "service": "telegram-bot",
+                "version": get_service_version("telegram"),
                 "checks": {},
             }
             overall_healthy = True
@@ -578,23 +581,10 @@ class TelegramBotService:
         """Send startup notification to owner user with version information."""
         try:
             from essence.chat.user_messages_sync import get_owner_users
+            from essence.utils.version import get_service_version
             
-            # Get version from package metadata
-            version = "unknown"
-            try:
-                import importlib.metadata
-                version = importlib.metadata.version("june-agent")
-            except (importlib.metadata.PackageNotFoundError, ImportError):
-                # Fallback: try reading from pyproject.toml
-                try:
-                    pyproject_path = Path(__file__).parent.parent.parent.parent / "pyproject.toml"
-                    if pyproject_path.exists():
-                        import tomli
-                        with open(pyproject_path, "rb") as f:
-                            pyproject = tomli.load(f)
-                            version = pyproject.get("project", {}).get("version", "unknown")
-                except Exception:
-                    pass
+            # Get version from service VERSION file
+            version = get_service_version("telegram")
             
             # Get owner user IDs
             owner_users = get_owner_users("telegram")

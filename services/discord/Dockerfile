@@ -12,6 +12,12 @@ COPY pyproject.toml poetry.lock ./
 # This includes all service code now (essence/services/discord)
 COPY essence ./essence
 
+# Copy VERSION file and set version label
+ARG SERVICE_VERSION=1.0.0
+COPY essence/services/discord/VERSION /app/VERSION
+LABEL org.opencontainers.image.version="${SERVICE_VERSION}"
+LABEL june.service.version="${SERVICE_VERSION}"
+
 # Install dependencies using poetry (skip installing project itself with --no-root)
 # Use environment variables to disable virtualenv creation
 ENV POETRY_VIRTUALENVS_CREATE=false
