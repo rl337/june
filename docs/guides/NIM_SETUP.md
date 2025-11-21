@@ -89,6 +89,7 @@ nim-qwen3:
     - CUDA_VISIBLE_DEVICES=0
     - NGC_API_KEY=${NGC_API_KEY}  # Required for NGC container access
     - MAX_CONTEXT_LENGTH=${NIM_MAX_CONTEXT_LENGTH:-131072}
+    - NIM_GPU_MEM_FRACTION=${NIM_GPU_MEMORY_UTILIZATION:-0.60}  # NIM-specific GPU memory fraction (defaults to 0.9). Set to 0.60 to fit in available GPU memory. This is the correct variable name for NIM containers (inference.py reads this).
     - ENABLE_TRACING=${ENABLE_TRACING:-true}
     - JAEGER_ENDPOINT=http://common-jaeger:14268/api/traces
   deploy:
