@@ -10,23 +10,39 @@ import json
 import os
 import sys
 
-def create_task(title, description, task_type="feature", agent_id="looping_agent", originator="ide_agent"):
-    """Create a task in Todorama."""
+def create_task(title, description, task_type="concrete", agent_id="looping_agent", originator="ide_agent", metadata=None):
+    """Create a task in Todorama.
+    
+    Note: Todorama only supports "concrete", "abstract", "epic" for task_type.
+    Use metadata to store intended type (e.g., "bug_fix", "feature", "human_interface").
+    """
     todo_service_url = os.getenv("TODO_SERVICE_URL", "http://todo-mcp-service:8004")
     if not todo_service_url.startswith("http"):
         todo_service_url = f"http://{todo_service_url}"
     
     api_key = os.getenv("TODO_SERVICE_API_KEY") or os.getenv("TODORAMA_API_KEY")
     
+    # Ensure task_type is a supported value
+    if task_type not in ("concrete", "abstract", "epic"):
+        # Store intended type in metadata and use "concrete" as default
+        if metadata is None:
+            metadata = {}
+        metadata["intended_task_type"] = task_type
+        task_type = "concrete"
+    
     task_payload = {
         "project_id": 1,
         "title": title,
         "description": description,
         "agent_type": "implementation",
-        "task_type": task_type,
+        "task_type": task_type,  # Use supported type
         "agent_id": agent_id,
         "originator": originator,
     }
+    
+    # Add metadata if provided
+    if metadata:
+        task_payload["metadata"] = metadata
     
     create_url = f"{todo_service_url}/tasks"
     headers = {}
@@ -131,17 +147,19 @@ Implement a formal release versioning system with auto-increment for all compone
     task1_id = create_task(
         "Fix Telegram service not responding to user messages",
         task1_desc,
-        task_type="bug_fix",
+        task_type="bug_fix",  # Will be converted to "concrete" with metadata
         agent_id="looping_agent",
-        originator="ide_agent"
+        originator="ide_agent",
+        metadata={"intended_task_type": "bug_fix"}
     )
     
     task2_id = create_task(
         "Formalize release versioning with auto-increment for all components",
         task2_desc,
-        task_type="feature",
+        task_type="feature",  # Will be converted to "concrete" with metadata
         agent_id="looping_agent",
-        originator="ide_agent"
+        originator="ide_agent",
+        metadata={"intended_task_type": "feature"}
     )
     
     if task1_id and task2_id:

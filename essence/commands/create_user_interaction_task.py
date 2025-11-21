@@ -141,14 +141,22 @@ Please process this user interaction and respond appropriately."""
             api_key = os.getenv("TODO_SERVICE_API_KEY") or os.getenv("TODORAMA_API_KEY")
             
             # Build task creation payload
+            # Note: Todorama only supports "concrete", "abstract", "epic" for task_type
+            # We use "concrete" and identify human_interface tasks by title pattern "User Interaction:"
             task_payload = {
                 "project_id": args.project_id,
                 "title": title,
                 "description": instruction,
                 "agent_type": "implementation",  # Agent type for the looping agent
-                "task_type": "human_interface",  # Task type for human interactions
+                "task_type": "concrete",  # Use supported type - human_interface identified by title pattern
                 "agent_id": "looping_agent",  # Agent that will work on this
                 "originator": user_name,  # User who created the task
+                "metadata": {
+                    "interaction_type": "human_interface",  # Store intended type in metadata
+                    "platform": args.platform,
+                    "user_id": args.user_id,
+                    "chat_id": args.chat_id,
+                },
             }
             
             # Create task via HTTP API

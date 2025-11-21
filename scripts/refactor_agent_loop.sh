@@ -237,11 +237,13 @@ You are working on refactoring the june project. Your task is to:
 
 1. **Check MCP todorama for available tasks** - Query for tasks to work on:
    - Use MCP todorama service to query available tasks: `mcp_todorama_list_available_tasks` with agent_type="implementation", project_id=1, limit=10
-   - **PRIORITY:** Human interaction tasks (task_type="human_interface") should be handled first - these are user messages from Telegram/Discord
+   - **PRIORITY:** Human interaction tasks should be handled first - these are user messages from Telegram/Discord
+   - Identify human_interface tasks by: title starting with "User Interaction:" OR metadata.interaction_type="human_interface"
+   - Use `mcp_todorama_search_tasks` with query="User Interaction" to find human_interface tasks
    - If tasks are available, reserve one using `mcp_todorama_reserve_task` and work on it
    - If no tasks available, you're done for this iteration
    - **CRITICAL:** Always reserve tasks before working on them, and always complete or unlock them when done
-   - **CRITICAL:** User interactions from Telegram/Discord are automatically created as todorama tasks (type="human_interface") - no file queue processing needed
+   - **CRITICAL:** User interactions from Telegram/Discord are automatically created as todorama tasks (identified by title pattern "User Interaction:" or metadata) - no file queue processing needed
 
 **Working on Related Projects:**
 - You CAN and SHOULD work on the `home_infra` project at `/home/rlee/dev/home_infra` when tasks require it
@@ -268,8 +270,9 @@ You are working on refactoring the june project. Your task is to:
    - Add progress updates using `mcp_todorama_add_task_update` as you work
    - If you encounter blockers, add a blocker update and unlock the task
    - When complete, mark the task as complete using `mcp_todorama_complete_task`
-   - **If the task is a human_interface task (user interaction):**
+   - **If the task is a human_interface task (user interaction - identified by title "User Interaction:" or metadata.interaction_type="human_interface"):**
      - The task description contains the user's message and context (user_id, chat_id, platform, message_id)
+     - Extract user_id, chat_id, and platform from the task description or metadata
      - Process the user's request and generate an appropriate response
      - Send the response to the user via Telegram/Discord using the Message API
      - Update the task with your response before completing it
@@ -307,11 +310,11 @@ You are working on refactoring the june project. Your task is to:
      - Task 2: Formalize release versioning with auto-increment for all components (feature)
 
 **Agent-to-User Communication:**
-- **CRITICAL:** For human_interface tasks, you MUST send a response message to the user
+- **CRITICAL:** For human_interface tasks (identified by title "User Interaction:" or metadata.interaction_type="human_interface"), you MUST send a response message to the user
 - Use the Message API client: `from essence.chat.message_api_client import send_message_via_api`
 - **When to send messages:**
   - **ALWAYS** when completing a human_interface task - send the response to the user
-  - Extract user_id, chat_id, and platform from the task description
+  - Extract user_id, chat_id, and platform from the task description or metadata
   - **DO NOT send status messages** for other task types - task creation/completion notifications are automatic
   - If no human_interface tasks were completed, do NOT send a message
 - **How to send:**
@@ -418,7 +421,7 @@ You are working on refactoring the june project. Your task is to:
 - Services to keep: telegram, discord, stt, tts
 - LLM Inference: TensorRT-LLM (in home_infra/shared-network, default) or NVIDIA NIM (nim-qwen3:8001). Legacy inference-api service available via --profile legacy for backward compatibility only.
 - Services removed: gateway, postgres, minio, redis, nats, orchestrator, webapp
-- **User Interactions:** Telegram/Discord services create todorama tasks directly (type="human_interface") - no file queue, tasks appear immediately in todorama
+- **User Interactions:** Telegram/Discord services create todorama tasks directly (identified by title "User Interaction:" or metadata.interaction_type="human_interface") - no file queue, tasks appear immediately in todorama
 - **Container-first requirement:** All model operations, downloads, and inference must happen in Docker containers - no host system pollution
 - **Sandbox requirement:** All benchmark executions must run in isolated sandboxes (containers/chroot) with full reviewability
 
@@ -468,7 +471,7 @@ You are working on refactoring the june project. Your task is to:
 **Reference Documents:**
 - QWEN3_SETUP_PLAN.md - Detailed Qwen3 setup instructions
 
-Now, check todorama for available tasks to work on. Prioritize human_interface tasks (user messages from Telegram/Discord).
+Now, check todorama for available tasks to work on. Prioritize human_interface tasks (identified by title "User Interaction:" or metadata.interaction_type="human_interface") - these are user messages from Telegram/Discord.
 PROMPT_EOF
 }
 
