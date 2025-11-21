@@ -1308,19 +1308,25 @@ The agent can help with steps 2-3 once the user provides the required informatio
 - Status values: "NEW", "PROCESSING", "RESPONDED", "ERROR"
 - File locking: Uses `fcntl` for exclusive/shared locks (open/write/close pattern)
 
-### Phase 18: Model Evaluation and Benchmarking ⏳ TODO
+### Phase 18: Model Evaluation and Benchmarking ✅ COMPLETED (Code Changes)
+
+**✅ COMPLETED (2025-11-21):** Added HTTP/NIM support to benchmark evaluation framework:
+- **CodingAgent HTTP Support:** Updated `essence/agents/coding_agent.py` to detect HTTP URLs and use LLMClient for HTTP/NIM inference. Tool calling not yet supported for HTTP (TODO for future enhancement).
+- **Sandbox Network Configuration:** Updated `essence/agents/sandbox.py` to connect sandboxes to shared-network when network is enabled, allowing sandboxes to access LLM services like nim-qwen3.
+- **Evaluator Network Auto-Enable:** Updated `essence/agents/evaluator.py` to automatically enable network for sandboxes when using HTTP LLM services (required for NIM access).
 
 **Operational Tasks:**
 - ⏳ Run model evaluation benchmarks on Qwen3-30B-A3B-Thinking-2507
-  - **Framework Status:** Ready (Phase 10 complete)
+  - **Framework Status:** Ready (Phase 10 complete) + HTTP/NIM support added ✅
   - **Requirements:** LLM service must be running (TensorRT-LLM or NIM)
-  - **Steps:** 1) Ensure LLM service is running, 2) Run benchmarks using run-benchmarks command, 3) Review results and analyze metrics, 4) Document findings
+  - **Steps:** 1) Ensure LLM service is running, 2) Run benchmarks using run-benchmarks command with `--llm-url http://nim-qwen3:8000` for NIM, 3) Review results and analyze metrics, 4) Document findings
   - **Note:** Can use --num-attempts parameter for accurate pass@k calculation
   - **Helper Script:** `scripts/run_benchmarks_operational.sh` - Orchestrates operational workflow (service verification, configuration, execution guidance)
+  - **Important:** Benchmarks must run from a container with Docker socket access (for sandbox creation) and shared-network access (to reach nim-qwen3). The telegram container has shared-network but not Docker socket access. Consider creating a dedicated benchmark runner container or running from host with proper network configuration.
 
 **Goal:** Evaluate Qwen3 model performance on benchmark datasets.
 
-**Status:** Benchmark evaluation framework complete (Phase 10 ✅). Proper pass@k calculation implemented ✅. Documentation updated for TensorRT-LLM. Remaining tasks are operational (running evaluations, analyzing results).
+**Status:** Benchmark evaluation framework complete (Phase 10 ✅). HTTP/NIM support added ✅. Proper pass@k calculation implemented ✅. Documentation updated for TensorRT-LLM. Remaining tasks are operational (running evaluations, analyzing results).
 
 **Note:** The benchmark evaluation framework was completed in Phase 10:
 - ✅ `essence/agents/evaluator.py` - BenchmarkEvaluator class implemented
