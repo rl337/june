@@ -37,14 +37,16 @@
     - ✅ **RESOLVED:** DGX Spark NIMs support ARM64 architecture! The Qwen3-32B DGX Spark NIM is confirmed ARM64-compatible and configured in home_infra/docker-compose.yml.
      - ✅ **LLM NIM:** Qwen3-32B DGX Spark NIM confirmed ARM64-compatible (image: `nvcr.io/nim/qwen/qwen3-32b-dgx-spark:1.0.0`)
     - ⏳ **STT NIM:** Riva ASR NIM available (Parakeet ASR-CTC-1.1B-EnUS) - image path placeholder (`nvcr.io/nim/riva/riva-asr:latest`)
-      - ⚠️ **ARM64 support unclear** - needs verification in NGC catalog (marked as unknown in list-nims output)
-      - ✅ **NGC API authentication fixed** - Updated list-nims command to use Basic auth with `$oauthtoken` username (2025-11-20 15:47) - should resolve 401 Unauthorized errors
-      - ⏳ **Action:** Verify Riva ASR NIM ARM64/DGX Spark compatibility via NGC catalog or test deployment (requires NGC_API_KEY to be set)
-       - ✅ **Helper script created:** `scripts/verify_nim_compatibility.sh` - Automated script to check NIM compatibility and provide guidance
-       - ✅ **Improved list-nims command:** Added Riva ASR NIM to known NIMs list (marked as unknown compatibility, needs verification)
-       - Usage: `./scripts/verify_nim_compatibility.sh [--stt-only] [--tts-only]` or `poetry run python -m essence list-nims --filter stt --dgx-spark-only`
-       - Requires NGC_API_KEY for full functionality (queries NGC catalog via list-nims command)
-       - **STATUS (2025-11-21 00:24):** list-nims command works, but NGC_API_KEY not set - Riva ASR NIM listed as "⚠️ Unknown" for DGX Spark compatibility. Cannot verify without NGC_API_KEY.
+      - ⚠️ **ARM64 support unclear** - needs manual verification via NGC catalog website
+      - ✅ **NGC_API_KEY found** - Located in home_infra/.env file (2025-11-21)
+      - ✅ **Verification attempted (2025-11-21):**
+        - ✅ Found NGC_API_KEY in home_infra/.env
+        - ❌ NGC catalog API queries failed (404 errors from nvcr.io/v2/nim/*/_catalog endpoints)
+        - ❌ Docker pull test failed (Access Denied for nvcr.io/nim/riva/riva-asr:latest - image path may be incorrect or requires different permissions)
+        - ⏳ **Manual verification required:** Check NGC catalog website directly: https://catalog.ngc.nvidia.com/orgs/nim/teams/riva/containers/riva-asr
+      - ✅ **Helper script created:** `scripts/verify_nim_compatibility.sh` - Automated script to check NIM compatibility and provide guidance
+      - ✅ **Improved list-nims command:** Added Riva ASR NIM to known NIMs list (marked as unknown compatibility, needs verification)
+      - **STATUS (2025-11-21):** Automated verification methods failed. Requires manual check of NGC catalog website to determine exact image path and ARM64/DGX Spark compatibility. Custom STT service continues to work as fallback.
     - ⏳ **TTS NIM:** Riva TTS NIM available (Magpie TTS Multilingual, FastPitch-HiFiGAN-EN) - image path placeholder (`nvcr.io/nim/riva/riva-tts:latest`)
       - ⚠️ **ARM64 support unclear** - needs verification in NGC catalog (marked as unknown in list-nims output)
       - ✅ **NGC API authentication fixed** - Updated list-nims command to use Basic auth with `$oauthtoken` username (2025-11-20 15:47) - should resolve 401 Unauthorized errors
