@@ -123,6 +123,9 @@
 - See operational tasks in REFACTOR_PLAN.md for details on starting services and running tests. 
 - See `docs/OPERATIONAL_READINESS.md` for a comprehensive operational readiness checklist.
 
+**🚨 CRITICAL DIRECTIVE - Task Management Migration:**
+The project has now matured enough that **existing work must be moved from REFACTOR_PLAN.md markdown files to the todorama MCP service** to facilitate multiple agents working concurrently. Markdown-based task tracking does not support concurrent access, task assignment, or proper workflow management. When migrating tasks to todorama, **include blocking relationships to enforce order of task execution** - tasks that depend on other tasks should be marked as blocked by their dependencies. All new tasks, operational work, and project tracking should be created and managed via todorama. REFACTOR_PLAN.md should be treated as historical documentation only - agents should read it for context but create and update tasks in todorama.
+
 **Note:** Commit count (e.g., "X commits ahead of origin/main") is informational only and does not need to be kept in sync. Do not update commit counts automatically - this creates an infinite loop.
 
 ## Active Feature Branches
@@ -433,6 +436,12 @@ The agent can help with steps 2-3 once the user provides the required informatio
        - **Fix:** Updated exposed ports to include 8000 for HTTP endpoint
        - **Status:** Healthcheck configuration corrected in `home_infra/docker-compose.yml`
        - **Note:** Service may need time to fully initialize after container recreation
+     - ✅ **NIM permission error fixed** - COMPLETED (2025-11-21)
+       - **Issue:** PermissionError: [Errno 13] Permission denied: '/opt/nim/.cache/huggingface'
+       - **Root cause:** NIM container couldn't write to `/opt/nim/.cache/huggingface` directory
+       - **Fix:** Added HuggingFace cache environment variables (HF_HOME, TRANSFORMERS_CACHE, HF_MODULES_CACHE) pointing to `/data/huggingface` (writable volume mount)
+       - **Status:** Service should now be able to initialize properly without permission errors
+       - **Note:** Service is starting successfully after fix (logs show "Started server process")
      - ✅ **COMPLETED (2025-11-21):** Update june services to use NIM endpoint - **HTTP SUPPORT ADDED**
       - **FIXED:** LLMClient now supports both gRPC (TensorRT-LLM, legacy inference-api) and HTTP (NVIDIA NIM) protocols
       - **Implementation:** Enhanced `essence/agents/llm_client.py` to:
