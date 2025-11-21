@@ -20,6 +20,15 @@ from essence.chat.user_messages_sync import (
 
 logger = logging.getLogger(__name__)
 
+# Try to import LLMClient - will be None if not available
+try:
+    from essence.agents.llm_client import LLMClient
+
+    LLM_AVAILABLE = True
+except ImportError:
+    LLM_AVAILABLE = False
+    LLMClient = None
+
 
 @dataclass
 class UserMessage:
@@ -173,6 +182,30 @@ class ProcessUserMessagesCommand(Command):
     def init(self) -> None:
         """Initialize the command."""
         logger.info("Initializing process-user-messages command")
+        
+        # Initialize LLM client if available
+        self.llm_client: Optional[LLMClient] = None
+        if LLM_AVAILABLE:
+            # Get LLM URL from environment (supports TensorRT-LLM, NIM, or legacy inference-api)
+            llm_url = os.getenv(
+                "LLM_URL",
+                os.getenv("INFERENCE_API_URL", "tensorrt-llm:8000")
+            ).replace("grpc://", "").replace("http://", "").replace("https://", "")
+            
+            try:
+                self.llm_client = LLMClient(
+                    llm_url=llm_url,
+                    model_name=os.getenv("LLM_MODEL_NAME", "Qwen/Qwen3-30B-A3B-Thinking-2507"),
+                    max_context_length=int(os.getenv("LLM_MAX_CONTEXT_LENGTH", "131072")),
+                    temperature=float(os.getenv("LLM_TEMPERATURE", "0.7")),
+                    max_tokens=int(os.getenv("LLM_MAX_TOKENS", "2048")),
+                )
+                logger.info(f"LLM client initialized with URL: {llm_url}")
+            except Exception as e:
+                logger.warning(f"Failed to initialize LLM client: {e}. Will use placeholder responses.")
+                self.llm_client = None
+        else:
+            logger.warning("LLM client not available. Will use placeholder responses.")
 
     def run(self) -> None:
         """Run the command to process NEW messages."""
@@ -207,13 +240,47 @@ class ProcessUserMessagesCommand(Command):
                     new_status="PROCESSING",
                 )
 
-                # Generate response (placeholder for now - will use LLM when inference engines are running)
-                # TODO: When inference engines are running, generate actual response using LLM
-                response_text = (
-                    f"✅ I received your message: '{message.content[:100]}...'\n\n"
-                    f"I'm currently processing it. When inference engines are running, "
-                    f"I'll generate a proper response using the LLM."
-                )
+                # Generate response using LLM if available, otherwise use placeholder
+                if self.llm_client is not None:
+                    try:
+                        logger.info(f"Generating LLM response for message from user {message.user_id}")
+                        # Use a simple system prompt for user message processing
+                        system_prompt = (
+                            "You are a helpful AI assistant. Respond to user messages "
+                            "concisely and helpfully. Keep responses clear and to the point."
+                        )
+                        
+                        # Generate response (non-streaming for simplicity)
+                        response_chunks = list(
+                            self.llm_client.generate(
+                                prompt=message.content,
+                                system_prompt=system_prompt,
+                                stream=False,
+                            )
+                        )
+                        response_text = "".join(response_chunks) if response_chunks else (
+                            f"✅ I received your message: '{message.content[:100]}...'\n\n"
+                            f"I processed it, but the LLM returned an empty response."
+                        )
+                        logger.info(f"Generated LLM response: {response_text[:100]}...")
+                    except Exception as llm_error:
+                        logger.error(
+                            f"Error generating LLM response: {llm_error}",
+                            exc_info=True,
+                        )
+                        # Fall back to placeholder response
+                        response_text = (
+                            f"✅ I received your message: '{message.content[:100]}...'\n\n"
+                            f"I attempted to process it with the LLM, but encountered an error. "
+                            f"Please try again later."
+                        )
+                else:
+                    # Placeholder response when LLM is not available
+                    response_text = (
+                        f"✅ I received your message: '{message.content[:100]}...'\n\n"
+                        f"I'm currently processing it. When inference engines are running, "
+                        f"I'll generate a proper response using the LLM."
+                    )
 
                 # Send response via Message API
                 # Use MESSAGE_API_URL env var or default to localhost:8083 (host port mapping)
@@ -298,3 +365,12 @@ class ProcessUserMessagesCommand(Command):
     def cleanup(self) -> None:
         """Cleanup resources."""
         logger.info("Cleaning up process-user-messages command")
+        
+        # Cleanup LLM client if it was initialized
+        if self.llm_client is not None and hasattr(self.llm_client, "_channel"):
+            try:
+                if self.llm_client._channel is not None:
+                    self.llm_client._channel.close()
+                    logger.info("Closed LLM client gRPC channel")
+            except Exception as e:
+                logger.warning(f"Error closing LLM client channel: {e}")
