@@ -424,6 +424,7 @@ The agent can help with steps 2-3 once the user provides the required informatio
         - Services restarted and running with NIM configuration
         - Environment variable verified: `LLM_URL=http://nim-qwen3:8000` in containers
       - **Current Status:** telegram and discord services are now using NIM for LLM inference
+      - **FIXED (2025-11-21):** Discord service crash - added missing methods (_setup_tracing_middleware, _setup_health_endpoint, _setup_signal_handlers, run, _run_async, _run_health_server, _graceful_shutdown). Discord service now starts and runs correctly.
        - ✅ **Helper script created:** `scripts/switch_to_nim.sh` - Automated script to switch june services to NIM endpoint
        - Usage: `./scripts/switch_to_nim.sh [--verify-only] [--use-env] [--no-restart]`
        - Verifies NIM is ready, updates LLM_URL configuration, and restarts services
