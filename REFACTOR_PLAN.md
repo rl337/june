@@ -308,7 +308,16 @@ All major refactoring phases have been completed:
      - **Fix:** Updated `get_llm_address()` to preserve `http://` prefix (was stripping it)
      - **Fix:** Updated Message API URL default to use container service name (`message-api:8082`)
      - **Status:** Telegram service now shows healthy status with NIM endpoint
-   - ⏳ **End-to-end testing not performed** - Ready to test now that health checks are fixed
+   - ✅ **End-to-end testing performed** - COMPLETED (2025-11-21)
+     - **Test script:** `tests/scripts/test_phase21_round_trip.py` - Automated round trip test
+     - **Results:**
+       - ✅ Message creation: Test messages are successfully created in USER_MESSAGES.md with status "NEW"
+       - ✅ Message processing: `process-user-messages` command successfully processes NEW messages
+       - ✅ Response delivery: Responses are successfully sent via Message API
+       - ⚠️ **Automatic processing:** Agent does not automatically process messages - requires manual trigger or polling loop
+       - **Note:** The `refactor_agent_loop.sh` script includes polling for `process-user-messages` when `ENABLE_USER_POLLING=1` is set
+     - **Status:** End-to-end communication flow is functional, but requires agent polling loop to be running for automatic processing
+     - **Next steps:** Set up agent polling loop with `ENABLE_USER_POLLING=1` for automatic message processing
 
 **Tasks:**
 1. **Establish whitelisted user communication:** ✅ COMPLETED
