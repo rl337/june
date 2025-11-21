@@ -1,5 +1,6 @@
 """Text message handler for Telegram bot - handles owner/whitelisted user messages."""
 import logging
+import re
 from typing import Optional
 
 from opentelemetry import trace
@@ -105,7 +106,6 @@ async def handle_text_message(
             from essence.chat.user_messages_sync import (
                 is_user_whitelisted,
                 is_user_owner,
-                append_message_to_user_messages,
             )
 
             is_whitelisted = is_user_whitelisted(str(user_id), "telegram")
@@ -131,28 +131,53 @@ async def handle_text_message(
             span.set_attribute("is_owner", is_owner)
 
             if is_owner:
-                # Owner: Append to USER_MESSAGES.md with status "NEW"
+                # Owner: Create todorama task instead of appending to USER_MESSAGES.md
                 logger.info(
-                    f"Owner user {user_id} - appending to USER_MESSAGES.md with status NEW"
+                    f"Owner user {user_id} - creating todorama task for user interaction"
                 )
 
-                success = append_message_to_user_messages(
-                    user_id=str(user_id),
-                    chat_id=str(chat_id),
-                    platform="telegram",
-                    message_type="Request",
-                    content=user_message,
-                    message_id=str(update.message.message_id),
-                    status="NEW",
-                    username=username,
-                )
-
-                if success:
-                    span.set_attribute("action", "appended_to_user_messages")
-                    logger.info(f"Successfully appended owner message to USER_MESSAGES.md")
-                else:
-                    span.set_attribute("action", "append_failed")
-                    logger.error(f"Failed to append owner message to USER_MESSAGES.md")
+                # Call command to create todorama task
+                import subprocess
+                import sys
+                
+                try:
+                    # Build command to create user interaction task
+                    cmd = [
+                        sys.executable,
+                        "-m",
+                        "essence",
+                        "create-user-interaction-task",
+                        "--user-id", str(user_id),
+                        "--chat-id", str(chat_id),
+                        "--platform", "telegram",
+                        "--content", user_message,
+                        "--message-id", str(update.message.message_id),
+                    ]
+                    
+                    if username:
+                        cmd.extend(["--username", username])
+                    
+                    # Run command (non-blocking, fire-and-forget)
+                    result = subprocess.run(
+                        cmd,
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                    )
+                    
+                    if result.returncode == 0:
+                        span.set_attribute("action", "created_todorama_task")
+                        logger.info(f"Successfully created todorama task for owner message")
+                    else:
+                        span.set_attribute("action", "task_creation_failed")
+                        logger.error(
+                            f"Failed to create todorama task: {result.stderr}"
+                        )
+                except Exception as e:
+                    span.set_attribute("action", "task_creation_error")
+                    logger.error(
+                        f"Error creating todorama task: {e}", exc_info=True
+                    )
 
                 span.set_status(trace.Status(trace.StatusCode.OK))
                 return
@@ -178,29 +203,49 @@ async def handle_text_message(
                 # Forward to first owner (for now - could be enhanced to forward to all)
                 owner_user_id = owner_users[0]
 
-                # Append forwarded message to USER_MESSAGES.md
+                # Create todorama task for forwarded message
                 forward_content = f"[Forwarded from whitelisted user {user_id} (@{username or 'unknown'})] {user_message}"
 
-                success = append_message_to_user_messages(
-                    user_id=owner_user_id,
-                    chat_id=str(chat_id),  # Use original chat_id
-                    platform="telegram",
-                    message_type="Request",
-                    content=forward_content,
-                    message_id=str(update.message.message_id),
-                    status="NEW",
-                    username=f"forwarded_from_{user_id}",
-                )
-
-                if success:
-                    span.set_attribute("action", "forwarded_to_owner")
-                    logger.info(
-                        f"Successfully forwarded whitelisted user message to owner {owner_user_id}"
+                import subprocess
+                import sys
+                
+                try:
+                    # Build command to create user interaction task
+                    cmd = [
+                        sys.executable,
+                        "-m",
+                        "essence",
+                        "create-user-interaction-task",
+                        "--user-id", str(owner_user_id),
+                        "--chat-id", str(chat_id),
+                        "--platform", "telegram",
+                        "--content", forward_content,
+                        "--message-id", str(update.message.message_id),
+                        "--username", f"forwarded_from_{user_id}",
+                    ]
+                    
+                    # Run command (non-blocking, fire-and-forget)
+                    result = subprocess.run(
+                        cmd,
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
                     )
-                else:
-                    span.set_attribute("action", "forward_failed")
+                    
+                    if result.returncode == 0:
+                        span.set_attribute("action", "forwarded_to_owner")
+                        logger.info(
+                            f"Successfully forwarded whitelisted user message to owner {owner_user_id}"
+                        )
+                    else:
+                        span.set_attribute("action", "forward_failed")
+                        logger.error(
+                            f"Failed to forward whitelisted user message: {result.stderr}"
+                        )
+                except Exception as e:
+                    span.set_attribute("action", "forward_error")
                     logger.error(
-                        f"Failed to forward whitelisted user message to owner {owner_user_id}"
+                        f"Error forwarding whitelisted user message: {e}", exc_info=True
                     )
 
                 span.set_status(trace.Status(trace.StatusCode.OK))

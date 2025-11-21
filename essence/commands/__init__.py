@@ -38,6 +38,8 @@ from . import verify_nim  # noqa: F401
 from . import verify_qwen3  # noqa: F401
 from . import verify_tensorrt_llm  # noqa: F401
 from . import list_nims  # noqa: F401
+from . import create_user_interaction_task  # noqa: F401
+from . import process_user_interaction_queue  # noqa: F401
 
 __all__ = [
     "telegram_service",
@@ -67,4 +69,6 @@ __all__ = [
     "process_user_messages",
     "message_api_service",
     "list_nims",
+    "create_user_interaction_task",
+    "process_user_interaction_queue",
 ]

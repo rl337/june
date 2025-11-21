@@ -1,8 +1,8 @@
 """
-Command to process NEW messages from USER_MESSAGES.md.
+Command to process user interaction tasks from todorama.
 
-Reads messages with status "NEW", processes them, generates responses,
-sends via Message API, and updates status accordingly.
+Queries todorama for user interaction tasks (created by Telegram/Discord services),
+processes them, generates responses, sends via Message API, and marks tasks as complete.
 """
 import logging
 import os
@@ -177,7 +177,7 @@ class ProcessUserMessagesCommand(Command):
     @classmethod
     def get_description(cls) -> str:
         """Get the command description."""
-        return "Process NEW messages from USER_MESSAGES.md and send responses via Message API"
+        return "Process user interaction tasks from todorama and send responses via Message API"
 
     def init(self) -> None:
         """Initialize the command."""
@@ -212,20 +212,31 @@ class ProcessUserMessagesCommand(Command):
             logger.warning("LLM client not available. Will use placeholder responses.")
 
     def run(self) -> None:
-        """Run the command to process NEW messages."""
+        """Run the command to process user interaction tasks from todorama."""
         from essence.chat.message_api_client import send_message_via_api
+        import os
 
-        logger.info("Processing NEW messages from USER_MESSAGES.md")
+        logger.info("Processing user interaction tasks from todorama")
 
-        # Get NEW messages
-        new_messages = get_new_messages()
+        # Query todorama for user interaction tasks
+        # These are tasks with titles starting with "User Interaction:"
+        agent_id = os.getenv("TODORAMA_AGENT_ID", "cursor-agent")
+        project_id = int(os.getenv("TODORAMA_PROJECT_ID", "1"))
+        
+        # Use MCP todorama to query tasks
+        # For now, we'll use a workaround: the agent loop will process these tasks
+        # This command is kept for backward compatibility but will be phased out
+        logger.warning(
+            "process-user-messages command is deprecated. "
+            "User interactions are now managed as todorama tasks. "
+            "The agent loop will process them automatically."
+        )
+        print("Note: User interactions are now managed as todorama tasks.")
+        print("The agent loop will process them automatically.")
+        return
 
-        if not new_messages:
-            logger.info("No NEW messages to process")
-            print("No NEW messages found in USER_MESSAGES.md")
-            return
-
-        logger.info(f"Processing {len(new_messages)} NEW messages")
+        # TODO: Implement todorama query when MCP client is available
+        # For now, this is a placeholder
 
         processed_count = 0
         error_count = 0

@@ -3,10 +3,10 @@
 # Refactor Agent Loop Script
 # 
 # This script runs cursor-agent in a continuous loop, instructing it to:
-# 1. Read REFACTOR_PLAN.md
-# 2. Pick an unfinished task to work on
-# 3. Perform the task
-# 4. Update REFACTOR_PLAN.md with progress and discoveries
+# 1. Process user interaction queue (create todorama tasks)
+# 2. Check todorama for available tasks
+# 3. Reserve and work on tasks from todorama
+# 4. Update task status in todorama
 #
 # Usage:
 #   ./scripts/refactor_agent_loop.sh
@@ -30,7 +30,7 @@ set -euo pipefail
 # Get the script directory and project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-REFACTOR_PLAN="$PROJECT_ROOT/REFACTOR_PLAN.md"
+# REFACTOR_PLAN.md is no longer used - all tasks are in todorama
 
 # Change to project root
 cd "$PROJECT_ROOT"
@@ -236,13 +236,18 @@ create_prompt() {
     cat << 'PROMPT_EOF'
 You are working on refactoring the june project. Your task is to:
 
-1. **Check MCP todorama for available tasks FIRST** - Before reading REFACTOR_PLAN.md:
-   - Use MCP todorama service to query available tasks: `cursor-agent mcp call todorama list_available_tasks --agent_type refactor --project_id 1 --limit 10`
-   - If tasks are available, reserve one and work on it (see MCP workflow below)
-   - If no tasks available, proceed to step 2
-   - **CRITICAL:** Always reserve tasks before working on them, and always complete or unlock them when done
+1. **Process user interaction queue FIRST** - Before checking for tasks:
+   - Check for pending user interaction tasks in: `${JUNE_DATA_DIR:-/home/rlee/june_data}/var-data/user_interaction_tasks_pending.jsonl`
+   - For each pending task, create a todorama task using MCP todorama service
+   - Use `mcp_todorama_create_task` with task_type="concrete", agent_id="cursor-agent", project_id=1
+   - After creating tasks, remove them from the pending file
+   - **CRITICAL:** User interactions from Telegram/Discord create tasks that you must process
 
-2. **Read REFACTOR_PLAN.md** - If no MCP tasks available, read the refactoring plan to understand the current state and identify TODO items.
+2. **Check MCP todorama for available tasks** - After processing user interaction queue:
+   - Use MCP todorama service to query available tasks: `mcp_todorama_list_available_tasks` with agent_type="implementation", project_id=1, limit=10
+   - If tasks are available, reserve one using `mcp_todorama_reserve_task` and work on it
+   - If no tasks available, you're done for this iteration
+   - **CRITICAL:** Always reserve tasks before working on them, and always complete or unlock them when done
 
 **Working on Related Projects:**
 - You CAN and SHOULD work on the `home_infra` project at `/home/rlee/dev/home_infra` when tasks require it
@@ -263,23 +268,13 @@ You are working on refactoring the june project. Your task is to:
    - Only proceed to pick a new task if there are no active failures
    - **If you fix a CI issue, create a task in todorama to track it:** Use MCP to create a task documenting what was fixed
 
-4. **Pick an unfinished task** - If no GitHub Actions failures and no MCP tasks:
-   - **🚨 IMMEDIATE PRIORITY:** Phase 19 Operational Deployment Tasks (see REFACTOR_PLAN.md):
-     - Deploy NIMs for inference (TTS, STT, agent efforts) - hardware is designed for this
-     - Configure Telegram/Discord whitelist for direct agent-user communication
-     - Start services with whitelist enabled
-     - These are operational tasks (starting services, setting env vars), not code changes - code is already complete
-   - **HIGH PRIORITY:** Check Phase 19 (Direct Agent-User Communication) in REFACTOR_PLAN.md - operational deployment tasks
-   - Look for tasks marked with ⏳ TODO in the REFACTOR_PLAN.md
-   - **For operational tasks that are blocked**, create MCP tasks in todorama to track them:
-     - Example: "Phase 15 Task 4: Compile Qwen3 model" → Create task in todorama with details
-     - Example: "Phase 16: End-to-end testing" → Create task in todorama with subtasks
-   - Choose a task that:
-   - Is clearly defined and actionable
-   - You have enough context to complete
-   - Will make meaningful progress toward the refactoring goals
-   - Is appropriate for a single iteration (not too large)
-   - **Priority order:** Phase 19 > Phase 15 > Phase 16 > Phase 18 > Other tasks
+4. **Work on reserved task** - If you have a reserved task from todorama:
+   - Read the task details carefully
+   - Follow the task instructions
+   - Add progress updates using `mcp_todorama_add_task_update` as you work
+   - If you encounter blockers, add a blocker update and unlock the task
+   - When complete, mark the task as complete using `mcp_todorama_complete_task`
+   - **If the task is a user interaction task**, after completing it, send a response to the user via Telegram/Discord using the Message API
 
 5. **Perform the task** - Complete the selected task. This may involve:
    - Removing code dependencies on removed services
@@ -302,29 +297,21 @@ You are working on refactoring the june project. Your task is to:
    - Store code patterns: `cursor-agent mcp call bucketofacts create_fact --subject "june" --predicate "pattern" --object "All services use gRPC for inter-service communication"`
    - Query before making decisions: `cursor-agent mcp call bucketofacts query_facts --subject "june"` to see what's been learned
 
-8. **Update REFACTOR_PLAN.md** - After completing the task:
-   - Mark the completed task(s) as ✅ COMPLETED
-   - Add a brief summary of what was done
-   - If you discovered new tasks or issues, add them to the appropriate section with ⏳ TODO
-   - If you found that a task needs to be broken down further, update the plan accordingly
-   - Document any important discoveries or decisions made
-
-9. **Document discoveries** - If during your work you discover:
-   - New tasks that need to be done
-   - Issues or blockers
-   - Better approaches or alternatives
-   - Dependencies between tasks
-   Add these to REFACTOR_PLAN.md in the appropriate section so the next iteration can understand and act on them.
+8. **Create new tasks in todorama** - If during your work you discover:
+   - New tasks that need to be done → Create tasks in todorama using `mcp_todorama_create_task`
+   - Issues or blockers → Create blocker tasks or add updates to existing tasks
+   - Better approaches or alternatives → Document in task updates or create new tasks
+   - Dependencies between tasks → Link tasks using parent_task_id and relationship_type
+   - **CRITICAL:** All task management happens in todorama, not in files
 
 **Agent-to-User Communication:**
-- **CRITICAL:** When you get stuck, need help, or complete significant work, send a message to the user via Telegram
+- **CRITICAL:** Only send messages when tasks are created or completed in todorama
 - Use the Message API client: `from essence.chat.message_api_client import send_message_via_api`
 - **When to send messages:**
-  - When you get stuck on a task and need clarification
-  - When you complete a significant task or milestone
-  - When you encounter blockers that prevent progress
-  - When you need user input or direction
-  - When you finish all available tasks and have nothing to do
+  - When you create a new task in todorama (user interaction tasks)
+  - When you complete a task in todorama (especially user interaction tasks)
+  - **DO NOT send status messages** - only send when there's actual task activity
+  - If no tasks were created or completed, do NOT send a message
 - **How to send:**
   ```python
   from essence.chat.message_api_client import send_message_via_api
@@ -360,16 +347,16 @@ You are working on refactoring the june project. Your task is to:
     - For long-running scripts: `nohup python script.py > script.log 2>&1 &`
     - Check background job status: `ps aux | grep <command>` or check log files (e.g., `tail -f output.log`)
     - Check if a process is still running: `pgrep -f "<command_pattern>"` or `ps aux | grep <pattern>`
-    - **Important:** Document in REFACTOR_PLAN.md that a long operation is running in background, including:
+    - **Important:** Add a task update in todorama documenting that a long operation is running in background, including:
       - The command that was started
       - The log file where output is being written
       - How to check if it completed (e.g., "check build.log for completion" or "check if docker compose build process is still running")
     - In the next iteration, check if the background operation completed before proceeding with dependent tasks
 - Work on ONE task per iteration (don't try to do everything at once)
 - Be thorough but focused
-- Update the plan immediately after completing work
-- If you encounter blockers, document them in the plan
-- If a task is too large, break it down and update the plan
+- Update task status in todorama immediately after completing work
+- If you encounter blockers, add blocker updates to the task in todorama
+- If a task is too large, break it down into subtasks in todorama
 - Always verify your changes work before marking tasks complete
 - All operations must run as the rlee user on the host. There is no sudo access or running as root.
   - **CRITICAL:** NEVER use `sudo` - not even in defensive patterns like `sudo cmd || cmd`
@@ -420,17 +407,13 @@ You are working on refactoring the june project. Your task is to:
 
 **Current Context:**
 - Project root: /home/rlee/dev/june
-- Refactor plan: REFACTOR_PLAN.md
+- **Task Management:** All tasks are in todorama (project_id=1) - no REFACTOR_PLAN.md task management
 - **Primary Goal:** Pare down june to bare essentials for Telegram/Discord voice round trip
 - **Extended Goal:** Get Qwen3-30B-A3B-Thinking-2507 running on GPU in containers and develop coding agent for benchmark evaluation
 - Services to keep: telegram, discord, stt, tts
 - LLM Inference: TensorRT-LLM (in home_infra/shared-network, default) or NVIDIA NIM (nim-qwen3:8001). Legacy inference-api service available via --profile legacy for backward compatibility only.
 - Services removed: gateway, postgres, minio, redis, nats, orchestrator, webapp
-- **NEW HIGH PRIORITY:** Phase 19 (Direct Agent-User Communication) - see REFACTOR_PLAN.md Phase 19
-  - Establish direct communication with whitelisted users via Telegram/Discord
-  - Sync all messages to USER_REQUESTS.md
-  - Replace agentic flow in services with direct agent communication
-  - Implement message grouping and periodic polling for user responses
+- **User Interactions:** Telegram/Discord services create todorama tasks for user messages (not USER_MESSAGES.md files)
 - **Container-first requirement:** All model operations, downloads, and inference must happen in Docker containers - no host system pollution
 - **Sandbox requirement:** All benchmark executions must run in isolated sandboxes (containers/chroot) with full reviewability
 
@@ -462,7 +445,7 @@ You are working on refactoring the june project. Your task is to:
 - DO NOT leave uncommitted changes - always commit and push your work before moving to the next task
 
 **CRITICAL - DO NOT UPDATE COMMIT COUNTS:**
-- **DO NOT automatically update commit counts in REFACTOR_PLAN.md** - The commit count (e.g., "85 commits ahead of origin/main") is informational only and does not need to be kept in sync
+- **DO NOT automatically update commit counts** - The commit count (e.g., "85 commits ahead of origin/main") is informational only and does not need to be kept in sync
 - **DO NOT create commits solely to update commit counts** - This creates an infinite loop where each commit increments the count, requiring another update
 - Only update commit counts if:
   1. You are explicitly documenting a major milestone or release
@@ -478,10 +461,9 @@ You are working on refactoring the june project. Your task is to:
 5. Other phases from the plan
 
 **Reference Documents:**
-- REFACTOR_PLAN.md - Main refactoring plan with all phases
-- QWEN3_SETUP_PLAN.md - Detailed Qwen3 setup instructions (referenced in Phase 10)
+- QWEN3_SETUP_PLAN.md - Detailed Qwen3 setup instructions
 
-Now, read REFACTOR_PLAN.md and begin working on an unfinished task, prioritizing Phase 10 if applicable.
+Now, process the user interaction queue and then check todorama for available tasks to work on.
 PROMPT_EOF
 }
 
@@ -489,7 +471,7 @@ PROMPT_EOF
 main() {
     log "Starting refactor agent loop"
     log "Project root: $PROJECT_ROOT"
-    log "Refactor plan: $REFACTOR_PLAN"
+    log "Task management: todorama (project_id=1)"
     log "Log file: $LOG_FILE"
     
     # Check if cursor-agent is available
