@@ -218,8 +218,8 @@ async def handle_text_message(
                                 
                                 originator = task_data.get("originator") or user_name or "unknown"
                                 assignee = task_data.get("agent_id") or task_data.get("assignee") or "looping_agent"
-                                task_title = task_data.get("title") or title
-                                task_description = task_data.get("description") or instruction
+                                task_title = task_data.get("title") or "User Interaction"
+                                task_description = task_data.get("description") or task_data.get("task_instruction") or user_message
                                 
                                 # Format acknowledgment message
                                 ack_message = (
