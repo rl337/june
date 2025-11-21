@@ -5,7 +5,7 @@ description = "Interactive autonomous agent with speech-to-text, text-to-speech,
 authors = [
     {name = "June Agent Team"}
 ]
-license = {text = "MIT"}
+license = "MIT"
 readme = "README.md"
 requires-python = "^3.10"
 dependencies = [
