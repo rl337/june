@@ -302,6 +302,9 @@ You are working on refactoring the june project. Your task is to:
    - Better approaches or alternatives → Document in task updates or create new tasks
    - Dependencies between tasks → Link tasks using parent_task_id and relationship_type
    - **CRITICAL:** All task management happens in todorama, not in files
+   - **PENDING TASKS TO CREATE:** There are pending tasks documented in `/home/rlee/dev/june/scripts/create_pending_tasks.py` that need to be created in Todorama. Run this script to create them (requires API key configuration first):
+     - Task 1: Fix Telegram service not responding to user messages (bug_fix, high priority)
+     - Task 2: Formalize release versioning with auto-increment for all components (feature)
 
 **Agent-to-User Communication:**
 - **CRITICAL:** For human_interface tasks, you MUST send a response message to the user
