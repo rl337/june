@@ -10,7 +10,7 @@ This script automates the testing of the complete round trip:
 5. Message status updated to "RESPONDED" in USER_MESSAGES.md
 
 Usage:
-    poetry run python scripts/test_phase21_round_trip.py
+    poetry run python tests/scripts/test_phase21_round_trip.py
 """
 
 import os
