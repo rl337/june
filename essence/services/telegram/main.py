@@ -574,6 +574,53 @@ class TelegramBotService:
             MessageHandler(filters.TEXT & ~filters.COMMAND, text_wrapper)
         )
 
+    async def _send_startup_notification(self):
+        """Send startup notification to owner user with version information."""
+        try:
+            from essence.chat.user_messages_sync import get_owner_users
+            
+            # Get version from package metadata
+            version = "unknown"
+            try:
+                import importlib.metadata
+                version = importlib.metadata.version("june-agent")
+            except (importlib.metadata.PackageNotFoundError, ImportError):
+                # Fallback: try reading from pyproject.toml
+                try:
+                    pyproject_path = Path(__file__).parent.parent.parent.parent / "pyproject.toml"
+                    if pyproject_path.exists():
+                        import tomli
+                        with open(pyproject_path, "rb") as f:
+                            pyproject = tomli.load(f)
+                            version = pyproject.get("project", {}).get("version", "unknown")
+                except Exception:
+                    pass
+            
+            # Get owner user IDs
+            owner_users = get_owner_users("telegram")
+            if not owner_users:
+                logger.warning("No owner users configured, skipping startup notification")
+                return
+            
+            # Send notification to first owner
+            owner_user_id = int(owner_users[0])  # Telegram expects integer chat_id
+            message = (
+                f"✅ **Telegram Service Started**\n\n"
+                f"**Version:** `{version}`\n"
+                f"**Status:** Running and ready\n"
+                f"**Mode:** Polling"
+            )
+            
+            await self.application.bot.send_message(
+                chat_id=owner_user_id,
+                text=message,
+                parse_mode="Markdown"
+            )
+            logger.info(f"Startup notification sent to owner user {owner_user_id}")
+        except Exception as e:
+            logger.warning(f"Failed to send startup notification: {e}", exc_info=True)
+            # Don't fail startup if notification fails
+
     def _setup_signal_handlers(self):
         """Setup signal handlers for graceful shutdown."""
 
@@ -666,6 +713,9 @@ class TelegramBotService:
                     allowed_updates=Update.ALL_TYPES
                 )
                 logger.info("Polling started")
+                
+                # Send startup notification to owner
+                await self._send_startup_notification()
             except Exception as e:
                 error_msg = f"Failed to start Telegram polling: {e}"
                 logger.error(error_msg, exc_info=True)

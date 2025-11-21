@@ -75,10 +75,37 @@ class CreateUserInteractionTaskCommand(Command):
             default=int(os.getenv("TODORAMA_PROJECT_ID", "1")),
             help="Todorama project ID (default: 1)",
         )
+        parser.add_argument(
+            "--originator",
+            type=str,
+            help="User name/originator for the task (e.g., 'richard'). If not provided, will be determined from user_id",
+        )
 
+    def init(self) -> None:
+        """Initialize the command"""
+        pass
+
+    def _get_user_name(self, user_id: str, platform: str) -> str:
+        """Map user ID to user name. Owner users map to 'richard'."""
+        from essence.chat.user_messages_sync import is_user_owner
+        
+        # Check if user is owner - owners are "richard"
+        if is_user_owner(user_id, platform):
+            return "richard"
+        
+        # For now, non-owner users use their user_id
+        # Later, we can add a mapping for whitelisted users
+        return f"user_{user_id}"
+    
     def run(self) -> None:
         """Run the command to create a todorama task."""
         args = self.args
+        
+        # Determine originator/assignee
+        if args.originator:
+            user_name = args.originator
+        else:
+            user_name = self._get_user_name(args.user_id, args.platform)
         
         # Format task title
         username_str = f"@{args.username} " if args.username else ""
@@ -99,50 +126,82 @@ Please process this user interaction and respond appropriately."""
 2. Agent has sent a response via {args.platform.capitalize()}
 3. Task can be marked as complete"""
         
-        # Create task via MCP todorama
-        # We'll write to a queue file that the agent loop will process
-        # The agent loop has access to MCP todorama and will create the actual tasks
+        # Create task directly in todorama via HTTP API
+        # This creates a human interaction task that the looping agent will process
         try:
+            import requests
             import json
-            from pathlib import Path
             
-            # Create queue file path
-            # In Docker containers, the volume is mounted at /var/data
-            # On the host, use JUNE_DATA_DIR/var-data
-            if Path("/var/data").exists():
-                # Running in container - use mounted volume
-                task_queue_file = Path("/var/data/user_interaction_tasks.jsonl")
-            else:
-                # Running on host - use JUNE_DATA_DIR
-                data_dir = os.getenv("JUNE_DATA_DIR", "/home/rlee/june_data")
-                task_queue_file = Path(f"{data_dir}/var-data/user_interaction_tasks.jsonl")
+            # Get todorama service URL
+            todo_service_url = os.getenv("TODO_SERVICE_URL", "http://todo-mcp-service:8004")
+            if not todo_service_url.startswith("http"):
+                todo_service_url = f"http://{todo_service_url}"
             
-            # Ensure directory exists
-            task_queue_file.parent.mkdir(parents=True, exist_ok=True)
+            # Get API key for authentication (if required)
+            api_key = os.getenv("TODO_SERVICE_API_KEY") or os.getenv("TODORAMA_API_KEY")
             
-            # Append task to queue file (JSONL format)
-            task_data = {
-                "user_id": args.user_id,
-                "chat_id": args.chat_id,
-                "platform": args.platform,
-                "content": args.content,
-                "message_id": args.message_id,
-                "username": args.username,
-                "title": title,
-                "instruction": instruction,
-                "verification": verification,
+            # Build task creation payload
+            task_payload = {
                 "project_id": args.project_id,
+                "title": title,
+                "description": instruction,
+                "agent_type": "implementation",  # Agent type for the looping agent
+                "task_type": "human_interface",  # Task type for human interactions
+                "agent_id": "looping_agent",  # Agent that will work on this
+                "originator": user_name,  # User who created the task
             }
             
-            with open(task_queue_file, "a") as f:
-                f.write(json.dumps(task_data) + "\n")
+            # Create task via HTTP API
+            create_url = f"{todo_service_url}/tasks"
+            logger.info(f"Creating todorama task via HTTP API: {title}")
+            logger.debug(f"POST {create_url} with payload: {task_payload}")
             
-            logger.info(f"Added user interaction task to queue: {title}")
-            print(f"Task queued: {title}")
-            print(f"Queue file: {task_queue_file}")
-            print("Note: The agent loop will process this queue and create todorama tasks.")
+            # Prepare headers with API key if available
+            headers = {}
+            if api_key:
+                headers["X-API-Key"] = api_key
+                logger.debug("Using API key for authentication")
+            else:
+                logger.warning("No API key found - request may fail if authentication is required")
             
+            response = requests.post(
+                create_url,
+                json=task_payload,
+                headers=headers,
+                timeout=10,
+            )
+            
+            if response.status_code in (200, 201):
+                task_data = response.json()
+                task_id = task_data.get("id") or task_data.get("task_id")
+                logger.info(f"Successfully created todorama task: {title} (ID: {task_id})")
+                
+                # Output task details as JSON for the calling service to parse
+                output_data = {
+                    "success": True,
+                    "task_id": task_id,
+                    "task_data": task_data,
+                }
+                print(json.dumps(output_data))
+            else:
+                error_msg = response.text or f"HTTP {response.status_code}"
+                logger.error(f"Failed to create todorama task: {error_msg}")
+                output_data = {
+                    "success": False,
+                    "error": error_msg,
+                }
+                print(json.dumps(output_data))
+                sys.exit(1)
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"HTTP request failed creating todorama task: {e}", exc_info=True)
+            print(f"ERROR: HTTP request failed: {e}", file=sys.stderr)
+            sys.exit(1)
         except Exception as e:
             logger.error(f"Failed to create user interaction task: {e}", exc_info=True)
             print(f"ERROR: Failed to create user interaction task: {e}", file=sys.stderr)
             sys.exit(1)
+
+    def cleanup(self) -> None:
+        """Cleanup resources"""
+        pass

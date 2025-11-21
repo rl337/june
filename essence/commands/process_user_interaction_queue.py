@@ -60,8 +60,15 @@ class ProcessUserInteractionQueueCommand(Command):
         if args.queue_file:
             queue_file = Path(args.queue_file)
         else:
-            data_dir = os.getenv("JUNE_DATA_DIR", "/home/rlee/june_data")
-            queue_file = Path(f"{data_dir}/var-data/user_interaction_tasks.jsonl")
+            # In Docker containers, the volume is mounted at /var/data
+            # On the host, use JUNE_DATA_DIR/var-data
+            if Path("/var/data").exists():
+                # Running in container - use mounted volume
+                queue_file = Path("/var/data/user_interaction_tasks.jsonl")
+            else:
+                # Running on host - use JUNE_DATA_DIR
+                data_dir = os.getenv("JUNE_DATA_DIR", "/home/rlee/june_data")
+                queue_file = Path(f"{data_dir}/var-data/user_interaction_tasks.jsonl")
         
         if not queue_file.exists():
             logger.info(f"Queue file does not exist: {queue_file}")
@@ -116,7 +123,13 @@ class ProcessUserInteractionQueueCommand(Command):
                 }
                 
                 # Write to a processing file that the agent loop will read
-                processing_file = queue_file.parent / "user_interaction_tasks_pending.jsonl"
+                # Use same path resolution logic as queue file
+                if Path("/var/data").exists():
+                    # Running in container - use mounted volume
+                    processing_file = Path("/var/data/user_interaction_tasks_pending.jsonl")
+                else:
+                    # Running on host - use same directory as queue file
+                    processing_file = queue_file.parent / "user_interaction_tasks_pending.jsonl"
                 with open(processing_file, "a") as f:
                     f.write(json.dumps(task_metadata) + "\n")
                 

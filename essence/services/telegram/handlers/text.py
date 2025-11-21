@@ -141,6 +141,10 @@ async def handle_text_message(
                 import sys
                 
                 try:
+                    # Determine user name for originator
+                    # Owner users are "richard"
+                    user_name = "richard" if is_owner else None
+                    
                     # Build command to create user interaction task
                     cmd = [
                         sys.executable,
@@ -157,7 +161,10 @@ async def handle_text_message(
                     if username:
                         cmd.extend(["--username", username])
                     
-                    # Run command (non-blocking, fire-and-forget)
+                    if user_name:
+                        cmd.extend(["--originator", user_name])
+                    
+                    # Run command and capture output
                     result = subprocess.run(
                         cmd,
                         capture_output=True,
@@ -168,6 +175,69 @@ async def handle_text_message(
                     if result.returncode == 0:
                         span.set_attribute("action", "created_todorama_task")
                         logger.info(f"Successfully created todorama task for owner message")
+                        
+                        # Parse task creation response and send acknowledgment
+                        try:
+                            import json
+                            output_lines = result.stdout.strip().split('\n')
+                            # Find the JSON output (should be the last line)
+                            task_output = None
+                            for line in reversed(output_lines):
+                                try:
+                                    parsed = json.loads(line)
+                                    if isinstance(parsed, dict) and "success" in parsed:
+                                        task_output = parsed
+                                        break
+                                except json.JSONDecodeError:
+                                    continue
+                            
+                            if task_output and task_output.get("success"):
+                                task_data = task_output.get("task_data", {})
+                                task_id = task_output.get("task_id") or task_data.get("id") or task_data.get("task_id")
+                                
+                                # Format task acknowledgment message
+                                project_id = task_data.get("project_id", 1)
+                                task_number = task_id if task_id else "?"
+                                task_ref = f"june-{task_number}"
+                                
+                                created_at = task_data.get("created_at") or task_data.get("created_date")
+                                if created_at:
+                                    from datetime import datetime
+                                    try:
+                                        if isinstance(created_at, str):
+                                            # Try parsing ISO format
+                                            dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                                            created_date_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+                                        else:
+                                            created_date_str = str(created_at)
+                                    except:
+                                        created_date_str = str(created_at)
+                                else:
+                                    from datetime import datetime
+                                    created_date_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                
+                                originator = task_data.get("originator") or user_name or "unknown"
+                                assignee = task_data.get("agent_id") or task_data.get("assignee") or "looping_agent"
+                                task_title = task_data.get("title") or title
+                                task_description = task_data.get("description") or instruction
+                                
+                                # Format acknowledgment message
+                                ack_message = (
+                                    f"✅ **Task Created**\n\n"
+                                    f"**Task:** `{task_ref}`\n"
+                                    f"**Created:** {created_date_str}\n"
+                                    f"**Created by:** {originator}\n"
+                                    f"**Assigned to:** {assignee}\n\n"
+                                    f"**{task_title}**\n"
+                                    f"{task_description[:200]}{'...' if len(task_description) > 200 else ''}"
+                                )
+                                
+                                # Send acknowledgment message
+                                await update.message.reply_text(ack_message, parse_mode="Markdown")
+                                logger.info(f"Sent task creation acknowledgment: {task_ref}")
+                        except Exception as e:
+                            logger.warning(f"Failed to send task acknowledgment: {e}", exc_info=True)
+                            # Don't fail the whole operation if acknowledgment fails
                     else:
                         span.set_attribute("action", "task_creation_failed")
                         logger.error(
@@ -210,6 +280,9 @@ async def handle_text_message(
                 import sys
                 
                 try:
+                    # Forwarded messages are from the owner (richard)
+                    user_name = "richard"
+                    
                     # Build command to create user interaction task
                     cmd = [
                         sys.executable,
@@ -221,8 +294,11 @@ async def handle_text_message(
                         "--platform", "telegram",
                         "--content", forward_content,
                         "--message-id", str(update.message.message_id),
-                        "--username", f"forwarded_from_{user_id}",
+                        "--originator", user_name,
                     ]
+                    
+                    if username:
+                        cmd.extend(["--username", f"forwarded_from_{user_id}"])
                     
                     # Run command (non-blocking, fire-and-forget)
                     result = subprocess.run(

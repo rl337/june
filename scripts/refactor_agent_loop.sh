@@ -3,10 +3,9 @@
 # Refactor Agent Loop Script
 # 
 # This script runs cursor-agent in a continuous loop, instructing it to:
-# 1. Process user interaction queue (create todorama tasks)
-# 2. Check todorama for available tasks
-# 3. Reserve and work on tasks from todorama
-# 4. Update task status in todorama
+# 1. Check todorama for available tasks (prioritizing human_interface tasks from Telegram/Discord)
+# 2. Reserve and work on tasks from todorama
+# 3. Update task status in todorama and send responses for human_interface tasks
 #
 # Usage:
 #   ./scripts/refactor_agent_loop.sh
@@ -236,18 +235,13 @@ create_prompt() {
     cat << 'PROMPT_EOF'
 You are working on refactoring the june project. Your task is to:
 
-1. **Process user interaction queue FIRST** - Before checking for tasks:
-   - Check for pending user interaction tasks in: `${JUNE_DATA_DIR:-/home/rlee/june_data}/var-data/user_interaction_tasks_pending.jsonl`
-   - For each pending task, create a todorama task using MCP todorama service
-   - Use `mcp_todorama_create_task` with task_type="concrete", agent_id="cursor-agent", project_id=1
-   - After creating tasks, remove them from the pending file
-   - **CRITICAL:** User interactions from Telegram/Discord create tasks that you must process
-
-2. **Check MCP todorama for available tasks** - After processing user interaction queue:
+1. **Check MCP todorama for available tasks** - Query for tasks to work on:
    - Use MCP todorama service to query available tasks: `mcp_todorama_list_available_tasks` with agent_type="implementation", project_id=1, limit=10
+   - **PRIORITY:** Human interaction tasks (task_type="human_interface") should be handled first - these are user messages from Telegram/Discord
    - If tasks are available, reserve one using `mcp_todorama_reserve_task` and work on it
    - If no tasks available, you're done for this iteration
    - **CRITICAL:** Always reserve tasks before working on them, and always complete or unlock them when done
+   - **CRITICAL:** User interactions from Telegram/Discord are automatically created as todorama tasks (type="human_interface") - no file queue processing needed
 
 **Working on Related Projects:**
 - You CAN and SHOULD work on the `home_infra` project at `/home/rlee/dev/home_infra` when tasks require it
@@ -274,7 +268,12 @@ You are working on refactoring the june project. Your task is to:
    - Add progress updates using `mcp_todorama_add_task_update` as you work
    - If you encounter blockers, add a blocker update and unlock the task
    - When complete, mark the task as complete using `mcp_todorama_complete_task`
-   - **If the task is a user interaction task**, after completing it, send a response to the user via Telegram/Discord using the Message API
+   - **If the task is a human_interface task (user interaction):**
+     - The task description contains the user's message and context (user_id, chat_id, platform, message_id)
+     - Process the user's request and generate an appropriate response
+     - Send the response to the user via Telegram/Discord using the Message API
+     - Update the task with your response before completing it
+     - **Note:** Task creation and completion automatically trigger notifications to the user, so you don't need to send separate status messages
 
 5. **Perform the task** - Complete the selected task. This may involve:
    - Removing code dependencies on removed services
@@ -288,9 +287,9 @@ You are working on refactoring the june project. Your task is to:
    - Any other task from the plan
 
 6. **Update task status in MCP todorama** - After completing the task:
-   - If you worked on an MCP task, mark it complete: `cursor-agent mcp call todorama complete_task --task_id <id> --agent_id refactor --notes "Completed: <summary>"`
-   - Add task updates during work: `cursor-agent mcp call todorama add_task_update --task_id <id> --agent_id refactor --content "<progress>" --update_type progress`
-   - If you encountered errors, unlock the task: `cursor-agent mcp call todorama unlock_task --task_id <id> --agent_id refactor`
+   - If you worked on an MCP task, mark it complete: `cursor-agent mcp call todorama complete_task --task_id <id> --agent_id looping_agent --notes "Completed: <summary>"`
+   - Add task updates during work: `cursor-agent mcp call todorama add_task_update --task_id <id> --agent_id looping_agent --content "<progress>" --update_type progress`
+   - If you encountered errors, unlock the task: `cursor-agent mcp call todorama unlock_task --task_id <id> --agent_id looping_agent`
 
 7. **Store learnings in MCP bucketofacts** - After completing significant work:
    - Store important decisions: `cursor-agent mcp call bucketofacts create_fact --subject "june" --predicate "uses" --object "TensorRT-LLM for LLM inference"`
@@ -305,13 +304,13 @@ You are working on refactoring the june project. Your task is to:
    - **CRITICAL:** All task management happens in todorama, not in files
 
 **Agent-to-User Communication:**
-- **CRITICAL:** Only send messages when tasks are created or completed in todorama
+- **CRITICAL:** For human_interface tasks, you MUST send a response message to the user
 - Use the Message API client: `from essence.chat.message_api_client import send_message_via_api`
 - **When to send messages:**
-  - When you create a new task in todorama (user interaction tasks)
-  - When you complete a task in todorama (especially user interaction tasks)
-  - **DO NOT send status messages** - only send when there's actual task activity
-  - If no tasks were created or completed, do NOT send a message
+  - **ALWAYS** when completing a human_interface task - send the response to the user
+  - Extract user_id, chat_id, and platform from the task description
+  - **DO NOT send status messages** for other task types - task creation/completion notifications are automatic
+  - If no human_interface tasks were completed, do NOT send a message
 - **How to send:**
   ```python
   from essence.chat.message_api_client import send_message_via_api
@@ -377,16 +376,16 @@ You are working on refactoring the june project. Your task is to:
 **MCP Services Workflow (REQUIRED):**
 
 **Step 1: Check for available tasks in todorama FIRST**
-- Query available tasks: `cursor-agent mcp call todorama list_available_tasks --agent_type refactor --project_id 1 --limit 10`
-- If tasks found, reserve one: `cursor-agent mcp call todorama reserve_task --task_id <id> --agent_id refactor`
+- Query available tasks: `cursor-agent mcp call todorama list_available_tasks --agent_type implementation --project_id 1 --limit 10`
+- If tasks found, reserve one: `cursor-agent mcp call todorama reserve_task --task_id <id> --agent_id looping_agent`
 - Work on the reserved task
-- Add progress updates: `cursor-agent mcp call todorama add_task_update --task_id <id> --agent_id refactor --content "<update>" --update_type progress`
-- When done: `cursor-agent mcp call todorama complete_task --task_id <id> --agent_id refactor --notes "<summary>"`
-- On error: `cursor-agent mcp call todorama unlock_task --task_id <id> --agent_id refactor` (always unlock on errors)
+- Add progress updates: `cursor-agent mcp call todorama add_task_update --task_id <id> --agent_id looping_agent --content "<update>" --update_type progress`
+- When done: `cursor-agent mcp call todorama complete_task --task_id <id> --agent_id looping_agent --notes "<summary>"`
+- On error: `cursor-agent mcp call todorama unlock_task --task_id <id> --agent_id looping_agent` (always unlock on errors)
 
 **Step 2: Create tasks for operational work**
 - When you encounter operational tasks (e.g., "compile model", "run end-to-end test"), create tasks in todorama:
-  - `cursor-agent mcp call todorama create_task --project_id 1 --title "<task>" --description "<details>" --agent_type refactor`
+  - `cursor-agent mcp call todorama create_task --project_id 1 --title "<task>" --description "<details>" --agent_type implementation --agent_id looping_agent`
 - This allows tracking operational work that's blocked on external factors
 
 **Step 3: Store learnings in bucketofacts**
@@ -404,16 +403,19 @@ You are working on refactoring the june project. Your task is to:
 - **docomatic:** 23 tools for documentation
 - **Access:** `cursor-agent mcp call <service> <tool> --<arg> <value>`
 - **CRITICAL:** Always reserve tasks before working, always complete or unlock them - never leave tasks in_progress
+- **YOUR AGENT ID:** `looping_agent` - Always use this as your agent_id when reserving, updating, or completing tasks
 
 **Current Context:**
 - Project root: /home/rlee/dev/june
+- **Your Agent ID:** `looping_agent` - Always use this when reserving, updating, or completing tasks
 - **Task Management:** All tasks are in todorama (project_id=1) - no REFACTOR_PLAN.md task management
+- **Note:** All existing tasks in todorama should be treated as if they were created/assigned to `looping_agent`. When you work on tasks, use agent_id="looping_agent"
 - **Primary Goal:** Pare down june to bare essentials for Telegram/Discord voice round trip
 - **Extended Goal:** Get Qwen3-30B-A3B-Thinking-2507 running on GPU in containers and develop coding agent for benchmark evaluation
 - Services to keep: telegram, discord, stt, tts
 - LLM Inference: TensorRT-LLM (in home_infra/shared-network, default) or NVIDIA NIM (nim-qwen3:8001). Legacy inference-api service available via --profile legacy for backward compatibility only.
 - Services removed: gateway, postgres, minio, redis, nats, orchestrator, webapp
-- **User Interactions:** Telegram/Discord services create todorama tasks for user messages (not USER_MESSAGES.md files)
+- **User Interactions:** Telegram/Discord services create todorama tasks directly (type="human_interface") - no file queue, tasks appear immediately in todorama
 - **Container-first requirement:** All model operations, downloads, and inference must happen in Docker containers - no host system pollution
 - **Sandbox requirement:** All benchmark executions must run in isolated sandboxes (containers/chroot) with full reviewability
 
@@ -463,7 +465,7 @@ You are working on refactoring the june project. Your task is to:
 **Reference Documents:**
 - QWEN3_SETUP_PLAN.md - Detailed Qwen3 setup instructions
 
-Now, process the user interaction queue and then check todorama for available tasks to work on.
+Now, check todorama for available tasks to work on. Prioritize human_interface tasks (user messages from Telegram/Discord).
 PROMPT_EOF
 }
 
@@ -472,6 +474,7 @@ main() {
     log "Starting refactor agent loop"
     log "Project root: $PROJECT_ROOT"
     log "Task management: todorama (project_id=1)"
+    log "Agent ID: looping_agent"
     log "Log file: $LOG_FILE"
     
     # Check if cursor-agent is available
