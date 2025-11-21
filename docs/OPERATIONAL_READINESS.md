@@ -332,7 +332,7 @@ Key environment variables for operational tasks:
 - `scripts/run_performance_tests_operational.sh` - Phase 16 Task 5
 - `scripts/run_benchmarks_operational.sh` - Phase 18
 - `scripts/setup_phase19_operational.sh` - Phase 19
-- `scripts/test_phase21_round_trip.py` - Phase 21
+- `tests/scripts/test_phase21_round_trip.py` - Phase 21 (moved from scripts/ to tests/scripts/)
 - `scripts/verify_nim_compatibility.sh` - Phase 19 NIM verification
 - `scripts/generate_nim_compose_snippet.sh` - Phase 19 Riva NIM deployment
 
