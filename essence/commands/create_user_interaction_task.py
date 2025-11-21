@@ -107,8 +107,15 @@ Please process this user interaction and respond appropriately."""
             from pathlib import Path
             
             # Create queue file path
-            data_dir = os.getenv("JUNE_DATA_DIR", "/home/rlee/june_data")
-            task_queue_file = Path(f"{data_dir}/var-data/user_interaction_tasks.jsonl")
+            # In Docker containers, the volume is mounted at /var/data
+            # On the host, use JUNE_DATA_DIR/var-data
+            if Path("/var/data").exists():
+                # Running in container - use mounted volume
+                task_queue_file = Path("/var/data/user_interaction_tasks.jsonl")
+            else:
+                # Running on host - use JUNE_DATA_DIR
+                data_dir = os.getenv("JUNE_DATA_DIR", "/home/rlee/june_data")
+                task_queue_file = Path(f"{data_dir}/var-data/user_interaction_tasks.jsonl")
             
             # Ensure directory exists
             task_queue_file.parent.mkdir(parents=True, exist_ok=True)
