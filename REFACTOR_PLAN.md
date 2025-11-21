@@ -294,7 +294,10 @@ All major refactoring phases have been completed:
      - **Next:** Verify connectivity once initialization completes, then switch june services to use NIM endpoint
    - ⏳ **STT/TTS NIMs not deployed** - Riva ASR/TTS NIMs need verification and deployment
      - **Impact:** STT/TTS services still using custom implementations instead of optimized NIMs
-     - **Action:** Verify Riva ASR/TTS NIM ARM64/DGX Spark compatibility, then deploy
+     - **Status (2025-11-21):** Attempted to verify Riva NIM image paths - placeholder paths (`nvcr.io/nim/riva/riva-asr:latest`, `nvcr.io/nim/riva/riva-tts:latest`) do not exist or are not accessible
+     - **Action:** Verify correct Riva ASR/TTS NIM image paths in NGC catalog, then update `home_infra/docker-compose.yml` with verified paths
+     - **Note:** Services are already configured in `home_infra/docker-compose.yml` with placeholder paths - need to update with correct image paths once verified
+     - **Alternative:** Continue using custom STT/TTS services (already configured and working)
    - ✅ **Whitelist configuration set up** - TELEGRAM_WHITELISTED_USERS and DISCORD_WHITELISTED_USERS configured (verified 2025-11-20 15:29)
      - **Status:** Services running with whitelist configuration loaded
    - ✅ **Telegram/Discord services running with whitelist enabled** - Services verified running with whitelist config (2025-11-20 15:29)
@@ -399,7 +402,11 @@ The agent can help with steps 2-3 once the user provides the required informatio
      - ✅ Image path verified: `nvcr.io/nim/qwen/qwen3-32b:1.0.0`
      - ✅ **RESOLVED:** NIM access granted - nim-qwen3 downloaded successfully
      - ⏳ **NEXT:** Deploy STT NIM (check NGC catalog for STT NIM container)
+       - **Status (2025-11-21):** Placeholder image path `nvcr.io/nim/riva/riva-asr:latest` does not exist or is not accessible
+       - **Action:** Verify correct Riva ASR NIM image path in NGC catalog, update `home_infra/docker-compose.yml` with verified path, then deploy
      - ⏳ **NEXT:** Deploy TTS NIM (check NGC catalog for TTS NIM container)
+       - **Status (2025-11-21):** Placeholder image path `nvcr.io/nim/riva/riva-tts:latest` does not exist or is not accessible
+       - **Action:** Verify correct Riva TTS NIM image path in NGC catalog, update `home_infra/docker-compose.yml` with verified path, then deploy
      - ✅ Start LLM NIM service: `cd /home/rlee/dev/home_infra && docker compose up -d nim-qwen3` → **COMPLETED** (2025-11-20 14:22:20)
      - ✅ Verify LLM NIM is running: `docker compose ps nim-qwen3` → **RUNNING** (status: health: starting, downloading model files)
      - ✅ Verify LLM NIM connectivity: `cd /home/rlee/dev/june && poetry run python -m essence verify-nim --nim-host nim-qwen3 --http-port 8000 --grpc-port 8001` → **COMPLETED (2025-11-20 18:22)** (Service fully initialized and ready! **FIXED (2025-11-20 17:46):** Found root cause: NIM container's inference.py uses `NIM_GPU_MEM_FRACTION` environment variable (defaults to 0.9), not `GPU_MEMORY_UTILIZATION` or `VLLM_GPU_MEMORY_UTILIZATION`. **FIX APPLIED:** Updated home_infra/docker-compose.yml to use `NIM_GPU_MEM_FRACTION=${NIM_GPU_MEMORY_UTILIZATION:-0.60}`. **VERIFIED:** Environment variable `NIM_GPU_MEM_FRACTION=0.60` is correctly set inside container. **INITIALIZATION COMPLETE:** Service started (2025-11-20 17:46:25), engine initialization completed at 02:20:05. All 5 model safetensors loaded (21.28 GiB, 121.94 seconds). Model compilation completed. Application startup complete. **HTTP ENDPOINT VERIFIED:** HTTP health endpoint accessible at `http://nim-qwen3:8000/v1/health/ready` (Status: 200, Response: "Service is ready"). Verified from telegram container on shared-network. **gRPC STATUS:** gRPC endpoint (port 8001) connectivity check timing out - may need additional configuration or service may be HTTP-only. HTTP endpoint is sufficient for OpenAI-compatible API access. **UPDATED:** Fixed verify-nim command to use `/v1/health/ready` endpoint instead of `/health`, and default HTTP port to 8000 (internal port). Previous failures: (1) Reduced GPU_MEMORY_UTILIZATION from 0.80 to 0.70 to 0.60 - wrong variable name, (2) Added VLLM_GPU_MEMORY_UTILIZATION - also wrong variable name, (3) Stopped TensorRT-LLM service - didn't help because wrong variable was being used. **SOLUTION:** Use `NIM_GPU_MEM_FRACTION` environment variable (NIM-specific, read by inference.py).)
