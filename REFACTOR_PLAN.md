@@ -440,8 +440,8 @@ The agent can help with steps 2-3 once the user provides the required informatio
        - **Issue:** PermissionError: [Errno 13] Permission denied: '/opt/nim/.cache/huggingface'
        - **Root cause:** NIM container couldn't write to `/opt/nim/.cache/huggingface` directory
        - **Fix:** Added HuggingFace cache environment variables (HF_HOME, TRANSFORMERS_CACHE, HF_MODULES_CACHE) pointing to `/data/huggingface` (writable volume mount)
-       - **Status:** Service should now be able to initialize properly without permission errors
-       - **Note:** Service is starting successfully after fix (logs show "Started server process")
+       - **Status:** Permission error resolved, service is starting successfully (logs show "Started server process")
+       - **Note:** Service may need additional time to fully initialize (model loading, engine startup). Healthcheck will report healthy once initialization completes.
      - ✅ **COMPLETED (2025-11-21):** Update june services to use NIM endpoint - **HTTP SUPPORT ADDED**
       - **FIXED:** LLMClient now supports both gRPC (TensorRT-LLM, legacy inference-api) and HTTP (NVIDIA NIM) protocols
       - **Implementation:** Enhanced `essence/agents/llm_client.py` to:
