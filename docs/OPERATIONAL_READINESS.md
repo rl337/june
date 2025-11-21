@@ -265,7 +265,7 @@ Before starting any operational tasks, ensure:
 
 4. **Test round trip (automated):**
    ```bash
-   poetry run python scripts/test_phase21_round_trip.py
+   poetry run python tests/scripts/test_phase21_round_trip.py
    ```
    - Automated test script verifies all steps of the round trip
    - Checks prerequisites, sends test message, verifies status transitions
@@ -284,7 +284,7 @@ Before starting any operational tasks, ensure:
 - Check agent logs: `tail -f refactor_agent_loop.log | grep "process-user-messages"`
 
 ### Helper Scripts
-- `scripts/test_phase21_round_trip.py` - Automated round trip test script
+- `tests/scripts/test_phase21_round_trip.py` - Automated round trip test script (moved from scripts/ to tests/scripts/)
 - `scripts/refactor_agent_loop.sh` - Looping agent with USER_MESSAGES.md processing
 
 ### Troubleshooting
