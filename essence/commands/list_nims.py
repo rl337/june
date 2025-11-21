@@ -250,7 +250,15 @@ class ListNIMsCommand(Command):
             if result.returncode == 0:
                 # Parse output (format may vary)
                 logger.info("list-model-profiles command executed successfully")
-                # TODO: Parse output to extract model information
+                # NOTE: Output parsing not implemented - the list-model-profiles command
+                # may not be available in all environments, and the NGC catalog API query
+                # (_query_ngc_catalog) already provides comprehensive NIM discovery.
+                # If needed in the future, parse result.stdout to extract model information.
+                # Expected format is typically JSON or structured text listing available
+                # model profiles from NGC.
+                logger.debug(
+                    f"list-model-profiles output (not parsed): {result.stdout[:200]}"
+                )
             else:
                 logger.debug(
                     f"list-model-profiles command failed: {result.stderr}"
