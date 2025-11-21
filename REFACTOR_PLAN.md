@@ -600,6 +600,7 @@ The agent can help with steps 2-3 once the user provides the required informatio
      - Response detection verified (may require actual file system for full end-to-end test)
 
 5. **Test end-to-end communication:** ⏳ TODO (Operational - requires user interaction)
+   - **MCP Task:** Created task #11 in todorama to track this operational work
    - **Note:** This task references USER_REQUESTS.md, but the system now uses USER_MESSAGES.md (see Phase 21)
    - **Prerequisites Verification:** Run `poetry run python scripts/verify_phase19_prerequisites.py` to check all prerequisites before testing
    - **Status:** ✅ All services healthy, all code complete, automated test script available
@@ -617,6 +618,7 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - **See Phase 21 Task 4 for detailed test steps**
 
 6. **Verify actual exchanges happening:** ⏳ TODO (Operational task, requires services running and user interaction)
+   - **MCP Task:** Created task #12 in todorama to track this operational work
    - **Note:** This task references USER_REQUESTS.md, but the system now uses USER_MESSAGES.md (see Phase 21)
    - **Status:** ✅ All services healthy, all code complete, polling loop integrated
    - **Automated Verification Available:**
@@ -1077,6 +1079,7 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - ⏳ Analyze Telegram/Discord message format requirements (tools ready, requires actual message data)
 
 5. **Performance testing:** ⏳ TODO (framework ready, requires real services)
+   - **MCP Task:** Created task #13 in todorama to track this operational work
    - ⏳ Measure latency for each stage (STT, LLM, TTS)
    - ⏳ Identify bottlenecks
    - ⏳ Optimize where possible
@@ -1528,6 +1531,7 @@ The agent can help with steps 2-3 once the user provides the required informatio
    - ⏳ Operational testing: End-to-end tests with real TensorRT-LLM service (requires service running)
 
 4. **Phase 18: Model Evaluation and Benchmarking** ⏳ TODO (Framework ready, operational work pending)
+   - **MCP Task:** Created task #14 in todorama to track this operational work
    - ✅ Benchmark evaluation framework complete (from Phase 10)
    - ⏳ Run evaluations on Qwen3 (operational work, requires TensorRT-LLM service)
    - ⏳ Analyze results and iterate
