@@ -56,11 +56,15 @@ Reusable tools have been migrated to commands. Use these instead of scripts:
 - `run_benchmarks_operational.sh` - Operational workflow for Phase 18 (Model evaluation and benchmarking)
 - `run_performance_tests_operational.sh` - Operational workflow for Phase 16 Task 5 (Performance testing)
 
-### Test Utilities (Should Move to tests/)
-- `test_phase21_round_trip.py` - Automated test script for Phase 21 USER_MESSAGES.md round trip verification
-- `test_*.py` files - Should be moved to `tests/scripts/` or converted to pytest
-- `run_audio_tests.sh` - Should be moved to `tests/scripts/` or converted to pytest
-- `test_artifact_collection.sh` - Should be moved to `tests/scripts/` or converted to pytest
+### Test Utilities
+- ✅ **COMPLETED:** Moved test files to `tests/scripts/`:
+  - `test_agent_message_api.py` - Test script for Message API agent integration
+  - `test_message_api.py` - Test script for Message API endpoints
+  - `test_phase21_round_trip.py` - Automated test script for Phase 21 USER_MESSAGES.md round trip verification
+  - `test_send_dms.py` - Test script for sending direct messages
+- ⏳ **Remaining:** Shell scripts that should be moved to `tests/scripts/` or converted to pytest:
+  - `run_audio_tests.sh` - Should be moved to `tests/scripts/` or converted to pytest
+  - `test_artifact_collection.sh` - Should be moved to `tests/scripts/` or converted to pytest
 
 ### Dataset/Data Scripts
 - All dataset generation tools have been converted to commands (see Available Commands above)
