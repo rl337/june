@@ -437,10 +437,11 @@ The agent can help with steps 2-3 once the user provides the required informatio
        - **Status:** Healthcheck configuration corrected in `home_infra/docker-compose.yml`
        - **Note:** Service may need time to fully initialize after container recreation
      - ✅ **NIM permission error fixed** - COMPLETED (2025-11-21)
-       - **Issue:** PermissionError: [Errno 13] Permission denied: '/opt/nim/.cache/huggingface'
-       - **Root cause:** NIM container couldn't write to `/opt/nim/.cache/huggingface` directory
-       - **Fix:** Added HuggingFace cache environment variables (HF_HOME, TRANSFORMERS_CACHE, HF_MODULES_CACHE) pointing to `/data/huggingface` (writable volume mount)
-       - **Status:** Permission error resolved, service is starting successfully (logs show "Started server process")
+       - **Issue:** PermissionError: [Errno 13] Permission denied: '/data/huggingface'
+       - **Root cause:** NIM container runs as `ubuntu` user (uid=1000) but couldn't write to `/data/huggingface` directory
+       - **Fix 1:** Added HuggingFace cache environment variables (HF_HOME, TRANSFORMERS_CACHE, HF_MODULES_CACHE) pointing to `/data/huggingface` (writable volume mount)
+       - **Fix 2:** Added `user: "1000:1000"` to docker-compose.yml to ensure container user matches host user (rlee, uid=1000) for write permissions
+       - **Status:** Permission error should be resolved with user mapping. Service restarting to apply fix.
        - **Note:** Service may need additional time to fully initialize (model loading, engine startup). Healthcheck will report healthy once initialization completes.
      - ✅ **COMPLETED (2025-11-21):** Update june services to use NIM endpoint - **HTTP SUPPORT ADDED**
       - **FIXED:** LLMClient now supports both gRPC (TensorRT-LLM, legacy inference-api) and HTTP (NVIDIA NIM) protocols
