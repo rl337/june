@@ -38,10 +38,14 @@
      - ✅ **LLM NIM:** Qwen3-32B DGX Spark NIM confirmed ARM64-compatible (image: `nvcr.io/nim/qwen/qwen3-32b-dgx-spark:1.0.0`)
     - ⏳ **STT NIM:** Multiple alternatives available
       - **Option 1: Riva ASR NIM** (nvcr.io/nim/riva/riva-asr:latest) - ✅ **Task 4 completed** (verification failed, needs manual check)
-      - **Option 2: Parakeet ASR NIM** (build.nvidia.com) - ⏳ **Task 9 created** (2025-11-21)
+      - **Option 2: Parakeet ASR NIM** (build.nvidia.com) - ✅ **Task 9 completed** (2025-11-21)
         - Model card: https://build.nvidia.com/nvidia/parakeet-1_1b-rnnt-multilingual-asr/modelcard
-        - Alternative source to nvcr.io/nim - may have different container registry paths
-        - Status: Verification pending
+        - ✅ **Verification attempted (2025-11-21):**
+          - Tested multiple Docker image path patterns: `nvcr.io/nim/riva/parakeet-*`, `nvcr.io/nim/nvidia/parakeet-*`
+          - All paths returned "Access Denied" - exact image path unclear
+          - build.nvidia.com appears to be a frontend - actual container registry paths need manual verification
+        - ⏳ **Manual verification required:** Check model card page directly for Docker pull command or deployment instructions
+        - Status: Verification attempted, manual check needed
       - ✅ **NGC_API_KEY found** - Located in home_infra/.env file (2025-11-21)
       - **STATUS (2025-11-21):** Task 4 completed (nvcr.io verification failed). Task 9 created for build.nvidia.com alternative. Custom STT service continues to work as fallback.
     - ⏳ **TTS NIM:** Multiple alternatives available
