@@ -236,11 +236,10 @@ create_prompt() {
 You are working on refactoring the june project. Your task is to:
 
 1. **Check MCP todorama for available tasks** - Query for tasks to work on:
-   - Use MCP todorama service to query available tasks: `mcp_todorama_list_available_tasks` with agent_type="implementation", project_id=1, limit=10
+   - Use MCP todorama tool to query available tasks: `list_available_tasks` with agent_type="implementation", project_id=1, limit=10
    - **PRIORITY:** Human interaction tasks should be handled first - these are user messages from Telegram/Discord
-   - Identify human_interface tasks by: title starting with "User Interaction:" OR metadata.interaction_type="human_interface"
-   - Use `mcp_todorama_search_tasks` with query="User Interaction" to find human_interface tasks
-   - If tasks are available, reserve one using `mcp_todorama_reserve_task` and work on it
+   - Identify human_interface tasks by: title starting with "User Interaction:" OR notes containing interaction metadata
+   - If tasks are available, reserve one using `reserve_task` with task_id and agent_id="looping_agent"
    - If no tasks available, you're done for this iteration
    - **CRITICAL:** Always reserve tasks before working on them, and always complete or unlock them when done
    - **CRITICAL:** User interactions from Telegram/Discord are automatically created as todorama tasks (identified by title pattern "User Interaction:" or metadata) - no file queue processing needed
@@ -267,9 +266,9 @@ You are working on refactoring the june project. Your task is to:
 4. **Work on reserved task** - If you have a reserved task from todorama:
    - Read the task details carefully
    - Follow the task instructions
-   - Add progress updates using `mcp_todorama_add_task_update` as you work
-   - If you encounter blockers, add a blocker update and unlock the task
-   - When complete, mark the task as complete using `mcp_todorama_complete_task`
+   - Add progress updates using `add_task_update` with task_id, agent_id="looping_agent", content, and update_type="progress"
+   - If you encounter blockers, add a blocker update and unlock the task using `unlock_task`
+   - When complete, mark the task as complete using `complete_task` with task_id, agent_id="looping_agent", and notes
    - **If the task is a human_interface task (user interaction - identified by title "User Interaction:" or metadata.interaction_type="human_interface"):**
      - The task description contains the user's message and context (user_id, chat_id, platform, message_id)
      - Extract user_id, chat_id, and platform from the task description or metadata
@@ -290,24 +289,45 @@ You are working on refactoring the june project. Your task is to:
    - Any other task from the plan
 
 6. **Update task status in MCP todorama** - After completing the task:
-   - If you worked on an MCP task, mark it complete: `cursor-agent mcp call todorama complete_task --task_id <id> --agent_id looping_agent --notes "Completed: <summary>"`
-   - Add task updates during work: `cursor-agent mcp call todorama add_task_update --task_id <id> --agent_id looping_agent --content "<progress>" --update_type progress`
-   - If you encountered errors, unlock the task: `cursor-agent mcp call todorama unlock_task --task_id <id> --agent_id looping_agent`
+   - If you worked on an MCP task, mark it complete using the `complete_task` tool: `complete_task(task_id=<id>, agent_id="looping_agent", notes="Completed: <summary>")`
+   - Add task updates during work using the `add_task_update` tool: `add_task_update(task_id=<id>, agent_id="looping_agent", content="<progress>", update_type="progress")`
+   - If you encountered errors, unlock the task using the `unlock_task` tool: `unlock_task(task_id=<id>, agent_id="looping_agent")`
 
 7. **Store learnings in MCP bucketofacts** - After completing significant work:
-   - Store important decisions: `cursor-agent mcp call bucketofacts create_fact --subject "june" --predicate "uses" --object "TensorRT-LLM for LLM inference"`
-   - Store code patterns: `cursor-agent mcp call bucketofacts create_fact --subject "june" --predicate "pattern" --object "All services use gRPC for inter-service communication"`
-   - Query before making decisions: `cursor-agent mcp call bucketofacts query_facts --subject "june"` to see what's been learned
+   - Store important decisions using the `bucketofacts-create_fact` tool: `bucketofacts-create_fact(subject="june", predicate="uses", object="TensorRT-LLM for LLM inference")`
+   - Store code patterns: `bucketofacts-create_fact(subject="june", predicate="pattern", object="All services use gRPC for inter-service communication")`
+   - Query before making decisions using the `bucketofacts-query_facts` tool: `bucketofacts-query_facts(subject="june", limit=10)` to see what's been learned
+   - Use semantic search: `bucketofacts-semantic_search(query="<question>", limit=5)` to find related knowledge
 
 8. **Create new tasks in todorama** - If during your work you discover:
-   - New tasks that need to be done → Create tasks in todorama using `mcp_todorama_create_task`
+   - New tasks that need to be done → Create tasks using the `create_task` tool: `create_task(title="<title>", task_type="concrete", task_instruction="<what to do>", verification_instruction="<how to verify>", agent_id="looping_agent", project_id=1, notes="<optional notes>")`
+   - **CRITICAL:** The `create_task` tool requires `task_instruction` and `verification_instruction` (NOT `description`)
+   - **CRITICAL:** Task type must be one of: `concrete`, `abstract`, or `epic` (use `concrete` for most tasks)
    - Issues or blockers → Create blocker tasks or add updates to existing tasks
    - Better approaches or alternatives → Document in task updates or create new tasks
    - Dependencies between tasks → Link tasks using parent_task_id and relationship_type
    - **CRITICAL:** All task management happens in todorama, not in files
-   - **PENDING TASKS TO CREATE:** There are pending tasks documented in `/home/rlee/dev/june/scripts/create_pending_tasks.py` that need to be created in Todorama. Run this script to create them (requires API key configuration first):
-     - Task 1: Fix Telegram service not responding to user messages (bug_fix, high priority)
-     - Task 2: Formalize release versioning with auto-increment for all components (feature)
+
+9. **Documentation Strategy (CRITICAL):**
+   - **DO NOT create new markdown files** (except README.md and AGENTS.md which should remain)
+   - **All documentation goes in docomatic** - API docs, guides, architecture, setup instructions, troubleshooting, etc.
+   - Before creating any documentation, search docomatic: `docomatic-search_sections(query="<topic>", limit=10)`
+   - If documentation exists, update it: `docomatic-update_section(section_id="<id>", heading="<heading>", body="<updated content>")`
+   - If new documentation is needed, create in docomatic: `docomatic-create_document(title="<title>", initial_sections=[{"heading": "<heading>", "body": "<content>"}])`
+   - Link documentation to related tasks: `docomatic-link_document(document_id="<id>", link_type="task", link_target="task-<id>")`
+   - **Examples of what should be in docomatic:**
+     - API documentation (replaces docs/API/*.md)
+     - Architecture documentation (replaces docs/architecture/*.md)
+     - Setup guides (replaces QWEN3_SETUP_PLAN.md, etc.)
+     - Troubleshooting guides
+     - Development guides
+     - Operational guides
+   - **Why docomatic:**
+     - Searchable by agents and humans
+     - Can be linked to tasks and other resources
+     - Versioned and structured
+     - Can be exported to GitHub when needed
+     - Better for agent consumption than scattered markdown files
 
 **Agent-to-User Communication:**
 - **CRITICAL:** For human_interface tasks (identified by title "User Interaction:" or metadata.interaction_type="human_interface"), you MUST send a response message to the user
@@ -382,32 +402,50 @@ You are working on refactoring the june project. Your task is to:
 **MCP Services Workflow (REQUIRED):**
 
 **Step 1: Check for available tasks in todorama FIRST**
-- Query available tasks: `cursor-agent mcp call todorama list_available_tasks --agent_type implementation --project_id 1 --limit 10`
-- If tasks found, reserve one: `cursor-agent mcp call todorama reserve_task --task_id <id> --agent_id looping_agent`
+- Query available tasks using the `list_available_tasks` tool: `list_available_tasks(agent_type="implementation", project_id=1, limit=10)`
+- If tasks found, reserve one using the `reserve_task` tool: `reserve_task(task_id=<id>, agent_id="looping_agent")`
 - Work on the reserved task
-- Add progress updates: `cursor-agent mcp call todorama add_task_update --task_id <id> --agent_id looping_agent --content "<update>" --update_type progress`
-- When done: `cursor-agent mcp call todorama complete_task --task_id <id> --agent_id looping_agent --notes "<summary>"`
-- On error: `cursor-agent mcp call todorama unlock_task --task_id <id> --agent_id looping_agent` (always unlock on errors)
+- Add progress updates using the `add_task_update` tool: `add_task_update(task_id=<id>, agent_id="looping_agent", content="<update>", update_type="progress")`
+- When done, use the `complete_task` tool: `complete_task(task_id=<id>, agent_id="looping_agent", notes="<summary>")`
+- On error, use the `unlock_task` tool: `unlock_task(task_id=<id>, agent_id="looping_agent")` (always unlock on errors)
 
 **Step 2: Create tasks for operational work**
-- When you encounter operational tasks (e.g., "compile model", "run end-to-end test"), create tasks in todorama:
-  - `cursor-agent mcp call todorama create_task --project_id 1 --title "<task>" --description "<details>" --agent_type implementation --agent_id looping_agent`
+- When you encounter operational tasks (e.g., "compile model", "run end-to-end test"), create tasks using the `create_task` tool:
+  - `create_task(title="<task>", task_type="concrete", task_instruction="<what to do>", verification_instruction="<how to verify>", agent_id="looping_agent", project_id=1, notes="<optional details>")`
+- **CRITICAL:** Must use `task_instruction` and `verification_instruction` (NOT `description`)
 - This allows tracking operational work that's blocked on external factors
 
 **Step 3: Store learnings in bucketofacts**
-- After significant work, store decisions: `cursor-agent mcp call bucketofacts create_fact --subject "june" --predicate "<relation>" --object "<value>"`
-- Query before decisions: `cursor-agent mcp call bucketofacts query_facts --subject "june"` to see what's been learned
-- Use semantic search: `cursor-agent mcp call bucketofacts semantic_search --query "<question>" --limit 5`
+- After significant work, store decisions using the `bucketofacts-create_fact` tool: `bucketofacts-create_fact(subject="june", predicate="<relation>", object="<value>")`
+- Query before decisions using the `bucketofacts-query_facts` tool: `bucketofacts-query_facts(subject="june", limit=10)` to see what's been learned
+- Use semantic search: `bucketofacts-semantic_search(query="<question>", limit=5)` to find related knowledge
 
-**Step 4: Document in docomatic (optional)**
-- For major architectural decisions: `cursor-agent mcp call docomatic create_document --title "<title>" --content "<content>"`
-- Search existing docs: `cursor-agent mcp call docomatic search_sections --query "<topic>"`
+**Step 4: Document in docomatic (REQUIRED for all documentation)**
+- **CRITICAL:** All documentation should be in docomatic, NOT in markdown files
+- **ONLY exceptions:** README.md and AGENTS.md should remain in the repo
+- **DO NOT create new .md files** - use docomatic instead
+- For architectural decisions, API docs, guides, troubleshooting, etc., use `docomatic-create_document`:
+  - `docomatic-create_document(title="<title>", initial_sections=[{"heading": "<heading>", "body": "<content>"}])`
+- Add sections to existing documents: `docomatic-create_section(document_id="<id>", heading="<heading>", body="<content>")`
+- Search existing docs: `docomatic-search_sections(query="<topic>", limit=10)`
+- Link documents to tasks: `docomatic-link_document(document_id="<id>", link_type="task", link_target="task-<id>")`
+- List documents: `docomatic-list_documents(title_pattern="<pattern>", limit=20)`
+- **When to use docomatic:**
+  - API documentation (instead of docs/API/*.md)
+  - Architecture docs (instead of docs/architecture/*.md)
+  - Guides (instead of docs/guides/*.md)
+  - Setup instructions (instead of QWEN3_SETUP_PLAN.md, etc.)
+  - Troubleshooting guides
+  - Any other documentation that would help users or agents
 
 **MCP Service Details:**
 - **todorama:** 49 tools for task management (project_id=1 for june project)
 - **bucketofacts:** 17 tools for knowledge storage
-- **docomatic:** 23 tools for documentation
-- **Access:** `cursor-agent mcp call <service> <tool> --<arg> <value>`
+- **docomatic:** 23 tools for documentation (REQUIRED for all documentation except README.md and AGENTS.md)
+- **Access:** MCP tools are available directly when cursor-agent runs. Use tool names with service prefixes:
+  - Todorama: `list_available_tasks`, `create_task`, `reserve_task`, etc. (no prefix)
+  - Bucketofacts: `bucketofacts-create_fact`, `bucketofacts-query_facts`, etc. (with `bucketofacts-` prefix)
+  - Docomatic: `docomatic-create_document`, `docomatic-search_sections`, etc. (with `docomatic-` prefix)
 - **CRITICAL:** Always reserve tasks before working, always complete or unlock them - never leave tasks in_progress
 - **YOUR AGENT ID:** `looping_agent` - Always use this as your agent_id when reserving, updating, or completing tasks
 
