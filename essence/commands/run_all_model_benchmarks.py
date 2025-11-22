@@ -48,7 +48,7 @@ try:
     import jiwer
     import numpy as np
     import soundfile as sf
-    from proto import asr_pb2, asr_pb2_grpc, tts_pb2, tts_pb2_grpc
+    from june_grpc_api.generated import asr_pb2, asr_pb2_grpc, tts_pb2, tts_pb2_grpc
     from june_grpc_api import asr as asr_shim
     from june_grpc_api.shim.tts import TextToSpeechClient, SynthesisConfig
 

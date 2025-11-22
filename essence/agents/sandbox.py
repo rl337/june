@@ -162,7 +162,9 @@ class Sandbox:
         )
         self.command_logs: List[CommandLog] = []
         self.container: Optional[docker.models.containers.Container] = None
-        self.container_name = f"june-sandbox-{task_id}"
+        # Sanitize task_id for Docker container name (only [a-zA-Z0-9][a-zA-Z0-9_.-] allowed)
+        sanitized_task_id = task_id.replace("/", "_").replace(" ", "_")
+        self.container_name = f"june-sandbox-{sanitized_task_id}"
 
         # Coding agent (will be initialized in container)
         self.coding_agent: Optional[CodingAgent] = None
