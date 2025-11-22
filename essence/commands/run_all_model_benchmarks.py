@@ -13,14 +13,17 @@ This command runs comprehensive benchmarks on all models:
 All results are compared against published third-party benchmarks to verify model performance.
 """
 import argparse
+import asyncio
+import io
 import json
 import logging
 import os
 import sys
+import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from essence.chat.utils.tracing import setup_tracing
 from essence.command import Command
@@ -41,12 +44,24 @@ except ImportError as e:
 
 try:
     import grpc
+    import grpc.aio
+    import jiwer
+    import numpy as np
+    import soundfile as sf
     from proto import asr_pb2, asr_pb2_grpc, tts_pb2, tts_pb2_grpc
+    from june_grpc_api import asr as asr_shim
+    from june_grpc_api.shim.tts import TextToSpeechClient, SynthesisConfig
 
     STT_TTS_AVAILABLE = True
 except ImportError as e:
     STT_TTS_AVAILABLE = False
     STT_TTS_IMPORT_ERROR = str(e)
+    jiwer = None
+    np = None
+    sf = None
+    asr_shim = None
+    TextToSpeechClient = None
+    SynthesisConfig = None
 
 
 @dataclass
@@ -277,7 +292,7 @@ class AllModelBenchmarkRunner(Command):
             logger.info("Running STT Benchmarks")
             logger.info("=" * 60)
             try:
-                stt_results = self._run_stt_benchmarks()
+                stt_results = asyncio.run(self._run_stt_benchmarks())
                 report.stt_results = stt_results
             except Exception as e:
                 logger.error(f"Failed to run STT benchmarks: {e}", exc_info=True)
@@ -288,7 +303,7 @@ class AllModelBenchmarkRunner(Command):
             logger.info("Running TTS Benchmarks")
             logger.info("=" * 60)
             try:
-                tts_results = self._run_tts_benchmarks()
+                tts_results = asyncio.run(self._run_tts_benchmarks())
                 report.tts_results = tts_results
             except Exception as e:
                 logger.error(f"Failed to run TTS benchmarks: {e}", exc_info=True)
@@ -299,7 +314,7 @@ class AllModelBenchmarkRunner(Command):
             logger.info("Running Audio Stack Benchmarks")
             logger.info("=" * 60)
             try:
-                audio_stack_results = self._run_audio_stack_benchmarks()
+                audio_stack_results = asyncio.run(self._run_audio_stack_benchmarks())
                 report.audio_stack_results = audio_stack_results
             except Exception as e:
                 logger.error(f"Failed to run audio stack benchmarks: {e}", exc_info=True)
@@ -355,61 +370,469 @@ class AllModelBenchmarkRunner(Command):
 
         return results
 
-    def _run_stt_benchmarks(self) -> STTBenchmarkResult:
-        """Run STT benchmarks against LibriSpeech test-clean."""
-        # TODO: Implement STT benchmarking
-        # This should:
-        # 1. Load LibriSpeech test-clean dataset (or use synthetic test cases)
-        # 2. Run transcription on all samples via STT gRPC service
-        # 3. Calculate WER/CER
-        # 4. Compare to published Whisper-large-v3 baseline (WER ~2.0-3.0% on LibriSpeech test-clean)
-        logger.warning("STT benchmarking not yet implemented - placeholder")
+    async def _run_stt_benchmarks(self) -> STTBenchmarkResult:
+        """Run STT benchmarks using test cases via gRPC."""
+        if not STT_TTS_AVAILABLE:
+            raise RuntimeError(f"STT/TTS dependencies not available: {STT_TTS_IMPORT_ERROR}")
+
+        # Test cases for STT benchmarking (synthetic for now - can be extended with LibriSpeech)
+        test_cases = [
+            "The quick brown fox jumps over the lazy dog.",
+            "Artificial intelligence is transforming the world.",
+            "Please call me at 555-123-4567.",
+            "The weather is sunny with a temperature of 75 degrees.",
+            "I would like to order a pizza with extra cheese.",
+            "Scientists discovered that machine learning algorithms can recognize patterns.",
+            "The meeting is scheduled for March 15th at 3:30 PM.",
+            "Visit our website at www.example.com or email us at info@example.com",
+            "The artificial intelligence system successfully processed the natural language input.",
+            "Prices are nineteen dollars and ninety-nine cents.",
+        ]
+
+        logger.info(f"Running STT benchmarks with {len(test_cases)} test cases...")
+        logger.info(f"STT service URL: {self.args.stt_url}")
+
+        # Parse STT URL
+        stt_host, stt_port = self._parse_grpc_url(self.args.stt_url, default_port=50052)
+
+        results = []
+        latencies = []
+
+        try:
+            # Create gRPC channel
+            channel = grpc.aio.insecure_channel(f"{stt_host}:{stt_port}")
+            stt_client = asr_shim.SpeechToTextClient(channel)
+
+            for i, test_text in enumerate(test_cases):
+                logger.info(f"Processing STT test case {i+1}/{len(test_cases)}: '{test_text[:50]}...'")
+
+                try:
+                    # For STT benchmarking, we need actual audio with known transcripts
+                    # Since we don't have LibriSpeech dataset, we'll use TTS to generate audio
+                    # from test text, then transcribe it back (round-trip approach)
+                    # This tests both TTS and STT together
+                    audio_data = await self._generate_audio_via_tts(test_text)
+
+                    # Call STT service
+                    start_time = time.time()
+                    config = asr_shim.RecognitionConfig(language="en")
+                    result = await stt_client.recognize(
+                        audio_data=audio_data,
+                        sample_rate=16000,
+                        encoding="wav",
+                        config=config,
+                        timeout=30.0,
+                    )
+                    latency = time.time() - start_time
+                    latencies.append(latency)
+
+                    transcribed_text = result.transcript if result.transcript else ""
+
+                    # Calculate WER/CER
+                    if jiwer:
+                        wer = jiwer.wer(test_text, transcribed_text)
+                        cer = jiwer.cer(test_text, transcribed_text)
+                    else:
+                        # Fallback calculation if jiwer not available
+                        wer = self._calculate_wer_simple(test_text, transcribed_text)
+                        cer = self._calculate_cer_simple(test_text, transcribed_text)
+
+                    results.append({
+                        "original": test_text,
+                        "transcribed": transcribed_text,
+                        "wer": wer,
+                        "cer": cer,
+                        "latency": latency,
+                    })
+
+                    logger.info(f"  WER: {wer:.4f}, CER: {cer:.4f}, Latency: {latency:.3f}s")
+
+                except Exception as e:
+                    logger.error(f"Error processing STT test case {i+1}: {e}", exc_info=True)
+                    results.append({
+                        "original": test_text,
+                        "transcribed": "",
+                        "wer": 1.0,
+                        "cer": 1.0,
+                        "latency": 0.0,
+                    })
+
+            # Close channel
+            await channel.close()
+
+        except Exception as e:
+            logger.error(f"Failed to connect to STT service: {e}", exc_info=True)
+            # Return placeholder result
+            return STTBenchmarkResult(
+                dataset="synthetic_test",
+                total_samples=len(test_cases),
+                successful_samples=0,
+                average_wer=1.0,
+                average_cer=1.0,
+                baseline_wer=2.5,
+                baseline_cer=1.0,
+            )
+
+        # Calculate aggregate metrics
+        successful = [r for r in results if r["transcribed"]]
+        if successful:
+            avg_wer = np.mean([r["wer"] for r in successful]) if np else sum(r["wer"] for r in successful) / len(successful)
+            avg_cer = np.mean([r["cer"] for r in successful]) if np else sum(r["cer"] for r in successful) / len(successful)
+            avg_latency = np.mean([r["latency"] for r in successful]) if np else sum(r["latency"] for r in successful) / len(successful)
+        else:
+            avg_wer = 1.0
+            avg_cer = 1.0
+            avg_latency = 0.0
+
+        baseline_wer = 2.5  # Published Whisper-large-v3 WER on LibriSpeech test-clean
+        baseline_cer = 1.0  # Approximate CER
+
         return STTBenchmarkResult(
-            dataset="librispeech_test_clean",
-            total_samples=0,
-            successful_samples=0,
-            average_wer=0.0,
-            average_cer=0.0,
-            baseline_wer=2.5,  # Published Whisper-large-v3 WER on LibriSpeech test-clean
-            baseline_cer=1.0,  # Approximate CER
+            dataset="synthetic_test",
+            total_samples=len(test_cases),
+            successful_samples=len(successful),
+            average_wer=avg_wer * 100,  # Convert to percentage
+            average_cer=avg_cer * 100,  # Convert to percentage
+            baseline_wer=baseline_wer,
+            baseline_cer=baseline_cer,
+            wer_delta=(avg_wer * 100) - baseline_wer,
+            cer_delta=(avg_cer * 100) - baseline_cer,
+            average_latency_seconds=avg_latency,
         )
 
-    def _run_tts_benchmarks(self) -> TTSBenchmarkResult:
-        """Run TTS benchmarks (quality metrics, round-trip)."""
-        # TODO: Implement TTS benchmarking
-        # This should:
-        # 1. Generate speech from test text samples
-        # 2. Measure quality metrics (MOS, MCD if available)
-        # 3. Run round-trip tests (TTS → STT) to measure WER/CER
-        # 4. Compare to published FastSpeech2 baselines
-        logger.warning("TTS benchmarking not yet implemented - placeholder")
+    async def _run_tts_benchmarks(self) -> TTSBenchmarkResult:
+        """Run TTS benchmarks (round-trip TTS → STT)."""
+        if not STT_TTS_AVAILABLE:
+            raise RuntimeError(f"STT/TTS dependencies not available: {STT_TTS_IMPORT_ERROR}")
+
+        # Test cases for TTS benchmarking
+        test_cases = [
+            "The quick brown fox jumps over the lazy dog.",
+            "Artificial intelligence is transforming the world.",
+            "Please call me at 555-123-4567.",
+            "The weather is sunny with a temperature of 75 degrees.",
+            "I would like to order a pizza with extra cheese.",
+        ]
+
+        logger.info(f"Running TTS benchmarks with {len(test_cases)} test cases...")
+        logger.info(f"TTS service URL: {self.args.tts_url}, STT service URL: {self.args.stt_url}")
+
+        # Parse URLs
+        tts_host, tts_port = self._parse_grpc_url(self.args.tts_url, default_port=50053)
+        stt_host, stt_port = self._parse_grpc_url(self.args.stt_url, default_port=50052)
+
+        round_trip_wers = []
+        round_trip_cers = []
+        tts_latencies = []
+        stt_latencies = []
+
+        try:
+            # Create gRPC channels
+            tts_channel = grpc.aio.insecure_channel(f"{tts_host}:{tts_port}")
+            stt_channel = grpc.aio.insecure_channel(f"{stt_host}:{stt_port}")
+            tts_client = TextToSpeechClient(tts_channel)
+            stt_client = asr_shim.SpeechToTextClient(stt_channel)
+
+            for i, test_text in enumerate(test_cases):
+                logger.info(f"Processing TTS test case {i+1}/{len(test_cases)}: '{test_text[:50]}...'")
+
+                try:
+                    # Step 1: TTS - Generate audio from text
+                    tts_start = time.time()
+                    config = SynthesisConfig(sample_rate=16000)
+                    audio_data = await tts_client.synthesize(
+                        text=test_text,
+                        voice_id="default",
+                        language="en",
+                        config=config,
+                        timeout=30.0,
+                    )
+                    tts_latency = time.time() - tts_start
+                    tts_latencies.append(tts_latency)
+
+                    # Step 2: STT - Transcribe audio back to text
+                    stt_start = time.time()
+                    stt_config = asr_shim.RecognitionConfig(language="en")
+                    result = await stt_client.recognize(
+                        audio_data=audio_data,
+                        sample_rate=16000,
+                        encoding="wav",
+                        config=stt_config,
+                        timeout=30.0,
+                    )
+                    stt_latency = time.time() - stt_start
+                    stt_latencies.append(stt_latency)
+
+                    transcribed_text = result.transcript if result.transcript else ""
+
+                    # Calculate round-trip WER/CER
+                    if jiwer:
+                        wer = jiwer.wer(test_text, transcribed_text)
+                        cer = jiwer.cer(test_text, transcribed_text)
+                    else:
+                        wer = self._calculate_wer_simple(test_text, transcribed_text)
+                        cer = self._calculate_cer_simple(test_text, transcribed_text)
+
+                    round_trip_wers.append(wer)
+                    round_trip_cers.append(cer)
+
+                    logger.info(f"  Round-trip WER: {wer:.4f}, CER: {cer:.4f}")
+                    logger.info(f"  TTS latency: {tts_latency:.3f}s, STT latency: {stt_latency:.3f}s")
+
+                except Exception as e:
+                    logger.error(f"Error processing TTS test case {i+1}: {e}", exc_info=True)
+                    round_trip_wers.append(1.0)
+                    round_trip_cers.append(1.0)
+
+            # Close channels
+            await tts_channel.close()
+            await stt_channel.close()
+
+        except Exception as e:
+            logger.error(f"Failed to connect to TTS/STT services: {e}", exc_info=True)
+            return TTSBenchmarkResult(
+                dataset="synthetic_test",
+                total_samples=len(test_cases),
+                successful_samples=0,
+            )
+
+        # Calculate aggregate metrics
+        if round_trip_wers:
+            avg_wer = np.mean(round_trip_wers) if np else sum(round_trip_wers) / len(round_trip_wers)
+            avg_cer = np.mean(round_trip_cers) if np else sum(round_trip_cers) / len(round_trip_cers)
+            avg_tts_latency = np.mean(tts_latencies) if np and tts_latencies else (sum(tts_latencies) / len(tts_latencies) if tts_latencies else 0.0)
+        else:
+            avg_wer = 1.0
+            avg_cer = 1.0
+            avg_tts_latency = 0.0
+
         return TTSBenchmarkResult(
-            dataset="ljspeech_test",
-            total_samples=0,
-            successful_samples=0,
+            dataset="synthetic_test",
+            total_samples=len(test_cases),
+            successful_samples=len(round_trip_wers),
+            round_trip_wer=avg_wer * 100,  # Convert to percentage
+            round_trip_cer=avg_cer * 100,  # Convert to percentage
             baseline_mos=4.0,  # Approximate FastSpeech2 MOS
             baseline_mcd=5.0,  # Approximate MCD
+            average_latency_seconds=avg_tts_latency,
         )
 
-    def _run_audio_stack_benchmarks(self) -> AudioStackBenchmarkResult:
-        """Run end-to-end audio stack benchmarks."""
-        # TODO: Implement audio stack benchmarking
-        # This should:
-        # 1. Run full round-trip: Text → TTS → STT → LLM → TTS → Audio
-        # 2. Measure latency at each stage
-        # 3. Measure end-to-end success rate
-        # 4. Measure round-trip WER/CER
-        logger.warning("Audio stack benchmarking not yet implemented - placeholder")
+    async def _run_audio_stack_benchmarks(self) -> AudioStackBenchmarkResult:
+        """Run end-to-end audio stack benchmarks (Text → TTS → STT → LLM → TTS)."""
+        if not STT_TTS_AVAILABLE:
+            raise RuntimeError(f"STT/TTS dependencies not available: {STT_TTS_IMPORT_ERROR}")
+
+        # Test cases for end-to-end audio stack
+        test_cases = [
+            "Hello, how are you?",
+            "What is the weather like today?",
+            "Tell me a joke.",
+        ]
+
+        logger.info(f"Running audio stack benchmarks with {len(test_cases)} test cases...")
+
+        # Parse URLs
+        tts_host, tts_port = self._parse_grpc_url(self.args.tts_url, default_port=50053)
+        stt_host, stt_port = self._parse_grpc_url(self.args.stt_url, default_port=50052)
+
+        results = []
+        llm_latencies = []
+        stt_latencies = []
+        tts_latencies = []
+        total_latencies = []
+
+        try:
+            # Create gRPC channels
+            tts_channel = grpc.aio.insecure_channel(f"{tts_host}:{tts_port}")
+            stt_channel = grpc.aio.insecure_channel(f"{stt_host}:{stt_port}")
+            tts_client = TextToSpeechClient(tts_channel)
+            stt_client = asr_shim.SpeechToTextClient(stt_channel)
+
+            # LLM client (if available)
+            llm_client = None
+            if LLM_BENCHMARKS_AVAILABLE:
+                try:
+                    from june_grpc_api.shim.llm import LLMClient
+                    llm_host, llm_port = self._parse_grpc_url(self.args.llm_url, default_port=8000)
+                    llm_channel = grpc.aio.insecure_channel(f"{llm_host}:{llm_port}")
+                    llm_client = LLMClient(llm_channel)
+                except Exception as e:
+                    logger.warning(f"LLM client not available, skipping LLM stage: {e}")
+
+            for i, test_text in enumerate(test_cases):
+                logger.info(f"Processing audio stack test case {i+1}/{len(test_cases)}: '{test_text}'")
+
+                total_start = time.time()
+                success = False
+                stt_latency = 0.0
+                tts_latency_1 = 0.0
+                tts_latency_2 = 0.0
+                llm_latency = 0.0
+                final_transcript = ""
+
+                try:
+                    # Step 1: TTS - Generate audio from input text
+                    tts_start = time.time()
+                    config = SynthesisConfig(sample_rate=16000)
+                    audio_1 = await tts_client.synthesize(
+                        text=test_text,
+                        voice_id="default",
+                        language="en",
+                        config=config,
+                        timeout=30.0,
+                    )
+                    tts_latency_1 = time.time() - tts_start
+                    tts_latencies.append(tts_latency_1)
+
+                    # Step 2: STT - Transcribe audio to text
+                    stt_start = time.time()
+                    stt_config = asr_shim.RecognitionConfig(language="en")
+                    stt_result = await stt_client.recognize(
+                        audio_data=audio_1,
+                        sample_rate=16000,
+                        encoding="wav",
+                        config=stt_config,
+                        timeout=30.0,
+                    )
+                    stt_latency = time.time() - stt_start
+                    stt_latencies.append(stt_latency)
+
+                    transcribed_text = stt_result.transcript if stt_result.transcript else ""
+                    if not transcribed_text:
+                        logger.warning(f"STT returned empty transcript for test case {i+1}")
+                        continue
+
+                    # Step 3: LLM - Process transcribed text (if LLM available)
+                    if llm_client:
+                        llm_start = time.time()
+                        try:
+                            # Simple LLM call - generate response
+                            llm_response = await llm_client.generate(
+                                prompt=f"User said: {transcribed_text}. Please respond briefly.",
+                                max_tokens=50,
+                                temperature=0.7,
+                                timeout=30.0,
+                            )
+                            llm_output = llm_response.text if hasattr(llm_response, 'text') else str(llm_response)
+                            llm_latency = time.time() - llm_start
+                            llm_latencies.append(llm_latency)
+                        except Exception as e:
+                            logger.warning(f"LLM call failed, using transcribed text as output: {e}")
+                            llm_output = transcribed_text
+                    else:
+                        llm_output = transcribed_text  # Skip LLM if not available
+
+                    # Step 4: TTS - Generate final audio from LLM output
+                    tts_start_2 = time.time()
+                    audio_2 = await tts_client.synthesize(
+                        text=llm_output,
+                        voice_id="default",
+                        language="en",
+                        config=config,
+                        timeout=30.0,
+                    )
+                    tts_latency_2 = time.time() - tts_start_2
+                    tts_latencies.append(tts_latency_2)
+
+                    # Step 5: STT - Transcribe final audio (optional - for round-trip verification)
+                    stt_start_2 = time.time()
+                    stt_result_2 = await stt_client.recognize(
+                        audio_data=audio_2,
+                        sample_rate=16000,
+                        encoding="wav",
+                        config=stt_config,
+                        timeout=30.0,
+                    )
+                    final_transcript = stt_result_2.transcript if stt_result_2.transcript else ""
+
+                    total_latency = time.time() - total_start
+                    total_latencies.append(total_latency)
+                    success = True
+
+                    logger.info(f"  Success! Total latency: {total_latency:.3f}s")
+                    logger.info(f"    TTS1: {tts_latency_1:.3f}s, STT1: {stt_latency:.3f}s, "
+                              f"LLM: {llm_latency:.3f}s, TTS2: {tts_latency_2:.3f}s")
+
+                except Exception as e:
+                    logger.error(f"Error processing audio stack test case {i+1}: {e}", exc_info=True)
+                    total_latency = time.time() - total_start
+                    total_latencies.append(total_latency)
+
+                results.append({
+                    "success": success,
+                    "stt_latency": stt_latency,
+                    "tts_latency_1": tts_latency_1,
+                    "tts_latency_2": tts_latency_2,
+                    "llm_latency": llm_latency,
+                    "total_latency": total_latency,
+                    "final_transcript": final_transcript,
+                })
+
+            # Close channels
+            await tts_channel.close()
+            await stt_channel.close()
+            if llm_client:
+                await llm_channel.close()
+
+        except Exception as e:
+            logger.error(f"Failed to connect to services: {e}", exc_info=True)
+            return AudioStackBenchmarkResult(
+                total_tests=len(test_cases),
+                successful_tests=0,
+                average_round_trip_wer=100.0,
+                average_round_trip_cer=100.0,
+                average_llm_latency_seconds=0.0,
+                average_stt_latency_seconds=0.0,
+                average_tts_latency_seconds=0.0,
+                average_total_latency_seconds=0.0,
+                end_to_end_success_rate=0.0,
+            )
+
+        # Calculate aggregate metrics
+        successful = [r for r in results if r["success"]]
+        success_rate = len(successful) / len(results) if results else 0.0
+
+        if successful:
+            avg_stt = np.mean([r["stt_latency"] for r in successful]) if np else sum(r["stt_latency"] for r in successful) / len(successful)
+            avg_tts = np.mean([r["tts_latency_1"] + r["tts_latency_2"] for r in successful]) / 2.0 if np else (sum(r["tts_latency_1"] + r["tts_latency_2"] for r in successful) / (2.0 * len(successful)) if successful else 0.0)
+            avg_llm = np.mean([r["llm_latency"] for r in successful if r["llm_latency"] > 0]) if np and any(r["llm_latency"] > 0 for r in successful) else (sum(r["llm_latency"] for r in successful if r["llm_latency"] > 0) / len([r for r in successful if r["llm_latency"] > 0]) if any(r["llm_latency"] > 0 for r in successful) else 0.0)
+            avg_total = np.mean([r["total_latency"] for r in successful]) if np else sum(r["total_latency"] for r in successful) / len(successful)
+        else:
+            avg_stt = 0.0
+            avg_tts = 0.0
+            avg_llm = 0.0
+            avg_total = 0.0
+
+        # Round-trip WER/CER (compare final transcript to original - simplified)
+        # In a real implementation, we'd compare more carefully
+        round_trip_wers = []
+        round_trip_cers = []
+        for idx, r in enumerate(results):
+            if r["success"] and r["final_transcript"]:
+                # Compare final transcript to original (simplified)
+                original_text = test_cases[idx]
+                if jiwer:
+                    wer = jiwer.wer(original_text, r["final_transcript"])
+                    cer = jiwer.cer(original_text, r["final_transcript"])
+                else:
+                    wer = self._calculate_wer_simple(original_text, r["final_transcript"])
+                    cer = self._calculate_cer_simple(original_text, r["final_transcript"])
+                round_trip_wers.append(wer)
+                round_trip_cers.append(cer)
+
+        avg_wer = np.mean(round_trip_wers) * 100 if np and round_trip_wers else (sum(round_trip_wers) / len(round_trip_wers) * 100 if round_trip_wers else 0.0)
+        avg_cer = np.mean(round_trip_cers) * 100 if np and round_trip_cers else (sum(round_trip_cers) / len(round_trip_cers) * 100 if round_trip_cers else 0.0)
+
         return AudioStackBenchmarkResult(
-            total_tests=0,
-            successful_tests=0,
-            average_round_trip_wer=0.0,
-            average_round_trip_cer=0.0,
-            average_llm_latency_seconds=0.0,
-            average_stt_latency_seconds=0.0,
-            average_tts_latency_seconds=0.0,
-            average_total_latency_seconds=0.0,
-            end_to_end_success_rate=0.0,
+            total_tests=len(test_cases),
+            successful_tests=len(successful),
+            average_round_trip_wer=avg_wer,
+            average_round_trip_cer=avg_cer,
+            average_llm_latency_seconds=avg_llm,
+            average_stt_latency_seconds=avg_stt,
+            average_tts_latency_seconds=avg_tts,
+            average_total_latency_seconds=avg_total,
+            end_to_end_success_rate=success_rate,
         )
 
     def _generate_summary(self, report: ComprehensiveBenchmarkReport) -> Dict[str, Any]:
@@ -510,6 +933,110 @@ class AllModelBenchmarkRunner(Command):
                 logger.warning(warning)
 
         logger.info("\n" + "=" * 60)
+
+    def _parse_grpc_url(self, url: str, default_port: int = 50052) -> Tuple[str, int]:
+        """Parse gRPC URL into host and port."""
+        # Remove grpc:// prefix if present
+        url = url.replace("grpc://", "").replace("http://", "").replace("https://", "")
+        
+        if ":" in url:
+            host, port_str = url.rsplit(":", 1)
+            try:
+                port = int(port_str)
+            except ValueError:
+                port = default_port
+        else:
+            host = url
+            port = default_port
+        
+        return host, port
+
+    async def _generate_audio_via_tts(self, text: str) -> bytes:
+        """Generate audio from text using TTS service via gRPC."""
+        if not STT_TTS_AVAILABLE or not TextToSpeechClient:
+            # Fallback to simple test audio
+            return self._generate_test_audio(text)
+        
+        try:
+            # Parse TTS URL
+            tts_host, tts_port = self._parse_grpc_url(self.args.tts_url, default_port=50053)
+            
+            # Create gRPC channel
+            channel = grpc.aio.insecure_channel(f"{tts_host}:{tts_port}")
+            tts_client = TextToSpeechClient(channel)
+            
+            # Generate audio
+            config = SynthesisConfig(sample_rate=16000)
+            audio_data = await tts_client.synthesize(
+                text=text,
+                voice_id="default",
+                language="en",
+                config=config,
+                timeout=30.0,
+            )
+            
+            await channel.close()
+            return audio_data
+        except Exception as e:
+            logger.warning(f"Failed to generate audio via TTS, using fallback: {e}")
+            return self._generate_test_audio(text)
+
+    def _generate_test_audio(self, text: str, sample_rate: int = 16000) -> bytes:
+        """Generate simple test audio from text (placeholder - real benchmarking would use TTS)."""
+        # This is a simplified placeholder - in real benchmarking, we'd use TTS service
+        # or load from LibriSpeech dataset
+        # For now, generate a simple sine wave as placeholder
+        if sf and np:
+            duration = min(len(text) * 0.1, 5.0)  # Estimate duration
+            t = np.linspace(0, duration, int(sample_rate * duration))
+            audio = np.sin(2 * np.pi * 440 * t) * 0.1  # Simple sine wave
+            audio += np.random.normal(0, 0.01, len(audio))  # Add noise
+            
+            # Write to WAV bytes
+            buffer = io.BytesIO()
+            sf.write(buffer, audio, sample_rate, format='WAV')
+            return buffer.getvalue()
+        else:
+            # Fallback: return empty audio
+            return b""
+
+    def _calculate_wer_simple(self, reference: str, hypothesis: str) -> float:
+        """Simple WER calculation (fallback if jiwer not available)."""
+        ref_words = reference.lower().split()
+        hyp_words = hypothesis.lower().split()
+        
+        # Simple Levenshtein-like calculation
+        # This is a simplified version - jiwer is preferred
+        if not ref_words:
+            return 1.0 if hyp_words else 0.0
+        
+        # Count word errors
+        errors = 0
+        ref_set = set(ref_words)
+        hyp_set = set(hyp_words)
+        
+        # Words in reference but not in hypothesis (deletions)
+        errors += len(ref_set - hyp_set)
+        # Words in hypothesis but not in reference (insertions)
+        errors += len(hyp_set - ref_set)
+        
+        return errors / len(ref_words)
+
+    def _calculate_cer_simple(self, reference: str, hypothesis: str) -> float:
+        """Simple CER calculation (fallback if jiwer not available)."""
+        ref_chars = list(reference.lower().replace(" ", ""))
+        hyp_chars = list(hypothesis.lower().replace(" ", ""))
+        
+        if not ref_chars:
+            return 1.0 if hyp_chars else 0.0
+        
+        # Simple character error calculation
+        errors = abs(len(ref_chars) - len(hyp_chars))
+        for i in range(min(len(ref_chars), len(hyp_chars))):
+            if ref_chars[i] != hyp_chars[i]:
+                errors += 1
+        
+        return errors / len(ref_chars)
 
     def cleanup(self) -> None:
         """Clean up resources."""
