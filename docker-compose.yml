@@ -268,6 +268,10 @@ services:
     - LLM_URL=http://nim-qwen3:8000
       # LLM options: tensorrt-llm:8000 (default), nim-qwen3:8001 (NIM, requires NGC_API_KEY in home_infra), inference-api:50051 (legacy)
     - ENABLE_TRACING=${ENABLE_TRACING:-true}
+    - TODO_SERVICE_API_KEY=${TODO_SERVICE_API_KEY:-}
+      # API key for Todorama service (required for creating tasks)
+    - TODORAMA_API_KEY=${TODORAMA_API_KEY:-}
+      # Alternative name for Todorama API key
     - JAEGER_ENDPOINT=http://common-jaeger:14268/api/traces
     - JAEGER_AGENT_HOST=common-jaeger
     - JAEGER_AGENT_PORT=6831
@@ -340,6 +344,10 @@ services:
     - LLM_URL=http://nim-qwen3:8000
       # LLM options: tensorrt-llm:8000 (default), nim-qwen3:8001 (NIM, requires NGC_API_KEY in home_infra), inference-api:50051 (legacy)
     - ENABLE_TRACING=${ENABLE_TRACING:-true}
+    - TODO_SERVICE_API_KEY=${TODO_SERVICE_API_KEY:-}
+      # API key for Todorama service (required for creating tasks)
+    - TODORAMA_API_KEY=${TODORAMA_API_KEY:-}
+      # Alternative name for Todorama API key
     - JAEGER_ENDPOINT=http://common-jaeger:14268/api/traces
     - JAEGER_AGENT_HOST=common-jaeger
     - JAEGER_AGENT_PORT=6831
