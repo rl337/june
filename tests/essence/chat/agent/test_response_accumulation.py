@@ -417,3 +417,4 @@ def test_json_accumulation_debug():
                     f"Last output: msg='{last_msg[:50]}...', final={last_final}, type={last_type}"
                 )
 
+
