@@ -30,16 +30,30 @@
   },
   "architect": {
     "type": "popen_cursor",
-    "name": "Architect Agent",
-    "description": "Breaks down abstract/epic tasks into concrete tasks",
-    "tags": ["planning", "task-breakdown"],
-    "roles": ["architect", "planner"],
+    "name": "Manish",
+    "description": "Architect who breaks down abstract/epic tasks into concrete tasks. Coordinates with Enid on release planning.",
+    "tags": ["planning", "task-breakdown", "architecture"],
+    "roles": ["architect"],
     "config": {
       "script_path": "/app/scripts/architect_agent.sh",
       "working_directory": "/app",
       "timeout": 3600,
       "use_simple": false,
       "role": "architect"
+    }
+  },
+  "Enid": {
+    "type": "popen_cursor",
+    "name": "Enid",
+    "description": "Project Manager who coordinates with Manish to create release plans. Follows PMBOK principles for software development lifecycle management.",
+    "tags": ["project-management", "release-planning", "coordination"],
+    "roles": ["project-manager"],
+    "config": {
+      "script_path": "/app/scripts/project_manager_agent.sh",
+      "working_directory": "/app",
+      "timeout": 3600,
+      "use_simple": false,
+      "role": "project-manager"
     }
   },
   "refactor-planner": {

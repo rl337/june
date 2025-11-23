@@ -77,14 +77,14 @@ class LoopingAgentServiceCommand(Command):
         parser.add_argument(
             "--lifecycle-roles",
             type=str,
-            default=os.getenv("LIFECYCLE_ROLES", "architect,implementation,precommit,refactor-planner,project-cleanup"),
-            help="Comma-separated list of roles to cycle through in lifecycle mode (default: architect,implementation,precommit,refactor-planner,project-cleanup)",
+            default=os.getenv("LIFECYCLE_ROLES", "project-manager,architect,implementation,precommit,refactor-planner,project-cleanup"),
+            help="Comma-separated list of roles to cycle through in lifecycle mode (default: project-manager,architect,implementation,precommit,refactor-planner,project-cleanup)",
         )
         parser.add_argument(
             "--role-priority",
             type=str,
-            default=os.getenv("ROLE_PRIORITY", "architect,precommit,implementation,refactor-planner,project-cleanup"),
-            help="Priority order for role selection when multiple tasks available (default: architect,precommit,implementation,refactor-planner,project-cleanup)",
+            default=os.getenv("ROLE_PRIORITY", "project-manager,architect,precommit,implementation,refactor-planner,project-cleanup"),
+            help="Priority order for role selection when multiple tasks available (default: project-manager,architect,precommit,implementation,refactor-planner,project-cleanup)",
         )
         parser.add_argument(
             "--switchboard-url",
@@ -114,6 +114,7 @@ class LoopingAgentServiceCommand(Command):
         self.agent_role_map: Dict[str, str] = {
             "normal": "implementation",  # Normal agent has roles: ["implementation", "task-worker"]
             "architect": "architect",
+            "project-manager": "project-manager",  # Enid, the project manager
             "refactor-planner": "refactor-planner",
             "project-cleanup": "project-cleanup",
             "precommit": "testing",  # Precommit agent has role "testing"
@@ -237,6 +238,7 @@ class LoopingAgentServiceCommand(Command):
         try:
             # Map role to agent_type for Todorama
             agent_type_map = {
+                "project-manager": "breakdown",  # Project management tasks
                 "architect": "breakdown",
                 "implementation": "implementation",
                 "testing": "implementation",  # Precommit tasks are implementation type
@@ -375,7 +377,8 @@ class LoopingAgentServiceCommand(Command):
 
         # Build message for agent with role-specific context
         role_context = {
-            "architect": "You are an architect agent. Break down this task into smaller, concrete subtasks.",
+            "project-manager": "You are Enid, the Project Manager. Coordinate release planning and project management following PMBOK principles.",
+            "architect": "You are Manish, the Architect. Break down this task into smaller, concrete subtasks.",
             "implementation": "You are an implementation agent. Complete this task with high-quality code.",
             "testing": "You are a testing/QA agent. Fix pre-commit failures and ensure code quality.",
             "refactor-planner": "You are a refactoring agent. Analyze and improve code structure.",
