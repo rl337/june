@@ -1,0 +1,88 @@
+{
+  "telegram-response": {
+    "type": "popen_cursor",
+    "name": "Telegram Response Agent",
+    "description": "Handles Telegram user messages and responds via cursor-agent",
+    "tags": ["telegram", "user-interface", "response"],
+    "roles": ["user-interface", "response"],
+    "config": {
+      "script_path": "/app/scripts/telegram_response_agent.sh",
+      "script_simple_path": "/app/scripts/telegram_response_agent_simple.sh",
+      "working_directory": "/app",
+      "timeout": 300,
+      "use_simple": false,
+      "role": "telegram-response"
+    }
+  },
+  "normal": {
+    "type": "popen_cursor",
+    "name": "Normal Agent",
+    "description": "Standard task work - picks up and completes concrete tasks",
+    "tags": ["task-work", "implementation"],
+    "roles": ["implementation", "task-worker"],
+    "config": {
+      "script_path": "/app/scripts/normal_agent.sh",
+      "working_directory": "/app",
+      "timeout": 3600,
+      "use_simple": false,
+      "role": "normal"
+    }
+  },
+  "architect": {
+    "type": "popen_cursor",
+    "name": "Architect Agent",
+    "description": "Breaks down abstract/epic tasks into concrete tasks",
+    "tags": ["planning", "task-breakdown"],
+    "roles": ["architect", "planner"],
+    "config": {
+      "script_path": "/app/scripts/architect_agent.sh",
+      "working_directory": "/app",
+      "timeout": 3600,
+      "use_simple": false,
+      "role": "architect"
+    }
+  },
+  "refactor-planner": {
+    "type": "popen_cursor",
+    "name": "Refactor Planner Agent",
+    "description": "Analyzes codebase and creates refactoring tasks",
+    "tags": ["refactoring", "analysis", "planning"],
+    "roles": ["architect", "refactor-planner"],
+    "config": {
+      "script_path": "/app/scripts/refactor_planner_agent.sh",
+      "working_directory": "/app",
+      "timeout": 3600,
+      "use_simple": false,
+      "role": "refactor-planner"
+    }
+  },
+  "project-cleanup": {
+    "type": "popen_cursor",
+    "name": "Project Cleanup Agent",
+    "description": "Analyzes project and creates cleanup tasks for docs/scripts",
+    "tags": ["cleanup", "analysis", "maintenance"],
+    "roles": ["maintenance", "cleanup"],
+    "config": {
+      "script_path": "/app/scripts/project_cleanup_agent.sh",
+      "working_directory": "/app",
+      "timeout": 3600,
+      "use_simple": false,
+      "role": "project-cleanup"
+    }
+  },
+  "precommit": {
+    "type": "popen_cursor",
+    "name": "Pre-commit Fix Agent",
+    "description": "Fixes pre-commit test failures",
+    "tags": ["testing", "fix", "pre-commit"],
+    "roles": ["testing", "fix"],
+    "config": {
+      "script_path": "/app/scripts/precommit_agent.sh",
+      "working_directory": "/app",
+      "timeout": 1800,
+      "use_simple": false,
+      "role": "precommit"
+    }
+  }
+}
+
