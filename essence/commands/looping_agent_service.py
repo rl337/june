@@ -137,10 +137,11 @@ class LoopingAgentServiceCommand(Command):
         self.iteration_count = 0
         self._shutdown_requested = False
         
-        # Lifecycle mode state
-        self.current_lifecycle_role_index = 0
-        self.lifecycle_roles: list = []
-        self.role_priority: list = []
+        # Lifecycle mode state (initialized above if lifecycle mode, otherwise empty)
+        if self.args.agent_mode != "lifecycle":
+            self.current_lifecycle_role_index = 0
+            self.lifecycle_roles: list = []
+            self.role_priority: list = []
 
         logger.info("Looping agent service initialized")
 
@@ -227,13 +228,38 @@ class LoopingAgentServiceCommand(Command):
                 span.end()
             return None
 
-    async def get_available_tasks(self) -> list:
-        """Get available tasks from Todorama."""
+    async def get_available_tasks(self, role: Optional[str] = None) -> list:
+        """Get available tasks from Todorama.
+        
+        Args:
+            role: Optional role to filter tasks by. If None, gets tasks for current agent mode.
+        """
         try:
+            # Map role to agent_type for Todorama
+            agent_type_map = {
+                "architect": "breakdown",
+                "implementation": "implementation",
+                "testing": "implementation",  # Precommit tasks are implementation type
+                "refactor-planner": "implementation",
+                "project-cleanup": "implementation",
+            }
+            
+            # Determine agent_type based on role or current mode
+            if role:
+                agent_type = agent_type_map.get(role, "implementation")
+            elif self.args.agent_mode == "lifecycle":
+                # In lifecycle mode, try to get tasks for current role
+                current_role = self.lifecycle_roles[self.current_lifecycle_role_index]
+                role_name = self.agent_role_map.get(current_role, current_role)
+                agent_type = agent_type_map.get(role_name, "implementation")
+            else:
+                role_name = self.agent_role_map.get(self.args.agent_mode, "implementation")
+                agent_type = agent_type_map.get(role_name, "implementation")
+            
             response = await self.client.post(
                 f"{self.args.todo_service_url}/mcp/list_available_tasks",
                 headers={"X-API-Key": self.args.api_key},
-                json={"agent_type": "implementation", "limit": 50},
+                json={"agent_type": agent_type, "limit": 50},
             )
             response.raise_for_status()
             data = response.json()
@@ -249,6 +275,42 @@ class LoopingAgentServiceCommand(Command):
             logger.error(f"Failed to get available tasks: {e}", exc_info=True)
             return []
 
+    def get_current_role(self) -> str:
+        """Get the current role based on agent mode."""
+        if self.args.agent_mode == "lifecycle":
+            return self.lifecycle_roles[self.current_lifecycle_role_index]
+        return self.args.agent_mode
+    
+    def advance_lifecycle_role(self) -> None:
+        """Advance to the next role in lifecycle mode."""
+        if self.args.agent_mode == "lifecycle":
+            self.current_lifecycle_role_index = (self.current_lifecycle_role_index + 1) % len(self.lifecycle_roles)
+            # Reset agent_id when role changes so we get the right agent
+            self.agent_id = None
+            logger.info(f"Advanced to lifecycle role: {self.get_current_role()}")
+
+    async def select_role_for_task(self, tasks: list) -> Optional[str]:
+        """Select the best role for available tasks based on priority.
+        
+        In lifecycle mode, this selects roles based on task types and priority order.
+        """
+        if self.args.agent_mode != "lifecycle":
+            return self.get_current_role()
+        
+        # Check which roles have available tasks
+        role_tasks: Dict[str, list] = {}
+        for role in self.role_priority:
+            role_name = self.agent_role_map.get(role, role)
+            role_tasks[role] = await self.get_available_tasks(role=role_name)
+        
+        # Select role with highest priority that has tasks
+        for role in self.role_priority:
+            if role_tasks.get(role):
+                return role
+        
+        # If no tasks for priority roles, use current role
+        return self.get_current_role()
+
     async def run_iteration(self) -> bool:
         """Run a single iteration of the loop."""
         self.iteration_count += 1
@@ -256,53 +318,94 @@ class LoopingAgentServiceCommand(Command):
         if tracer:
             span = tracer.start_span("run_iteration")
             span.set_attribute("iteration.number", self.iteration_count)
-        
+
         logger.info(f"Starting iteration {self.iteration_count}")
 
-        # Get agent ID if we don't have it yet
-        if not self.agent_id:
-            role = self.agent_role_map.get(self.args.agent_mode, "normal")
-            self.agent_id = await self.get_agent_id_by_role(role)
+        # Determine which role to use
+        if self.args.agent_mode == "lifecycle":
+            # Get all available tasks first
+            all_tasks = await self.get_available_tasks()
+            if all_tasks:
+                # Select best role based on available tasks
+                selected_role = await self.select_role_for_task(all_tasks)
+                if selected_role:
+                    # Update lifecycle index to match selected role
+                    if selected_role in self.lifecycle_roles:
+                        self.current_lifecycle_role_index = self.lifecycle_roles.index(selected_role)
+                    role_name = self.agent_role_map.get(selected_role, selected_role)
+                else:
+                    # No tasks, advance to next role
+                    self.advance_lifecycle_role()
+                    role_name = self.agent_role_map.get(self.get_current_role(), "implementation")
+            else:
+                # No tasks available, advance to next role
+                self.advance_lifecycle_role()
+                role_name = self.agent_role_map.get(self.get_current_role(), "implementation")
+        else:
+            role_name = self.agent_role_map.get(self.args.agent_mode, "implementation")
+
+        # Get agent ID for current role
+        if not self.agent_id or (self.args.agent_mode == "lifecycle" and self.session_id != role_name):
+            self.agent_id = await self.get_agent_id_by_role(role_name)
             if not self.agent_id:
-                logger.error(f"Failed to get agent ID for role: {role}")
+                logger.error(f"Failed to get agent ID for role: {role_name}")
+                if self.args.agent_mode == "lifecycle":
+                    self.advance_lifecycle_role()
                 return False
 
             # Use role as session ID for persistence
-            self.session_id = role
-            logger.info(f"Using agent ID: {self.agent_id}, session ID: {self.session_id}")
+            self.session_id = role_name
+            logger.info(f"Using agent ID: {self.agent_id}, session ID: {self.session_id}, role: {role_name}")
 
-        # Get available tasks
-        tasks = await self.get_available_tasks()
+        # Get available tasks for current role
+        tasks = await self.get_available_tasks(role=role_name)
         if not tasks:
-            logger.info("No available tasks found, skipping iteration")
+            logger.info(f"No available tasks found for role {role_name}, skipping iteration")
+            if self.args.agent_mode == "lifecycle":
+                self.advance_lifecycle_role()
             return True
 
         # Select first available task
         task = tasks[0]
         task_id = task.get("task_id", "unknown")
         task_description = task.get("description", "No description")
+        task_type = task.get("task_type", "unknown")
 
-        logger.info(f"Processing task {task_id}: {task_description}")
+        logger.info(f"Processing task {task_id} ({task_type}) with role {role_name}: {task_description}")
 
-        # Build message for agent
-        message = f"Please work on this task: {task_description}\n\nTask ID: {task_id}"
+        # Build message for agent with role-specific context
+        role_context = {
+            "architect": "You are an architect agent. Break down this task into smaller, concrete subtasks.",
+            "implementation": "You are an implementation agent. Complete this task with high-quality code.",
+            "testing": "You are a testing/QA agent. Fix pre-commit failures and ensure code quality.",
+            "refactor-planner": "You are a refactoring agent. Analyze and improve code structure.",
+            "project-cleanup": "You are a maintenance agent. Clean up documentation and scripts.",
+        }
+        
+        context_msg = role_context.get(role_name, "")
+        message = f"{context_msg}\n\nPlease work on this task: {task_description}\n\nTask ID: {task_id}"
 
         # Execute agent
         response = await self.execute_agent(
             self.agent_id,
             self.session_id,
             message,
-            context={"task_id": task_id, "task": task},
+            context={"task_id": task_id, "task": task, "role": role_name, "task_type": task_type},
         )
 
         if response:
-            logger.info(f"Agent execution completed for task {task_id}")
+            logger.info(f"Agent execution completed for task {task_id} (role: {role_name})")
             logger.debug(f"Agent response: {response}")
             if span:
                 span.set_attribute("iteration.success", True)
                 span.set_attribute("task.id", task_id)
+                span.set_attribute("agent.role", role_name)
+            
+            # Advance to next role in lifecycle mode after successful execution
+            if self.args.agent_mode == "lifecycle":
+                self.advance_lifecycle_role()
         else:
-            logger.warning(f"Agent execution failed for task {task_id}")
+            logger.warning(f"Agent execution failed for task {task_id} (role: {role_name})")
             if span:
                 span.set_attribute("iteration.success", False)
                 span.set_status(trace.Status(trace.StatusCode.ERROR, "Agent execution failed"))
