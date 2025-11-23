@@ -133,7 +133,7 @@ services:
     volumes:
     - ${MODEL_CACHE_DIR:-/home/rlee/models}:/models
     - ${JUNE_DATA_DIR:-/home/rlee/june_data}/model_artifacts/inference-api:/app/model_artifacts
-    - /var/log/june/inference-api:/logs
+    - june-logs:/var/log/june
     networks:
     - june_network
     - shared-network
@@ -167,7 +167,7 @@ services:
     volumes:
     - ${MODEL_CACHE_DIR:-/home/rlee/models}:/models
     - ${JUNE_DATA_DIR:-/home/rlee/june_data}/model_artifacts/stt:/app/model_artifacts
-    - /var/log/june/stt:/logs
+    - june-logs:/var/log/june
     healthcheck:
       test:
       - CMD
@@ -211,7 +211,7 @@ services:
     - ${MODEL_CACHE_DIR:-/home/rlee/models}:/models
     - ${JUNE_DATA_DIR:-/home/rlee/june_data}/model_artifacts/tts:/app/model_artifacts
     - ./services/tts:/app/services/tts
-    - /var/log/june/tts:/logs
+    - june-logs:/var/log/june
     healthcheck:
       test:
       - CMD
@@ -233,6 +233,12 @@ services:
     ports:
     - 8080:8080
     - 8443:8443
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        labels: "service=telegram"
     environment:
     - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
     - TELEGRAM_AUTHORIZED_USERS=${TELEGRAM_AUTHORIZED_USERS:-39833618}
@@ -297,7 +303,7 @@ services:
     - ${JUNE_DATA_DIR:-/home/rlee/june_data}/cursor-container-config:/home/june/.config/cursor:rw
     - ./config/cursor-mcp-config.json:/home/june/.config/cursor/mcp.json:ro
     - ${HOME}/.cursor:/home/june/.cursor:rw
-    - /var/log/june/telegram:/logs
+    - june-logs:/var/log/june
     - ${JUNE_DATA_DIR:-/home/rlee/june_data}/var-data:/var/data
     deploy:
       resources:
@@ -363,7 +369,7 @@ services:
     - ${JUNE_DATA_DIR:-/home/rlee/june_data}/cursor-container-config:/home/june/.config/cursor:rw
     - ./config/cursor-mcp-config.json:/home/june/.config/cursor/mcp.json:ro
     - ${HOME}/.cursor:/home/june/.cursor:rw
-    - /var/log/june/discord:/logs
+    - june-logs:/var/log/june
     - ${JUNE_DATA_DIR:-/home/rlee/june_data}/var-data:/var/data
     networks:
     - june_network
@@ -401,7 +407,7 @@ services:
     - JAEGER_AGENT_HOST=common-jaeger
     - JAEGER_AGENT_PORT=6831
     volumes:
-    - /var/log/june/message-api:/logs
+    - june-logs:/var/log/june
     - ${JUNE_DATA_DIR:-/home/rlee/june_data}/var-data:/var/data
     networks:
     - june_network
@@ -433,7 +439,7 @@ services:
     - JAEGER_AGENT_HOST=common-jaeger
     - JAEGER_AGENT_PORT=6831
     volumes:
-    - /var/log/june/integration-test:/logs
+    - june-logs:/var/log/june
     networks:
     - june_network
     - shared-network
@@ -447,6 +453,83 @@ services:
       timeout: 10s
       retries: 3
       start_period: 30s
+  switchboard:
+    build:
+      context: /home/rlee/dev/agenticness
+      dockerfile: services/Dockerfile
+    container_name: june-switchboard
+    restart: unless-stopped
+    environment:
+      - SWITCHBOARD_HOST=0.0.0.0
+      - SWITCHBOARD_PORT=8082
+      - SWITCHBOARD_LOCK_DIR=/var/data/june/switchboard/locks
+      - SWITCHBOARD_CONFIG=/home/rlee/dev/june/config/switchboard_agents.json
+      - AGENTICNESS_DATA_DIR=/var/data/june/switchboard
+      - AGENTICNESS_LOG_DIR=/var/log/june/switchboard
+      - SESSION_STATE_DIR=/var/data/june/switchboard/sessions
+      - AGENTICNESS_STATE_DIR=/var/data/june/switchboard
+      - STATE_DIR=/var/data/june/switchboard
+      - CURSOR_AGENT_EXE=${CURSOR_AGENT_EXE:-cursor-agent}
+      - AGENT_ID=${AGENT_ID:-switchboard}
+      - AGENT_TIMEOUT=${AGENT_TIMEOUT:-3600}
+      - PATH=/usr/local/bin/cursor-tools:${PATH}
+      - PYTHONPATH=/app:/home/rlee/dev/agenticness:${PYTHONPATH}
+    volumes:
+      - ${JUNE_DATA_DIR:-/home/rlee/june_data}/switchboard:/var/data/june/switchboard
+      - june-logs:/var/log/june
+      - ./config/switchboard_agents.json:/home/rlee/dev/june/config/switchboard_agents.json:ro
+      - ${HOME}/.local/share/cursor-agent/versions/2025.11.06-8fe8a63:/usr/local/bin/cursor-tools:ro
+      - ${HOME}/.config/cursor/auth.json:/home/june/.config/cursor/auth.json:ro
+      - ${HOME}/.cursor:/home/june/.cursor:rw
+      - /home/rlee/dev/agenticness:/home/rlee/dev/agenticness:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+    networks:
+      - june_network
+      - shared-network
+  looping-agent:
+    build:
+      context: .
+      dockerfile: ./services/looping-agent/Dockerfile
+    container_name: june-looping-agent
+    restart: "no"  # Don't auto-restart - we'll manually restart for iterations
+    environment:
+      - LOOPING_AGENT_ITERATIONS=${LOOPING_AGENT_ITERATIONS:-50}
+      - LOOPING_AGENT_SLEEP_INTERVAL=${LOOPING_AGENT_SLEEP_INTERVAL:-60}
+      - AGENT_MODE=${AGENT_MODE:-normal}
+      - SWITCHBOARD_URL=http://host.docker.internal:8082
+      - TODO_SERVICE_URL=http://todorama-mcp-service-todo:8004
+      - TODO_API_KEY=${TODO_API_KEY:-test-key}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ENABLE_TRACING=${ENABLE_TRACING:-true}
+      - JAEGER_ENDPOINT=http://common-jaeger:14268/api/traces
+      - JAEGER_AGENT_HOST=common-jaeger
+      - JAEGER_AGENT_PORT=6831
+    volumes:
+      - june-logs:/var/log/june
+    networks:
+      - june_network
+      - shared-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  # In-memory tmpfs for all service logs (shared between all services and promtail)
+  # 250MB allows for multiple services with 10MB log rotation per service
+  # Logs are lost on container restart, but that's acceptable for this use case
+  # Promtail should have plenty of time to ship logs to Loki
+  # Reduces SSD writes by keeping logs in memory
+  june-logs:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=250M  # 250MB for all service logs with rotation
+
 networks:
   june_network:
     driver: bridge
