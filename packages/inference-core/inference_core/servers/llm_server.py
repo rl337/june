@@ -10,7 +10,7 @@ from june_grpc_api.generated import llm_pb2, llm_pb2_grpc
 
 from ..config import config
 from ..strategies import InferenceRequest, LlmStrategy
-from ..utils import setup_logging
+from .. import setup_logging
 
 logger = logging.getLogger(__name__)
 

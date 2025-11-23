@@ -9,13 +9,15 @@
 # 5. Verify message syncing and polling
 #
 # Usage:
-#   ./scripts/setup_phase19_operational.sh [--telegram-users USER1,USER2] [--discord-users USER1,USER2] [--skip-start] [--test-only]
+#   ./scripts/setup_phase19_operational.sh [--telegram-users USER1,USER2] [--discord-users USER1,USER2] [--telegram-owner-users USER1] [--discord-owner-users USER1] [--skip-start] [--test-only]
 #
 # Options:
-#   --telegram-users    Comma-separated list of Telegram user IDs to whitelist
-#   --discord-users     Comma-separated list of Discord user IDs to whitelist
-#   --skip-start        Skip service startup (assumes services already running)
-#   --test-only         Only run tests (assumes services already running with whitelist configured)
+#   --telegram-users         Comma-separated list of Telegram user IDs to whitelist
+#   --discord-users          Comma-separated list of Discord user IDs to whitelist
+#   --telegram-owner-users   Comma-separated list of Telegram owner user IDs (subset of whitelisted, for USER_MESSAGES.md flow)
+#   --discord-owner-users    Comma-separated list of Discord owner user IDs (subset of whitelisted, for USER_MESSAGES.md flow)
+#   --skip-start             Skip service startup (assumes services already running)
+#   --test-only              Only run tests (assumes services already running with whitelist configured)
 
 set -euo pipefail
 
@@ -25,6 +27,8 @@ cd "$PROJECT_ROOT"
 
 TELEGRAM_USERS=""
 DISCORD_USERS=""
+TELEGRAM_OWNER_USERS=""
+DISCORD_OWNER_USERS=""
 SKIP_START=false
 TEST_ONLY=false
 
@@ -39,6 +43,14 @@ while [[ $# -gt 0 ]]; do
             DISCORD_USERS="$2"
             shift 2
             ;;
+        --telegram-owner-users)
+            TELEGRAM_OWNER_USERS="$2"
+            shift 2
+            ;;
+        --discord-owner-users)
+            DISCORD_OWNER_USERS="$2"
+            shift 2
+            ;;
         --skip-start)
             SKIP_START=true
             shift
@@ -49,7 +61,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--telegram-users USER1,USER2] [--discord-users USER1,USER2] [--skip-start] [--test-only]"
+            echo "Usage: $0 [--telegram-users USER1,USER2] [--discord-users USER1,USER2] [--telegram-owner-users USER1] [--discord-owner-users USER1] [--skip-start] [--test-only]"
             exit 1
             ;;
     esac
@@ -94,16 +106,35 @@ if [ "$TEST_ONLY" = false ]; then
             echo "✅ Discord whitelist configured: $DISCORD_USERS"
         fi
         
+        if [ -n "$TELEGRAM_OWNER_USERS" ]; then
+            export TELEGRAM_OWNER_USERS="$TELEGRAM_OWNER_USERS"
+            echo "✅ Telegram owner users configured: $TELEGRAM_OWNER_USERS"
+        fi
+        
+        if [ -n "$DISCORD_OWNER_USERS" ]; then
+            export DISCORD_OWNER_USERS="$DISCORD_OWNER_USERS"
+            echo "✅ Discord owner users configured: $DISCORD_OWNER_USERS"
+        fi
+        
         echo ""
-        echo "To persist these settings, add to your environment or docker-compose.yml:"
+        echo "To persist these settings, add to your .env file:"
         echo "  TELEGRAM_WHITELISTED_USERS=$TELEGRAM_USERS"
         echo "  DISCORD_WHITELISTED_USERS=$DISCORD_USERS"
+        if [ -n "$TELEGRAM_OWNER_USERS" ]; then
+            echo "  TELEGRAM_OWNER_USERS=$TELEGRAM_OWNER_USERS"
+        fi
+        if [ -n "$DISCORD_OWNER_USERS" ]; then
+            echo "  DISCORD_OWNER_USERS=$DISCORD_OWNER_USERS"
+        fi
+        echo ""
+        echo "⚠️  IMPORTANT: Owner users must be configured for USER_MESSAGES.md flow to work correctly."
+        echo "   Owner users are a subset of whitelisted users (your personal accounts for direct communication)."
         echo ""
     fi
 fi
 
-# Step 2: Verify whitelist configuration
-echo "Step 2: Verify whitelist configuration"
+# Step 2: Verify whitelist and owner configuration
+echo "Step 2: Verify whitelist and owner configuration"
 echo "-----------------------------------"
 
 if [ -n "${TELEGRAM_WHITELISTED_USERS:-}" ]; then
@@ -112,10 +143,22 @@ else
     echo "⚠️  TELEGRAM_WHITELISTED_USERS: Not set"
 fi
 
+if [ -n "${TELEGRAM_OWNER_USERS:-}" ]; then
+    echo "✅ TELEGRAM_OWNER_USERS: $TELEGRAM_OWNER_USERS"
+else
+    echo "⚠️  TELEGRAM_OWNER_USERS: Not set (required for USER_MESSAGES.md flow)"
+fi
+
 if [ -n "${DISCORD_WHITELISTED_USERS:-}" ]; then
     echo "✅ DISCORD_WHITELISTED_USERS: $DISCORD_WHITELISTED_USERS"
 else
     echo "⚠️  DISCORD_WHITELISTED_USERS: Not set"
+fi
+
+if [ -n "${DISCORD_OWNER_USERS:-}" ]; then
+    echo "✅ DISCORD_OWNER_USERS: $DISCORD_OWNER_USERS"
+else
+    echo "⚠️  DISCORD_OWNER_USERS: Not set (required for USER_MESSAGES.md flow)"
 fi
 
 echo ""
@@ -137,7 +180,11 @@ if [ "$SKIP_START" = false ] && [ "$TEST_ONLY" = false ]; then
     # Start Telegram service
     if [ -n "${TELEGRAM_WHITELISTED_USERS:-}" ]; then
         echo "Starting Telegram service with whitelist..."
-        TELEGRAM_WHITELISTED_USERS="$TELEGRAM_WHITELISTED_USERS" docker compose up -d telegram
+        ENV_VARS="TELEGRAM_WHITELISTED_USERS=$TELEGRAM_WHITELISTED_USERS"
+        if [ -n "${TELEGRAM_OWNER_USERS:-}" ]; then
+            ENV_VARS="$ENV_VARS TELEGRAM_OWNER_USERS=$TELEGRAM_OWNER_USERS"
+        fi
+        eval "$ENV_VARS docker compose up -d telegram"
         echo "✅ Telegram service started"
     else
         echo "⚠️  Skipping Telegram service (no whitelist configured)"
@@ -146,7 +193,11 @@ if [ "$SKIP_START" = false ] && [ "$TEST_ONLY" = false ]; then
     # Start Discord service
     if [ -n "${DISCORD_WHITELISTED_USERS:-}" ]; then
         echo "Starting Discord service with whitelist..."
-        DISCORD_WHITELISTED_USERS="$DISCORD_WHITELISTED_USERS" docker compose up -d discord
+        ENV_VARS="DISCORD_WHITELISTED_USERS=$DISCORD_WHITELISTED_USERS"
+        if [ -n "${DISCORD_OWNER_USERS:-}" ]; then
+            ENV_VARS="$ENV_VARS DISCORD_OWNER_USERS=$DISCORD_OWNER_USERS"
+        fi
+        eval "$ENV_VARS docker compose up -d discord"
         echo "✅ Discord service started"
     else
         echo "⚠️  Skipping Discord service (no whitelist configured)"

@@ -15,6 +15,13 @@ These tests require:
 
 ## Test Files
 
+### Message API and Communication Tests
+- `test_agent_message_api.py` - Test script for Message API agent integration
+- `test_message_api.py` - Test script for Message API endpoints
+- `test_phase21_round_trip.py` - Automated test script for Phase 21 USER_MESSAGES.md round trip verification
+- `test_send_dms.py` - Test script for sending direct messages
+
+### Service Integration Tests
 - `test_e2e_text_passthrough.py` - ⚠️ **OBSOLETE** - End-to-end text passthrough test (depends on removed gateway service, kept for reference only)
 - `test_generate_stream.py` - LLM stream generation test
 - `test_validate_tts_stt.py` - TTS/STT validation test

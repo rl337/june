@@ -9,7 +9,7 @@ from june_grpc_api.generated import asr_pb2, asr_pb2_grpc
 
 from ..config import config
 from ..strategies import SttStrategy
-from ..utils import setup_logging
+from .. import setup_logging
 
 
 class _SttServicer(asr_pb2_grpc.SpeechToTextServicer):

@@ -26,6 +26,7 @@ from . import manage_tensorrt_llm  # noqa: F401
 from . import message_api_service  # noqa: F401
 from . import monitor_gpu  # noqa: F401
 from . import poll_user_responses  # noqa: F401
+from . import process_user_messages  # noqa: F401
 from . import read_user_requests  # noqa: F401
 from . import review_sandbox  # noqa: F401
 from . import run_benchmarks  # noqa: F401
@@ -36,6 +37,9 @@ from . import tts_service  # noqa: F401
 from . import verify_nim  # noqa: F401
 from . import verify_qwen3  # noqa: F401
 from . import verify_tensorrt_llm  # noqa: F401
+from . import list_nims  # noqa: F401
+from . import create_user_interaction_task  # noqa: F401
+from . import process_user_interaction_queue  # noqa: F401
 
 __all__ = [
     "telegram_service",
@@ -62,5 +66,9 @@ __all__ = [
     "compile_model",
     "read_user_requests",
     "poll_user_responses",
+    "process_user_messages",
     "message_api_service",
+    "list_nims",
+    "create_user_interaction_task",
+    "process_user_interaction_queue",
 ]

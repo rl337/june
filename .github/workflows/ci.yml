@@ -15,6 +15,10 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.12'
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y python3.12-dev build-essential
     - name: Install Poetry
       run: |
         pip install --break-system-packages poetry
@@ -22,8 +26,27 @@ jobs:
       env:
         POETRY_VIRTUALENVS_CREATE: "true"
         POETRY_VIRTUALENVS_IN_PROJECT: "true"
+      timeout-minutes: 15
       run: |
-        poetry install --no-interaction --no-ansi --no-root
+        # Retry poetry install up to 3 times to handle transient network issues
+        max_attempts=3
+        attempt=1
+        while [ $attempt -le $max_attempts ]; do
+          echo "Poetry install attempt $attempt of $max_attempts"
+          if poetry install --no-interaction --no-ansi --no-root; then
+            echo "Poetry install succeeded on attempt $attempt"
+            exit 0
+          else
+            if [ $attempt -lt $max_attempts ]; then
+              echo "Poetry install failed on attempt $attempt, retrying in 10 seconds..."
+              sleep 10
+            else
+              echo "Poetry install failed after $max_attempts attempts"
+              exit 1
+            fi
+          fi
+          attempt=$((attempt + 1))
+        done
     - name: Diagnostic information
       run: |
         echo "=== Environment Diagnostics ==="

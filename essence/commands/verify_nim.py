@@ -61,7 +61,8 @@ def check_http_health(
 
     try:
         with httpx.Client(timeout=timeout) as client:
-            response = client.get(f"{base_url}/health")
+            # NIM services use /v1/health/ready endpoint (OpenAI-compatible API)
+            response = client.get(f"{base_url}/v1/health/ready")
             details["status_code"] = response.status_code
             details["response"] = response.text if response.status_code == 200 else None
             details["accessible"] = response.status_code == 200
@@ -69,7 +70,7 @@ def check_http_health(
             if response.status_code == 200:
                 return (
                     True,
-                    f"HTTP health endpoint accessible at {base_url}/health",
+                    f"HTTP health endpoint accessible at {base_url}/v1/health/ready",
                     details,
                 )
             else:
@@ -79,11 +80,11 @@ def check_http_health(
                     details,
                 )
     except httpx.TimeoutException:
-        return False, f"HTTP health endpoint timeout at {base_url}/health", details
+        return False, f"HTTP health endpoint timeout at {base_url}/v1/health/ready", details
     except httpx.ConnectError:
         return (
             False,
-            f"HTTP health endpoint not reachable at {base_url}/health",
+            f"HTTP health endpoint not reachable at {base_url}/v1/health/ready",
             details,
         )
     except Exception as e:
@@ -295,8 +296,8 @@ class VerifyNIMCommand(Command):
         parser.add_argument(
             "--http-port",
             type=int,
-            default=int(os.getenv("NIM_HTTP_PORT", "8003")),
-            help="NIM HTTP port (default: 8003)",
+            default=int(os.getenv("NIM_HTTP_PORT", "8000")),
+            help="NIM HTTP port (default: 8000, internal port; use 8003 for exposed port)",
         )
         parser.add_argument(
             "--grpc-port",

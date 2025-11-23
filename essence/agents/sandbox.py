@@ -162,7 +162,9 @@ class Sandbox:
         )
         self.command_logs: List[CommandLog] = []
         self.container: Optional[docker.models.containers.Container] = None
-        self.container_name = f"june-sandbox-{task_id}"
+        # Sanitize task_id for Docker container name (only [a-zA-Z0-9][a-zA-Z0-9_.-] allowed)
+        sanitized_task_id = task_id.replace("/", "_").replace(" ", "_")
+        self.container_name = f"june-sandbox-{sanitized_task_id}"
 
         # Coding agent (will be initialized in container)
         self.coding_agent: Optional[CodingAgent] = None
@@ -186,20 +188,40 @@ class Sandbox:
                 pass
 
             # Create container
-            self.container = self.docker_client.containers.create(
-                image=self.base_image,
-                name=self.container_name,
-                volumes={str(self.workspace_dir): {"bind": "/workspace", "mode": "rw"}},
-                working_dir="/workspace",
-                mem_limit=self.max_memory,
-                cpu_quota=int(float(self.max_cpu) * 100000),  # Convert to microseconds
-                cpu_period=100000,
-                network_disabled=self.network_disabled,
-                detach=True,
-                tty=True,
-                stdin_open=True,
-                command="tail -f /dev/null",  # Keep container running
-            )
+            # If network is enabled, connect to shared-network so sandboxes can access LLM services
+            network_config = None
+            if not self.network_disabled:
+                # Try to connect to shared-network (for accessing LLM services like nim-qwen3)
+                try:
+                    # Check if shared-network exists
+                    networks = self.docker_client.networks.list(names=["shared_network"])
+                    if networks:
+                        network_config = networks[0].id
+                        logger.info(f"Connecting sandbox to shared-network for LLM access")
+                except Exception as e:
+                    logger.warning(f"Could not connect to shared-network: {e}. Sandbox will use default network.")
+            
+            container_kwargs = {
+                "image": self.base_image,
+                "name": self.container_name,
+                "volumes": {str(self.workspace_dir): {"bind": "/workspace", "mode": "rw"}},
+                "working_dir": "/workspace",
+                "mem_limit": self.max_memory,
+                "cpu_quota": int(float(self.max_cpu) * 100000),  # Convert to microseconds
+                "cpu_period": 100000,
+                "network_disabled": self.network_disabled,
+                "detach": True,
+                "tty": True,
+                "stdin_open": True,
+                "command": "tail -f /dev/null",  # Keep container running
+            }
+            
+            # Add network configuration if network is enabled and shared-network is available
+            if network_config:
+                container_kwargs["network"] = network_config
+                container_kwargs["network_disabled"] = False  # Override network_disabled when using custom network
+            
+            self.container = self.docker_client.containers.create(**container_kwargs)
 
             logger.info(f"Created container {self.container_name}")
         except DockerException as e:

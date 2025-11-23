@@ -45,13 +45,16 @@ class GrpcConnectionPool:
         self.max_connections = max_connections_per_service
 
         # Connection pools: service_name -> list of channels
+        # Store event loop ID with each channel to prevent cross-loop reuse
         self._pools: Dict[str, list] = {"stt": [], "tts": [], "llm": []}
-
-        # Semaphores to limit concurrent connections
-        self._semaphores: Dict[str, asyncio.Semaphore] = {
-            "stt": asyncio.Semaphore(max_connections_per_service),
-            "tts": asyncio.Semaphore(max_connections_per_service),
-            "llm": asyncio.Semaphore(max_connections_per_service),
+        
+        # Don't create semaphores here - they're event loop bound
+        # Create them lazily in _get_semaphore() method
+        self._max_connections = max_connections_per_service
+        self._semaphores: Dict[str, Optional[asyncio.Semaphore]] = {
+            "stt": None,
+            "tts": None,
+            "llm": None,
         }
 
         # gRPC channel options for connection pooling and keepalive
@@ -78,6 +81,29 @@ class GrpcConnectionPool:
 
         self._shutdown = False
 
+    def _get_semaphore(self, service_name: str) -> asyncio.Semaphore:
+        """Get or create semaphore for service in current event loop.
+        
+        Semaphores are event loop bound, so we create them lazily to ensure
+        they're created in the current event loop context.
+        """
+        # Check if semaphore exists
+        if self._semaphores[service_name] is None:
+            self._semaphores[service_name] = asyncio.Semaphore(self._max_connections)
+        else:
+            # Verify semaphore is for current loop (recreate if needed)
+            try:
+                # Try to check if semaphore is valid for current loop
+                # If it doesn't have expected attributes, recreate it
+                if not hasattr(self._semaphores[service_name], '_value'):
+                    # Semaphore seems invalid, create new one
+                    self._semaphores[service_name] = asyncio.Semaphore(self._max_connections)
+            except (RuntimeError, AttributeError):
+                # Semaphore is from different loop or invalid, create new one
+                self._semaphores[service_name] = asyncio.Semaphore(self._max_connections)
+        
+        return self._semaphores[service_name]
+
     @asynccontextmanager
     async def get_stt_channel(self):
         """Get STT service channel from pool."""
@@ -101,36 +127,26 @@ class GrpcConnectionPool:
         """Get channel from pool or create new one.
 
         Uses semaphore to limit concurrent connections and reuses channels when possible.
+        Ensures channels are created in the current event loop to avoid cross-loop issues.
         """
         if self._shutdown:
             raise RuntimeError("Connection pool is shut down")
 
+        # Get semaphore for current event loop
+        semaphore = self._get_semaphore(service_name)
+        
         # Acquire semaphore to limit concurrent connections
-        async with self._semaphores[service_name]:
+        async with semaphore:
             # Try to reuse existing channel from pool
-            if self._pools[service_name]:
+            # Filter out channels that might be from different event loops
+            valid_channels = []
+            while self._pools[service_name]:
                 channel = self._pools[service_name].pop()
                 # Check if channel is still ready
                 try:
                     state = channel.get_state()
                     if state == grpc.ChannelConnectivity.READY:
-                        try:
-                            yield channel
-                            # Return channel to pool if still ready
-                            if channel.get_state() == grpc.ChannelConnectivity.READY:
-                                self._pools[service_name].append(channel)
-                            else:
-                                # Channel is not ready, close it
-                                await channel.close()
-                        except Exception as e:
-                            logger.warning(
-                                f"Error using pooled {service_name} channel: {e}"
-                            )
-                            try:
-                                await channel.close()
-                            except Exception:
-                                pass
-                        return
+                        valid_channels.append(channel)
                     else:
                         # Channel not ready, close it
                         try:
@@ -143,8 +159,59 @@ class GrpcConnectionPool:
                         await channel.close()
                     except Exception:
                         pass
+            
+            # Put valid channels back in pool
+            self._pools[service_name] = valid_channels
+            
+            # Try to reuse a valid channel
+            if valid_channels:
+                channel = valid_channels.pop()
+                try:
+                    yield channel
+                    # Return channel to pool if still ready
+                    if channel.get_state() == grpc.ChannelConnectivity.READY:
+                        if len(self._pools[service_name]) < self.max_connections:
+                            self._pools[service_name].append(channel)
+                        else:
+                            # Pool is full, close the channel
+                            await channel.close()
+                    else:
+                        # Channel is not ready, close it
+                        await channel.close()
+                except RuntimeError as e:
+                    # Catch "attached to a different loop" error
+                    if "different loop" in str(e) or "attached to a different" in str(e):
+                        logger.warning(
+                            f"Channel {service_name} from different event loop, creating new one: {e}"
+                        )
+                        try:
+                            await channel.close()
+                        except Exception:
+                            pass
+                        # Fall through to create new channel
+                    else:
+                        logger.warning(
+                            f"Error using pooled {service_name} channel: {e}"
+                        )
+                        try:
+                            await channel.close()
+                        except Exception:
+                            pass
+                        raise
+                except Exception as e:
+                    logger.warning(
+                        f"Error using pooled {service_name} channel: {e}"
+                    )
+                    try:
+                        await channel.close()
+                    except Exception:
+                        pass
+                    # Don't raise - try creating new channel instead
+                else:
+                    # Successfully used channel, return early
+                    return
 
-            # Create new channel
+            # Create new channel in current event loop
             channel = grpc.aio.insecure_channel(address, options=self._channel_options)
             try:
                 # Wait for channel to be ready (with timeout)
@@ -205,7 +272,7 @@ def get_grpc_pool() -> GrpcConnectionPool:
     if _pool is None:
         import os
 
-        from dependencies.config import (
+        from essence.services.telegram.dependencies.config import (
             get_llm_address,
             get_stt_address,
             get_tts_address,

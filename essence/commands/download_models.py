@@ -21,11 +21,15 @@ try:
     import requests
     import whisper
     from huggingface_hub import hf_hub_download, snapshot_download
-    from TTS.api import TTS
+    # Don't import TTS at module level - it causes scipy/numpy compatibility issues
+    # during command discovery. Import it lazily in download_tts_model() instead.
+    # from TTS.api import TTS
 
     DEPENDENCIES_AVAILABLE = True
+    TTS_AVAILABLE = False  # Will be set to True if TTS can be imported when needed
 except ImportError as e:
     DEPENDENCIES_AVAILABLE = False
+    TTS_AVAILABLE = False
     IMPORT_ERROR = str(e)
 
 from essence.command import Command
@@ -225,6 +229,15 @@ class ModelDownloader:
     def download_tts_model(self, model_name: str) -> bool:
         """Download a TTS model."""
         try:
+            # Lazy import TTS to avoid scipy/numpy compatibility issues during command discovery
+            # This allows the TTS service to start even if TTS package has dependency issues
+            try:
+                from TTS.api import TTS
+            except ImportError as e:
+                logger.error(f"TTS package not available: {e}")
+                logger.error("TTS package may have scipy/numpy compatibility issues. Check Dockerfile for correct versions.")
+                return False
+
             logger.info(f"Downloading TTS model: {model_name}")
 
             # Set TTS cache directory

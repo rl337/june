@@ -29,6 +29,12 @@ RUN pip install -e /tmp/june-grpc-api && \
 # Copy service code
 COPY services/stt .
 
+# Copy VERSION file and set version label
+ARG SERVICE_VERSION=1.0.0
+COPY services/stt/VERSION /app/VERSION
+LABEL org.opencontainers.image.version="${SERVICE_VERSION}"
+LABEL june.service.version="${SERVICE_VERSION}"
+
 # Ensure permissions
 USER root
 RUN chown -R june:june /app
@@ -43,7 +49,9 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
 
 # Run the STT service via essence command system
 ENV STT_MODEL_NAME=base.en
-ENV STT_DEVICE=cpu
+# Use GPU for Whisper model (cuda) - CRITICAL: Never use CPU for large models
+# If GPU not available, service will fail (preferred over CPU memory exhaustion)
+ENV STT_DEVICE=cuda
 CMD ["poetry", "run", "python", "-m", "essence", "stt"]
 
 

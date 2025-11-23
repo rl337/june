@@ -3,10 +3,9 @@
 # Refactor Agent Loop Script
 # 
 # This script runs cursor-agent in a continuous loop, instructing it to:
-# 1. Read REFACTOR_PLAN.md
-# 2. Pick an unfinished task to work on
-# 3. Perform the task
-# 4. Update REFACTOR_PLAN.md with progress and discoveries
+# 1. Check todorama for available tasks (prioritizing human_interface tasks from Telegram/Discord)
+# 2. Reserve and work on tasks from todorama
+# 3. Update task status in todorama and send responses for human_interface tasks
 #
 # Usage:
 #   ./scripts/refactor_agent_loop.sh
@@ -21,6 +20,7 @@
 # The script also runs periodic polling for user responses in the background:
 # - Polls for user responses to agent messages (default: every 2 minutes)
 # - Checks for pending user requests from USER_REQUESTS.md
+# - Processes NEW messages from USER_MESSAGES.md (Phase 21)
 # - Polling interval can be configured via USER_POLLING_INTERVAL_SECONDS environment variable
 # - Polling can be disabled by setting ENABLE_USER_POLLING=0
 
@@ -29,7 +29,7 @@ set -euo pipefail
 # Get the script directory and project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-REFACTOR_PLAN="$PROJECT_ROOT/REFACTOR_PLAN.md"
+# REFACTOR_PLAN.md is no longer used - all tasks are in todorama
 
 # Change to project root
 cd "$PROJECT_ROOT"
@@ -144,6 +144,14 @@ poll_user_responses() {
         else
             log_file_only "Pending requests check encountered an error (non-fatal, will retry)"
         fi
+        
+        # Process NEW messages from USER_MESSAGES.md (Phase 21)
+        log_file_only "Processing NEW messages from USER_MESSAGES.md..."
+        if cd "$PROJECT_ROOT" && poetry run python -m essence process-user-messages >> "$LOG_FILE" 2>&1; then
+            log_file_only "User messages processing completed"
+        else
+            log_file_only "User messages processing encountered an error (non-fatal, will retry)"
+        fi
     done
     
     log "User response polling stopped"
@@ -227,13 +235,14 @@ create_prompt() {
     cat << 'PROMPT_EOF'
 You are working on refactoring the june project. Your task is to:
 
-1. **Check MCP todorama for available tasks FIRST** - Before reading REFACTOR_PLAN.md:
-   - Use MCP todorama service to query available tasks: `cursor-agent mcp call todorama list_available_tasks --agent_type refactor --project_id 1 --limit 10`
-   - If tasks are available, reserve one and work on it (see MCP workflow below)
-   - If no tasks available, proceed to step 2
+1. **Check MCP todorama for available tasks** - Query for tasks to work on:
+   - Use MCP todorama tool to query available tasks: `list_available_tasks` with agent_type="implementation", project_id=1, limit=10
+   - **PRIORITY:** Human interaction tasks should be handled first - these are user messages from Telegram/Discord
+   - Identify human_interface tasks by: title starting with "User Interaction:" OR notes containing interaction metadata
+   - If tasks are available, reserve one using `reserve_task` with task_id and agent_id="looping_agent"
+   - If no tasks available, you're done for this iteration
    - **CRITICAL:** Always reserve tasks before working on them, and always complete or unlock them when done
-
-2. **Read REFACTOR_PLAN.md** - If no MCP tasks available, read the refactoring plan to understand the current state and identify TODO items.
+   - **CRITICAL:** User interactions from Telegram/Discord are automatically created as todorama tasks (identified by title pattern "User Interaction:" or metadata) - no file queue processing needed
 
 **Working on Related Projects:**
 - You CAN and SHOULD work on the `home_infra` project at `/home/rlee/dev/home_infra` when tasks require it
@@ -254,23 +263,19 @@ You are working on refactoring the june project. Your task is to:
    - Only proceed to pick a new task if there are no active failures
    - **If you fix a CI issue, create a task in todorama to track it:** Use MCP to create a task documenting what was fixed
 
-4. **Pick an unfinished task** - If no GitHub Actions failures and no MCP tasks:
-   - **🚨 IMMEDIATE PRIORITY:** Phase 19 Operational Deployment Tasks (see REFACTOR_PLAN.md):
-     - Deploy NIMs for inference (TTS, STT, agent efforts) - hardware is designed for this
-     - Configure Telegram/Discord whitelist for direct agent-user communication
-     - Start services with whitelist enabled
-     - These are operational tasks (starting services, setting env vars), not code changes - code is already complete
-   - **HIGH PRIORITY:** Check Phase 19 (Direct Agent-User Communication) in REFACTOR_PLAN.md - operational deployment tasks
-   - Look for tasks marked with ⏳ TODO in the REFACTOR_PLAN.md
-   - **For operational tasks that are blocked**, create MCP tasks in todorama to track them:
-     - Example: "Phase 15 Task 4: Compile Qwen3 model" → Create task in todorama with details
-     - Example: "Phase 16: End-to-end testing" → Create task in todorama with subtasks
-   - Choose a task that:
-   - Is clearly defined and actionable
-   - You have enough context to complete
-   - Will make meaningful progress toward the refactoring goals
-   - Is appropriate for a single iteration (not too large)
-   - **Priority order:** Phase 19 > Phase 15 > Phase 16 > Phase 18 > Other tasks
+4. **Work on reserved task** - If you have a reserved task from todorama:
+   - Read the task details carefully
+   - Follow the task instructions
+   - Add progress updates using `add_task_update` with task_id, agent_id="looping_agent", content, and update_type="progress"
+   - If you encounter blockers, add a blocker update and unlock the task using `unlock_task`
+   - When complete, mark the task as complete using `complete_task` with task_id, agent_id="looping_agent", and notes
+   - **If the task is a human_interface task (user interaction - identified by title "User Interaction:" or metadata.interaction_type="human_interface"):**
+     - The task description contains the user's message and context (user_id, chat_id, platform, message_id)
+     - Extract user_id, chat_id, and platform from the task description or metadata
+     - Process the user's request and generate an appropriate response
+     - Send the response to the user via Telegram/Discord using the Message API
+     - Update the task with your response before completing it
+     - **Note:** Task creation and completion automatically trigger notifications to the user, so you don't need to send separate status messages
 
 5. **Perform the task** - Complete the selected task. This may involve:
    - Removing code dependencies on removed services
@@ -284,38 +289,54 @@ You are working on refactoring the june project. Your task is to:
    - Any other task from the plan
 
 6. **Update task status in MCP todorama** - After completing the task:
-   - If you worked on an MCP task, mark it complete: `cursor-agent mcp call todorama complete_task --task_id <id> --agent_id refactor --notes "Completed: <summary>"`
-   - Add task updates during work: `cursor-agent mcp call todorama add_task_update --task_id <id> --agent_id refactor --content "<progress>" --update_type progress`
-   - If you encountered errors, unlock the task: `cursor-agent mcp call todorama unlock_task --task_id <id> --agent_id refactor`
+   - If you worked on an MCP task, mark it complete using the `complete_task` tool: `complete_task(task_id=<id>, agent_id="looping_agent", notes="Completed: <summary>")`
+   - Add task updates during work using the `add_task_update` tool: `add_task_update(task_id=<id>, agent_id="looping_agent", content="<progress>", update_type="progress")`
+   - If you encountered errors, unlock the task using the `unlock_task` tool: `unlock_task(task_id=<id>, agent_id="looping_agent")`
 
 7. **Store learnings in MCP bucketofacts** - After completing significant work:
-   - Store important decisions: `cursor-agent mcp call bucketofacts create_fact --subject "june" --predicate "uses" --object "TensorRT-LLM for LLM inference"`
-   - Store code patterns: `cursor-agent mcp call bucketofacts create_fact --subject "june" --predicate "pattern" --object "All services use gRPC for inter-service communication"`
-   - Query before making decisions: `cursor-agent mcp call bucketofacts query_facts --subject "june"` to see what's been learned
+   - Store important decisions using the `bucketofacts-create_fact` tool: `bucketofacts-create_fact(subject="june", predicate="uses", object="TensorRT-LLM for LLM inference")`
+   - Store code patterns: `bucketofacts-create_fact(subject="june", predicate="pattern", object="All services use gRPC for inter-service communication")`
+   - Query before making decisions using the `bucketofacts-query_facts` tool: `bucketofacts-query_facts(subject="june", limit=10)` to see what's been learned
+   - Use semantic search: `bucketofacts-semantic_search(query="<question>", limit=5)` to find related knowledge
 
-8. **Update REFACTOR_PLAN.md** - After completing the task:
-   - Mark the completed task(s) as ✅ COMPLETED
-   - Add a brief summary of what was done
-   - If you discovered new tasks or issues, add them to the appropriate section with ⏳ TODO
-   - If you found that a task needs to be broken down further, update the plan accordingly
-   - Document any important discoveries or decisions made
+8. **Create new tasks in todorama** - If during your work you discover:
+   - New tasks that need to be done → Create tasks using the `create_task` tool: `create_task(title="<title>", task_type="concrete", task_instruction="<what to do>", verification_instruction="<how to verify>", agent_id="looping_agent", project_id=1, notes="<optional notes>")`
+   - **CRITICAL:** The `create_task` tool requires `task_instruction` and `verification_instruction` (NOT `description`)
+   - **CRITICAL:** Task type must be one of: `concrete`, `abstract`, or `epic` (use `concrete` for most tasks)
+   - Issues or blockers → Create blocker tasks or add updates to existing tasks
+   - Better approaches or alternatives → Document in task updates or create new tasks
+   - Dependencies between tasks → Link tasks using parent_task_id and relationship_type
+   - **CRITICAL:** All task management happens in todorama, not in files
 
-9. **Document discoveries** - If during your work you discover:
-   - New tasks that need to be done
-   - Issues or blockers
-   - Better approaches or alternatives
-   - Dependencies between tasks
-   Add these to REFACTOR_PLAN.md in the appropriate section so the next iteration can understand and act on them.
+9. **Documentation Strategy (CRITICAL):**
+   - **DO NOT create new markdown files** (except README.md and AGENTS.md which should remain)
+   - **All documentation goes in docomatic** - API docs, guides, architecture, setup instructions, troubleshooting, etc.
+   - Before creating any documentation, search docomatic: `docomatic-search_sections(query="<topic>", limit=10)`
+   - If documentation exists, update it: `docomatic-update_section(section_id="<id>", heading="<heading>", body="<updated content>")`
+   - If new documentation is needed, create in docomatic: `docomatic-create_document(title="<title>", initial_sections=[{"heading": "<heading>", "body": "<content>"}])`
+   - Link documentation to related tasks: `docomatic-link_document(document_id="<id>", link_type="task", link_target="task-<id>")`
+   - **Examples of what should be in docomatic:**
+     - API documentation (replaces docs/API/*.md)
+     - Architecture documentation (replaces docs/architecture/*.md)
+     - Setup guides (replaces QWEN3_SETUP_PLAN.md, etc.)
+     - Troubleshooting guides
+     - Development guides
+     - Operational guides
+   - **Why docomatic:**
+     - Searchable by agents and humans
+     - Can be linked to tasks and other resources
+     - Versioned and structured
+     - Can be exported to GitHub when needed
+     - Better for agent consumption than scattered markdown files
 
 **Agent-to-User Communication:**
-- **CRITICAL:** When you get stuck, need help, or complete significant work, send a message to the user via Telegram
+- **CRITICAL:** For human_interface tasks (identified by title "User Interaction:" or metadata.interaction_type="human_interface"), you MUST send a response message to the user
 - Use the Message API client: `from essence.chat.message_api_client import send_message_via_api`
 - **When to send messages:**
-  - When you get stuck on a task and need clarification
-  - When you complete a significant task or milestone
-  - When you encounter blockers that prevent progress
-  - When you need user input or direction
-  - When you finish all available tasks and have nothing to do
+  - **ALWAYS** when completing a human_interface task - send the response to the user
+  - Extract user_id, chat_id, and platform from the task description or metadata
+  - **DO NOT send status messages** for other task types - task creation/completion notifications are automatic
+  - If no human_interface tasks were completed, do NOT send a message
 - **How to send:**
   ```python
   from essence.chat.message_api_client import send_message_via_api
@@ -351,18 +372,22 @@ You are working on refactoring the june project. Your task is to:
     - For long-running scripts: `nohup python script.py > script.log 2>&1 &`
     - Check background job status: `ps aux | grep <command>` or check log files (e.g., `tail -f output.log`)
     - Check if a process is still running: `pgrep -f "<command_pattern>"` or `ps aux | grep <pattern>`
-    - **Important:** Document in REFACTOR_PLAN.md that a long operation is running in background, including:
+    - **Important:** Add a task update in todorama documenting that a long operation is running in background, including:
       - The command that was started
       - The log file where output is being written
       - How to check if it completed (e.g., "check build.log for completion" or "check if docker compose build process is still running")
     - In the next iteration, check if the background operation completed before proceeding with dependent tasks
 - Work on ONE task per iteration (don't try to do everything at once)
 - Be thorough but focused
-- Update the plan immediately after completing work
-- If you encounter blockers, document them in the plan
-- If a task is too large, break it down and update the plan
+- Update task status in todorama immediately after completing work
+- If you encounter blockers, add blocker updates to the task in todorama
+- If a task is too large, break it down into subtasks in todorama
 - Always verify your changes work before marking tasks complete
 - All operations must run as the rlee user on the host. There is no sudo access or running as root.
+  - **CRITICAL:** NEVER use `sudo` - not even in defensive patterns like `sudo cmd || cmd`
+  - If you encounter permission errors, check file/directory ownership and permissions first
+  - Create directories/files only in locations owned by the rlee user (e.g., `/var/data/june/*`, `/home/rlee/*`)
+  - For Docker volume mounts, ensure host directories exist with proper permissions (775 or 755) before mounting
 - **Container-first:** For Phase 10 tasks (Qwen3 setup), all model operations must happen in Docker containers - use `docker compose run` or `docker compose exec` for all model-related work
 - **Sandbox isolation:** For benchmark tasks (Phase 10.5), ensure each task runs in an isolated sandbox (container/chroot) with full activity logging and reviewability
 - **Efficiency evaluation:** When working on benchmarks, capture not just correctness but also efficiency metrics (commands executed, time to solution, resource usage)
@@ -377,47 +402,64 @@ You are working on refactoring the june project. Your task is to:
 **MCP Services Workflow (REQUIRED):**
 
 **Step 1: Check for available tasks in todorama FIRST**
-- Query available tasks: `cursor-agent mcp call todorama list_available_tasks --agent_type refactor --project_id 1 --limit 10`
-- If tasks found, reserve one: `cursor-agent mcp call todorama reserve_task --task_id <id> --agent_id refactor`
+- Query available tasks using the `list_available_tasks` tool: `list_available_tasks(agent_type="implementation", project_id=1, limit=10)`
+- If tasks found, reserve one using the `reserve_task` tool: `reserve_task(task_id=<id>, agent_id="looping_agent")`
 - Work on the reserved task
-- Add progress updates: `cursor-agent mcp call todorama add_task_update --task_id <id> --agent_id refactor --content "<update>" --update_type progress`
-- When done: `cursor-agent mcp call todorama complete_task --task_id <id> --agent_id refactor --notes "<summary>"`
-- On error: `cursor-agent mcp call todorama unlock_task --task_id <id> --agent_id refactor` (always unlock on errors)
+- Add progress updates using the `add_task_update` tool: `add_task_update(task_id=<id>, agent_id="looping_agent", content="<update>", update_type="progress")`
+- When done, use the `complete_task` tool: `complete_task(task_id=<id>, agent_id="looping_agent", notes="<summary>")`
+- On error, use the `unlock_task` tool: `unlock_task(task_id=<id>, agent_id="looping_agent")` (always unlock on errors)
 
 **Step 2: Create tasks for operational work**
-- When you encounter operational tasks (e.g., "compile model", "run end-to-end test"), create tasks in todorama:
-  - `cursor-agent mcp call todorama create_task --project_id 1 --title "<task>" --description "<details>" --agent_type refactor`
+- When you encounter operational tasks (e.g., "compile model", "run end-to-end test"), create tasks using the `create_task` tool:
+  - `create_task(title="<task>", task_type="concrete", task_instruction="<what to do>", verification_instruction="<how to verify>", agent_id="looping_agent", project_id=1, notes="<optional details>")`
+- **CRITICAL:** Must use `task_instruction` and `verification_instruction` (NOT `description`)
 - This allows tracking operational work that's blocked on external factors
 
 **Step 3: Store learnings in bucketofacts**
-- After significant work, store decisions: `cursor-agent mcp call bucketofacts create_fact --subject "june" --predicate "<relation>" --object "<value>"`
-- Query before decisions: `cursor-agent mcp call bucketofacts query_facts --subject "june"` to see what's been learned
-- Use semantic search: `cursor-agent mcp call bucketofacts semantic_search --query "<question>" --limit 5`
+- After significant work, store decisions using the `bucketofacts-create_fact` tool: `bucketofacts-create_fact(subject="june", predicate="<relation>", object="<value>")`
+- Query before decisions using the `bucketofacts-query_facts` tool: `bucketofacts-query_facts(subject="june", limit=10)` to see what's been learned
+- Use semantic search: `bucketofacts-semantic_search(query="<question>", limit=5)` to find related knowledge
 
-**Step 4: Document in docomatic (optional)**
-- For major architectural decisions: `cursor-agent mcp call docomatic create_document --title "<title>" --content "<content>"`
-- Search existing docs: `cursor-agent mcp call docomatic search_sections --query "<topic>"`
+**Step 4: Document in docomatic (REQUIRED for all documentation)**
+- **CRITICAL:** All documentation should be in docomatic, NOT in markdown files
+- **ONLY exceptions:** README.md and AGENTS.md should remain in the repo
+- **DO NOT create new .md files** - use docomatic instead
+- For architectural decisions, API docs, guides, troubleshooting, etc., use `docomatic-create_document`:
+  - `docomatic-create_document(title="<title>", initial_sections=[{"heading": "<heading>", "body": "<content>"}])`
+- Add sections to existing documents: `docomatic-create_section(document_id="<id>", heading="<heading>", body="<content>")`
+- Search existing docs: `docomatic-search_sections(query="<topic>", limit=10)`
+- Link documents to tasks: `docomatic-link_document(document_id="<id>", link_type="task", link_target="task-<id>")`
+- List documents: `docomatic-list_documents(title_pattern="<pattern>", limit=20)`
+- **When to use docomatic:**
+  - API documentation (instead of docs/API/*.md)
+  - Architecture docs (instead of docs/architecture/*.md)
+  - Guides (instead of docs/guides/*.md)
+  - Setup instructions (instead of QWEN3_SETUP_PLAN.md, etc.)
+  - Troubleshooting guides
+  - Any other documentation that would help users or agents
 
 **MCP Service Details:**
 - **todorama:** 49 tools for task management (project_id=1 for june project)
 - **bucketofacts:** 17 tools for knowledge storage
-- **docomatic:** 23 tools for documentation
-- **Access:** `cursor-agent mcp call <service> <tool> --<arg> <value>`
+- **docomatic:** 23 tools for documentation (REQUIRED for all documentation except README.md and AGENTS.md)
+- **Access:** MCP tools are available directly when cursor-agent runs. Use tool names with service prefixes:
+  - Todorama: `list_available_tasks`, `create_task`, `reserve_task`, etc. (no prefix)
+  - Bucketofacts: `bucketofacts-create_fact`, `bucketofacts-query_facts`, etc. (with `bucketofacts-` prefix)
+  - Docomatic: `docomatic-create_document`, `docomatic-search_sections`, etc. (with `docomatic-` prefix)
 - **CRITICAL:** Always reserve tasks before working, always complete or unlock them - never leave tasks in_progress
+- **YOUR AGENT ID:** `looping_agent` - Always use this as your agent_id when reserving, updating, or completing tasks
 
 **Current Context:**
 - Project root: /home/rlee/dev/june
-- Refactor plan: REFACTOR_PLAN.md
+- **Your Agent ID:** `looping_agent` - Always use this when reserving, updating, or completing tasks
+- **Task Management:** All tasks are in todorama (project_id=1) - no REFACTOR_PLAN.md task management
+- **Note:** All existing tasks in todorama should be treated as if they were created/assigned to `looping_agent`. When you work on tasks, use agent_id="looping_agent"
 - **Primary Goal:** Pare down june to bare essentials for Telegram/Discord voice round trip
 - **Extended Goal:** Get Qwen3-30B-A3B-Thinking-2507 running on GPU in containers and develop coding agent for benchmark evaluation
 - Services to keep: telegram, discord, stt, tts
 - LLM Inference: TensorRT-LLM (in home_infra/shared-network, default) or NVIDIA NIM (nim-qwen3:8001). Legacy inference-api service available via --profile legacy for backward compatibility only.
 - Services removed: gateway, postgres, minio, redis, nats, orchestrator, webapp
-- **NEW HIGH PRIORITY:** Phase 19 (Direct Agent-User Communication) - see REFACTOR_PLAN.md Phase 19
-  - Establish direct communication with whitelisted users via Telegram/Discord
-  - Sync all messages to USER_REQUESTS.md
-  - Replace agentic flow in services with direct agent communication
-  - Implement message grouping and periodic polling for user responses
+- **User Interactions:** Telegram/Discord services create todorama tasks directly (identified by title "User Interaction:" or metadata.interaction_type="human_interface") - no file queue, tasks appear immediately in todorama
 - **Container-first requirement:** All model operations, downloads, and inference must happen in Docker containers - no host system pollution
 - **Sandbox requirement:** All benchmark executions must run in isolated sandboxes (containers/chroot) with full reviewability
 
@@ -449,7 +491,7 @@ You are working on refactoring the june project. Your task is to:
 - DO NOT leave uncommitted changes - always commit and push your work before moving to the next task
 
 **CRITICAL - DO NOT UPDATE COMMIT COUNTS:**
-- **DO NOT automatically update commit counts in REFACTOR_PLAN.md** - The commit count (e.g., "85 commits ahead of origin/main") is informational only and does not need to be kept in sync
+- **DO NOT automatically update commit counts** - The commit count (e.g., "85 commits ahead of origin/main") is informational only and does not need to be kept in sync
 - **DO NOT create commits solely to update commit counts** - This creates an infinite loop where each commit increments the count, requiring another update
 - Only update commit counts if:
   1. You are explicitly documenting a major milestone or release
@@ -465,10 +507,9 @@ You are working on refactoring the june project. Your task is to:
 5. Other phases from the plan
 
 **Reference Documents:**
-- REFACTOR_PLAN.md - Main refactoring plan with all phases
-- QWEN3_SETUP_PLAN.md - Detailed Qwen3 setup instructions (referenced in Phase 10)
+- QWEN3_SETUP_PLAN.md - Detailed Qwen3 setup instructions
 
-Now, read REFACTOR_PLAN.md and begin working on an unfinished task, prioritizing Phase 10 if applicable.
+Now, check todorama for available tasks to work on. Prioritize human_interface tasks (identified by title "User Interaction:" or metadata.interaction_type="human_interface") - these are user messages from Telegram/Discord.
 PROMPT_EOF
 }
 
@@ -476,19 +517,14 @@ PROMPT_EOF
 main() {
     log "Starting refactor agent loop"
     log "Project root: $PROJECT_ROOT"
-    log "Refactor plan: $REFACTOR_PLAN"
+    log "Task management: todorama (project_id=1)"
+    log "Agent ID: looping_agent"
     log "Log file: $LOG_FILE"
     
     # Check if cursor-agent is available
     check_cursor_agent
     CURSOR_AGENT_CMD=$(get_cursor_agent_cmd)
     log "Using cursor-agent command: $CURSOR_AGENT_CMD"
-    
-    # Check if REFACTOR_PLAN.md exists
-    if [[ ! -f "$REFACTOR_PLAN" ]]; then
-        log "ERROR: REFACTOR_PLAN.md not found at $REFACTOR_PLAN"
-        exit 1
-    fi
     
     # Create the prompt
     PROMPT=$(create_prompt)

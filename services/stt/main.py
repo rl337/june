@@ -12,7 +12,8 @@ from typing import Any, AsyncGenerator, Dict, List, Optional
 
 import grpc
 import librosa
-import nats
+# NATS removed - services communicate via gRPC directly
+# import nats
 import numpy as np
 import soundfile as sf
 import torch
@@ -133,7 +134,8 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
     def __init__(self):
         self.whisper_model = None
         self.vad = None
-        self.nats_client = None
+        # NATS removed - services communicate via gRPC directly
+        # self.nats_client = None
         self.health_checker = HealthChecker()
         self.audio_buffer = CircularBuffer(1000)
         self.device = config.stt.device
@@ -141,7 +143,8 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
 
         # Add health checks
         self.health_checker.add_check("model", self._check_model_health)
-        self.health_checker.add_check("nats", self._check_nats_health)
+        # NATS removed - services communicate via gRPC directly
+        # self.health_checker.add_check("nats", self._check_nats_health)
 
     async def RecognizeStream(
         self,
@@ -670,9 +673,53 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
                 # Extract just the model name part (e.g., "openai/whisper-large-v3" -> "large-v3")
                 model_name = model_name.split("/")[-1].replace("whisper-", "")
             
-            self.whisper_model = whisper.load_model(
-                model_name, device=self.device
-            )
+            # Check CUDA availability and adjust device if needed
+            import torch
+            actual_device = self.device
+            if self.device.startswith("cuda") and not torch.cuda.is_available():
+                logger.warning(
+                    f"CUDA device '{self.device}' requested but CUDA is not available. "
+                    "Falling back to CPU. This may cause performance issues."
+                )
+                actual_device = "cpu"
+            elif self.device.startswith("cuda"):
+                # Verify CUDA device is accessible
+                try:
+                    device_index = int(self.device.split(":")[-1]) if ":" in self.device else 0
+                    if device_index >= torch.cuda.device_count():
+                        logger.warning(
+                            f"CUDA device '{self.device}' not available (only {torch.cuda.device_count()} devices). "
+                            "Falling back to CPU."
+                        )
+                        actual_device = "cpu"
+                except (ValueError, IndexError):
+                    logger.warning(f"Invalid CUDA device format '{self.device}'. Falling back to CPU.")
+                    actual_device = "cpu"
+            
+            logger.info(f"Loading Whisper model on device: {actual_device}")
+            
+            # If falling back to CPU but cached model was saved on CUDA, we need to handle device mapping
+            # Set torch device mapping to handle CUDA->CPU conversion for cached models
+            if actual_device == "cpu" and self.device.startswith("cuda"):
+                import torch
+                # Monkey-patch torch.load to handle CUDA->CPU mapping for cached models
+                original_load = torch.load
+                def load_with_cpu_mapping(*args, **kwargs):
+                    if "map_location" not in kwargs:
+                        kwargs["map_location"] = torch.device("cpu")
+                    return original_load(*args, **kwargs)
+                torch.load = load_with_cpu_mapping
+                try:
+                    self.whisper_model = whisper.load_model(
+                        model_name, device=actual_device
+                    )
+                finally:
+                    # Restore original torch.load
+                    torch.load = original_load
+            else:
+                self.whisper_model = whisper.load_model(
+                    model_name, device=actual_device
+                )
 
             # Initialize VAD if enabled
             if config.stt.enable_vad:
@@ -683,27 +730,24 @@ class STTService(asr_pb2_grpc.SpeechToTextServicer):
 
     async def _connect_services(self):
         """Connect to external services."""
-        try:
-            # Connect to NATS
-            self.nats_client = await nats.connect(config.nats.url)
-            logger.info("Connected to NATS")
-
-        except Exception as e:
-            logger.error(f"Failed to connect to services: {e}")
-            raise
+        # NATS removed - services communicate via gRPC directly
+        # No external service connections needed
+        logger.info("STT service ready (no external service connections required)")
 
     async def _check_model_health(self) -> bool:
         """Check if Whisper model is loaded and ready."""
         return self.whisper_model is not None
 
-    async def _check_nats_health(self) -> bool:
-        """Check NATS connection health."""
-        return self.nats_client is not None and self.nats_client.is_connected
+    # NATS removed - services communicate via gRPC directly
+    # async def _check_nats_health(self) -> bool:
+    #     """Check NATS connection health."""
+    #     return self.nats_client is not None and self.nats_client.is_connected
 
     async def disconnect_services(self):
         """Disconnect from external services."""
-        if self.nats_client:
-            await self.nats_client.close()
+        # NATS removed - services communicate via gRPC directly
+        # No cleanup needed
+        pass
 
 
 # Global service instance

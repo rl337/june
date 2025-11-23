@@ -108,7 +108,13 @@ class MessageHistoryResponse(BaseModel):
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "healthy", "service": SERVICE_NAME}
+    from essence.utils.version import get_service_version
+    
+    return {
+        "status": "healthy",
+        "service": SERVICE_NAME,
+        "version": get_service_version("message-api"),
+    }
 
 
 @app.get("/messages", response_model=MessageHistoryResponse)

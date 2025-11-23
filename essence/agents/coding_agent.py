@@ -4,12 +4,15 @@ Coding Agent Interface
 Provides an interface for sending coding tasks to the Qwen3 model via inference API.
 Handles tool calling, code execution, file operations, and multi-turn conversations.
 All operations run in containers - no host system pollution.
+
+Supports both gRPC (TensorRT-LLM, legacy inference-api) and HTTP (NVIDIA NIM) protocols.
 """
 import json
 import logging
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional
+from urllib.parse import urlparse
 
 import grpc
 from june_grpc_api import llm_pb2_grpc
@@ -17,12 +20,14 @@ from june_grpc_api.llm_pb2 import (
     ChatMessage,
     ChatRequest,
     Context,
+    FunctionCall,
     GenerationParameters,
     ToolCall,
     ToolDefinition,
 )
 from opentelemetry import trace
 
+from essence.agents.llm_client import LLMClient
 from essence.chat.utils.tracing import get_tracer
 
 logger = logging.getLogger(__name__)
@@ -48,9 +53,9 @@ class CodingAgent:
         Initialize the coding agent.
 
         Args:
-            llm_url: gRPC endpoint for LLM inference service (default: "tensorrt-llm:8000" for TensorRT-LLM).
-                    Can use "localhost:50051" for local testing, "inference-api:50051" for legacy service,
-                    or "nim-qwen3:8001" for NVIDIA NIM.
+            llm_url: LLM endpoint URL. Supports:
+                    - gRPC: "tensorrt-llm:8000" (default), "inference-api:50051", "grpc://nim-qwen3:8001"
+                    - HTTP: "http://nim-qwen3:8000" (NVIDIA NIM OpenAI-compatible API)
             model_name: Name of the model to use
             max_context_length: Maximum context length for the model
             temperature: Sampling temperature
@@ -62,9 +67,25 @@ class CodingAgent:
         self.temperature = temperature
         self.max_tokens = max_tokens
 
+        # Detect protocol from URL
+        if "://" in llm_url:
+            parsed = urlparse(llm_url)
+            self._protocol = parsed.scheme
+        elif "nim" in llm_url.lower() and (":8000" in llm_url or ":8003" in llm_url):
+            self._protocol = "http"
+        else:
+            self._protocol = "grpc"
+
+        # gRPC connection (for TensorRT-LLM, legacy inference-api)
         self._channel: Optional[grpc.Channel] = None
         self._stub: Optional[llm_pb2_grpc.LLMInferenceStub] = None
+        
+        # HTTP client (for NVIDIA NIM)
+        self._llm_client: Optional[LLMClient] = None
+        
         self._conversation_history: List[ChatMessage] = []
+        # For HTTP/NIM: Store OpenAI-format messages for better context
+        self._openai_messages: List[Dict[str, Any]] = []
         self._workspace_dir: Optional[Path] = None
         self._available_tools: List[ToolDefinition] = []
 
@@ -72,11 +93,26 @@ class CodingAgent:
         self._initialize_tools()
 
     def _ensure_connection(self) -> None:
-        """Ensure gRPC connection to LLM inference service is established."""
-        if self._channel is None or self._stub is None:
-            self._channel = grpc.insecure_channel(self.llm_url)
-            self._stub = llm_pb2_grpc.LLMInferenceStub(self._channel)
-            logger.info(f"Connected to LLM inference service at {self.llm_url}")
+        """Ensure connection to LLM inference service is established (gRPC or HTTP)."""
+        if self._protocol == "http":
+            # HTTP/NIM: Use LLMClient
+            if self._llm_client is None:
+                self._llm_client = LLMClient(
+                    llm_url=self.llm_url,
+                    model_name=self.model_name,
+                    max_context_length=self.max_context_length,
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens,
+                )
+                logger.info(f"Initialized HTTP client for LLM service at {self.llm_url}")
+        else:
+            # gRPC: Use direct gRPC connection
+            if self._channel is None or self._stub is None:
+                # Strip grpc:// prefix if present
+                grpc_url = self.llm_url.replace("grpc://", "")
+                self._channel = grpc.insecure_channel(grpc_url)
+                self._stub = llm_pb2_grpc.LLMInferenceStub(self._channel)
+                logger.info(f"Connected to gRPC LLM inference service at {grpc_url}")
 
     def _create_chat_message(self, role: str, content: str) -> ChatMessage:
         """Create a ChatMessage protobuf object."""
@@ -114,96 +150,196 @@ class CodingAgent:
 
                 # Build system message with coding context
                 system_message = self._build_system_message(context)
-                if system_message:
-                    # Add system message if conversation is empty
-                    if not self._conversation_history:
-                        self._conversation_history.append(
-                            self._create_chat_message("system", system_message)
-                        )
-
-                # Add user message
-                user_message = self._create_chat_message("user", task_description)
-                self._conversation_history.append(user_message)
-
-                span.set_attribute(
-                    "conversation_length", len(self._conversation_history)
-                )
-
-                # Create chat request with tools enabled
-                chat_context = Context(
-                    enable_tools=True,
-                    available_tools=self._available_tools,
-                    max_context_tokens=self.max_context_length,
-                )
-
-                request = ChatRequest(
-                    messages=self._conversation_history,
-                    params=GenerationParameters(
-                        temperature=self.temperature,
-                        max_tokens=self.max_tokens,
-                        top_p=0.9,
-                    ),
-                    context=chat_context,
-                    stream=True,
-                )
-
-                # Stream response from model and handle tool calls
-                chunk_count = 0
-                full_response = ""
-                tool_calls: List[ToolCall] = []
-
-                with tracer.start_as_current_span(
-                    "coding_agent.stream_response"
-                ) as stream_span:
-                    for chunk in self._stub.ChatStream(request):
-                        if chunk.chunk.role == "assistant":
-                            content = chunk.chunk.content
-                            if content:
-                                chunk_count += 1
-                                full_response += content
-                                stream_span.set_attribute("chunk_count", chunk_count)
-                                yield content
-
-                            # Collect tool calls
-                            if chunk.chunk.tool_calls:
-                                tool_calls.extend(chunk.chunk.tool_calls)
-                                stream_span.set_attribute(
-                                    "tool_calls_count", len(tool_calls)
+                
+                # Handle HTTP/NIM vs gRPC differently
+                if self._protocol == "http":
+                    # HTTP/NIM: Use LLMClient with OpenAI-compatible function calling
+                    # Convert tools to OpenAI format
+                    openai_tools = self._convert_tools_to_openai_format()
+                    
+                    # Build OpenAI-format messages from conversation history
+                    openai_messages = self._build_openai_messages(system_message, task_description)
+                    
+                    # Generate using LLMClient with messages format (better OpenAI compatibility)
+                    full_response = ""
+                    chunk_count = 0
+                    function_calls_data: List[Dict[str, Any]] = []
+                    
+                    with tracer.start_as_current_span(
+                        "coding_agent.stream_response_http"
+                    ) as stream_span:
+                        # Use generate_from_messages for proper OpenAI message format
+                        for chunk in self._llm_client.generate_from_messages(
+                            messages=openai_messages,
+                            temperature=self.temperature,
+                            max_tokens=self.max_tokens,
+                            stream=True,
+                            tools=openai_tools if openai_tools else None,
+                        ):
+                            # Check if chunk contains function call marker
+                            if chunk.startswith("\n[FUNCTION_CALLS:"):
+                                # Extract function calls from marker
+                                try:
+                                    func_calls_str = chunk[len("\n[FUNCTION_CALLS:"):].rstrip("]")
+                                    function_calls_data = json.loads(func_calls_str)
+                                    stream_span.set_attribute("function_calls_detected", True)
+                                    stream_span.set_attribute("function_calls_count", len(function_calls_data))
+                                except (json.JSONDecodeError, ValueError) as e:
+                                    logger.warning(f"Failed to parse function calls from chunk: {e}")
+                                continue  # Don't yield function call markers
+                            
+                            chunk_count += 1
+                            full_response += chunk
+                            stream_span.set_attribute("chunk_count", chunk_count)
+                            yield chunk
+                        
+                        stream_span.set_attribute("is_final", True)
+                        stream_span.set_attribute("total_chunks", chunk_count)
+                        stream_span.set_attribute("response_length", len(full_response))
+                    
+                    # Handle function calls if any were detected
+                    if function_calls_data:
+                        span.set_attribute("has_function_calls", True)
+                        span.set_attribute("function_calls_count", len(function_calls_data))
+                        
+                        # Convert OpenAI function calls to ToolCall format for execution
+                        tool_calls: List[ToolCall] = []
+                        for func_call in function_calls_data:
+                            func = func_call.get("function", {})
+                            tool_call = ToolCall(
+                                id=func_call.get("id", ""),
+                                type=func_call.get("type", "function"),
+                                function=FunctionCall(
+                                    name=func.get("name", ""),
+                                    arguments=func.get("arguments", "{}")
                                 )
-
-                        if chunk.is_final:
-                            stream_span.set_attribute("is_final", True)
-                            stream_span.set_attribute("total_chunks", chunk_count)
-                            stream_span.set_attribute(
-                                "response_length", len(full_response)
                             )
-                            break
-
-                # Handle tool calls if any
-                if tool_calls:
-                    span.set_attribute("has_tool_calls", True)
-                    span.set_attribute("tool_calls_count", len(tool_calls))
-                    tool_results = self._execute_tool_calls(tool_calls, span)
-
-                    # Add tool results as a new message and continue conversation
-                    if tool_results:
-                        tool_message = self._create_tool_results_message(tool_results)
-                        self._conversation_history.append(tool_message)
-
-                        # Continue conversation with tool results
-                        # (This would require another request - for now, we'll include results in the response)
-                        yield f"\n\n[Tool execution completed. Results: {tool_results}]\n"
-
-                # Add assistant response to conversation history
-                if full_response:
-                    assistant_message = self._create_chat_message(
-                        "assistant", full_response
-                    )
-                    if tool_calls:
-                        assistant_message.tool_calls.extend(tool_calls)
-                    self._conversation_history.append(assistant_message)
+                            tool_calls.append(tool_call)
+                        
+                        # Execute tool calls
+                        tool_results = self._execute_tool_calls(tool_calls, span)
+                        
+                        # Add tool results as a new message and continue conversation
+                        if tool_results:
+                            tool_message_text = json.dumps(tool_results, indent=2)
+                            # Add tool results to conversation history as tool role messages
+                            for tool_call_id, result in tool_results.items():
+                                tool_msg = self._create_chat_message(
+                                    "tool", tool_message_text
+                                )
+                                tool_msg.name = tool_call_id  # Store tool_call_id in name field
+                                self._conversation_history.append(tool_msg)
+                            
+                            yield f"\n\n[Tool execution completed. Results: {tool_message_text}]\n"
+                    
+                    span.set_attribute("tool_calls_supported", True)
+                    span.set_attribute("tools_count", len(openai_tools))
                     span.set_attribute("response_length", len(full_response))
                     span.set_attribute("final_chunk_count", chunk_count)
+                    
+                    # Add assistant response to conversation history
+                    if full_response:
+                        assistant_message = self._create_chat_message(
+                            "assistant", full_response
+                        )
+                        # Add tool calls if any were executed
+                        if tool_calls:
+                            assistant_message.tool_calls.extend(tool_calls)
+                        self._conversation_history.append(assistant_message)
+                        span.set_attribute("response_added_to_history", True)
+                    
+                else:
+                    # gRPC: Use existing protobuf-based implementation with tool calling
+                    if system_message:
+                        # Add system message if conversation is empty
+                        if not self._conversation_history:
+                            self._conversation_history.append(
+                                self._create_chat_message("system", system_message)
+                            )
+
+                    # Add user message
+                    user_message = self._create_chat_message("user", task_description)
+                    self._conversation_history.append(user_message)
+
+                    span.set_attribute(
+                        "conversation_length", len(self._conversation_history)
+                    )
+
+                    # Create chat request with tools enabled
+                    chat_context = Context(
+                        enable_tools=True,
+                        available_tools=self._available_tools,
+                        max_context_tokens=self.max_context_length,
+                    )
+
+                    request = ChatRequest(
+                        messages=self._conversation_history,
+                        params=GenerationParameters(
+                            temperature=self.temperature,
+                            max_tokens=self.max_tokens,
+                            top_p=0.9,
+                        ),
+                        context=chat_context,
+                        stream=True,
+                    )
+
+                    # Stream response from model and handle tool calls
+                    chunk_count = 0
+                    full_response = ""
+                    tool_calls: List[ToolCall] = []
+
+                    with tracer.start_as_current_span(
+                        "coding_agent.stream_response"
+                    ) as stream_span:
+                        for chunk in self._stub.ChatStream(request):
+                            if chunk.chunk.role == "assistant":
+                                content = chunk.chunk.content
+                                if content:
+                                    chunk_count += 1
+                                    full_response += content
+                                    stream_span.set_attribute("chunk_count", chunk_count)
+                                    yield content
+
+                                # Collect tool calls
+                                if chunk.chunk.tool_calls:
+                                    tool_calls.extend(chunk.chunk.tool_calls)
+                                    stream_span.set_attribute(
+                                        "tool_calls_count", len(tool_calls)
+                                    )
+
+                            if chunk.is_final:
+                                stream_span.set_attribute("is_final", True)
+                                stream_span.set_attribute("total_chunks", chunk_count)
+                                stream_span.set_attribute(
+                                    "response_length", len(full_response)
+                                )
+                                break
+
+                    # Handle tool calls if any
+                    if tool_calls:
+                        span.set_attribute("has_tool_calls", True)
+                        span.set_attribute("tool_calls_count", len(tool_calls))
+                        tool_results = self._execute_tool_calls(tool_calls, span)
+
+                        # Add tool results as a new message and continue conversation
+                        if tool_results:
+                            tool_message = self._create_tool_results_message(tool_results)
+                            self._conversation_history.append(tool_message)
+
+                            # Continue conversation with tool results
+                            # (This would require another request - for now, we'll include results in the response)
+                            yield f"\n\n[Tool execution completed. Results: {tool_results}]\n"
+
+                    # Add assistant response to conversation history
+                    if full_response:
+                        assistant_message = self._create_chat_message(
+                            "assistant", full_response
+                        )
+                        if tool_calls:
+                            assistant_message.tool_calls.extend(tool_calls)
+                        self._conversation_history.append(assistant_message)
+                        span.set_attribute("response_length", len(full_response))
+                        span.set_attribute("final_chunk_count", chunk_count)
 
             except grpc.RpcError as e:
                 span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
@@ -215,8 +351,105 @@ class CodingAgent:
             except Exception as e:
                 span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
                 span.record_exception(e)
-                logger.error(f"Error in coding agent: {e}", exc_info=True)
-                raise
+                # Handle HTTP errors specifically
+                if self._protocol == "http" and ("HTTP" in str(type(e).__name__) or "httpx" in str(type(e).__module__)):
+                    logger.error(f"HTTP error in coding agent: {e}")
+                    raise RuntimeError(
+                        f"Failed to communicate with LLM service: {e}"
+                    ) from e
+                else:
+                    logger.error(f"Error in coding agent: {e}", exc_info=True)
+                    raise
+
+    def _convert_tools_to_openai_format(self) -> List[Dict[str, Any]]:
+        """
+        Convert ToolDefinition protobuf messages to OpenAI function format.
+        
+        Returns:
+            List of OpenAI function definitions
+        """
+        functions = []
+        for tool in self._available_tools:
+            try:
+                # Parse parameters schema from JSON string
+                params_schema = json.loads(tool.parameters_schema)
+            except (json.JSONDecodeError, AttributeError):
+                # If parsing fails, create a minimal schema
+                params_schema = {"type": "object", "properties": {}}
+            
+            functions.append({
+                "type": "function",
+                "function": {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "parameters": params_schema,
+                }
+            })
+        return functions
+
+    def _convert_chat_message_to_openai(self, msg: ChatMessage) -> Dict[str, Any]:
+        """
+        Convert ChatMessage protobuf to OpenAI message format.
+        
+        Args:
+            msg: ChatMessage protobuf object
+            
+        Returns:
+            OpenAI-format message dict
+        """
+        openai_msg: Dict[str, Any] = {
+            "role": msg.role,
+            "content": msg.content,
+        }
+        
+        # Add tool calls if present
+        if msg.tool_calls:
+            openai_msg["tool_calls"] = []
+            for tool_call in msg.tool_calls:
+                openai_msg["tool_calls"].append({
+                    "id": tool_call.id,
+                    "type": tool_call.type,
+                    "function": {
+                        "name": tool_call.function.name,
+                        "arguments": tool_call.function.arguments,
+                    }
+                })
+        
+        # Add tool role messages (for function results)
+        if msg.role == "tool" and msg.name:
+            openai_msg["role"] = "tool"
+            openai_msg["tool_call_id"] = msg.name  # Use name field for tool_call_id
+        
+        return openai_msg
+
+    def _build_openai_messages(
+        self, system_message: Optional[str], task_description: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Build OpenAI-format messages from conversation history.
+        
+        Args:
+            system_message: Optional system message
+            task_description: Current task description
+            
+        Returns:
+            List of OpenAI-format messages
+        """
+        messages: List[Dict[str, Any]] = []
+        
+        # Add system message if provided
+        if system_message:
+            messages.append({"role": "system", "content": system_message})
+        
+        # Convert conversation history to OpenAI format
+        for msg in self._conversation_history:
+            openai_msg = self._convert_chat_message_to_openai(msg)
+            messages.append(openai_msg)
+        
+        # Add current task as user message
+        messages.append({"role": "user", "content": task_description})
+        
+        return messages
 
     def _initialize_tools(self) -> None:
         """Initialize available tools for the coding agent."""
@@ -590,12 +823,20 @@ class CodingAgent:
         ]
 
     def close(self) -> None:
-        """Close the gRPC connection."""
-        if self._channel:
-            self._channel.close()
-            self._channel = None
-            self._stub = None
-            logger.info("Closed connection to inference API")
+        """Close the connection (gRPC or HTTP)."""
+        if self._protocol == "http":
+            # HTTP/NIM: Clean up LLMClient
+            if self._llm_client:
+                self._llm_client.cleanup()
+                self._llm_client = None
+                logger.info("Closed HTTP connection to LLM service")
+        else:
+            # gRPC: Close gRPC channel
+            if self._channel:
+                self._channel.close()
+                self._channel = None
+                self._stub = None
+                logger.info("Closed gRPC connection to inference API")
 
     def __enter__(self):
         """Context manager entry."""

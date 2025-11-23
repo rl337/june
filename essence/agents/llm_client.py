@@ -2,18 +2,22 @@
 LLM Client for Agentic Reasoning
 
 Provides a unified interface for LLM interactions used by reasoning components.
-Wraps the gRPC LLM inference service (TensorRT-LLM) for use in reasoning phases.
+Supports both gRPC (TensorRT-LLM, legacy inference-api) and HTTP (NVIDIA NIM) protocols.
 """
 import logging
 from typing import Any, Dict, Iterator, List, Optional
+from urllib.parse import urlparse
 
 import grpc
+import httpx
 from june_grpc_api import llm_pb2_grpc
 from june_grpc_api.llm_pb2 import (
     ChatMessage,
     ChatRequest,
     Context,
+    FunctionCall,
     GenerationParameters,
+    ToolCall,
 )
 from opentelemetry import trace
 
@@ -42,8 +46,9 @@ class LLMClient:
         Initialize the LLM client.
 
         Args:
-            llm_url: gRPC endpoint for LLM inference service (default: "tensorrt-llm:8000" for TensorRT-LLM).
-                    Can use "inference-api:50051" for legacy service or "nim-qwen3:8001" for NVIDIA NIM.
+            llm_url: LLM endpoint URL. Supports:
+                    - gRPC: "tensorrt-llm:8000" (default), "inference-api:50051", "grpc://nim-qwen3:8001"
+                    - HTTP: "http://nim-qwen3:8000" (NVIDIA NIM OpenAI-compatible API)
             model_name: Name of the model to use
             max_context_length: Maximum context length for the model
             temperature: Sampling temperature
@@ -55,15 +60,81 @@ class LLMClient:
         self.temperature = temperature
         self.max_tokens = max_tokens
 
+        # Detect protocol from URL
+        if "://" in llm_url:
+            # URL has explicit scheme
+            parsed = urlparse(llm_url)
+            self._protocol = parsed.scheme
+            self._host = parsed.hostname or parsed.netloc.split(":")[0]
+            self._port = parsed.port or (8000 if self._protocol in ["http", "https"] else 8001)
+            # Ensure protocol is valid
+            if self._protocol not in ["http", "https", "grpc"]:
+                # If unknown scheme, default based on port
+                if self._port in [8000, 8003] and "nim" in self._host.lower():
+                    self._protocol = "http"
+                    logger.warning(f"Unknown scheme '{parsed.scheme}', defaulting to HTTP for NIM service")
+                else:
+                    self._protocol = "grpc"
+                    logger.warning(f"Unknown scheme '{parsed.scheme}', defaulting to gRPC")
+        else:
+            # No scheme - parse as host:port
+            if ":" in llm_url:
+                parts = llm_url.split(":")
+                self._host = parts[0]
+                try:
+                    self._port = int(parts[1])
+                except (ValueError, IndexError):
+                    self._port = 8001  # Default gRPC port
+            else:
+                self._host = llm_url
+                self._port = 8001  # Default gRPC port
+            
+            # Detect protocol based on hostname and port
+            if "nim" in self._host.lower() and self._port in [8000, 8003]:
+                self._protocol = "http"
+                logger.info(f"Detected NIM service ({self._host}:{self._port}) - using HTTP protocol")
+            else:
+                self._protocol = "grpc"
+        
+        # Map model name for NIM (NIM expects "Qwen/Qwen3-32B", not full HuggingFace path)
+        if self._protocol == "http" and "nim" in self._host.lower():
+            # NIM model name mapping
+            if "qwen3" in self.model_name.lower() and "32b" in self.model_name.lower():
+                # Map any Qwen3-32B variant to the NIM model name
+                self._nim_model_name = "Qwen/Qwen3-32B"
+                logger.debug(f"Mapped model name '{self.model_name}' to NIM model '{self._nim_model_name}'")
+            else:
+                # Use model name as-is (may need adjustment for other models)
+                self._nim_model_name = self.model_name
+        else:
+            self._nim_model_name = None  # Not using NIM
+        
+        # gRPC connection (for TensorRT-LLM, legacy inference-api)
         self._channel: Optional[grpc.Channel] = None
         self._stub: Optional[llm_pb2_grpc.LLMInferenceStub] = None
+        
+        # HTTP client (for NVIDIA NIM OpenAI-compatible API)
+        self._http_client: Optional[httpx.Client] = None
+        self._http_base_url: Optional[str] = None
 
     def _ensure_connection(self) -> None:
-        """Ensure gRPC connection to LLM inference service is established."""
-        if self._channel is None or self._stub is None:
-            self._channel = grpc.insecure_channel(self.llm_url)
-            self._stub = llm_pb2_grpc.LLMInferenceStub(self._channel)
-            logger.info(f"Connected to LLM inference service at {self.llm_url}")
+        """Ensure connection to LLM inference service is established (gRPC or HTTP)."""
+        if self._protocol == "http":
+            # HTTP connection (NVIDIA NIM OpenAI-compatible API)
+            if self._http_client is None:
+                # Build base URL
+                if not self._http_base_url:
+                    self._http_base_url = f"http://{self._host}:{self._port}"
+                self._http_client = httpx.Client(timeout=120.0)  # Longer timeout for LLM inference
+                logger.info(f"Initialized HTTP client for LLM service at {self._http_base_url}")
+        else:
+            # gRPC connection (TensorRT-LLM, legacy inference-api)
+            if self._channel is None or self._stub is None:
+                # Build gRPC address (host:port format)
+                grpc_address = f"{self._host}:{self._port}"
+                self._channel = grpc.insecure_channel(grpc_address)
+                self._stub = llm_pb2_grpc.LLMInferenceStub(self._channel)
+                logger.info(f"Connected to LLM inference service via gRPC at {grpc_address}")
 
     def _create_chat_message(self, role: str, content: str) -> ChatMessage:
         """Create a ChatMessage protobuf object."""
@@ -76,6 +147,7 @@ class LLMClient:
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
         stream: bool = False,
+        tools: Optional[List[Dict[str, Any]]] = None,
     ) -> Iterator[str]:
         """
         Generate text from a prompt.
@@ -94,49 +166,301 @@ class LLMClient:
             try:
                 span.set_attribute("prompt_length", len(prompt))
                 span.set_attribute("stream", stream)
+                span.set_attribute("protocol", self._protocol)
 
                 self._ensure_connection()
 
-                # Build messages
-                messages: List[ChatMessage] = []
-                if system_prompt:
-                    messages.append(self._create_chat_message("system", system_prompt))
-                messages.append(self._create_chat_message("user", prompt))
-
-                # Create request
-                request = ChatRequest(
-                    messages=messages,
-                    params=GenerationParameters(
-                        temperature=temperature or self.temperature,
-                        max_tokens=max_tokens or self.max_tokens,
-                        top_p=0.9,
-                    ),
-                    context=Context(
-                        enable_tools=False,
-                        max_context_tokens=self.max_context_length,
-                    ),
-                    stream=stream,
-                )
-
-                # Generate response
-                if stream:
-                    for chunk in self._stub.ChatStream(request):
-                        if chunk.chunk.role == "assistant":
-                            content = chunk.chunk.content
-                            if content:
-                                yield content
+                if self._protocol == "http":
+                    # HTTP/OpenAI-compatible API (NVIDIA NIM)
+                    yield from self._generate_http(
+                        prompt=prompt,
+                        system_prompt=system_prompt,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        stream=stream,
+                        span=span,
+                        tools=tools,
+                        messages=None,  # LLMClient.generate() doesn't support messages yet
+                    )
                 else:
-                    # Non-streaming: collect all chunks
-                    response = ""
-                    for chunk in self._stub.ChatStream(request):
-                        if chunk.chunk.role == "assistant":
-                            content = chunk.chunk.content
-                            if content:
-                                response += content
-                    yield response
+                    # gRPC API (TensorRT-LLM, legacy inference-api)
+                    # Build messages
+                    messages: List[ChatMessage] = []
+                    if system_prompt:
+                        messages.append(self._create_chat_message("system", system_prompt))
+                    messages.append(self._create_chat_message("user", prompt))
+
+                    # Create request
+                    request = ChatRequest(
+                        messages=messages,
+                        params=GenerationParameters(
+                            temperature=temperature or self.temperature,
+                            max_tokens=max_tokens or self.max_tokens,
+                            top_p=0.9,
+                        ),
+                        context=Context(
+                            enable_tools=False,
+                            max_context_tokens=self.max_context_length,
+                        ),
+                        stream=stream,
+                    )
+
+                    # Generate response
+                    if stream:
+                        for chunk in self._stub.ChatStream(request):
+                            if chunk.chunk.role == "assistant":
+                                content = chunk.chunk.content
+                                if content:
+                                    yield content
+                    else:
+                        # Non-streaming: collect all chunks
+                        response = ""
+                        for chunk in self._stub.ChatStream(request):
+                            if chunk.chunk.role == "assistant":
+                                content = chunk.chunk.content
+                                if content:
+                                    response += content
+                        yield response
 
             except Exception as e:
                 logger.error(f"Error generating text: {e}", exc_info=True)
+                span.record_exception(e)
+                span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+                raise
+
+    def _generate_http(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        stream: bool = False,
+        span: Optional[trace.Span] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        messages: Optional[List[Dict[str, Any]]] = None,
+    ) -> Iterator[str]:
+        """
+        Generate text using HTTP/OpenAI-compatible API (NVIDIA NIM).
+
+        Args:
+            prompt: The input prompt (used if messages is None)
+            system_prompt: Optional system prompt (used if messages is None)
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
+            stream: Whether to stream the response
+            span: OpenTelemetry span for tracing
+            tools: Optional list of OpenAI-format tool definitions for function calling
+            messages: Optional list of OpenAI-format messages (if provided, prompt and system_prompt are ignored)
+
+        Yields:
+            Response chunks as they arrive
+        """
+        # Build messages in OpenAI format
+        if messages is not None:
+            # Use provided messages directly
+            openai_messages = messages
+        else:
+            # Build messages from prompt/system_prompt (backward compatibility)
+            openai_messages: List[Dict[str, Any]] = []
+            if system_prompt:
+                openai_messages.append({"role": "system", "content": system_prompt})
+            openai_messages.append({"role": "user", "content": prompt})
+
+        # Build request payload
+        # Use NIM-specific model name if available, otherwise use default
+        model_name_for_request = self._nim_model_name if self._nim_model_name else self.model_name
+        payload = {
+            "model": model_name_for_request,
+            "messages": openai_messages,
+            "temperature": temperature or self.temperature,
+            "max_tokens": max_tokens or self.max_tokens,
+            "stream": stream,
+        }
+        
+        # Add tools if provided (for function calling)
+        if tools:
+            payload["tools"] = tools
+            payload["tool_choice"] = "auto"  # Let model decide when to call functions
+
+        url = f"{self._http_base_url}/v1/chat/completions"
+        
+        try:
+            if stream:
+                # Streaming response
+                # Collect function calls incrementally (OpenAI streams them in parts)
+                accumulated_tool_calls: Dict[int, Dict[str, Any]] = {}  # Index -> tool call
+                
+                with self._http_client.stream(
+                    "POST", url, json=payload, timeout=120.0
+                ) as response:
+                    response.raise_for_status()
+                    for line in response.iter_lines():
+                        if line.startswith("data: "):
+                            data_str = line[6:]  # Remove "data: " prefix
+                            if data_str == "[DONE]":
+                                # Finalize any accumulated function calls
+                                if accumulated_tool_calls:
+                                    final_tool_calls = [tc for idx, tc in sorted(accumulated_tool_calls.items())]
+                                    yield f"\n[FUNCTION_CALLS:{json.dumps(final_tool_calls)}]"
+                                break
+                            try:
+                                import json
+                                data = json.loads(data_str)
+                                if "choices" in data and len(data["choices"]) > 0:
+                                    delta = data["choices"][0].get("delta", {})
+                                    content = delta.get("content", "")
+                                    if content:
+                                        yield content
+                                    
+                                    # Handle function calls (streamed incrementally)
+                                    if "tool_calls" in delta:
+                                        for tool_call_delta in delta["tool_calls"]:
+                                            index = tool_call_delta.get("index")
+                                            if index is not None:
+                                                # Initialize or update accumulated tool call
+                                                if index not in accumulated_tool_calls:
+                                                    accumulated_tool_calls[index] = {
+                                                        "id": tool_call_delta.get("id", ""),
+                                                        "type": tool_call_delta.get("type", "function"),
+                                                        "function": {"name": "", "arguments": ""}
+                                                    }
+                                                
+                                                # Update function name if present
+                                                if "function" in tool_call_delta:
+                                                    func_delta = tool_call_delta["function"]
+                                                    if "name" in func_delta:
+                                                        accumulated_tool_calls[index]["function"]["name"] = func_delta["name"]
+                                                    if "arguments" in func_delta:
+                                                        # Arguments are streamed incrementally
+                                                        accumulated_tool_calls[index]["function"]["arguments"] += func_delta["arguments"]
+                                                
+                                                # Update ID and type if present
+                                                if "id" in tool_call_delta:
+                                                    accumulated_tool_calls[index]["id"] = tool_call_delta["id"]
+                                                if "type" in tool_call_delta:
+                                                    accumulated_tool_calls[index]["type"] = tool_call_delta["type"]
+                            except json.JSONDecodeError:
+                                logger.warning(f"Failed to parse streaming chunk: {data_str}")
+                                continue
+                    
+                    # After stream ends, yield accumulated function calls if any
+                    if accumulated_tool_calls:
+                        final_tool_calls = [tc for idx, tc in sorted(accumulated_tool_calls.items())]
+                        yield f"\n[FUNCTION_CALLS:{json.dumps(final_tool_calls)}]"
+            else:
+                # Non-streaming response
+                response = self._http_client.post(url, json=payload, timeout=120.0)
+                response.raise_for_status()
+                result = response.json()
+                if "choices" in result and len(result["choices"]) > 0:
+                    message = result["choices"][0].get("message", {})
+                    content = message.get("content", "")
+                    if content:
+                        yield content
+                    # Check for function calls in non-streaming response
+                    if "tool_calls" in message:
+                        # Function calls present - yield special marker
+                        yield f"\n[FUNCTION_CALLS:{json.dumps(message['tool_calls'])}]"
+        except httpx.HTTPError as e:
+            logger.error(f"HTTP request to LLM service failed: {e}")
+            if span:
+                span.record_exception(e)
+                span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
+            raise
+
+    def generate_from_messages(
+        self,
+        messages: List[Dict[str, Any]],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        stream: bool = False,
+        tools: Optional[List[Dict[str, Any]]] = None,
+    ) -> Iterator[str]:
+        """
+        Generate text from OpenAI-format messages.
+
+        Args:
+            messages: List of OpenAI-format messages (role, content, etc.)
+            temperature: Sampling temperature (overrides default)
+            max_tokens: Maximum tokens to generate (overrides default)
+            stream: Whether to stream the response
+            tools: Optional list of OpenAI-format tool definitions for function calling
+
+        Yields:
+            Response chunks as they arrive (if stream=True)
+        """
+        with tracer.start_as_current_span("llm_client.generate_from_messages") as span:
+            try:
+                span.set_attribute("messages_count", len(messages))
+                span.set_attribute("stream", stream)
+                span.set_attribute("protocol", self._protocol)
+
+                self._ensure_connection()
+
+                if self._protocol == "http":
+                    # HTTP/OpenAI-compatible API (NVIDIA NIM)
+                    yield from self._generate_http(
+                        prompt="",  # Not used when messages is provided
+                        system_prompt=None,  # Not used when messages is provided
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        stream=stream,
+                        span=span,
+                        tools=tools,
+                        messages=messages,
+                    )
+                else:
+                    # gRPC: Convert messages to ChatMessage protobuf
+                    chat_messages: List[ChatMessage] = []
+                    for msg in messages:
+                        role = msg.get("role", "user")
+                        content = msg.get("content", "")
+                        chat_msg = self._create_chat_message(role, content)
+                        
+                        # Handle tool calls if present
+                        if "tool_calls" in msg:
+                            for tool_call_dict in msg["tool_calls"]:
+                                tool_call = ToolCall(
+                                    id=tool_call_dict.get("id", ""),
+                                    type=tool_call_dict.get("type", "function"),
+                                    function=FunctionCall(
+                                        name=tool_call_dict.get("function", {}).get("name", ""),
+                                        arguments=tool_call_dict.get("function", {}).get("arguments", "{}")
+                                    )
+                                )
+                                chat_msg.tool_calls.append(tool_call)
+                        
+                        chat_messages.append(chat_msg)
+                    
+                    # Create request
+                    request = ChatRequest(
+                        messages=chat_messages,
+                        params=GenerationParameters(
+                            temperature=temperature or self.temperature,
+                            max_tokens=max_tokens or self.max_tokens,
+                        ),
+                        stream=stream,
+                    )
+
+                    # Generate response
+                    if stream:
+                        for chunk in self._stub.ChatStream(request):
+                            if chunk.chunk.role == "assistant":
+                                content = chunk.chunk.content
+                                if content:
+                                    yield content
+                    else:
+                        # Non-streaming: collect all chunks
+                        response = ""
+                        for chunk in self._stub.ChatStream(request):
+                            if chunk.chunk.role == "assistant":
+                                content = chunk.chunk.content
+                                if content:
+                                    response += content
+                        yield response
+
+            except Exception as e:
+                logger.error(f"Error generating text from messages: {e}", exc_info=True)
                 span.record_exception(e)
                 span.set_status(trace.Status(trace.StatusCode.ERROR, str(e)))
                 raise
@@ -371,3 +695,22 @@ Evaluate:
                 logger.error(f"Error in reflect phase: {e}", exc_info=True)
                 span.record_exception(e)
                 raise
+
+    def cleanup(self) -> None:
+        """Clean up connections (close HTTP client and gRPC channel)."""
+        if self._http_client is not None:
+            try:
+                self._http_client.close()
+                self._http_client = None
+                logger.debug("Closed HTTP client connection")
+            except Exception as e:
+                logger.warning(f"Error closing HTTP client: {e}")
+        
+        if self._channel is not None:
+            try:
+                self._channel.close()
+                self._channel = None
+                self._stub = None
+                logger.debug("Closed gRPC channel connection")
+            except Exception as e:
+                logger.warning(f"Error closing gRPC channel: {e}")

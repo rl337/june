@@ -71,19 +71,10 @@ class TTSServiceCommand(Command):
         """
         Initialize TTS service.
 
-        Sets up signal handlers for graceful shutdown and initializes the TTSService
-        with the configured port and model. The service will be started when run() is called.
+        Sets up signal handlers for graceful shutdown. The service will be started when run() is called.
         """
         # Setup signal handlers
         self.setup_signal_handlers()
-
-        # Import the service
-        sys.path.insert(
-            0, str(Path(__file__).parent.parent.parent / "services" / "tts")
-        )
-        from main import TTSService
-
-        self.service = TTSService(port=self.args.port, model=self.args.model)
         logger.info("TTS service initialized")
 
     def run(self) -> None:
@@ -94,7 +85,17 @@ class TTSServiceCommand(Command):
         until the service is stopped (via signal handler). The service listens
         for text synthesis requests and processes them using TTS models.
         """
-        self.service.run()
+        # Import and run the TTS service main function
+        # The main.py is in /app/services/tts/main.py in the container
+        tts_main_path = Path(__file__).parent.parent.parent / "services" / "tts" / "main.py"
+        sys.path.insert(0, str(tts_main_path.parent))
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("tts_main", str(tts_main_path))
+        tts_main = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(tts_main)
+        
+        # Run the TTS service
+        tts_main.main()
 
     def cleanup(self) -> None:
         """
@@ -103,6 +104,6 @@ class TTSServiceCommand(Command):
         Releases any resources held by the TTS service, including model memory
         and gRPC connections. Calls the service's cleanup method if available.
         """
-        if hasattr(self.service, "cleanup"):
-            self.service.cleanup()
+        # TTS service main() handles its own cleanup via signal handlers
+        # No need to access self.service since we call main() directly
         logger.info("TTS service cleanup complete")

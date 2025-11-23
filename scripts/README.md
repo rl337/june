@@ -50,13 +50,21 @@ Reusable tools have been migrated to commands. Use these instead of scripts:
 - `setup_qwen3_operational.sh` - Operational workflow for Phase 10.1-10.2 (Qwen3 model setup on GPU)
 - `setup_nim_operational.sh` - Operational workflow for Phase 15 (NVIDIA NIM setup)
 - `setup_phase19_operational.sh` - Operational workflow for Phase 19 (Direct Agent-User Communication)
+- `verify_nim_compatibility.sh` - Helper script for Phase 19 NIM ARM64/DGX Spark compatibility verification
+- `generate_nim_compose_snippet.sh` - Generates docker-compose.yml service snippets for Riva ASR/TTS NIMs
+- `switch_to_nim.sh` - Helper script to switch june services from TensorRT-LLM to NVIDIA NIM endpoint (verifies NIM is ready, updates configuration, restarts services)
 - `run_benchmarks_operational.sh` - Operational workflow for Phase 18 (Model evaluation and benchmarking)
 - `run_performance_tests_operational.sh` - Operational workflow for Phase 16 Task 5 (Performance testing)
 
-### Test Utilities (Should Move to tests/)
-- `test_*.py` files - Should be moved to `tests/scripts/` or converted to pytest
-- `run_audio_tests.sh` - Should be moved to `tests/scripts/` or converted to pytest
-- `test_artifact_collection.sh` - Should be moved to `tests/scripts/` or converted to pytest
+### Test Utilities
+- ✅ **COMPLETED:** Moved test files to `tests/scripts/`:
+  - `test_agent_message_api.py` - Test script for Message API agent integration
+  - `test_message_api.py` - Test script for Message API endpoints
+  - `test_phase21_round_trip.py` - Automated test script for Phase 21 USER_MESSAGES.md round trip verification
+  - `test_send_dms.py` - Test script for sending direct messages
+- ✅ **COMPLETED:** All test Python files moved to `tests/scripts/`
+- ⏳ **Remaining:** Shell scripts that should be moved to `tests/scripts/` or converted to pytest (if they exist):
+  - Note: `run_audio_tests.sh` and `test_artifact_collection.sh` mentioned in previous TODO but do not exist in scripts/ directory
 
 ### Dataset/Data Scripts
 - All dataset generation tools have been converted to commands (see Available Commands above)

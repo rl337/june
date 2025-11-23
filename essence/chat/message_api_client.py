@@ -13,7 +13,9 @@ import httpx
 logger = logging.getLogger(__name__)
 
 # Default API base URL
-DEFAULT_API_URL = os.getenv("MESSAGE_API_URL", "http://localhost:8082")
+# Note: Message API is mapped as 8083:8082 in docker-compose.yml (host:container)
+# For host access, use port 8083. For container access, use port 8082.
+DEFAULT_API_URL = os.getenv("MESSAGE_API_URL", "http://localhost:8083")
 
 
 class MessageAPIClient:
