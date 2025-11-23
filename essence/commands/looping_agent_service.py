@@ -121,14 +121,6 @@ class LoopingAgentServiceCommand(Command):
             "lifecycle": "lifecycle",  # Special mode that cycles through roles
         }
         
-        # Lifecycle role configuration
-        if self.args.agent_mode == "lifecycle":
-            self.lifecycle_roles = [r.strip() for r in self.args.lifecycle_roles.split(",")]
-            self.role_priority = [r.strip() for r in self.args.role_priority.split(",")]
-            self.current_lifecycle_role_index = 0
-            logger.info(f"Lifecycle mode enabled with roles: {self.lifecycle_roles}")
-            logger.info(f"Role priority: {self.role_priority}")
-
         # HTTP client will be created in async context
         self.client: Optional[httpx.AsyncClient] = None
 
@@ -138,11 +130,18 @@ class LoopingAgentServiceCommand(Command):
         self.iteration_count = 0
         self._shutdown_requested = False
         
-        # Lifecycle mode state (initialized above if lifecycle mode, otherwise empty)
-        if self.args.agent_mode != "lifecycle":
+        # Lifecycle mode state
+        self.current_lifecycle_role_index = 0
+        self.lifecycle_roles: list = []
+        self.role_priority: list = []
+        
+        # Lifecycle role configuration
+        if self.args.agent_mode == "lifecycle":
+            self.lifecycle_roles = [r.strip() for r in self.args.lifecycle_roles.split(",")]
+            self.role_priority = [r.strip() for r in self.args.role_priority.split(",")]
             self.current_lifecycle_role_index = 0
-            self.lifecycle_roles: list = []
-            self.role_priority: list = []
+            logger.info(f"Lifecycle mode enabled with roles: {self.lifecycle_roles}")
+            logger.info(f"Role priority: {self.role_priority}")
 
         logger.info("Looping agent service initialized")
 
