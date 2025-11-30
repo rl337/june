@@ -2,6 +2,39 @@
 
 This document provides essential context and guidelines for AI agents working on the June project refactoring.
 
+## Versioning
+
+**IMPORTANT**: This project uses **automatic semantic versioning** via GitHub Actions.
+
+### How It Works
+
+- **Regular commits to main**: Automatically bumps patch version (0.2.0 → 0.2.1)
+- **Merge commits to main**: Automatically bumps minor version (0.2.0 → 0.3.0)
+- **Major versions**: Must be bumped manually using `poetry version major`
+
+### What This Means for Agents
+
+1. **Do NOT manually update versions** in `pyproject.toml` or `essence/__init__.py` unless:
+   - You're bumping a major version (breaking changes)
+   - You're fixing a version that got out of sync
+
+2. **Version bumps are automatic**: When you commit to main (or merge a PR), the version will be automatically bumped by the GitHub Actions workflow.
+
+3. **Version sync**: The workflow updates both:
+   - `pyproject.toml` (the `version = "X.Y.Z"` field)
+   - `essence/__init__.py` (the `__version__ = "X.Y.Z"` field)
+
+4. **Skip CI**: Version bump commits include `[skip ci]` to prevent infinite loops.
+
+### Manual Version Bumping
+
+If you need to manually bump a major version:
+
+```bash
+poetry version major
+# Then manually update essence/__init__.py to match
+```
+
 ## Current Refactoring Context
 
 **Goal:** Pare down the june project to bare essentials for the **voice message → STT → LLM → TTS → voice response** round trip, supporting both **Telegram** and **Discord** platforms.

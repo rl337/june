@@ -2,6 +2,16 @@
 
 June is a simplified voice-to-voice AI agent system that processes voice messages through speech-to-text, LLM, and text-to-speech pipelines. It supports both **Telegram** and **Discord** platforms.
 
+## Versioning
+
+This project uses **automatic semantic versioning**:
+
+- **Regular commits to main**: Automatically bumps patch version (0.2.0 → 0.2.1)
+- **Merge commits to main**: Automatically bumps minor version (0.2.0 → 0.3.0)
+- **Major versions**: Must be bumped manually using `poetry version major`
+
+Version bumps happen automatically via GitHub Actions on every push to main. Both `pyproject.toml` and `essence/__init__.py` are updated automatically.
+
 ## 🏗️ Architecture Overview
 
 June uses a minimal microservices architecture with the following essential services:
