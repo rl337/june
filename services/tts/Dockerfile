@@ -80,9 +80,13 @@ EXPOSE 50053
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD python -c "import grpc; grpc.insecure_channel('localhost:50053').check_connectivity_state(True)" || exit 1
 
-# Run the TTS service via essence command system
+# Copy log wrapper script
+COPY scripts/log-wrapper.sh /usr/local/bin/log-wrapper.sh
+RUN chmod +x /usr/local/bin/log-wrapper.sh
+
+# Run the TTS service via essence command system, wrapped to capture logs
 # Use poetry run to ensure proper Python environment and path setup
 WORKDIR /app
-CMD ["poetry", "run", "python", "-m", "essence", "tts"]
+CMD ["/usr/local/bin/log-wrapper.sh", "tts", "poetry", "run", "python", "-m", "essence", "tts"]
 
 

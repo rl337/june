@@ -20,5 +20,9 @@ RUN poetry install --no-interaction --no-root
 # Set Python path
 ENV PYTHONPATH=/app
 
-# Run the message API service
-CMD ["poetry", "run", "python", "-m", "essence", "message-api-service"]
+# Copy log wrapper script
+COPY scripts/log-wrapper.sh /usr/local/bin/log-wrapper.sh
+RUN chmod +x /usr/local/bin/log-wrapper.sh
+
+# Run the message API service, wrapped to capture logs
+CMD ["/usr/local/bin/log-wrapper.sh", "message-api", "poetry", "run", "python", "-m", "essence", "message-api-service"]

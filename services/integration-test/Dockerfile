@@ -36,5 +36,9 @@ EXPOSE 8082
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8082/health || exit 1
 
-# Run the integration test service via essence command system
-CMD ["poetry", "run", "python", "-m", "essence", "integration-test-service"]
+# Copy log wrapper script
+COPY scripts/log-wrapper.sh /usr/local/bin/log-wrapper.sh
+RUN chmod +x /usr/local/bin/log-wrapper.sh
+
+# Run the integration test service via essence command system, wrapped to capture logs
+CMD ["/usr/local/bin/log-wrapper.sh", "integration-test", "poetry", "run", "python", "-m", "essence", "integration-test-service"]

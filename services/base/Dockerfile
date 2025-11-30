@@ -28,6 +28,9 @@ RUN pip install poetry && \
 # Install runtime libs common to services
 RUN pip install grpcio nats-py prometheus-client pydantic uvicorn fastapi scipy
 
+# Install cron and logrotate for log rotation
+RUN apt-get update && apt-get install -y cron logrotate && rm -rf /var/lib/apt/lists/*
+
 # Note: Packages (june-grpc-api, inference-core) are now installed in editable mode
 # by individual service Dockerfiles that need them, not in the base image.
 # This allows faster iteration during development without rebuilding wheels.

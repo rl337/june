@@ -40,6 +40,11 @@ EXPOSE 8081
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8081/health || exit 1
 
-# Run the Discord bot via essence command system
-CMD ["poetry", "run", "python", "-m", "essence", "discord-service"]
+# Copy log wrapper script
+COPY scripts/log-wrapper.sh /usr/local/bin/log-wrapper.sh
+RUN chmod +x /usr/local/bin/log-wrapper.sh
+
+# Run the Discord bot via essence command system, wrapped to capture logs
+# Logs go to both stdout/stderr (Docker) and /logs/discord.log (Promtail)
+CMD ["/usr/local/bin/log-wrapper.sh", "discord", "poetry", "run", "python", "-m", "essence", "discord-service"]
 

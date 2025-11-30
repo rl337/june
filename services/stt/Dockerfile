@@ -47,11 +47,15 @@ EXPOSE 50052
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD python -c "import grpc; grpc.insecure_channel('localhost:50052').check_connectivity_state(True)" || exit 1
 
-# Run the STT service via essence command system
+# Copy log wrapper script
+COPY scripts/log-wrapper.sh /usr/local/bin/log-wrapper.sh
+RUN chmod +x /usr/local/bin/log-wrapper.sh
+
+# Run the STT service via essence command system, wrapped to capture logs
 ENV STT_MODEL_NAME=base.en
 # Use GPU for Whisper model (cuda) - CRITICAL: Never use CPU for large models
 # If GPU not available, service will fail (preferred over CPU memory exhaustion)
 ENV STT_DEVICE=cuda
-CMD ["poetry", "run", "python", "-m", "essence", "stt"]
+CMD ["/usr/local/bin/log-wrapper.sh", "stt", "poetry", "run", "python", "-m", "essence", "stt"]
 
 

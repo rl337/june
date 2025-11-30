@@ -30,7 +30,7 @@ RUN pip install -e /tmp/june-grpc-api && \
 # Note: Container needs NVIDIA Container Toolkit for GPU access
 RUN pip uninstall -y torch torchvision torchaudio 2>/dev/null || true && \
     (pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124 || \
-     pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121) && \
+    pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121) && \
     python -c "import torch; print(f'PyTorch {torch.__version__} installed'); print(f'CUDA compiled: {torch.version.cuda if torch.version.cuda else \"None (CPU build)\"}')"
 
 ## shared module removed; use inference_core instead
@@ -45,7 +45,7 @@ COPY services/inference-api .
 # (ensures PyTorch CUDA is not overwritten by any service code dependencies)
 RUN pip uninstall -y torch torchvision torchaudio 2>/dev/null || true && \
     (pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124 || \
-     pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121) && \
+    pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121) && \
     python -c "import torch; print(f'Final PyTorch {torch.__version__}'); print(f'CUDA compiled: {torch.version.cuda if torch.version.cuda else \"None\"}')"
 
 # Ensure permissions
@@ -59,7 +59,11 @@ EXPOSE 50051
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD poetry run python -c "import grpc; grpc.insecure_channel('localhost:50051').check_connectivity_state(True)" || exit 1
 
-# Run the inference API service via essence command system
-CMD ["poetry", "run", "python", "-m", "essence", "inference-api"]
+# Copy log wrapper script
+COPY scripts/log-wrapper.sh /usr/local/bin/log-wrapper.sh
+RUN chmod +x /usr/local/bin/log-wrapper.sh
+
+# Run the inference API service via essence command system, wrapped to capture logs
+CMD ["/usr/local/bin/log-wrapper.sh", "inference-api", "poetry", "run", "python", "-m", "essence", "inference-api"]
 
 

@@ -9,14 +9,7 @@ USER root
 COPY pyproject.toml poetry.lock ./
 
 # Copy essence package (needed for poetry install and command execution)
-# This includes all service code now (essence/services/telegram)
 COPY essence ./essence
-
-# Copy VERSION file and set version label
-ARG SERVICE_VERSION=1.0.0
-COPY essence/services/telegram/VERSION /app/VERSION
-LABEL org.opencontainers.image.version="${SERVICE_VERSION}"
-LABEL june.service.version="${SERVICE_VERSION}"
 
 # Install dependencies using poetry (skip installing project itself with --no-root)
 # Use environment variables to disable virtualenv creation
@@ -25,7 +18,6 @@ ENV POETRY_VIRTUALENVS_IN_PROJECT=false
 RUN poetry install --no-interaction --no-ansi --only main --no-root
 
 # Install june-grpc-api and inference-core packages in editable mode from source
-# This allows faster iteration during development without rebuilding wheels
 COPY packages/june-grpc-api /tmp/june-grpc-api
 COPY packages/inference-core /tmp/inference-core
 RUN pip install -e /tmp/june-grpc-api && \
@@ -33,14 +25,11 @@ RUN pip install -e /tmp/june-grpc-api && \
 
 # Ensure permissions
 RUN chown -R june:june /app
+
+# Create log directory with proper permissions
+RUN mkdir -p /var/log/june/looping-agent && chown -R june:june /var/log/june
+
 USER june
-
-# Expose health check port
-EXPOSE 8080
-
-# Health check using the /health endpoint
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
 
 # Copy log wrapper script
 COPY --chmod=755 scripts/log-wrapper.sh /usr/local/bin/log-wrapper.sh
@@ -49,9 +38,8 @@ COPY --chmod=755 scripts/log-wrapper.sh /usr/local/bin/log-wrapper.sh
 COPY config/logrotate-june-services.conf /etc/logrotate.d/june-services
 
 # Configure logrotate to run every 5 minutes via cron
-# Run as root to have permission to manage logs
 USER root
-RUN echo "*/5 * * * * /usr/sbin/logrotate -f /etc/logrotate.d/june-services >> /var/log/june/telegram/logrotate.log 2>&1" | crontab -
+RUN echo "*/5 * * * * /usr/sbin/logrotate -f /etc/logrotate.d/june-services >> /var/log/june/looping-agent/logrotate.log 2>&1" | crontab -
 
 # Create entrypoint wrapper to start cron before service
 RUN echo '#!/bin/bash' > /entrypoint-wrapper.sh && \
@@ -61,8 +49,7 @@ RUN echo '#!/bin/bash' > /entrypoint-wrapper.sh && \
 
 USER june
 
-# Run the Telegram bot via essence command system, wrapped to capture logs
-# Logs go to both stdout/stderr (Docker) and /var/log/june/telegram/telegram.log (Promtail)
+# Run the looping agent service via essence command system, wrapped to capture logs
 ENTRYPOINT ["/entrypoint-wrapper.sh"]
-CMD ["/usr/local/bin/log-wrapper.sh", "telegram", "poetry", "run", "python", "-m", "essence", "telegram-service"]
+CMD ["/usr/local/bin/log-wrapper.sh", "looping-agent", "poetry", "run", "python", "-m", "essence", "looping-agent-service"]
 

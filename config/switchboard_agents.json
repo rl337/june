@@ -3,8 +3,15 @@
     "type": "popen_cursor",
     "name": "Telegram Response Agent",
     "description": "Handles Telegram user messages and responds via cursor-agent",
-    "tags": ["telegram", "user-interface", "response"],
-    "roles": ["user-interface", "response"],
+    "tags": [
+      "telegram",
+      "user-interface",
+      "response"
+    ],
+    "roles": [
+      "user-interface",
+      "response"
+    ],
     "config": {
       "script_path": "/app/scripts/telegram_response_agent.sh",
       "script_simple_path": "/app/scripts/telegram_response_agent_simple.sh",
@@ -18,8 +25,14 @@
     "type": "popen_cursor",
     "name": "Normal Agent",
     "description": "Standard task work - picks up and completes concrete tasks",
-    "tags": ["task-work", "implementation"],
-    "roles": ["implementation", "task-worker"],
+    "tags": [
+      "task-work",
+      "implementation"
+    ],
+    "roles": [
+      "implementation",
+      "task-worker"
+    ],
     "config": {
       "script_path": "/app/scripts/normal_agent.sh",
       "working_directory": "/app",
@@ -32,8 +45,14 @@
     "type": "popen_cursor",
     "name": "Manish",
     "description": "Architect who breaks down abstract/epic tasks into concrete tasks. Coordinates with Enid on release planning.",
-    "tags": ["planning", "task-breakdown", "architecture"],
-    "roles": ["architect"],
+    "tags": [
+      "planning",
+      "task-breakdown",
+      "architecture"
+    ],
+    "roles": [
+      "architect"
+    ],
     "config": {
       "script_path": "/app/scripts/architect_agent.sh",
       "working_directory": "/app",
@@ -46,8 +65,14 @@
     "type": "popen_cursor",
     "name": "Enid",
     "description": "Project Manager who coordinates with Manish to create release plans. Follows PMBOK principles for software development lifecycle management.",
-    "tags": ["project-management", "release-planning", "coordination"],
-    "roles": ["project-manager"],
+    "tags": [
+      "project-management",
+      "release-planning",
+      "coordination"
+    ],
+    "roles": [
+      "project-manager"
+    ],
     "config": {
       "script_path": "/app/scripts/project_manager_agent.sh",
       "working_directory": "/app",
@@ -60,8 +85,15 @@
     "type": "popen_cursor",
     "name": "Refactor Planner Agent",
     "description": "Analyzes codebase and creates refactoring tasks",
-    "tags": ["refactoring", "analysis", "planning"],
-    "roles": ["architect", "refactor-planner"],
+    "tags": [
+      "refactoring",
+      "analysis",
+      "planning"
+    ],
+    "roles": [
+      "architect",
+      "refactor-planner"
+    ],
     "config": {
       "script_path": "/app/scripts/refactor_planner_agent.sh",
       "working_directory": "/app",
@@ -74,8 +106,15 @@
     "type": "popen_cursor",
     "name": "Project Cleanup Agent",
     "description": "Analyzes project and creates cleanup tasks for docs/scripts",
-    "tags": ["cleanup", "analysis", "maintenance"],
-    "roles": ["maintenance", "cleanup"],
+    "tags": [
+      "cleanup",
+      "analysis",
+      "maintenance"
+    ],
+    "roles": [
+      "maintenance",
+      "cleanup"
+    ],
     "config": {
       "script_path": "/app/scripts/project_cleanup_agent.sh",
       "working_directory": "/app",
@@ -88,8 +127,15 @@
     "type": "popen_cursor",
     "name": "Pre-commit Fix Agent",
     "description": "Fixes pre-commit test failures",
-    "tags": ["testing", "fix", "pre-commit"],
-    "roles": ["testing", "fix"],
+    "tags": [
+      "testing",
+      "fix",
+      "pre-commit"
+    ],
+    "roles": [
+      "testing",
+      "fix"
+    ],
     "config": {
       "script_path": "/app/scripts/precommit_agent.sh",
       "working_directory": "/app",
@@ -99,4 +145,3 @@
     }
   }
 }
-

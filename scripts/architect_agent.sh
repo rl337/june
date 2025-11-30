@@ -1,6 +1,6 @@
 #!/bin/bash
-# Project Manager Agent (Enid) for June project - Coordinates releases and project management
-# Usage: project_manager_agent.sh [instruction]
+# Architect Agent for June project - Breaks down abstract/epic tasks
+# Usage: architect_agent.sh [instruction]
 # Output: JSON response on stdout, errors on stderr
 
 set -euo pipefail
@@ -11,24 +11,22 @@ AGENTICNESS_DIR="/home/rlee/dev/agenticness"
 
 # Set standardized directories
 export AGENTICNESS_DATA_DIR="${AGENTICNESS_DATA_DIR:-${JUNE_DATA_DIR:-/home/rlee/june_data}/switchboard}"
-export PROMPTS_DIR="${PROMPTS_DIR:-${AGENTICNESS_DIR}/prompts/project-manager}"
+export PROMPTS_DIR="${PROMPTS_DIR:-${AGENTICNESS_DIR}/prompts/architect}"
 export WORKING_DIRECTORY="${WORKING_DIRECTORY:-/app}"
 
 # Parse arguments
 INSTRUCTION="${1:-}"
 
 # Agent configuration
-ROLE="project-manager"
-# Use new three-part prompt structure (definition.txt, agentic.txt, instruction from message)
-PROMPT_DIR="${PROMPTS_DIR}"
+ROLE="architect"
+PROMPT_FILE="${PROMPTS_DIR}/prompt.txt"
 TIMEOUT="${AGENT_TIMEOUT:-3600}"
 MAX_ERRORS="${MAX_CONSECUTIVE_ERRORS:-3}"
 
 # Call Python executor
-# Pass the prompt directory (not a file) to enable three-part prompt structure
 exec python3 -m agenticness.commands.execute_cursor_agent \
     --role "$ROLE" \
-    --prompt-file "$PROMPT_DIR" \
+    --prompt-file "$PROMPT_FILE" \
     --working-dir "$WORKING_DIRECTORY" \
     --timeout "$TIMEOUT" \
     --max-errors "$MAX_ERRORS" \
