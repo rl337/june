@@ -18,6 +18,8 @@ A finding from the source corpus can therefore imply:
 - distinct requirements on both sides of an interface; or
 - no architectural change.
 
+The existing June repository is evidence about current behavior, not an authority on the target architecture. Legacy services, abstractions and coupling SHOULD be evaluated against these requirements and MAY be replaced, consolidated or retired. Agents working from this document MUST NOT preserve existing structure merely because it already exists; compatibility should be intentional and justified.
+
 ## Requirements
 
 ### 1. Persistent goals are first-class June state
@@ -69,22 +71,43 @@ For each runnable task, June SHOULD:
 
 June owns steps 1, 2, 3, 6 and 7 as orchestration policy. MechaHarness owns generic semantics for graph instantiation/execution, linkage, envelopes, verification and checkpoints.
 
-### 4. June owns concrete template composition, not generic template definitions
+### 4. June owns concrete graph realization; MechaHarness owns generic template definitions
 
 **Sources**
 - Claude, **Introducing dynamic workflows in Claude Code** (2026-05-28): https://claude.com/blog/introducing-dynamic-workflows-in-claude-code
 - Claude, **A harness for every task: dynamic workflows in Claude Code** (2026-06-02): https://claude.com/blog/a-harness-for-every-task-dynamic-workflows-in-claude-code
 
 **Requirements**
-- June SHOULD prefer reusable MechaHarness GraphTemplates for generally useful patterns.
+- June SHOULD prefer reusable MechaHarness `GraphTemplate` definitions for generally useful patterns.
 - June MUST own the product decision about which templates are selected, parameterized, sequenced and nested for a goal.
-- June-specific workflows MAY be represented as configuration/composition over reusable templates.
-- A June-specific composition SHOULD migrate into MechaHarness only when it becomes a genuinely reusable parameterized execution pattern independent of June semantics.
-- June SHOULD NOT fork generic templates merely to adjust application policy that can be expressed through parameters/providers.
+- June MUST own the concrete executable realization created by filling template soft points with June-specific tools, providers, prompts/skills, model choices/capabilities, budgets, persistence adapters, task/goal state and application policies.
+- June-specific code MAY add nodes, edges, bindings or composition around a reusable template when those details express June semantics rather than generic harness behavior.
+- The resulting concrete graph/workflow MAY live as June code or June durable configuration even though MechaHarness validates and executes it.
+- June SHOULD NOT move concrete application bindings into MechaHarness merely because the execution engine needs to consume them.
+- June SHOULD NOT fork a generic template merely to adjust application policy that can be expressed through parameters/providers.
 
-This is the central seam: **MechaHarness owns reusable graph grammar and patterns; June writes the sentences.**
+This is the central seam: **MechaHarness owns reusable graph grammar and patterns; June writes and stores the concrete sentences.**
 
-### 5. Document manager is a durable information substrate
+### 5. Template incubation and promotion are evidence-driven
+
+**Sources**
+- Claude, **Introducing dynamic workflows in Claude Code** (2026-05-28): https://claude.com/blog/introducing-dynamic-workflows-in-claude-code
+- Claude, **A harness for every task: dynamic workflows in Claude Code** (2026-06-02): https://claude.com/blog/a-harness-for-every-task-dynamic-workflows-in-claude-code
+- Cursor, **Continually improving our agent harness** (2026-04-30): https://cursor.com/blog/continually-improving-agent-harness
+
+**Requirements**
+- A graph/workflow MAY originate entirely in June when its topology, bindings or semantics are still entangled with June.
+- June SHOULD allow such workflows to mature locally rather than forcing premature abstraction into MechaHarness.
+- Repeated use, repeated duplication, stable topology across distinct June tasks, or clear reuse outside June SHOULD trigger an abstraction review.
+- Promotion MUST identify the reusable skeleton and the June-specific soft points separately.
+- A promoted pattern SHOULD move only its generic template definition into MechaHarness; June SHOULD retain its concrete bindings, composition and operational policy.
+- After promotion, June SHOULD refactor its concrete workflow to consume the MechaHarness template rather than maintain a divergent local copy.
+- Promotion SHOULD carry tests/provenance showing that the generic template can reproduce the relevant behavior when rebound by June.
+- If a MechaHarness template later proves to encode June-specific assumptions, June SHOULD support moving those assumptions back to the application boundary rather than preserving accidental framework coupling.
+
+The intended path is: **June-specific executable graph → observed reusable pattern → soft-point extraction → MechaHarness template → June rebinding**.
+
+### 6. Document manager is a durable information substrate
 
 **Sources**
 - Cursor, **Dynamic context discovery** (2026-01-06): https://cursor.com/blog/dynamic-context-discovery
@@ -98,7 +121,7 @@ This is the central seam: **MechaHarness owns reusable graph grammar and pattern
 - Large document payloads SHOULD be loaded just in time and only for the execution scope that needs them.
 - A task SHOULD be able to persist references to documents without copying their contents into durable graph state.
 
-### 6. Knowledge graph is June state, not harness context
+### 7. Knowledge graph is June state, not harness context
 
 **Sources**
 - Cursor, **Dynamic context discovery** (2026-01-06): https://cursor.com/blog/dynamic-context-discovery
@@ -111,7 +134,7 @@ This is the central seam: **MechaHarness owns reusable graph grammar and pattern
 - New facts proposed by model executions SHOULD carry provenance and SHOULD pass June-defined promotion/validation policy before becoming durable authoritative knowledge.
 - June SHOULD distinguish event/history records, retrieved evidence, inferred facts and stable knowledge rather than collapsing them into one memory bucket.
 
-### 7. Issue tracker is the durable work ledger
+### 8. Issue tracker is the durable work ledger
 
 **Sources**
 - Cursor, **Introducing Projects** (2026-09-10): https://cursor.com/blog/projects
@@ -125,7 +148,7 @@ This is the central seam: **MechaHarness owns reusable graph grammar and pattern
 - Structured run failures MAY create/update issues according to June policy.
 - Repeated failure classes SHOULD be linkable across issues/runs so June can identify process-level problems.
 
-### 8. Orchestration policy is revisable product policy
+### 9. Orchestration policy is revisable product policy
 
 **Sources**
 - Claude, **Agent Harness Design: 3 Patterns for Harnessing Claude's Intelligence** (2026-04-02): https://claude.com/blog/harnessing-claudes-intelligence
@@ -139,7 +162,7 @@ This is the central seam: **MechaHarness owns reusable graph grammar and pattern
 - Model/runtime improvements SHOULD trigger retirement tests for orchestration scaffolding.
 - A policy that no longer improves June-level outcomes SHOULD be removable without modifying MechaHarness primitives.
 
-### 9. Autonomy decisions combine June consequence policy with MechaHarness enforcement
+### 10. Autonomy decisions combine June consequence policy with MechaHarness enforcement
 
 **Sources**
 - Cursor, **Governing agent autonomy with Auto-review** (2026-06-11): https://cursor.com/blog/agent-autonomy-auto-review
@@ -153,7 +176,7 @@ This is the central seam: **MechaHarness owns reusable graph grammar and pattern
 - June MUST NOT rely on prompts alone to implement hard security boundaries.
 - Approval frequency, reversals, denied actions and unnecessary interruptions SHOULD be observable as product metrics.
 
-### 10. Advisor usage is orchestrated by June but executed through a generic interface
+### 11. Advisor usage is orchestrated by June but executed through a generic interface
 
 **Sources**
 - Claude Code Docs, **Escalate hard decisions with the advisor tool** (reviewed 2026-09-29): https://code.claude.com/docs/en/advisor
@@ -165,7 +188,7 @@ This is the central seam: **MechaHarness owns reusable graph grammar and pattern
 - The Advisor interface, non-binding guidance semantics, capability routing, budget enforcement and observability SHOULD remain generic MechaHarness facilities.
 - June SHOULD record whether advice changed orchestration and whether the eventual outcome improved.
 
-### 11. Sleep/dreaming is a June self-improvement workflow
+### 12. Sleep/dreaming is a June self-improvement workflow
 
 **Sources**
 - Cursor, **Continually improving our agent harness** (2026-04-30): https://cursor.com/blog/continually-improving-agent-harness
@@ -178,7 +201,7 @@ This is the central seam: **MechaHarness owns reusable graph grammar and pattern
 - Generic improvements to MechaHarness SHOULD be proposed across the repository boundary rather than silently implemented as June-only forks.
 - June SHOULD preserve provenance from observed failure → hypothesis → experiment → promoted/retired change.
 
-### 12. June-level outcome measurement spans multiple MechaHarness runs
+### 13. June-level outcome measurement spans multiple MechaHarness runs
 
 **Sources**
 - Cursor, **How we compare model quality in Cursor** (2026-03-11): https://cursor.com/blog/cursorbench
@@ -200,7 +223,7 @@ This is the central seam: **MechaHarness owns reusable graph grammar and pattern
 | Knowledge graph | graph schema, provenance, promotion/query policy | scoped ContextProvider protocol |
 | Issue tracker | durable work model and transitions | structured execution/failure/trace outputs |
 | Persistent goals | identity, triggers, completion policy | checkpoints, OutcomeContract-compatible signals |
-| Concrete orchestration | template selection/binding/composition | reusable parameterized GraphTemplates |
+| Concrete orchestration | template selection/binding/composition and concrete executable graph realization | reusable parameterized GraphTemplates + graph validation/execution |
 | Autonomy | product consequence/approval policy | grants, CapabilityEnvelope, verification primitives |
 | Advisor use | product triggers and evidence selection | Advisor / AdvisorPolicy |
 | Dreaming | mining, hypotheses, promotion workflow | traces, HarnessExperiment/eval hooks |
