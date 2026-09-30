@@ -5,215 +5,45 @@ __pycache__/
 *.so
 .Python
 build/
-develop-eggs/
 dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
+.eggs/
+wheels/
 
 # Virtual environments
 .env
-.venv
-env/
+.venv/
 venv/
 ENV/
-env.bak/
-venv.bak/
 
-# IDE
+# IDE / OS
 .vscode/
 .idea/
-*.swp
-*.swo
+.DS_Store
 *~
 
-# OS
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Logs
-*.log
-logs/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Coverage directory used by tools like istanbul
-coverage/
-*.lcov
-
-# nyc test coverage
-.nyc_output
-
-# Dependency directories
-node_modules/
-jspm_packages/
-
-# Optional npm cache directory
-.npm
-
-# Optional eslint cache
-.eslintcache
-
-# Microbundle cache
-.rpt2_cache/
-.rts2_cache_cjs/
-.rts2_cache_es/
-.rts2_cache_umd/
-
-# Optional REPL history
-.node_repl_history
-
-# Output of 'npm pack'
-*.tgz
-
-# Yarn Integrity file
-.yarn-integrity
-
-# dotenv environment variables file
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Credentials and secrets
-*.key
-*.pem
-*.p12
-*.pfx
-secrets/
-credentials/
-config/secrets/
-
-# Model cache and data
-models/
-*.bin
-*.safetensors
-*.ckpt
-*.pt
-*.pth
-.cache/
-huggingface/
-
-# June Agent data directory (CRITICAL - Never commit runtime data!)
-/home/rlee/june_data/
-june_data/
-
-# Test data and artifacts (CRITICAL - Never commit test artifacts!)
-/home/rlee/june_test_data/
-june_test_data/
-test_data/
-test_artifacts/
-
-# Model artifacts from containers
-model_artifacts/
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
-
-# Docker
-.dockerignore
-
-# Temporary files
-tmp/
-temp/
-*.tmp
-*.temp
-
-# Refactor agent tracking files
-.refactor_agent_error_count
-.refactor_agent_session_id
-
-# Build artifacts
-build/
-dist/
-*.tar.gz
-*.zip
-
-# Test artifacts
+# Test / type / lint caches
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
 .coverage
 htmlcov/
 .tox/
-.nox/
 
-# Jupyter Notebook
-.ipynb_checkpoints
+# Secrets
+*.key
+*.pem
+secrets/
+credentials/
 
-# pyenv
-.python-version
+# Runtime / local data
+june_data/
+*.db
+*.sqlite3
+tmp/
+temp/
+*.log
 
-# pipenv
-Pipfile.lock
-
-# Poetry
-poetry.lock
-
-# Celery
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
-# Spyder project settings
-.spyderproject
-.spyproject
-
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
-
-# mypy
-.mypy_cache/
-.dmypy.json
-dmypy.json
-
-# Pyre type checker
-.pyre/
-
-# React build
-services/webapp/build/
-services/webapp/.env.local
-services/webapp/.env.development.local
-services/webapp/.env.test.local
-services/webapp/.env.production.local
-
-# Ignore ALL-CAPS markdown except README.md, AGENTS.md, TODO.md, COMMANDS.md, TESTING.md, MONITORING.md, MESSAGE_FORMAT_REQUIREMENTS.md, NIM_SETUP.md, and OPERATIONAL_READINESS.md
-[A-Z]*.md
-!README.md
-!AGENTS.md
-!TODO.md
-!COMMANDS.md
-!TESTING.md
-!MONITORING.md
-!MESSAGE_FORMAT_REQUIREMENTS.md
-!NIM_SETUP.md
-!USER_REQUESTS.md
-!OPERATIONAL_READINESS.md
+# Packaging
+*.tar.gz
+*.zip

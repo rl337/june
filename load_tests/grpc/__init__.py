@@ -1,1 +1,0 @@
-"""gRPC load test files."""

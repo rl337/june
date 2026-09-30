@@ -1,1 +1,0 @@
-# Commands tests package
