@@ -41,11 +41,23 @@ docs/inspiration/dev-blog-inspiration.md
 ```bash
 python -m venv .venv
 source .venv/bin/activate
+pip install -U pip setuptools wheel
 pip install -e ".[dev]"
-# Install MechaHarness from its repo if not published yet:
-# pip install -e ../mechaharness
+# Optional MechaHarness client dependency:
+# pip install -e ".[harness]"   # or: pip install -e ../mechaharness
 june status
+june goal-create "First vertical slice" --criteria "runner writes goal/issue state"
 pytest
+```
+
+## First vertical slice
+
+```bash
+june --data-dir /tmp/june-data goal-create "Ship harness binding" --criteria "marked complete"
+# copy goal id from output
+june --data-dir /tmp/june-data wake <goal-id> --task "bind template" --complete
+june --data-dir /tmp/june-data status
+june --data-dir /tmp/june-data dream
 ```
 
 ## Boundary
