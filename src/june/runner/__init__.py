@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from typing import Any, Callable
 
 from june.advisor import AdvisorOrchestrator, AdvisorRequest
+from june.budget import budget_for_decision, budget_from_payload
 from june.documents import DocumentStore
 from june.goals import GoalStatus, GoalStore
 from june.harness import BoundRun, MechaHarnessClient, RunResult
@@ -101,6 +102,11 @@ class TaskRunner:
         subject = goal.id if goal is not None else None
         context_refs.extend(self.knowledge.scoped_context(subject=subject))
 
+        budget = budget_for_decision(
+            decision,
+            override=budget_from_payload(work.payload),
+        )
+
         bound = self.client.bind_template(
             spec.mechaharness_template or spec.name,
             bindings={
@@ -115,6 +121,7 @@ class TaskRunner:
             grants=decision.grants,
             context_refs=context_refs,
             node_kinds=spec.node_kinds,
+            budget=budget,
         )
 
         if self.advisor.should_consult(
@@ -172,6 +179,7 @@ class TaskRunner:
                 "verification": run_result.verification,
                 "checkpoint": run_result.graph_checkpoint,
                 "template": spec.name,
+                "budget_policy": run_result.budget,
             },
             run_id=run_result.run_id,
             decision=next_decision,
@@ -180,6 +188,7 @@ class TaskRunner:
                 "consequence": decision.consequence.value,
                 "grants": decision.grants,
                 "reason": decision.reason,
+                "budget_policy": budget.to_dict(),
             },
         )
 
@@ -196,10 +205,11 @@ class TaskRunner:
             self.goals.link_run(goal_id, run_result.run_id)
         if issue_id:
             self.issues.link_run(issue_id, run_result.run_id)
-        if run_result.status == "failed":
+        if run_result.status in {"failed", "hard_budget_exceeded", "soft_exhausted"}:
+            failure_class = str(run_result.error or run_result.status or "run_failed")
             self.issues.record_failure(
                 title=f"Run failed for work {work.id}",
-                failure_class=str(run_result.error or "run_failed"),
+                failure_class=failure_class,
                 goal_id=goal_id,
                 run_id=run_result.run_id,
                 note=str(run_result.raw),
@@ -208,6 +218,20 @@ class TaskRunner:
     def _decide(self, work: RunnableWork, run_result: RunResult) -> str:
         if run_result.status in {"denied"}:
             return "deny"
+        # MechaHarness budget outcomes (GraphExecutor statuses).
+        if run_result.status == "soft_exhausted":
+            # Soft wind-down: treat as complete-with-limit unless payload asks retry.
+            if work.payload.get("retry_on_soft_budget"):
+                retried = self.scheduler.retry(work, backoff_seconds=1)
+                return "retry" if retried is not None else "escalate"
+            return "complete"
+        if run_result.status == "hard_budget_exceeded":
+            self.policy.record_metric(
+                "hard_budget_exceeded",
+                work_id=work.id,
+                budget=run_result.budget,
+            )
+            return "escalate"
         if run_result.status == "failed":
             retried = self.scheduler.retry(work, backoff_seconds=1)
             return "retry" if retried is not None else "escalate"

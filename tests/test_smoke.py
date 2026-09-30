@@ -156,6 +156,62 @@ def test_denied_action_path() -> None:
     assert outcome.decision == "deny"
 
 
+def test_subgraph_budget_attached_and_scaled_by_consequence() -> None:
+    from june.budget import SubgraphBudget, budget_for_decision
+    from june.policy import Consequence, PolicyDecision
+
+    low = budget_for_decision(
+        PolicyDecision(
+            allow=True,
+            require_approval=False,
+            consequence=Consequence.LOW,
+            reason="test",
+        )
+    )
+    assert low.hard_limit == 32.0
+    critical = budget_for_decision(
+        PolicyDecision(
+            allow=True,
+            require_approval=True,
+            consequence=Consequence.CRITICAL,
+            reason="test",
+        )
+    )
+    assert critical.hard_limit == 16.0
+    assert SubgraphBudget.unlimited().hard_limit is None
+
+    runner = TaskRunner()
+    sched = Scheduler()
+    work = sched.enqueue(
+        reason=WakeReason.MANUAL,
+        goal_id="g1",
+        payload={"task": "budgeted", "budget_policy": {"soft_limit": 1, "hard_limit": 2}},
+    )
+    outcome = runner.run(work)
+    assert outcome.policy["budget_policy"]["hard_limit"] == 2
+    assert outcome.result["budget_policy"]["soft_limit"] == 1
+
+
+def test_hard_budget_exceeded_escalates() -> None:
+    from june.budget import SubgraphBudget
+    from june.harness import RunResult
+    from june.runner import TaskRunner
+    from june.scheduler import RunnableWork, WakeReason
+
+    runner = TaskRunner()
+    work = RunnableWork(goal_id="g", issue_id=None, reason=WakeReason.MANUAL)
+    decision = runner._decide(
+        work,
+        RunResult(
+            status="hard_budget_exceeded",
+            run_id="r1",
+            template_name="direct",
+            budget=SubgraphBudget(soft_limit=1, hard_limit=2).to_dict(),
+        ),
+    )
+    assert decision == "escalate"
+
+
 def test_work_queue_sleep_caps_at_100ms_or_next_job() -> None:
     from datetime import datetime, timedelta, timezone
 

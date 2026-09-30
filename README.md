@@ -25,6 +25,7 @@ orchestration.
 ```
 src/june/
   control/      # June control graph: timed queue, ≤100ms tick, cron/polls
+  budget.py     # select MechaHarness BudgetPolicy for child graph runs
   goals/        # persistent goals
   scheduler/    # wake / runnable-work policy
   runner/       # orchestration around MechaHarness runs
@@ -45,8 +46,8 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -U pip setuptools wheel
 pip install -e ".[dev]"
-# Optional MechaHarness client dependency:
-# pip install -e ".[harness]"   # or: pip install -e ../mechaharness
+# Optional MechaHarness client dependency (BudgetPolicy / GraphExecutor):
+# pip install -e ".[harness]"   # mechaharness>=0.2.0
 june status
 june goal-create "First vertical slice" --criteria "runner writes goal/issue state"
 pytest

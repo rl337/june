@@ -51,6 +51,7 @@ The existing June repository is evidence about current behavior, not an authorit
 - Scheduling decisions SHOULD be durable and observable, including why a task woke and which goal/issue caused it.
 - Duplicate or overlapping wakes SHOULD be coalesced when product semantics allow.
 - Scheduling MUST NOT imply execution capability; the task runner still resolves the chosen MechaHarness graph against current providers, permissions and environment.
+- The June control graph (`june.control`) is the base operating layer and SHOULD be treated as uncapped for MechaHarness `BudgetPolicy` purposes. When the control graph spawns a child MechaHarness execution, June MUST supply a `BudgetPolicy` (soft/hard limits) for that run; MechaHarness enforces spend and returns `soft_exhausted` / `hard_budget_exceeded` outcomes.
 
 ### 3. Task runner owns orchestration, MechaHarness owns execution
 
@@ -224,6 +225,7 @@ The intended path is: **June-specific executable graph → observed reusable pat
 | Issue tracker | durable work model and transitions | structured execution/failure/trace outputs |
 | Persistent goals | identity, triggers, completion policy | checkpoints, OutcomeContract-compatible signals |
 | Concrete orchestration | template selection/binding/composition and concrete executable graph realization | reusable parameterized GraphTemplates + graph validation/execution |
+| Subgraph budgets | select soft/hard `BudgetPolicy` per child run (control graph uncapped) | `mechaharness.budget.BudgetPolicy` / `Budget` enforcement on `GraphExecutor.run` |
 | Autonomy | product consequence/approval policy | grants, CapabilityEnvelope, verification primitives |
 | Advisor use | product triggers and evidence selection | Advisor / AdvisorPolicy |
 | Dreaming | mining, hypotheses, promotion workflow | traces, HarnessExperiment/eval hooks |
