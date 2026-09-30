@@ -1,73 +1,26 @@
-name: Run Tests
+name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.9", "3.12"]
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
-    - name: Install system dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y python3.12-dev build-essential
-    - name: Install Poetry
-      run: |
-        pip install --break-system-packages poetry
-    - name: Configure Poetry and install dependencies
-      env:
-        POETRY_VIRTUALENVS_CREATE: "true"
-        POETRY_VIRTUALENVS_IN_PROJECT: "true"
-      timeout-minutes: 15
-      run: |
-        # Retry poetry install up to 3 times to handle transient network issues
-        max_attempts=3
-        attempt=1
-        while [ $attempt -le $max_attempts ]; do
-          echo "Poetry install attempt $attempt of $max_attempts"
-          if poetry install --no-interaction --no-ansi --no-root; then
-            echo "Poetry install succeeded on attempt $attempt"
-            exit 0
-          else
-            if [ $attempt -lt $max_attempts ]; then
-              echo "Poetry install failed on attempt $attempt, retrying in 10 seconds..."
-              sleep 10
-            else
-              echo "Poetry install failed after $max_attempts attempts"
-              exit 1
-            fi
-          fi
-          attempt=$((attempt + 1))
-        done
-    - name: Diagnostic information
-      run: |
-        echo "=== Environment Diagnostics ==="
-        echo "Python version: $(python --version)"
-        echo "Poetry version: $(poetry --version)"
-        echo "Pytest version: $(poetry run pytest --version || echo 'pytest not available')"
-        echo "Working directory: $(pwd)"
-        echo "Python path: $(which python)"
-        echo "=== Test directory structure ==="
-        find tests/essence -name "*.py" -type f | head -20
-        echo "=== Pytest configuration ==="
-        poetry run pytest --co -q tests/essence/ 2>&1 | head -30 || echo "Collection failed"
-    - name: Check test collection
-      run: |
-        echo "Checking pytest collection..."
-        poetry run pytest tests/essence/ -m "not integration" --co -q || {
-          echo "ERROR: Test collection failed!"
-          echo "Attempting to collect all tests (including integration) to see what's available..."
-          poetry run pytest tests/essence/ --co -q || true
-          exit 1
-        }
-    - name: Run tests
-      run: |
-        poetry run pytest tests/essence/ -m "not integration" -v --tb=short
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Ruff
+        run: ruff check src tests
+      - name: Tests
+        run: pytest -q
