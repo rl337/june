@@ -24,6 +24,7 @@ orchestration.
 
 ```
 src/june/
+  control/      # June control graph: timed queue, ≤100ms tick, cron/polls
   goals/        # persistent goals
   scheduler/    # wake / runnable-work policy
   runner/       # orchestration around MechaHarness runs
@@ -32,6 +33,7 @@ src/june/
   knowledge/    # knowledge graph (June state)
   issues/       # durable work ledger
   policy/       # versioned orchestration / autonomy policy
+  orchestrator.py
   cli.py
 docs/inspiration/dev-blog-inspiration.md
 ```
@@ -48,6 +50,21 @@ pip install -e ".[dev]"
 june status
 june goal-create "First vertical slice" --criteria "runner writes goal/issue state"
 pytest
+```
+
+## Control graph entrypoint
+
+`june run` is the single long-lived process. It boots the incubating
+`june.control` graph with a timed work queue:
+
+- recurring cron tick + Telegram/Discord/webapp poll nodes (adapters stubbed)
+- max tick **100ms**; sleeps `min(100ms, time_until_next_job)` when idle
+- due `execute_work` jobs bind/run through the task runner / MechaHarness client
+
+```bash
+june --data-dir /tmp/june-data run --max-steps 5
+# or until Ctrl-C:
+june --data-dir /tmp/june-data run
 ```
 
 ## First vertical slice

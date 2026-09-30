@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import signal
 import sys
 from pathlib import Path
 
@@ -40,8 +41,20 @@ def app(argv: list[str] | None = None) -> None:
     wake.add_argument("--complete", action="store_true")
     wake.set_defaults(func=_cmd_wake)
 
-    tick = sub.add_parser("tick", help="Materialize schedules and drain runnable work")
+    tick = sub.add_parser("tick", help="One control-graph step (cron/polls/due work)")
     tick.set_defaults(func=_cmd_tick)
+
+    run = sub.add_parser(
+        "run",
+        help="Single entrypoint: run the June control graph (cron + polling loop)",
+    )
+    run.add_argument(
+        "--max-steps",
+        type=int,
+        default=None,
+        help="Stop after N control steps (default: run until interrupted)",
+    )
+    run.set_defaults(func=_cmd_run)
 
     dream = sub.add_parser("dream", help="Mine durable traces for improvement proposals")
     dream.set_defaults(func=_cmd_dream)
@@ -94,6 +107,47 @@ def _cmd_tick(args: argparse.Namespace) -> None:
         for o in outcomes
     ]
     print(json.dumps(payload, indent=2))
+
+
+def _cmd_run(args: argparse.Namespace) -> None:
+    orch = _orch(args)
+    stop = {"flag": False}
+
+    def _stop(signum: int, frame: object) -> None:
+        del signum, frame
+        stop["flag"] = True
+        print("stopping control graph…", file=sys.stderr)
+
+    signal.signal(signal.SIGINT, _stop)
+    signal.signal(signal.SIGTERM, _stop)
+    print(
+        json.dumps(
+            {
+                "event": "control_graph_start",
+                "graph": orch.control.describe(),
+            },
+            indent=2,
+        ),
+        file=sys.stderr,
+    )
+    results = orch.run(max_steps=args.max_steps, should_stop=lambda: stop["flag"])
+    print(
+        json.dumps(
+            {
+                "event": "control_graph_stop",
+                "steps": len(results),
+                "last": None
+                if not results
+                else {
+                    "slept_seconds": results[-1].slept_seconds,
+                    "jobs_run": results[-1].jobs_run,
+                    "events": len(results[-1].events),
+                    "work_outcomes": len(results[-1].work_outcomes),
+                },
+            },
+            indent=2,
+        )
+    )
 
 
 def _cmd_dream(args: argparse.Namespace) -> None:

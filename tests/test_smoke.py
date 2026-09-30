@@ -154,3 +154,74 @@ def test_denied_action_path() -> None:
     outcome = runner.run(work)
     assert outcome.status == "denied"
     assert outcome.decision == "deny"
+
+
+def test_work_queue_sleep_caps_at_100ms_or_next_job() -> None:
+    from datetime import datetime, timedelta, timezone
+
+    from june.control import ControlJobKind, WorkQueue
+
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    queue = WorkQueue()
+    assert queue.sleep_seconds(now) == 0.1
+
+    queue.schedule(
+        ControlJobKind.EXECUTE_WORK,
+        run_at=now + timedelta(milliseconds=30),
+        payload={"task": "soon"},
+    )
+    assert abs(queue.sleep_seconds(now) - 0.03) < 1e-6
+
+    queue.schedule(
+        ControlJobKind.EXECUTE_WORK,
+        run_at=now - timedelta(milliseconds=1),
+        payload={"task": "due"},
+    )
+    assert queue.sleep_seconds(now) == 0.0
+
+
+def test_control_graph_tick_and_early_wake() -> None:
+    from datetime import datetime, timedelta, timezone
+
+    from june.control import ControlGraph, ControlJobKind, WorkQueue
+
+    now = {"t": datetime(2026, 1, 1, tzinfo=timezone.utc)}
+    slept: list[float] = []
+
+    def clock() -> datetime:
+        return now["t"]
+
+    def sleeper(seconds: float) -> None:
+        slept.append(seconds)
+        now["t"] = now["t"] + timedelta(seconds=seconds)
+
+    executed: list[dict] = []
+    graph = ControlGraph(
+        queue=WorkQueue(),
+        max_tick_seconds=0.1,
+        poll_interval_seconds=0.1,
+        clock=clock,
+        sleeper=sleeper,
+        on_execute_work=lambda payload: executed.append(payload) or {"ok": True},
+    )
+    graph.bootstrap()
+    # Next pollers are due immediately at bootstrap time → first step sleeps 0.
+    step1 = graph.step()
+    assert step1.slept_seconds == 0.0
+    assert ControlJobKind.CRON_TICK.value in step1.jobs_run
+    assert ControlJobKind.POLL_TELEGRAM.value in step1.jobs_run
+
+    # Schedule work sooner than the 100ms poll cadence.
+    graph.schedule_work({"task": "urgent"}, run_at=now["t"] + timedelta(milliseconds=25))
+    step2 = graph.step()
+    assert abs(step2.slept_seconds - 0.025) < 1e-6
+    assert executed
+    assert executed[-1]["task"] == "urgent"
+
+
+def test_orchestrator_run_registers_control_template(tmp_path: Path) -> None:
+    orch = Orchestrator(tmp_path)
+    assert orch.templates.get("june.control") is not None
+    results = orch.run(max_steps=1)
+    assert len(results) == 1
+    assert "control.cron_tick" in results[0].jobs_run
