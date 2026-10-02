@@ -34,7 +34,8 @@ const MENU_CATALOG = {
       items: [
         { id: "graph", label: "Graph (main)", action: "view:open:graph" },
         { id: "status", label: "Orchestrator status", action: "view:toggle:status" },
-        { id: "events", label: "Event log", action: "view:toggle:events" },
+        { id: "activity", label: "Event activity", action: "view:toggle:activity" },
+        { id: "events", label: "Event log (list)", action: "view:toggle:events" },
         { id: "inspector", label: "Node inspector", action: "view:toggle:inspector" },
       ],
     },
@@ -55,8 +56,9 @@ const MENU_CATALOG = {
       id: "time",
       short: "Ti",
       name: "Timeline",
-      tip: "Last update and event stream",
+      tip: "Activity chart and last update",
       items: [
+        { id: "activity", label: "Event activity", action: "view:toggle:activity" },
         { id: "updated", label: "Show last update", action: "dialog:last-update" },
       ],
     },
@@ -85,12 +87,19 @@ const VIEW_SPECS = {
     naturalHeight: 140,
     defaultOpen: false,
   },
+  activity: {
+    title: "Event activity",
+    dock: "bottom",
+    naturalWidth: null,
+    naturalHeight: 160,
+    defaultOpen: true,
+  },
   events: {
     title: "Event log",
     dock: "left",
     naturalWidth: 340,
     naturalHeight: null,
-    defaultOpen: true,
+    defaultOpen: false,
   },
   inspector: {
     title: "Inspector",
@@ -109,9 +118,9 @@ export class JuneConsoleShell {
     this.orbs = [];
     /** @type {Record<string, string[]>} dock edge → stacked view ids (top is last) */
     this.dockStacks = {
-      left: ["events"],
+      left: [],
       right: [],
-      bottom: [],
+      bottom: ["activity"],
       top: [],
     };
     this.lastSnapshot = null;
@@ -170,11 +179,19 @@ export class JuneConsoleShell {
       insp.textContent = JSON.stringify(scene, null, 2);
     }
     this._renderEventLog(snapshot.event_log || []);
+    this._renderActivityChart(snapshot.event_rate || {}, snapshot.event_log || []);
     const countEl = this.workspace.querySelector('[data-view="events"] .event-count');
     if (countEl) {
       const n = (snapshot.event_log || []).length;
       countEl.textContent = String(n);
       countEl.hidden = n === 0;
+    }
+    const rateEl = this.workspace.querySelector('[data-view="activity"] .event-count');
+    if (rateEl) {
+      const bins = (snapshot.event_rate && snapshot.event_rate.bins) || [];
+      const n = bins.reduce((sum, b) => sum + (b.count || 0), 0);
+      rateEl.textContent = String(n);
+      rateEl.hidden = n === 0;
     }
   }
 
@@ -189,21 +206,133 @@ export class JuneConsoleShell {
     const atBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 48;
     list.innerHTML = "";
     for (const row of entries) {
-      const li = document.createElement("li");
-      li.className = "event-log-row";
-      if (row.type === "june.console.log") li.classList.add("is-console-log");
-      if (String(row.type).includes("graph_node_start")) li.classList.add("is-start");
-      if (String(row.type).includes("graph_node_end")) li.classList.add("is-end");
-      li.innerHTML = `
-        <span class="event-log-ts">${escapeHtml((row.ts || "").slice(11, 19))}</span>
-        <span class="event-log-type">${escapeHtml(shortType(row.type))}</span>
-        <span class="event-log-summary">${escapeHtml(row.summary || "")}</span>
-      `;
-      list.appendChild(li);
+      list.appendChild(eventLogItem(row));
     }
     if (atBottom) {
       body.scrollTop = body.scrollHeight;
     }
+  }
+
+  _renderActivityChart(rate, eventLog) {
+    const body = this.workspace.querySelector('[data-view="activity"] .view-body');
+    if (!body) return;
+    let chart = body.querySelector(".event-rate-chart");
+    if (!chart) {
+      body.innerHTML = `
+        <div class="event-rate-chart" role="img" aria-label="Rolling event rate"></div>
+        <p class="event-rate-hint">Click a bar for that bin’s events</p>
+      `;
+      chart = body.querySelector(".event-rate-chart");
+    }
+    const bins = rate.bins || [];
+    const max = Math.max(1, ...bins.map((b) => b.count || 0));
+    chart.innerHTML = "";
+    bins.forEach((bin, idx) => {
+      const bar = document.createElement("button");
+      bar.type = "button";
+      bar.className = "event-rate-bar";
+      if ((bin.count || 0) > 0) bar.classList.add("has-events");
+      const pct = Math.max(4, Math.round(((bin.count || 0) / max) * 100));
+      bar.style.setProperty("--bar-h", `${pct}%`);
+      bar.title = `${bin.count || 0} events · ${(bin.start || "").slice(11, 19)}–${(bin.end || "").slice(11, 19)}`;
+      bar.dataset.binIndex = String(idx);
+      bar.addEventListener("click", () => {
+        this.openEventBinDialog(bin, eventLog);
+      });
+      chart.appendChild(bar);
+    });
+  }
+
+  openEventBinDialog(bin, eventLog) {
+    const indices = bin.event_indices || [];
+    const rows = indices
+      .map((i) => eventLog[i])
+      .filter(Boolean);
+    this.openCustomDialog({
+      kind: `events-bin-${bin.index}`,
+      title: `Events · ${(bin.start || "").slice(11, 19)}–${(bin.end || "").slice(11, 19)}`,
+      bodyHtml: rows.length
+        ? `<ul class="event-log-list dialog-event-list">${rows
+            .map((row) => eventLogItem(row).outerHTML)
+            .join("")}</ul>`
+        : `<p class="dialog-text">No events in this bin.</p>`,
+    });
+  }
+
+  openInstanceStackDialog(node) {
+    const snap = this.lastSnapshot || {};
+    const parentId = node.stack_parent_id || node.id;
+    const hidden = new Set(node.stack_hidden || []);
+    const all = (snap.instances || []).filter(
+      (i) => i.parent_node_id === parentId || hidden.has(i.run_id),
+    );
+    const running = all.filter((i) => i.status === "running");
+    const others = all.filter((i) => i.status !== "running");
+    const ordered = [...running, ...others];
+    const listHtml = ordered.length
+      ? `<ul class="instance-list">${ordered
+          .map((inst) => {
+            const short = String(inst.run_id || "").slice(-8);
+            const st = escapeHtml(inst.status || "");
+            const active = escapeHtml(inst.active_node_id || "—");
+            return `<li class="instance-row ${inst.status === "running" ? "is-running" : ""}">
+              <button type="button" class="instance-watch" data-run-id="${escapeHtml(inst.run_id || "")}">
+                <span class="instance-id">run ${escapeHtml(short)}</span>
+                <span class="instance-status">${st}</span>
+                <span class="instance-active">${active}</span>
+              </button>
+            </li>`;
+          })
+          .join("")}</ul>`
+      : `<p class="dialog-text">No instances for this stack.</p>`;
+    const dialog = this.openCustomDialog({
+      kind: `stack-${parentId}`,
+      title: "Running instances",
+      bodyHtml: `<p class="dialog-text">Double-clicked stack · watch an instance</p>${listHtml}`,
+    });
+    dialog.querySelectorAll(".instance-watch").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const runId = btn.getAttribute("data-run-id");
+        this.emit("instance:watch", { runId, parentId });
+        this.openCustomDialog({
+          kind: `watch-${runId}`,
+          title: `Watch · ${String(runId || "").slice(-8)}`,
+          bodyHtml: `<pre class="dialog-pre">${escapeHtml(
+            JSON.stringify(
+              (snap.instances || []).find((i) => i.run_id === runId) || { run_id: runId },
+              null,
+              2,
+            ),
+          )}</pre>`,
+        });
+      });
+    });
+  }
+
+  openCustomDialog({ kind, title, bodyHtml, anchorEl = null }) {
+    for (const existing of [...this.dialogLayer.querySelectorAll(".console-dialog")]) {
+      if (existing.dataset.dialog === kind) existing.remove();
+    }
+    const dialog = document.createElement("div");
+    dialog.className = "console-dialog";
+    dialog.dataset.dialog = kind;
+    if (anchorEl) {
+      const rect = anchorEl.getBoundingClientRect();
+      dialog.style.setProperty("--origin-x", `${rect.left + rect.width / 2}px`);
+      dialog.style.setProperty("--origin-y", `${rect.top + rect.height / 2}px`);
+    } else {
+      dialog.style.setProperty("--origin-x", "50vw");
+      dialog.style.setProperty("--origin-y", "45vh");
+    }
+    dialog.innerHTML = `
+      <button type="button" class="dialog-close" aria-label="Close">×</button>
+      <h3 class="dialog-title">${escapeHtml(title)}</h3>
+      ${bodyHtml}
+    `;
+    dialog.querySelector(".dialog-close").addEventListener("click", () => dialog.remove());
+    this.dialogLayer.appendChild(dialog);
+    requestAnimationFrame(() => dialog.classList.add("is-open"));
+    return dialog;
   }
 
   _buildMenus() {
@@ -328,7 +457,9 @@ export class JuneConsoleShell {
       if (spec.naturalWidth) pane.style.setProperty("--natural-w", `${spec.naturalWidth}px`);
       if (spec.naturalHeight) pane.style.setProperty("--natural-h", `${spec.naturalHeight}px`);
       const countBadge =
-        id === "events" ? '<span class="event-count pill" hidden>0</span>' : "";
+        id === "events" || id === "activity"
+          ? '<span class="event-count pill" hidden>0</span>'
+          : "";
       pane.innerHTML = `
         <header class="view-chrome">
           <span class="view-title">${spec.title}</span>
@@ -341,6 +472,12 @@ export class JuneConsoleShell {
       if (id === "events") {
         pane.querySelector(".view-body").innerHTML =
           '<ul class="event-log-list" aria-label="Graph event log"></ul>';
+      }
+      if (id === "activity") {
+        pane.querySelector(".view-body").innerHTML = `
+          <div class="event-rate-chart" role="img" aria-label="Rolling event rate"></div>
+          <p class="event-rate-hint">Click a bar for that bin’s events</p>
+        `;
       }
       if (id === "legend") {
         pane.querySelector(".view-body").innerHTML = `
@@ -436,7 +573,7 @@ export class JuneConsoleShell {
     if (this._topView("bottom")) {
       const seam = document.createElement("div");
       seam.className = "view-seam";
-      seam.dataset.between = "graph-legend";
+      seam.dataset.between = `graph-${this._topView("bottom")}`;
       seam.style.gridColumn = "1 / 6";
       seam.style.gridRow = "2";
       this.workspace.appendChild(seam);
@@ -494,6 +631,20 @@ function shortType(type) {
   if (t.startsWith("core:")) return t.slice(5);
   if (t.startsWith("june.")) return t.slice(5);
   return t;
+}
+
+function eventLogItem(row) {
+  const li = document.createElement("li");
+  li.className = "event-log-row";
+  if (row.type === "june.console.log") li.classList.add("is-console-log");
+  if (String(row.type).includes("graph_node_start")) li.classList.add("is-start");
+  if (String(row.type).includes("graph_node_end")) li.classList.add("is-end");
+  li.innerHTML = `
+    <span class="event-log-ts">${escapeHtml((row.ts || "").slice(11, 19))}</span>
+    <span class="event-log-type">${escapeHtml(shortType(row.type))}</span>
+    <span class="event-log-summary">${escapeHtml(row.summary || "")}</span>
+  `;
+  return li;
 }
 
 function escapeHtml(text) {
