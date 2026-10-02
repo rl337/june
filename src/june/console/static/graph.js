@@ -220,10 +220,7 @@ export class GraphViewport {
     svg.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
 
     const defs = el("defs");
-    const glow = el("filter", { id: "glow" });
-    glow.innerHTML =
-      '<feGaussianBlur stdDeviation="3.5" result="b"/><feColorMatrix in="b" type="matrix" values="0 0 0 0 0.36  0 0 0 0 1  0 0 0 0 0.69  0 0 0 0.75 0" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>';
-    defs.appendChild(glow);
+    appendBubbleTroubleDefs(defs);
     svg.appendChild(defs);
 
     const root = el("g", { class: "world-root" });
@@ -320,16 +317,12 @@ function drawNodeTree(layer, node, ctx) {
 
   // Bubble Trouble palette: membrane green idle, bright bubble cyan running.
   const soft = node.shape === "round_rect";
+  const rx = soft ? Math.min(26, Math.max(14, node.h * 0.28)) : 4;
   let fill;
   let opacity;
   if (running) {
-    if (reveal) {
-      fill = soft ? "#5dffb0" : "#3de0ff";
-      opacity = "0.28";
-    } else {
-      fill = soft ? "#5dffb0" : "#3de0ff";
-      opacity = "0.78";
-    }
+    fill = soft ? "#5dffb0" : "#3de0ff";
+    opacity = reveal ? "0.28" : "0.78";
   } else {
     fill = soft ? "#1f6b45" : "#1a5a66";
     opacity = reveal ? "0.24" : "0.9";
@@ -339,8 +332,8 @@ function drawNodeTree(layer, node, ctx) {
     y: 0,
     width: node.w,
     height: node.h,
-    rx: soft ? 22 : 4,
-    ry: soft ? 22 : 4,
+    rx,
+    ry: rx,
     fill,
     "fill-opacity": opacity,
     stroke: selected ? "#ffb347" : running ? "#c8ffe8" : "#7eab8f",
@@ -348,7 +341,15 @@ function drawNodeTree(layer, node, ctx) {
   });
   if (running) rect.setAttribute("filter", "url(#glow)");
   g.dataset.running = running ? "1" : "0";
+  g.dataset.shape = soft ? "soft" : "hard";
   g.appendChild(rect);
+
+  // Soft/circular-ish nodes: glass bubble specular. Hard rects: muted Metroid tiles.
+  if (soft) {
+    appendBubbleSpecular(g, node.w, node.h, rx, { running, reveal });
+  } else {
+    appendTileTexture(g, node.w, node.h, rx, { reveal });
+  }
 
   if (node.label && screenH >= LABEL_MIN_PX) {
     const label = el("text", {
@@ -398,6 +399,192 @@ function drawNodeTree(layer, node, ctx) {
   }
 
   layer.appendChild(g);
+}
+
+function appendBubbleTroubleDefs(defs) {
+  const glow = el("filter", { id: "glow" });
+  glow.innerHTML =
+    '<feGaussianBlur stdDeviation="3.5" result="b"/><feColorMatrix in="b" type="matrix" values="0 0 0 0 0.36  0 0 0 0 1  0 0 0 0 0.69  0 0 0 0.75 0" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>';
+  defs.appendChild(glow);
+
+  // Soft bubble body sheen (top-left light wrap).
+  const sheen = el("radialGradient", {
+    id: "bubbleSheen",
+    cx: "0.28",
+    cy: "0.24",
+    r: "0.78",
+    gradientUnits: "objectBoundingBox",
+  });
+  sheen.appendChild(el("stop", { offset: "0%", "stop-color": "#f4fff9", "stop-opacity": "0.55" }));
+  sheen.appendChild(el("stop", { offset: "28%", "stop-color": "#9dffd4", "stop-opacity": "0.22" }));
+  sheen.appendChild(el("stop", { offset: "62%", "stop-color": "#1f6b45", "stop-opacity": "0.06" }));
+  sheen.appendChild(el("stop", { offset: "100%", "stop-color": "#040806", "stop-opacity": "0" }));
+  defs.appendChild(sheen);
+
+  const sheenRun = el("radialGradient", {
+    id: "bubbleSheenRun",
+    cx: "0.28",
+    cy: "0.24",
+    r: "0.78",
+    gradientUnits: "objectBoundingBox",
+  });
+  sheenRun.appendChild(el("stop", { offset: "0%", "stop-color": "#ffffff", "stop-opacity": "0.62" }));
+  sheenRun.appendChild(el("stop", { offset: "30%", "stop-color": "#c8ffe8", "stop-opacity": "0.28" }));
+  sheenRun.appendChild(el("stop", { offset: "70%", "stop-color": "#5dffb0", "stop-opacity": "0.08" }));
+  sheenRun.appendChild(el("stop", { offset: "100%", "stop-color": "#041810", "stop-opacity": "0" }));
+  defs.appendChild(sheenRun);
+
+  // Tight specular glint.
+  const hot = el("radialGradient", {
+    id: "bubbleHot",
+    cx: "0.5",
+    cy: "0.5",
+    r: "0.5",
+    gradientUnits: "objectBoundingBox",
+  });
+  hot.appendChild(el("stop", { offset: "0%", "stop-color": "#ffffff", "stop-opacity": "0.85" }));
+  hot.appendChild(el("stop", { offset: "45%", "stop-color": "#e8fff4", "stop-opacity": "0.35" }));
+  hot.appendChild(el("stop", { offset: "100%", "stop-color": "#ffffff", "stop-opacity": "0" }));
+  defs.appendChild(hot);
+
+  // Lower rim refraction for bubble depth.
+  const rim = el("linearGradient", {
+    id: "bubbleRim",
+    x1: "0",
+    y1: "0",
+    x2: "0",
+    y2: "1",
+    gradientUnits: "objectBoundingBox",
+  });
+  rim.appendChild(el("stop", { offset: "0%", "stop-color": "#ffffff", "stop-opacity": "0" }));
+  rim.appendChild(el("stop", { offset: "68%", "stop-color": "#ffffff", "stop-opacity": "0" }));
+  rim.appendChild(el("stop", { offset: "100%", "stop-color": "#9dffd4", "stop-opacity": "0.18" }));
+  defs.appendChild(rim);
+
+  // Muted Metroid-style tiled blocks with bubbly column holes.
+  const tile = el("pattern", {
+    id: "metroidTile",
+    width: 18,
+    height: 18,
+    patternUnits: "userSpaceOnUse",
+  });
+  tile.appendChild(el("rect", { width: "18", height: "18", fill: "#0a1c14" }));
+  tile.appendChild(
+    el("rect", {
+      x: "0.6",
+      y: "0.6",
+      width: "16.8",
+      height: "16.8",
+      fill: "#123526",
+      stroke: "#1f4f38",
+      "stroke-width": "1",
+    }),
+  );
+  // Inner face bevel
+  tile.appendChild(
+    el("rect", {
+      x: "2",
+      y: "2",
+      width: "14",
+      height: "14",
+      fill: "none",
+      stroke: "#0d281c",
+      "stroke-width": "0.8",
+      opacity: "0.8",
+    }),
+  );
+  // Bubble cutout in the block
+  tile.appendChild(
+    el("circle", {
+      cx: "9",
+      cy: "9",
+      r: "4.4",
+      fill: "#06140e",
+      stroke: "#2a6046",
+      "stroke-width": "0.9",
+    }),
+  );
+  tile.appendChild(
+    el("ellipse", {
+      cx: "7.6",
+      cy: "7.4",
+      rx: "1.5",
+      ry: "1.05",
+      fill: "#3d7a58",
+      opacity: "0.28",
+    }),
+  );
+  defs.appendChild(tile);
+}
+
+function appendBubbleSpecular(g, w, h, rx, { running, reveal }) {
+  const sheen = el("rect", {
+    x: 0,
+    y: 0,
+    width: w,
+    height: h,
+    rx,
+    ry: rx,
+    fill: running ? "url(#bubbleSheenRun)" : "url(#bubbleSheen)",
+    "fill-opacity": reveal ? "0.85" : "1",
+    "pointer-events": "none",
+    class: "bubble-sheen",
+  });
+  g.appendChild(sheen);
+
+  const rim = el("rect", {
+    x: 0,
+    y: 0,
+    width: w,
+    height: h,
+    rx,
+    ry: rx,
+    fill: "url(#bubbleRim)",
+    "pointer-events": "none",
+    class: "bubble-rim",
+  });
+  g.appendChild(rim);
+
+  const glintR = Math.min(w, h);
+  const hot = el("ellipse", {
+    cx: w * 0.27,
+    cy: h * 0.22,
+    rx: Math.max(6, glintR * 0.13),
+    ry: Math.max(3.5, glintR * 0.075),
+    fill: "url(#bubbleHot)",
+    "pointer-events": "none",
+    class: "bubble-hot",
+  });
+  g.appendChild(hot);
+
+  // Secondary smaller glint for glass depth.
+  const hot2 = el("ellipse", {
+    cx: w * 0.38,
+    cy: h * 0.3,
+    rx: Math.max(2.5, glintR * 0.045),
+    ry: Math.max(1.6, glintR * 0.028),
+    fill: "#ffffff",
+    "fill-opacity": running ? "0.45" : "0.28",
+    "pointer-events": "none",
+    class: "bubble-hot-secondary",
+  });
+  g.appendChild(hot2);
+}
+
+function appendTileTexture(g, w, h, rx, { reveal }) {
+  const tex = el("rect", {
+    x: 0,
+    y: 0,
+    width: w,
+    height: h,
+    rx,
+    ry: rx,
+    fill: "url(#metroidTile)",
+    "fill-opacity": reveal ? "0.16" : "0.28",
+    "pointer-events": "none",
+    class: "tile-texture",
+  });
+  g.appendChild(tex);
 }
 
 function el(name, attrs = {}) {
