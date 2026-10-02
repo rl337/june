@@ -15,6 +15,7 @@ export class GraphViewport {
     this.zoom = 1;
     this.panX = 0;
     this.panY = 0;
+    this._cameraReady = false;
     this._dragging = false;
     this._dragLast = null;
     this._raf = null;
@@ -23,23 +24,27 @@ export class GraphViewport {
   }
 
   setWorld(world, { preserveCamera = true } = {}) {
-    const prevSelected = this.selectedId;
     this.world = world || { nodes: [], edges: [], width: 400, height: 240 };
     this._index = indexNodes(this.world.nodes || []);
-    if (!preserveCamera || !prevSelected) {
-      this.fit();
-    } else if (prevSelected && this._index.has(prevSelected)) {
-      this.selectedId = prevSelected;
-      this._centerOnSelected({ animate: false });
+    // Keep the user's camera unless this is the first frame or an explicit reset.
+    if (!preserveCamera || !this._cameraReady) {
+      this.fit({ clearSelection: false });
+      this._cameraReady = true;
+    }
+    // Drop selection only if the selected node disappeared from the world.
+    if (this.selectedId && !this._index.has(this.selectedId)) {
+      this.selectedId = null;
     }
     this.render();
   }
 
   select(nodeId, { zoomToward = true } = {}) {
+    const changing = this.selectedId !== nodeId;
     this.selectedId = nodeId;
     if (this.onSelectNode) this.onSelectNode(nodeId);
-    if (zoomToward) {
-      this._centerOnSelected({ animate: true, zoomBoost: 1.35 });
+    if (zoomToward && changing) {
+      // Center on the new selection without multiplying zoom each click.
+      this._centerOnSelected({ animate: true, zoomBoost: 1 });
     } else {
       this.render();
     }
@@ -51,7 +56,7 @@ export class GraphViewport {
     this.render();
   }
 
-  fit() {
+  fit({ clearSelection = true } = {}) {
     if (!this.world) return;
     const rect = this.svg.getBoundingClientRect();
     const vw = Math.max(rect.width, 1);
@@ -61,7 +66,8 @@ export class GraphViewport {
     this.zoom = clamp(Math.min(vw / ww, vh / wh) * 0.92, MIN_ZOOM, MAX_ZOOM);
     this.panX = ww / 2;
     this.panY = wh / 2;
-    this.selectedId = null;
+    if (clearSelection) this.selectedId = null;
+    this._cameraReady = true;
     this.render();
   }
 

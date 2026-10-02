@@ -55,6 +55,7 @@ class ConsoleHub:
         self._run_status: str = "idle"
         self._selected_node_id: str | None = ROOT_SCENE_ID
         self._orchestrator_status: dict[str, Any] = {}
+        self._instances: dict[str, dict[str, Any]] = {}
         self._listeners: list[Callable[[ConsoleSnapshot], None]] = []
 
     def subscribe(self, listener: Callable[[ConsoleSnapshot], None]) -> None:
@@ -101,14 +102,13 @@ class ConsoleHub:
             self._events.append(event)
             if len(self._events) > _EVENT_LOG_LIMIT:
                 self._events = self._events[-_EVENT_LOG_LIMIT:]
-            payload = getattr(event, "payload", None)
-            if isinstance(payload, dict):
-                graph = payload.get("graph")
-                if isinstance(graph, dict):
-                    if self._structure_checkpoint:
-                        base = dict(self._structure_checkpoint)
-                        self._checkpoint = _deep_merge_graph(base, graph)
-                    else:
+            # Instance pipeline checkpoints are tracked via touch_instance /
+            # complete_instance so overlapping runs do not clobber the master graph.
+            if not self._structure_checkpoint:
+                payload = getattr(event, "payload", None)
+                if isinstance(payload, dict):
+                    graph = payload.get("graph")
+                    if isinstance(graph, dict):
                         self._checkpoint = graph
             self._publish()
 
@@ -121,6 +121,76 @@ class ConsoleHub:
                 merged = _deep_merge_graph(self._checkpoint, checkpoint)
                 self._checkpoint = merged
             self._publish()
+
+    def begin_instance(
+        self,
+        *,
+        run_id: str,
+        bucket: str,
+        parent_node_id: str,
+        pipeline: dict[str, Any],
+    ) -> None:
+        with self._lock:
+            self._instances[run_id] = {
+                "run_id": run_id,
+                "bucket": bucket,
+                "parent_node_id": parent_node_id,
+                "status": "running",
+                "started_at": datetime.now(timezone.utc).isoformat(),
+                "pipeline": pipeline,
+                "active_node_id": None,
+            }
+            self._publish()
+
+    def touch_instance(self, run_id: str, *, event: Any | None = None) -> None:
+        with self._lock:
+            inst = self._instances.get(run_id)
+            if inst is None:
+                return
+            if event is not None:
+                payload = getattr(event, "payload", None)
+                etype = str(getattr(event, "type", ""))
+                if isinstance(payload, dict):
+                    if etype.endswith("graph_node_start") and isinstance(payload.get("node_id"), str):
+                        inst["active_node_id"] = payload["node_id"]
+                    graph = payload.get("graph")
+                    if isinstance(graph, dict):
+                        inst["pipeline"] = graph
+            self._publish()
+
+    def complete_instance(
+        self,
+        *,
+        run_id: str,
+        status: str,
+        pipeline: dict[str, Any] | None = None,
+    ) -> None:
+        with self._lock:
+            inst = self._instances.get(run_id)
+            if inst is None:
+                return
+            inst["status"] = status
+            inst["finished_at"] = datetime.now(timezone.utc).isoformat()
+            if pipeline is not None:
+                inst["pipeline"] = pipeline
+            # Keep a short trail of finished instances, drop older ones.
+            finished = [
+                i
+                for i in self._instances.values()
+                if i.get("status") not in {"running", "pending"}
+            ]
+            finished.sort(key=lambda i: str(i.get("finished_at", "")))
+            while len(finished) > 4:
+                old = finished.pop(0)
+                self._instances.pop(str(old.get("run_id")), None)
+            self._publish()
+
+    def bucket_has_active_instances(self, bucket: str) -> bool:
+        with self._lock:
+            return any(
+                i.get("bucket") == bucket and i.get("status") == "running"
+                for i in self._instances.values()
+            )
 
     def mark_bucket_running(self, node_id: str) -> None:
         self._set_node_status(node_id, "running")
@@ -189,8 +259,14 @@ class ConsoleHub:
                 scene_kind="idle",
                 active_node_id=None,
             )
+        instances = [dict(v) for v in self._instances.values()]
         world = (
-            build_world_graph(self._checkpoint, self._events, run_id=run_id).to_dict()
+            build_world_graph(
+                self._checkpoint,
+                self._events,
+                run_id=run_id,
+                instances=instances,
+            ).to_dict()
             if self._checkpoint
             else {
                 "root_id": run_id,

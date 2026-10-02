@@ -13,14 +13,15 @@ from june.console.scene import node_shape, recent_node_ids
 from june.harness.visualization import active_node_from_events
 
 # Base leaf dimensions (world units ≈ CSS px at zoom=1).
-LEAF_W = 148.0
-LEAF_H = 52.0
-PAD_X = 28.0
-PAD_Y = 36.0
-GAP = 18.0
-HEADER_H = 28.0
-BG_CHIP_W = 110.0
-BG_CHIP_H = 36.0
+LEAF_W = 160.0
+LEAF_H = 56.0
+PAD_X = 32.0
+PAD_Y = 40.0
+GAP = 22.0
+HEADER_H = 30.0
+BG_CHIP_W = 120.0
+BG_CHIP_H = 38.0
+INSTANCE_GAP = 28.0
 
 
 @dataclass
@@ -100,49 +101,27 @@ def _execution(
     return "pending"
 
 
-def _background_children(raw: dict[str, Any], *, prefix: str) -> list[WorldNode]:
-    payload = _payload_of(raw)
-    items: list[WorldNode] = []
-    refs = payload.get("context_refs")
-    if isinstance(refs, list):
-        for idx, ref in enumerate(refs):
-            if not isinstance(ref, dict):
-                continue
-            title = str(ref.get("title") or ref.get("id") or f"context-{idx}")
-            items.append(
-                WorldNode(
-                    id=f"{prefix}:ctx:{idx}",
-                    label=title,
-                    kind="context",
-                    shape="round_rect",
-                    status="materialized",
-                    execution="pending",
-                    detail=str(ref.get("summary") or ""),
-                    w=BG_CHIP_W,
-                    h=BG_CHIP_H,
-                )
-            )
-    bindings = payload.get("bindings")
-    if isinstance(bindings, dict):
-        for key in sorted(bindings):
-            items.append(
-                WorldNode(
-                    id=f"{prefix}:bind:{key}",
-                    label=str(key),
-                    kind="soft_point",
-                    shape="round_rect",
-                    status="bound",
-                    execution="pending",
-                    detail=str(bindings[key])[:80],
-                    w=BG_CHIP_W,
-                    h=BG_CHIP_H,
-                )
-            )
-    return items
+def _layout_column(
+    children: list[WorldNode], *, origin_x: float, origin_y: float
+) -> tuple[float, float]:
+    """Stack children top-to-bottom (cleaner for sequential pipelines)."""
+    if not children:
+        return 0.0, 0.0
+    y = origin_y
+    max_w = 0.0
+    for child in children:
+        child.x = origin_x
+        child.y = y
+        y += child.h + GAP
+        max_w = max(max_w, child.w)
+    # Center narrower children in the column.
+    for child in children:
+        child.x = origin_x + (max_w - child.w) / 2
+    total_h = sum(c.h for c in children) + GAP * (len(children) - 1)
+    return max_w, total_h
 
 
 def _layout_row(children: list[WorldNode], *, origin_x: float, origin_y: float) -> tuple[float, float]:
-    """Place children in a row; return (total_w, total_h)."""
     if not children:
         return 0.0, 0.0
     x = origin_x
@@ -154,48 +133,6 @@ def _layout_row(children: list[WorldNode], *, origin_x: float, origin_y: float) 
         max_h = max(max_h, child.h)
     total_w = sum(c.w for c in children) + GAP * (len(children) - 1)
     return total_w, max_h
-
-
-def _build_from_subgraph(
-    subgraph: dict[str, Any],
-    *,
-    active_node_id: str | None,
-    recent_ids: set[str],
-) -> tuple[list[WorldNode], list[dict[str, str]], float, float]:
-    raw_nodes = subgraph.get("nodes") or {}
-    if not isinstance(raw_nodes, dict):
-        return [], [], LEAF_W, LEAF_H
-    children: list[WorldNode] = []
-    for node_id, raw in raw_nodes.items():
-        if not isinstance(raw, dict):
-            continue
-        children.append(
-            _build_node(
-                str(node_id),
-                raw,
-                active_node_id=active_node_id,
-                recent_ids=recent_ids,
-            )
-        )
-    children.sort(key=lambda n: n.id)
-    edges = []
-    for edge in subgraph.get("edges") or []:
-        if not isinstance(edge, dict):
-            continue
-        src, dst = edge.get("from_node"), edge.get("to_node")
-        if isinstance(src, str) and isinstance(dst, str):
-            edges.append({"from": src, "to": dst})
-
-    # Prefer dependency order when edges exist.
-    if edges:
-        order = _topo_order([c.id for c in children], edges)
-        by_id = {c.id: c for c in children}
-        children = [by_id[i] for i in order if i in by_id]
-
-    content_w, content_h = _layout_row(children, origin_x=PAD_X, origin_y=HEADER_H + PAD_Y / 2)
-    width = max(LEAF_W, content_w + PAD_X * 2)
-    height = max(LEAF_H, content_h + HEADER_H + PAD_Y)
-    return children, edges, width, height
 
 
 def _topo_order(ids: list[str], edges: list[dict[str, str]]) -> list[str]:
@@ -221,6 +158,55 @@ def _topo_order(ids: list[str], edges: list[dict[str, str]]) -> list[str]:
     return ordered
 
 
+def _build_from_subgraph(
+    subgraph: dict[str, Any],
+    *,
+    active_node_id: str | None,
+    recent_ids: set[str],
+    vertical: bool = True,
+) -> tuple[list[WorldNode], list[dict[str, str]], float, float]:
+    raw_nodes = subgraph.get("nodes") or {}
+    if not isinstance(raw_nodes, dict):
+        return [], [], LEAF_W, LEAF_H
+    children: list[WorldNode] = []
+    for node_id, raw in raw_nodes.items():
+        if not isinstance(raw, dict):
+            continue
+        children.append(
+            _build_node(
+                str(node_id),
+                raw,
+                active_node_id=active_node_id,
+                recent_ids=recent_ids,
+            )
+        )
+    edges = []
+    for edge in subgraph.get("edges") or []:
+        if not isinstance(edge, dict):
+            continue
+        src, dst = edge.get("from_node"), edge.get("to_node")
+        if isinstance(src, str) and isinstance(dst, str):
+            edges.append({"from": src, "to": dst})
+    if edges:
+        order = _topo_order([c.id for c in children], edges)
+        by_id = {c.id: c for c in children}
+        children = [by_id[i] for i in order if i in by_id]
+    else:
+        children.sort(key=lambda n: n.id)
+
+    if vertical:
+        content_w, content_h = _layout_column(
+            children, origin_x=PAD_X, origin_y=HEADER_H + PAD_Y / 2
+        )
+    else:
+        content_w, content_h = _layout_row(
+            children, origin_x=PAD_X, origin_y=HEADER_H + PAD_Y / 2
+        )
+    width = max(LEAF_W, content_w + PAD_X * 2)
+    height = max(LEAF_H, content_h + HEADER_H + PAD_Y)
+    return children, edges, width, height
+
+
 def _build_node(
     node_id: str,
     raw: dict[str, Any],
@@ -232,8 +218,7 @@ def _build_node(
     status = str(raw.get("status", "pending"))
     goal = str(raw.get("goal", ""))
     payload = _payload_of(raw)
-    short = node_id.split(":")[-1] if ":" in node_id else node_id
-    label = f"{kind} ({short})" if not goal else goal
+    label = goal or kind
     shape = node_shape(kind, payload)
     execution = _execution(node_id, status, active_node_id=active_node_id, recent_ids=recent_ids)
 
@@ -247,15 +232,8 @@ def _build_node(
             subgraph,
             active_node_id=active_node_id,
             recent_ids=recent_ids,
+            vertical=True,
         )
-    else:
-        bg = _background_children(raw, prefix=node_id)
-        if bg:
-            children = bg
-            content_w, content_h = _layout_row(bg, origin_x=PAD_X, origin_y=HEADER_H + PAD_Y / 2)
-            width = max(LEAF_W, content_w + PAD_X * 2)
-            height = max(LEAF_H * 1.4, content_h + HEADER_H + PAD_Y)
-
     return WorldNode(
         id=node_id,
         label=label,
@@ -271,11 +249,89 @@ def _build_node(
     )
 
 
+def _instance_node(inst: dict[str, Any], *, recent_ids: set[str]) -> WorldNode:
+    run_id = str(inst.get("run_id"))
+    status = str(inst.get("status", "running"))
+    active = inst.get("active_node_id") if isinstance(inst.get("active_node_id"), str) else None
+    pipeline = inst.get("pipeline") if isinstance(inst.get("pipeline"), dict) else {}
+    short = run_id[-8:]
+    label = f"run {short}"
+    children, edges, width, height = _build_from_subgraph(
+        pipeline,
+        active_node_id=active,
+        recent_ids=recent_ids,
+        vertical=True,
+    )
+    return WorldNode(
+        id=run_id,
+        label=label,
+        kind="subgraph",
+        shape="round_rect",
+        status=status,
+        execution="running" if status == "running" else "dim",
+        detail=str(inst.get("bucket", "")),
+        w=width,
+        h=height,
+        children=children,
+        edges=edges,
+    )
+
+
+def _attach_instances(
+    tops: list[WorldNode],
+    instances: list[dict[str, Any]],
+    *,
+    recent_ids: set[str],
+) -> None:
+    """Place live/recent bucket instances as children of their parent bucket."""
+    by_parent: dict[str, list[dict[str, Any]]] = {}
+    for inst in instances:
+        parent = str(inst.get("parent_node_id") or "")
+        if not parent:
+            continue
+        by_parent.setdefault(parent, []).append(inst)
+
+    for top in tops:
+        group = by_parent.get(top.id)
+        if not group:
+            continue
+        # Prefer running instances first, then newest finished.
+        group.sort(
+            key=lambda i: (
+                0 if i.get("status") == "running" else 1,
+                str(i.get("started_at", "")),
+            )
+        )
+        instance_nodes = [_instance_node(i, recent_ids=recent_ids) for i in group]
+        # Template pipeline stays as a dim reference on the left; instances to the right.
+        template = list(top.children)
+        template_edges = list(top.edges)
+        if template:
+            # Shrink visual weight: keep template as one compact column.
+            content_w, content_h = _layout_column(
+                template, origin_x=PAD_X, origin_y=HEADER_H + PAD_Y / 2
+            )
+        else:
+            content_w, content_h = 0.0, 0.0
+
+        inst_origin_x = PAD_X + (content_w + INSTANCE_GAP if template else 0.0)
+        inst_w, inst_h = _layout_row(
+            instance_nodes,
+            origin_x=inst_origin_x,
+            origin_y=HEADER_H + PAD_Y / 2,
+        )
+        top.children = template + instance_nodes
+        top.edges = template_edges
+        top.w = max(LEAF_W, PAD_X * 2 + content_w + (INSTANCE_GAP if template and instance_nodes else 0) + inst_w)
+        top.h = max(LEAF_H, HEADER_H + PAD_Y + max(content_h, inst_h))
+
+
 def build_world_graph(
     checkpoint: dict[str, Any],
     events: list[Any],
     *,
     run_id: str,
+    instances: list[dict[str, Any]] | None = None,
 ) -> WorldGraph:
     """Layout the full checkpoint hierarchy for continuous zoom rendering."""
     active = active_node_from_events(events, run_id=run_id)
@@ -304,7 +360,6 @@ def build_world_graph(
                 recent_ids=recent,
             )
         )
-    tops.sort(key=lambda n: n.id)
 
     edges: list[dict[str, str]] = []
     for edge in checkpoint.get("edges") or []:
@@ -318,8 +373,11 @@ def build_world_graph(
         order = _topo_order([n.id for n in tops], edges)
         by_id = {n.id: n for n in tops}
         tops = [by_id[i] for i in order if i in by_id]
+    else:
+        tops.sort(key=lambda n: n.id)
 
-    # Fan from left-to-right with vertical centering.
+    _attach_instances(tops, instances or [], recent_ids=recent)
+
     total_w = sum(n.w for n in tops) + GAP * max(0, len(tops) - 1)
     max_h = max((n.h for n in tops), default=LEAF_H)
     world_w = total_w + PAD_X * 2

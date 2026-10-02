@@ -13,10 +13,42 @@ def test_world_graph_sizes_buckets_by_subgraph_content() -> None:
     by_id = {n.id: n for n in world.nodes}
     bucket = by_id["june.console.cron:bucket:10s"]
     leaf = by_id["june.console.cron:cron"]
-    assert bucket.w > leaf.w
+    # Vertical pipeline: taller than a leaf, four timed steps.
     assert bucket.h > leaf.h
-    assert len(bucket.children) == 3
-    assert world.width > bucket.w
+    assert len(bucket.children) == 4
+    assert world.width >= bucket.w
+
+
+def test_world_attaches_overlapping_instances() -> None:
+    checkpoint = build_console_cron_graph().checkpoint()
+    bucket = checkpoint["nodes"]["june.console.cron:bucket:10s"]
+    pipeline = bucket["subgraph"]
+    instances = [
+        {
+            "run_id": "june.console.cron:10s:instAAAA",
+            "bucket": "10s",
+            "parent_node_id": "june.console.cron:bucket:10s",
+            "status": "running",
+            "pipeline": pipeline,
+            "started_at": "2026-01-01T00:00:00+00:00",
+        },
+        {
+            "run_id": "june.console.cron:10s:instBBBB",
+            "bucket": "10s",
+            "parent_node_id": "june.console.cron:bucket:10s",
+            "status": "running",
+            "pipeline": pipeline,
+            "started_at": "2026-01-01T00:00:10+00:00",
+        },
+    ]
+    world = build_world_graph(
+        checkpoint, [], run_id="june.console.cron", instances=instances
+    )
+    bucket_node = next(n for n in world.nodes if n.id.endswith(":bucket:10s"))
+    instance_ids = {c.id for c in bucket_node.children if c.id.startswith("june.console.cron:10s:")}
+    assert "june.console.cron:10s:instAAAA" in instance_ids
+    assert "june.console.cron:10s:instBBBB" in instance_ids
+
 
 
 def test_world_included_in_hub_snapshot() -> None:

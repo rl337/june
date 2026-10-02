@@ -63,12 +63,62 @@ def _june_runner_registry(
                     "message": message,
                     "summary": message,
                     "bucket": node.payload.get("bucket"),
+                    "instance_id": node.payload.get("instance_id"),
                 }
             )
         return NodeOutcome(
             status=NodeStatus.SUCCEEDED,
             payload={"console_message": message, "node_id": node.id},
             cost_units=0.25,
+        )
+
+    async def _timed_log(node: Any, context: Any) -> Any:
+        import asyncio as _asyncio
+
+        message = str(node.payload.get("message") or node.goal or "timed")
+        try:
+            delay = float(node.payload.get("duration_seconds", 3.0))
+        except (TypeError, ValueError):
+            delay = 3.0
+        delay = max(0.0, min(delay, 30.0))
+        if on_console_log is not None:
+            on_console_log(
+                {
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                    "type": "june.console.log",
+                    "run_id": context.run_id,
+                    "node_id": node.id,
+                    "kind": node.kind,
+                    "message": f"{message} (wait {delay:.0f}s)",
+                    "summary": f"⏳ {message}",
+                    "bucket": node.payload.get("bucket"),
+                    "instance_id": node.payload.get("instance_id"),
+                }
+            )
+        if delay:
+            await _asyncio.sleep(delay)
+        if on_console_log is not None:
+            on_console_log(
+                {
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                    "type": "june.console.log",
+                    "run_id": context.run_id,
+                    "node_id": node.id,
+                    "kind": node.kind,
+                    "message": message,
+                    "summary": f"✓ {message}",
+                    "bucket": node.payload.get("bucket"),
+                    "instance_id": node.payload.get("instance_id"),
+                }
+            )
+        return NodeOutcome(
+            status=NodeStatus.SUCCEEDED,
+            payload={
+                "console_message": message,
+                "node_id": node.id,
+                "duration_seconds": delay,
+            },
+            cost_units=0.5,
         )
 
     async def _cron_hub(node: Any, context: Any) -> Any:
@@ -89,6 +139,7 @@ def _june_runner_registry(
     registry = GraphNodeRunnerRegistry()
     registry.register(CallableGraphNodeRunner(["june.task"], _june_task))
     registry.register(CallableGraphNodeRunner(["june.event_log"], _event_log))
+    registry.register(CallableGraphNodeRunner(["june.timed_log"], _timed_log))
     registry.register(CallableGraphNodeRunner(["june.cron"], _cron_hub))
     return registry
 
