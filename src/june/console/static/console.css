@@ -532,7 +532,6 @@ body {
   --orb-opacity: 0.28;
   position: relative;
   isolation: isolate;
-  overflow: hidden;
   width: var(--orb-size);
   height: var(--orb-size);
   border-radius: 50%;
