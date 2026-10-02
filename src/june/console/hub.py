@@ -11,6 +11,7 @@ from typing import Any
 
 from june.console.event_format import serialize_event, serialize_journal_entry
 from june.console.scene import ROOT_SCENE_ID, SceneFrame, build_scene_frame
+from june.console.world import build_world_graph
 
 _EVENT_LOG_LIMIT = 800
 
@@ -24,6 +25,7 @@ class ConsoleSnapshot:
     status: str
     selected_node_id: str | None
     scene: dict[str, Any]
+    world: dict[str, Any] = field(default_factory=dict)
     event_log: list[dict[str, Any]] = field(default_factory=list)
     orchestrator: dict[str, Any] = field(default_factory=dict)
 
@@ -34,6 +36,7 @@ class ConsoleSnapshot:
             "status": self.status,
             "selected_node_id": self.selected_node_id,
             "scene": self.scene,
+            "world": self.world,
             "event_log": self.event_log,
             "orchestrator": self.orchestrator,
         }
@@ -186,12 +189,26 @@ class ConsoleHub:
                 scene_kind="idle",
                 active_node_id=None,
             )
+        world = (
+            build_world_graph(self._checkpoint, self._events, run_id=run_id).to_dict()
+            if self._checkpoint
+            else {
+                "root_id": run_id,
+                "goal": "waiting for execution",
+                "width": 400,
+                "height": 240,
+                "nodes": [],
+                "edges": [],
+                "active_node_id": None,
+            }
+        )
         return ConsoleSnapshot(
             updated_at=datetime.now(timezone.utc).isoformat(),
             run_id=self._run_id,
             status=self._run_status,
             selected_node_id=self._selected_node_id,
             scene=scene.to_dict(),
+            world=world,
             event_log=self._event_log_entries(),
             orchestrator=dict(self._orchestrator_status),
         )

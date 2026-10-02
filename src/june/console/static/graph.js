@@ -1,111 +1,391 @@
-/** Graph SVG rendering inside the graph view pane. */
+/** Continuous zoom/pan graph viewport with content-sized nested nodes. */
 
-const NODE_W = 132;
-const NODE_H = 44;
-const LAYER_Y = { foreground: 120, background: 250 };
+const NS = "http://www.w3.org/2000/svg";
+const MIN_ZOOM = 0.15;
+const MAX_ZOOM = 8;
+const CONTENT_REVEAL_PX = 110; // screen height before interiors show
+const LABEL_MIN_PX = 10;
 
-export function renderGraph(canvas, snapshot, { onSelectNode } = {}) {
-  if (!canvas) return;
-  const scene = snapshot.scene || {};
-  const nodes = scene.nodes || [];
-  const edges = scene.edges || [];
-  const fg = nodes.filter((n) => n.layer === "foreground");
-  const bg = nodes.filter((n) => n.layer === "background");
-
-  while (canvas.firstChild) canvas.removeChild(canvas.firstChild);
-
-  const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
-  const glow = document.createElementNS("http://www.w3.org/2000/svg", "filter");
-  glow.setAttribute("id", "glow");
-  glow.innerHTML =
-    '<feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>';
-  defs.appendChild(glow);
-  canvas.appendChild(defs);
-
-  const edgeLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
-  const nodeLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
-  canvas.appendChild(edgeLayer);
-  canvas.appendChild(nodeLayer);
-
-  const positions = layoutNodes(fg, bg);
-  edges.forEach((e) => drawEdge(edgeLayer, positions, e.from, e.to));
-  nodes.forEach((n) =>
-    drawNode(nodeLayer, n, positions.get(n.id), () => {
-      if (onSelectNode) onSelectNode(n.id);
-    }),
-  );
-}
-
-function layoutNodes(foreground, background) {
-  const positions = new Map();
-  const placeRow = (row, y) => {
-    const gap = 24;
-    const totalW = row.length * NODE_W + Math.max(0, row.length - 1) * gap;
-    let x = (960 - totalW) / 2;
-    row.forEach((n) => {
-      positions.set(n.id, { x, y, node: n });
-      x += NODE_W + gap;
-    });
-  };
-  placeRow(foreground, LAYER_Y.foreground);
-  placeRow(background, LAYER_Y.background);
-  return positions;
-}
-
-function drawEdge(layer, positions, from, to) {
-  const a = positions.get(from);
-  const b = positions.get(to);
-  if (!a || !b) return;
-  const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-  line.setAttribute("x1", String(a.x + NODE_W / 2));
-  line.setAttribute("y1", String(a.y + NODE_H));
-  line.setAttribute("x2", String(b.x + NODE_W / 2));
-  line.setAttribute("y2", String(b.y));
-  line.setAttribute("stroke", "#4b5c78");
-  line.setAttribute("stroke-width", "1.5");
-  layer.appendChild(line);
-}
-
-function drawNode(layer, node, pos, onClick) {
-  if (!pos) return;
-  const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-  g.classList.add("node", node.execution || "pending");
-  g.style.cursor = node.layer === "foreground" ? "pointer" : "default";
-  if (node.layer === "foreground" && onClick) {
-    g.addEventListener("click", () => onClick());
+export class GraphViewport {
+  constructor(svg, { onSelectNode } = {}) {
+    this.svg = svg;
+    this.onSelectNode = onSelectNode;
+    this.world = null;
+    this.selectedId = null;
+    this.zoom = 1;
+    this.panX = 0;
+    this.panY = 0;
+    this._dragging = false;
+    this._dragLast = null;
+    this._raf = null;
+    this._index = new Map();
+    this._bindInput();
   }
+
+  setWorld(world, { preserveCamera = true } = {}) {
+    const prevSelected = this.selectedId;
+    this.world = world || { nodes: [], edges: [], width: 400, height: 240 };
+    this._index = indexNodes(this.world.nodes || []);
+    if (!preserveCamera || !prevSelected) {
+      this.fit();
+    } else if (prevSelected && this._index.has(prevSelected)) {
+      this.selectedId = prevSelected;
+      this._centerOnSelected({ animate: false });
+    }
+    this.render();
+  }
+
+  select(nodeId, { zoomToward = true } = {}) {
+    this.selectedId = nodeId;
+    if (this.onSelectNode) this.onSelectNode(nodeId);
+    if (zoomToward) {
+      this._centerOnSelected({ animate: true, zoomBoost: 1.35 });
+    } else {
+      this.render();
+    }
+  }
+
+  clearSelection() {
+    this.selectedId = null;
+    if (this.onSelectNode) this.onSelectNode("root");
+    this.render();
+  }
+
+  fit() {
+    if (!this.world) return;
+    const rect = this.svg.getBoundingClientRect();
+    const vw = Math.max(rect.width, 1);
+    const vh = Math.max(rect.height, 1);
+    const ww = Math.max(this.world.width || 400, 1);
+    const wh = Math.max(this.world.height || 240, 1);
+    this.zoom = clamp(Math.min(vw / ww, vh / wh) * 0.92, MIN_ZOOM, MAX_ZOOM);
+    this.panX = ww / 2;
+    this.panY = wh / 2;
+    this.selectedId = null;
+    this.render();
+  }
+
+  zoomBy(factor, { aroundSelected = true } = {}) {
+    const next = clamp(this.zoom * factor, MIN_ZOOM, MAX_ZOOM);
+    if (aroundSelected && this.selectedId && this._index.has(this.selectedId)) {
+      this.zoom = next;
+      this._centerOnSelected({ animate: false });
+    } else {
+      this.zoom = next;
+      this.render();
+    }
+  }
+
+  zoomIn() {
+    this.zoomBy(1.25);
+  }
+
+  zoomOut() {
+    this.zoomBy(1 / 1.25);
+  }
+
+  focusSelected() {
+    if (!this.selectedId) return;
+    this._centerOnSelected({ animate: true, zoomBoost: 1.6 });
+  }
+
+  _centerOnSelected({ animate = false, zoomBoost = 1 } = {}) {
+    const node = this._index.get(this.selectedId);
+    if (!node) {
+      this.render();
+      return;
+    }
+    const targetZoom = clamp(this.zoom * zoomBoost, MIN_ZOOM, MAX_ZOOM);
+    const targetX = node.absX + node.w / 2;
+    const targetY = node.absY + node.h / 2;
+    if (!animate) {
+      this.zoom = targetZoom;
+      this.panX = targetX;
+      this.panY = targetY;
+      this.render();
+      return;
+    }
+    const start = {
+      zoom: this.zoom,
+      panX: this.panX,
+      panY: this.panY,
+      t: performance.now(),
+    };
+    const duration = 280;
+    const step = (now) => {
+      const u = Math.min(1, (now - start.t) / duration);
+      const e = 1 - (1 - u) ** 3;
+      this.zoom = start.zoom + (targetZoom - start.zoom) * e;
+      this.panX = start.panX + (targetX - start.panX) * e;
+      this.panY = start.panY + (targetY - start.panY) * e;
+      this.render();
+      if (u < 1) this._raf = requestAnimationFrame(step);
+    };
+    if (this._raf) cancelAnimationFrame(this._raf);
+    this._raf = requestAnimationFrame(step);
+  }
+
+  _bindInput() {
+    this.svg.addEventListener(
+      "wheel",
+      (e) => {
+        e.preventDefault();
+        const factor = e.deltaY > 0 ? 1 / 1.12 : 1.12;
+        if (this.selectedId) {
+          this.zoomBy(factor, { aroundSelected: true });
+        } else {
+          const before = this._screenToWorld(e.clientX, e.clientY);
+          this.zoom = clamp(this.zoom * factor, MIN_ZOOM, MAX_ZOOM);
+          const after = this._screenToWorld(e.clientX, e.clientY);
+          this.panX += before.x - after.x;
+          this.panY += before.y - after.y;
+          this.render();
+        }
+      },
+      { passive: false },
+    );
+
+    this.svg.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      if (e.target.closest(".graph-node")) return;
+      this._dragging = true;
+      this._dragLast = { x: e.clientX, y: e.clientY };
+      this.svg.setPointerCapture(e.pointerId);
+      this.svg.classList.add("is-panning");
+    });
+    this.svg.addEventListener("pointermove", (e) => {
+      if (!this._dragging || !this._dragLast) return;
+      const dx = e.clientX - this._dragLast.x;
+      const dy = e.clientY - this._dragLast.y;
+      this._dragLast = { x: e.clientX, y: e.clientY };
+      this.panX -= dx / this.zoom;
+      this.panY -= dy / this.zoom;
+      this.render();
+    });
+    const endDrag = (e) => {
+      if (!this._dragging) return;
+      this._dragging = false;
+      this._dragLast = null;
+      this.svg.classList.remove("is-panning");
+      try {
+        this.svg.releasePointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+    };
+    this.svg.addEventListener("pointerup", endDrag);
+    this.svg.addEventListener("pointercancel", endDrag);
+
+    this.svg.addEventListener("dblclick", (e) => {
+      if (e.target.closest(".graph-node")) return;
+      this.fit();
+    });
+  }
+
+  _screenToWorld(clientX, clientY) {
+    const rect = this.svg.getBoundingClientRect();
+    const sx = clientX - rect.left;
+    const sy = clientY - rect.top;
+    return {
+      x: this.panX + (sx - rect.width / 2) / this.zoom,
+      y: this.panY + (sy - rect.height / 2) / this.zoom,
+    };
+  }
+
+  _viewBox() {
+    const rect = this.svg.getBoundingClientRect();
+    const vw = Math.max(rect.width, 1) / this.zoom;
+    const vh = Math.max(rect.height, 1) / this.zoom;
+    return {
+      x: this.panX - vw / 2,
+      y: this.panY - vh / 2,
+      w: vw,
+      h: vh,
+    };
+  }
+
+  render() {
+    const svg = this.svg;
+    const world = this.world || { nodes: [], edges: [] };
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+    const vb = this._viewBox();
+    svg.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+
+    const defs = el("defs");
+    const glow = el("filter", { id: "glow" });
+    glow.innerHTML =
+      '<feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>';
+    defs.appendChild(glow);
+    svg.appendChild(defs);
+
+    const root = el("g", { class: "world-root" });
+    svg.appendChild(root);
+
+    drawEdges(root, world.edges || [], this._index, 0);
+    (world.nodes || []).forEach((node) => {
+      drawNodeTree(root, node, {
+        absX: node.x,
+        absY: node.y,
+        zoom: this.zoom,
+        selectedId: this.selectedId,
+        onSelect: (id) => this.select(id),
+      });
+    });
+
+    const zoomLabel = document.getElementById("zoom-level");
+    if (zoomLabel) zoomLabel.textContent = `${Math.round(this.zoom * 100)}%`;
+  }
+}
+
+function indexNodes(nodes, absX = 0, absY = 0, map = new Map()) {
+  for (const node of nodes) {
+    const x = absX + (node.x || 0);
+    const y = absY + (node.y || 0);
+    map.set(node.id, { ...node, absX: x, absY: y });
+    if (node.children && node.children.length) {
+      indexNodes(node.children, x, y, map);
+    }
+  }
+  return map;
+}
+
+function drawEdges(layer, edges, index, depth) {
+  for (const edge of edges) {
+    const a = index.get(edge.from);
+    const b = index.get(edge.to);
+    if (!a || !b) continue;
+    const line = el("line", {
+      x1: a.absX + a.w / 2,
+      y1: a.absY + a.h / 2,
+      x2: b.absX + b.w / 2,
+      y2: b.absY + b.h / 2,
+      stroke: depth === 0 ? "#4b5c78" : "#6a7d99",
+      "stroke-width": depth === 0 ? 2 : 1.2,
+      "stroke-opacity": "0.85",
+      class: "graph-edge",
+    });
+    layer.appendChild(line);
+  }
+}
+
+function drawNodeTree(layer, node, ctx) {
+  const absX = ctx.absX;
+  const absY = ctx.absY;
+  const screenH = node.h * ctx.zoom;
+  const reveal = screenH >= CONTENT_REVEAL_PX && (node.children || []).length > 0;
+  const selected = ctx.selectedId === node.id;
+
+  const g = el("g", {
+    class: `graph-node node ${node.execution || "pending"}${selected ? " is-selected" : ""}`,
+    transform: `translate(${absX} ${absY})`,
+  });
+  g.style.cursor = "pointer";
+  g.addEventListener("click", (e) => {
+    e.stopPropagation();
+    ctx.onSelect(node.id);
+  });
 
   const fill = node.shape === "round_rect" ? "#7c5cbf" : "#3d6fb8";
-  const shape = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-  if (node.shape === "round_rect") {
-    shape.setAttribute("rx", "14");
-    shape.setAttribute("ry", "14");
-  }
-  shape.setAttribute("x", String(pos.x));
-  shape.setAttribute("y", String(pos.y));
-  shape.setAttribute("width", String(NODE_W));
-  shape.setAttribute("height", String(NODE_H));
-  shape.setAttribute("fill", fill);
-  shape.setAttribute("stroke", "#dfe7f5");
-  shape.setAttribute("stroke-width", "1");
-  if (node.execution === "running") {
-    shape.setAttribute("filter", "url(#glow)");
-  }
-  g.appendChild(shape);
+  const rect = el("rect", {
+    x: 0,
+    y: 0,
+    width: node.w,
+    height: node.h,
+    rx: node.shape === "round_rect" ? 16 : 4,
+    ry: node.shape === "round_rect" ? 16 : 4,
+    fill,
+    "fill-opacity": reveal ? "0.22" : "0.92",
+    stroke: selected ? "#f5c542" : "#dfe7f5",
+    "stroke-width": selected ? 3 : 1.25,
+  });
+  if (node.execution === "running") rect.setAttribute("filter", "url(#glow)");
+  g.appendChild(rect);
 
-  const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
-  label.setAttribute("x", String(pos.x + NODE_W / 2));
-  label.setAttribute("y", String(pos.y + NODE_H / 2 + 4));
-  label.setAttribute("text-anchor", "middle");
-  label.classList.add("node-label");
-  label.textContent = truncate(node.label || node.kind, 16);
-  g.appendChild(label);
+  if (node.label && screenH >= LABEL_MIN_PX) {
+    const label = el("text", {
+      x: node.w / 2,
+      y: reveal ? 18 : node.h / 2 + 4,
+      "text-anchor": "middle",
+      class: "node-label",
+      "font-size": reveal ? 12 : Math.min(14, Math.max(9, 12 / Math.sqrt(ctx.zoom))),
+    });
+    label.textContent = truncate(node.label, reveal ? 28 : 18);
+    g.appendChild(label);
+  }
+
+  if (reveal) {
+    const inner = el("g", { class: "node-interior" });
+    for (const edge of node.edges || []) {
+      const a = (node.children || []).find((c) => c.id === edge.from);
+      const b = (node.children || []).find((c) => c.id === edge.to);
+      if (!a || !b) continue;
+      inner.appendChild(
+        el("line", {
+          x1: a.x + a.w / 2,
+          y1: a.y + a.h / 2,
+          x2: b.x + b.w / 2,
+          y2: b.y + b.h / 2,
+          stroke: "#8aa0c0",
+          "stroke-width": 1.25,
+          class: "graph-edge",
+        }),
+      );
+    }
+    for (const child of node.children || []) {
+      drawNodeTree(inner, child, {
+        absX: child.x || 0,
+        absY: child.y || 0,
+        zoom: ctx.zoom,
+        selectedId: ctx.selectedId,
+        onSelect: ctx.onSelect,
+      });
+    }
+    g.appendChild(inner);
+  }
 
   layer.appendChild(g);
 }
 
+function el(name, attrs = {}) {
+  const node = document.createElementNS(NS, name);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null) continue;
+    if (k === "class") node.setAttribute("class", v);
+    else node.setAttribute(k, String(v));
+  }
+  return node;
+}
+
 function truncate(text, max) {
-  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+  const s = String(text || "");
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+}
+
+function clamp(v, lo, hi) {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+/** @deprecated use GraphViewport */
+export function renderGraph(canvas, snapshot, opts = {}) {
+  if (!canvas._viewport) {
+    canvas._viewport = new GraphViewport(canvas, opts);
+  }
+  canvas._viewport.setWorld(snapshot.world || emptyWorldFromScene(snapshot.scene), {
+    preserveCamera: true,
+  });
+  return canvas._viewport;
+}
+
+function emptyWorldFromScene(scene) {
+  return {
+    root_id: "root",
+    goal: (scene && scene.scene_title) || "",
+    width: 400,
+    height: 240,
+    nodes: [],
+    edges: [],
+  };
 }
 
 export async function selectScene(nodeId) {

@@ -1,10 +1,25 @@
 import { JuneConsoleShell } from "./shell.js";
-import { renderGraph, selectScene } from "./graph.js";
+import { GraphViewport, selectScene } from "./graph.js";
 
 const root = document.getElementById("june-console");
 const canvas = document.getElementById("canvas");
 const wsStatus = document.getElementById("ws-status");
 const shell = new JuneConsoleShell(root);
+
+const viewport = new GraphViewport(canvas, {
+  onSelectNode: (id) => {
+    selectScene(id);
+    const sub = document.getElementById("scene-title");
+    if (sub && id && id !== "root") {
+      sub.dataset.selected = id;
+    }
+  },
+});
+
+document.getElementById("btn-zoom-in")?.addEventListener("click", () => viewport.zoomIn());
+document.getElementById("btn-zoom-out")?.addEventListener("click", () => viewport.zoomOut());
+document.getElementById("btn-zoom-fit")?.addEventListener("click", () => viewport.fit());
+document.getElementById("btn-zoom-focus")?.addEventListener("click", () => viewport.focusSelected());
 
 function setWsState(state) {
   if (!wsStatus) return;
@@ -12,20 +27,20 @@ function setWsState(state) {
   wsStatus.title = state === "open" ? "Live (WebSocket connected)" : "Reconnecting…";
 }
 
-shell.on("scene:root", () => selectScene("root"));
+shell.on("scene:root", () => {
+  viewport.clearSelection();
+  viewport.fit();
+  selectScene("root");
+});
 shell.on("snapshot:refresh", async () => {
   const res = await fetch("/api/snapshot");
-  const data = await res.json();
-  shell.setSnapshot(data);
-  renderGraph(canvas, data, {
-    onSelectNode: (id) => selectScene(id),
-  });
+  applySnapshot(await res.json());
 });
 
 function applySnapshot(data) {
   shell.setSnapshot(data);
-  renderGraph(canvas, data, {
-    onSelectNode: (id) => selectScene(id),
+  viewport.setWorld(data.world || { nodes: [], edges: [], width: 400, height: 240 }, {
+    preserveCamera: true,
   });
 }
 
