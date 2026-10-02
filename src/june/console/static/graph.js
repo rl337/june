@@ -524,7 +524,7 @@ function appendBubbleSpecular(g, w, h, rx, { running, reveal }) {
     rx,
     ry: rx,
     fill: running ? "url(#bubbleSheenRun)" : "url(#bubbleSheen)",
-    "fill-opacity": reveal ? "0.85" : "1",
+    "fill-opacity": reveal ? "0.95" : "1",
     "pointer-events": "none",
     class: "bubble-sheen",
   });
@@ -545,10 +545,10 @@ function appendBubbleSpecular(g, w, h, rx, { running, reveal }) {
 
   const glintR = Math.min(w, h);
   const hot = el("ellipse", {
-    cx: w * 0.27,
-    cy: h * 0.22,
-    rx: Math.max(6, glintR * 0.13),
-    ry: Math.max(3.5, glintR * 0.075),
+    cx: w * 0.24,
+    cy: h * 0.18,
+    rx: Math.max(8, glintR * 0.16),
+    ry: Math.max(4.5, glintR * 0.09),
     fill: "url(#bubbleHot)",
     "pointer-events": "none",
     class: "bubble-hot",
@@ -557,12 +557,12 @@ function appendBubbleSpecular(g, w, h, rx, { running, reveal }) {
 
   // Secondary smaller glint for glass depth.
   const hot2 = el("ellipse", {
-    cx: w * 0.38,
-    cy: h * 0.3,
-    rx: Math.max(2.5, glintR * 0.045),
-    ry: Math.max(1.6, glintR * 0.028),
+    cx: w * 0.36,
+    cy: h * 0.28,
+    rx: Math.max(3, glintR * 0.055),
+    ry: Math.max(2, glintR * 0.032),
     fill: "#ffffff",
-    "fill-opacity": running ? "0.45" : "0.28",
+    "fill-opacity": running ? "0.55" : "0.38",
     "pointer-events": "none",
     class: "bubble-hot-secondary",
   });
@@ -578,7 +578,8 @@ function appendTileTexture(g, w, h, rx, { reveal }) {
     rx,
     ry: rx,
     fill: "url(#metroidTile)",
-    "fill-opacity": reveal ? "0.16" : "0.28",
+    // Muted enough for labels; pattern still reads as bubbly wall tiles.
+    "fill-opacity": reveal ? "0.26" : "0.38",
     "pointer-events": "none",
     class: "tile-texture",
   });
