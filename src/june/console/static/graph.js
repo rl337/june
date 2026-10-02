@@ -464,54 +464,52 @@ function appendBubbleTroubleDefs(defs) {
   // Muted Metroid-style tiled blocks with bubbly column holes.
   const tile = el("pattern", {
     id: "metroidTile",
-    width: 18,
-    height: 18,
+    width: 14,
+    height: 14,
     patternUnits: "userSpaceOnUse",
   });
-  tile.appendChild(el("rect", { width: "18", height: "18", fill: "#0a1c14" }));
+  tile.appendChild(el("rect", { width: "14", height: "14", fill: "#081912" }));
   tile.appendChild(
     el("rect", {
-      x: "0.6",
-      y: "0.6",
-      width: "16.8",
-      height: "16.8",
-      fill: "#123526",
-      stroke: "#1f4f38",
-      "stroke-width": "1",
+      x: "0.5",
+      y: "0.5",
+      width: "13",
+      height: "13",
+      fill: "#154030",
+      stroke: "#2d6b4c",
+      "stroke-width": "1.1",
     }),
   );
-  // Inner face bevel
   tile.appendChild(
-    el("rect", {
-      x: "2",
-      y: "2",
-      width: "14",
-      height: "14",
-      fill: "none",
-      stroke: "#0d281c",
-      "stroke-width": "0.8",
-      opacity: "0.8",
+    el("line", {
+      x1: "0.5",
+      y1: "0.5",
+      x2: "13.5",
+      y2: "0.5",
+      stroke: "#3a7d5a",
+      "stroke-opacity": "0.35",
+      "stroke-width": "0.7",
     }),
   );
-  // Bubble cutout in the block
+  // Bubble cutout in the block (classic Metroid wall motif).
   tile.appendChild(
     el("circle", {
-      cx: "9",
-      cy: "9",
-      r: "4.4",
-      fill: "#06140e",
-      stroke: "#2a6046",
+      cx: "7",
+      cy: "7",
+      r: "3.4",
+      fill: "#040d09",
+      stroke: "#3f8a5e",
       "stroke-width": "0.9",
     }),
   );
   tile.appendChild(
     el("ellipse", {
-      cx: "7.6",
-      cy: "7.4",
-      rx: "1.5",
-      ry: "1.05",
-      fill: "#3d7a58",
-      opacity: "0.28",
+      cx: "5.9",
+      cy: "5.8",
+      rx: "1.15",
+      ry: "0.8",
+      fill: "#5aa876",
+      opacity: "0.32",
     }),
   );
   defs.appendChild(tile);

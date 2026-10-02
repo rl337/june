@@ -108,10 +108,8 @@ body {
 /* Soft graph nodes keep labels above bubble glints. */
 .graph-node .node-label {
   paint-order: stroke fill;
-}
-
-.graph-node[data-shape="hard"] .tile-texture {
-  mix-blend-mode: soft-light;
+  stroke: rgba(4, 8, 6, 0.55);
+  stroke-width: 2.5px;
 }
 
 /* —— View workspace (IDE panes) —— */
