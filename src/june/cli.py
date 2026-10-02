@@ -197,6 +197,7 @@ def _cmd_serve(args: argparse.Namespace) -> None:
     runtime = ConsoleRuntime(orch, hub)
     runtime.refresh_status()
     runtime.start_control_loop()
+    runtime.start_cron_graph()
 
     demo = args.demo_graph or os.environ.get("JUNE_CONSOLE_DEMO", "").lower() in {
         "1",

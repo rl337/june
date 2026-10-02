@@ -107,12 +107,14 @@ body {
   grid-row: 1;
 }
 
+.view-pane[data-view="events"],
 .view-pane[data-view="inspector"] {
   grid-column: 1;
   grid-row: 1;
   transform-origin: left center;
 }
 
+.view-pane[data-view="events"].is-open,
 .view-pane[data-view="inspector"].is-open {
   animation: slide-in-left var(--transition-pane);
 }
@@ -660,4 +662,47 @@ body {
 
 .dim-sample {
   opacity: 0.45;
+}
+
+.event-log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.event-log-row {
+  display: grid;
+  grid-template-columns: 4.5rem 5.5rem 1fr;
+  gap: 0.35rem;
+  padding: 0.28rem 0.15rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.event-log-row.is-start {
+  color: var(--running);
+}
+
+.event-log-row.is-end {
+  color: var(--muted);
+}
+
+.event-log-row.is-console-log {
+  color: #d4c4ff;
+}
+
+.event-log-ts {
+  color: var(--muted);
+}
+
+.event-log-type {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.65rem;
+}
+
+.view-pane[data-view="events"] .view-body {
+  padding: 0.35rem 0.5rem;
 }

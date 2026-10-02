@@ -5,6 +5,7 @@ from __future__ import annotations
 import threading
 from typing import Any
 
+from june.console.cron_scheduler import ConsoleCronScheduler
 from june.console.hub import ConsoleHub
 from june.harness.visualization import GRAPH_NODE_EVENT
 from june.orchestrator import Orchestrator
@@ -18,6 +19,7 @@ class ConsoleRuntime:
         self.hub = hub
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._cron: ConsoleCronScheduler | None = None
         self._attach_client()
 
     def _attach_client(self) -> None:
@@ -49,6 +51,14 @@ class ConsoleRuntime:
     def refresh_status(self) -> None:
         self.hub.set_orchestrator_status(self.orchestrator.status())
 
+    def start_cron_graph(self) -> None:
+        if not self.orchestrator.client.connect():
+            return
+        if self._cron is not None:
+            return
+        self._cron = ConsoleCronScheduler(self.hub, self.orchestrator.client)
+        self._cron.start()
+
     def start_control_loop(self) -> None:
         if self._thread is not None:
             return
@@ -65,6 +75,9 @@ class ConsoleRuntime:
 
     def stop(self) -> None:
         self._stop.set()
+        if self._cron is not None:
+            self._cron.stop()
+            self._cron = None
         if self._thread is not None:
             self._thread.join(timeout=2.0)
             self._thread = None

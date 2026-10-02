@@ -121,3 +121,4 @@ def test_console_api_snapshot() -> None:
     assert response.status_code == 200
     body = response.json()
     assert "scene" in body
+    assert "event_log" in body

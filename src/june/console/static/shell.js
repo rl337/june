@@ -34,6 +34,7 @@ const MENU_CATALOG = {
       items: [
         { id: "graph", label: "Graph (main)", action: "view:open:graph" },
         { id: "status", label: "Orchestrator status", action: "view:toggle:status" },
+        { id: "events", label: "Event log", action: "view:toggle:events" },
         { id: "inspector", label: "Node inspector", action: "view:toggle:inspector" },
       ],
     },
@@ -84,6 +85,13 @@ const VIEW_SPECS = {
     naturalHeight: 140,
     defaultOpen: false,
   },
+  events: {
+    title: "Event log",
+    dock: "left",
+    naturalWidth: 340,
+    naturalHeight: null,
+    defaultOpen: true,
+  },
   inspector: {
     title: "Inspector",
     dock: "left",
@@ -99,7 +107,7 @@ export class JuneConsoleShell {
     this.workspace = root.querySelector("#view-workspace");
     this.dialogLayer = root.querySelector("#dialog-layer");
     this.orbs = [];
-    this.openViews = new Set(["graph"]);
+    this.openViews = new Set(["graph", "events"]);
     this.lastSnapshot = null;
     this.handlers = {};
     this._buildMenus();
@@ -132,6 +140,35 @@ export class JuneConsoleShell {
     const insp = this.workspace.querySelector('[data-view="inspector"] .view-body');
     if (insp) {
       insp.textContent = JSON.stringify(scene, null, 2);
+    }
+    this._renderEventLog(snapshot.event_log || []);
+  }
+
+  _renderEventLog(entries) {
+    const body = this.workspace.querySelector('[data-view="events"] .view-body');
+    if (!body) return;
+    let list = body.querySelector(".event-log-list");
+    if (!list) {
+      body.innerHTML = '<ul class="event-log-list" aria-label="Graph event log"></ul>';
+      list = body.querySelector(".event-log-list");
+    }
+    const atBottom = body.scrollHeight - body.scrollTop - body.clientHeight < 48;
+    list.innerHTML = "";
+    for (const row of entries) {
+      const li = document.createElement("li");
+      li.className = "event-log-row";
+      if (row.type === "june.console.log") li.classList.add("is-console-log");
+      if (String(row.type).includes("graph_node_start")) li.classList.add("is-start");
+      if (String(row.type).includes("graph_node_end")) li.classList.add("is-end");
+      li.innerHTML = `
+        <span class="event-log-ts">${escapeHtml((row.ts || "").slice(11, 19))}</span>
+        <span class="event-log-type">${escapeHtml(shortType(row.type))}</span>
+        <span class="event-log-summary">${escapeHtml(row.summary || "")}</span>
+      `;
+      list.appendChild(li);
+    }
+    if (atBottom) {
+      body.scrollTop = body.scrollHeight;
     }
   }
 
@@ -264,6 +301,10 @@ export class JuneConsoleShell {
         <div class="view-body"></div>
       `;
       pane.querySelector(".view-close").addEventListener("click", () => this.closeView(id));
+      if (id === "events") {
+        pane.querySelector(".view-body").innerHTML =
+          '<ul class="event-log-list" aria-label="Graph event log"></ul>';
+      }
       if (id === "legend") {
         pane.querySelector(".view-body").innerHTML = `
           <ul class="legend-list">
@@ -295,10 +336,19 @@ export class JuneConsoleShell {
   }
 
   _layoutViews() {
+    const leftPane =
+      this.openViews.has("events")
+        ? "events"
+        : this.openViews.has("inspector")
+          ? "inspector"
+          : null;
     const panes = [...this.workspace.querySelectorAll(".view-pane")];
     panes.forEach((pane) => {
       const id = pane.dataset.view;
-      const open = this.openViews.has(id);
+      let open = this.openViews.has(id);
+      if (id === "events" || id === "inspector") {
+        open = id === leftPane;
+      }
       pane.classList.toggle("is-open", open);
       pane.classList.toggle("is-closed", !open);
     });
@@ -309,7 +359,9 @@ export class JuneConsoleShell {
       "has-bottom",
       "has-top",
     );
-    if (this.openViews.has("inspector")) this.workspace.classList.add("has-left");
+    if (this.openViews.has("events") || this.openViews.has("inspector")) {
+      this.workspace.classList.add("has-left");
+    }
     if (this.openViews.has("status")) this.workspace.classList.add("has-right");
     if (this.openViews.has("legend")) this.workspace.classList.add("has-bottom");
 
@@ -318,10 +370,10 @@ export class JuneConsoleShell {
 
   _injectSeams() {
     this.workspace.querySelectorAll(".view-seam").forEach((el) => el.remove());
-    if (this.openViews.has("inspector")) {
+    if (this.openViews.has("events") || this.openViews.has("inspector")) {
       const seam = document.createElement("div");
       seam.className = "view-seam";
-      seam.dataset.between = "inspector-graph";
+      seam.dataset.between = "events-graph";
       seam.style.gridColumn = "2";
       seam.style.gridRow = "1";
       this.workspace.appendChild(seam);
@@ -388,6 +440,13 @@ export class JuneConsoleShell {
     this.dialogLayer.appendChild(dialog);
     requestAnimationFrame(() => dialog.classList.add("is-open"));
   }
+}
+
+function shortType(type) {
+  const t = String(type || "");
+  if (t.startsWith("core:")) return t.slice(5);
+  if (t.startsWith("june.")) return t.slice(5);
+  return t;
 }
 
 function escapeHtml(text) {
