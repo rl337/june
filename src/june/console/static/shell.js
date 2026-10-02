@@ -142,6 +142,12 @@ export class JuneConsoleShell {
       insp.textContent = JSON.stringify(scene, null, 2);
     }
     this._renderEventLog(snapshot.event_log || []);
+    const countEl = this.workspace.querySelector('[data-view="events"] .event-count');
+    if (countEl) {
+      const n = (snapshot.event_log || []).length;
+      countEl.textContent = String(n);
+      countEl.hidden = n === 0;
+    }
   }
 
   _renderEventLog(entries) {
@@ -293,9 +299,12 @@ export class JuneConsoleShell {
       pane.dataset.dockEdge = spec.dock;
       if (spec.naturalWidth) pane.style.setProperty("--natural-w", `${spec.naturalWidth}px`);
       if (spec.naturalHeight) pane.style.setProperty("--natural-h", `${spec.naturalHeight}px`);
+      const countBadge =
+        id === "events" ? '<span class="event-count pill" hidden>0</span>' : "";
       pane.innerHTML = `
         <header class="view-chrome">
           <span class="view-title">${spec.title}</span>
+          ${countBadge}
           <button type="button" class="view-close" aria-label="Close pane">×</button>
         </header>
         <div class="view-body"></div>
