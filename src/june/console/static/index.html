@@ -7,33 +7,32 @@
     <link rel="stylesheet" href="/static/console.css" />
   </head>
   <body>
-    <header class="top">
-      <div>
-        <h1>June Console</h1>
-        <p id="scene-title" class="subtitle">Connecting…</p>
+    <div id="june-console" class="june-console">
+      <div class="dock dock-top" data-dock="top" aria-label="Top menu dock"></div>
+      <div class="dock dock-left" data-dock="left" aria-label="Left menu dock"></div>
+      <div class="dock dock-right" data-dock="right" aria-label="Right menu dock"></div>
+      <div class="dock dock-bottom" data-dock="bottom" aria-label="Bottom menu dock"></div>
+
+      <div id="view-workspace" class="view-workspace">
+        <section
+          class="view-pane view-pane--graph is-open"
+          data-view="graph"
+          data-dock-edge="center"
+          style="--natural-w: 1fr; --natural-h: 1fr"
+        >
+          <header class="view-chrome">
+            <span class="view-title">Graph</span>
+            <span id="scene-title" class="view-subtitle">Connecting…</span>
+            <span id="run-status" class="pill">idle</span>
+          </header>
+          <div class="view-body view-body--graph">
+            <svg id="canvas" viewBox="0 0 960 420" role="img" aria-label="Graph execution scene"></svg>
+          </div>
+        </section>
       </div>
-      <div class="meta">
-        <span id="run-status" class="pill">idle</span>
-        <span id="run-id" class="mono"></span>
-      </div>
-    </header>
 
-    <section class="legend">
-      <span><span class="shape hard"></span> hard node</span>
-      <span><span class="shape soft"></span> soft node</span>
-      <span class="glow-sample">running</span>
-      <span class="dim-sample">finished</span>
-    </section>
-
-    <main>
-      <div class="layer-label">Scene</div>
-      <svg id="canvas" viewBox="0 0 960 360" role="img" aria-label="Graph execution scene"></svg>
-    </main>
-
-    <footer>
-      <button type="button" id="btn-root">Overview</button>
-      <span id="updated-at" class="mono"></span>
-    </footer>
-    <script src="/static/console.js"></script>
+      <div id="dialog-layer" class="dialog-layer" aria-live="polite"></div>
+    </div>
+    <script type="module" src="/static/console.js"></script>
   </body>
 </html>
