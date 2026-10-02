@@ -281,6 +281,8 @@ function drawEdges(layer, edges, index, depth) {
 
 function subtreeRunning(node) {
   if (node.execution === "running" || node.status === "running") return true;
+  // Finished stack cards must not inherit stale nested "running" bits.
+  if (node.stack_role === "front" || node.stack_role === "back") return false;
   return (node.children || []).some((c) => subtreeRunning(c));
 }
 

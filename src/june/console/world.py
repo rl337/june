@@ -399,12 +399,19 @@ def _attach_instances(
 
 
 def _propagate_running(node: WorldNode) -> bool:
-    """Mark ancestors running when any descendant is running (for collapsed zoom)."""
+    """Mark ancestors running when any descendant is running (for collapsed zoom).
+
+    Finished stack instance cards are not re-lit from stale nested statuses.
+    """
+    self_running = node.execution == "running" or node.status == "running"
+    # Stack cards already carry authoritative instance status.
+    if node.stack_role in {"front", "back"}:
+        return self_running
+
     child_running = False
     for child in node.children:
         if _propagate_running(child):
             child_running = True
-    self_running = node.execution == "running" or node.status == "running"
     if child_running and not self_running:
         node.execution = "running"
         if node.status in {"pending", "succeeded", "dim", ""}:
