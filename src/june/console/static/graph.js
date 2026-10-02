@@ -318,15 +318,19 @@ function drawNodeTree(layer, node, ctx) {
     }
   });
 
-  // Idle purple vs lighter running wash. Collapsed nodes keep the running
-  // wash when any descendant is live — do not fall back to solid idle purple.
+  // Idle purple vs running wash. When interiors un-render, keep a clear
+  // teal/cyan running fill — never the solid idle purple.
   const soft = node.shape === "round_rect";
   let fill;
   let opacity;
   if (running) {
-    fill = soft ? "#c4b5fd" : "#7dd3fc";
-    // Collapsed: stay clearly lit; revealed: light wash over children.
-    opacity = reveal ? "0.30" : "0.78";
+    if (reveal) {
+      fill = soft ? "#c4b5fd" : "#7dd3fc";
+      opacity = "0.30";
+    } else {
+      fill = soft ? "#5eead4" : "#38bdf8";
+      opacity = "0.72";
+    }
   } else {
     fill = soft ? "#7c5cbf" : "#3d6fb8";
     opacity = reveal ? "0.22" : "0.92";
