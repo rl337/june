@@ -48,6 +48,8 @@ pip install -U pip setuptools wheel
 pip install -e ".[dev]"
 # Optional MechaHarness client dependency (BudgetPolicy / GraphExecutor):
 # pip install -e ".[harness]"   # mechaharness>=0.2.0
+# Web graph console:
+# pip install -e ".[harness,console]"
 june status
 june goal-create "First vertical slice" --criteria "runner writes goal/issue state"
 pytest
@@ -67,6 +69,37 @@ june --data-dir /tmp/june-data run --max-steps 5
 # or until Ctrl-C:
 june --data-dir /tmp/june-data run
 ```
+
+## Web console (container)
+
+The console renders MechaHarness execution as a **scene** with **foreground**
+(hard/soft graph nodes that compose the selected node) and **background**
+(context, bindings, advisor material as soft round-rect nodes). The active node
+glows; recently finished nodes dim as execution moves.
+
+```bash
+pip install -e ".[container]"
+june serve --demo-graph
+# open http://localhost:8080
+```
+
+Docker:
+
+```bash
+docker compose up --build
+```
+
+Environment:
+
+- `JUNE_DATA_DIR` — durable JSON state (default in container: `/data`)
+- `JUNE_CONSOLE_DEMO=1` — run a sample graph on startup
+
+Task payloads may set `execute_graph: true` so the task runner drives a live
+`GraphExecutor` run (events stream to the console when using `june serve`).
+
+`june serve` also boots a **cron graph** (`june.console.cron`) with **10s** and
+**60s** bucket subgraphs whose `june.event_log` nodes append to the left-docked
+**Event log** view (MechaHarness lifecycle events + console log lines).
 
 ## First vertical slice
 

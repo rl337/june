@@ -139,7 +139,8 @@ class TaskRunner:
             )
             bound.bindings["advisor_guidance"] = advice.guidance
 
-        run_result = self.client.execute(bound)
+        driver = "run" if work.payload.get("execute_graph") else "plan"
+        run_result = self.client.execute(bound, driver=driver)
         self._write_back(work, bound, run_result, goal_id=work.goal_id, issue_id=work.issue_id)
 
         next_decision = self._decide(work, run_result)
