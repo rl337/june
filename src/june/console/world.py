@@ -22,6 +22,10 @@ HEADER_H = 30.0
 BG_CHIP_W = 120.0
 BG_CHIP_H = 38.0
 INSTANCE_GAP = 28.0
+STACK_VISIBLE = 2
+STACK_OVERLAP = 1.0 / 3.0  # back card shows 1/3; front covers 2/3
+STACK_BADGE_W = 72.0
+STACK_BADGE_H = 72.0
 
 
 @dataclass
@@ -39,6 +43,10 @@ class WorldNode:
     h: float = LEAF_H
     children: list[WorldNode] = field(default_factory=list)
     edges: list[dict[str, str]] = field(default_factory=list)
+    stack_role: str | None = None  # front | back | badge | None
+    stack_depth: int = 0
+    stack_hidden: list[str] = field(default_factory=list)
+    stack_parent_id: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -55,6 +63,10 @@ class WorldNode:
             "h": self.h,
             "children": [c.to_dict() for c in self.children],
             "edges": self.edges,
+            "stack_role": self.stack_role,
+            "stack_depth": self.stack_depth,
+            "stack_hidden": list(self.stack_hidden),
+            "stack_parent_id": self.stack_parent_id,
         }
 
 
@@ -283,7 +295,7 @@ def _attach_instances(
     *,
     recent_ids: set[str],
 ) -> None:
-    """Place live/recent bucket instances as children of their parent bucket."""
+    """Place live instances as an overlapping stack under each parent bucket."""
     by_parent: dict[str, list[dict[str, Any]]] = {}
     for inst in instances:
         parent = str(inst.get("parent_node_id") or "")
@@ -295,35 +307,116 @@ def _attach_instances(
         group = by_parent.get(top.id)
         if not group:
             continue
-        # Prefer running instances first, then newest finished.
+        # Newest first (running preferred, then by start time descending).
         group.sort(
             key=lambda i: (
                 0 if i.get("status") == "running" else 1,
                 str(i.get("started_at", "")),
-            )
+            ),
+            reverse=False,
         )
-        instance_nodes = [_instance_node(i, recent_ids=recent_ids) for i in group]
-        # Template pipeline stays as a dim reference on the left; instances to the right.
+        # Among running, prefer newest started_at last in sort above was ascending
+        # with running first — re-sort: running newest first, then finished newest.
+        running = [i for i in group if i.get("status") == "running"]
+        finished = [i for i in group if i.get("status") != "running"]
+        running.sort(key=lambda i: str(i.get("started_at", "")), reverse=True)
+        finished.sort(key=lambda i: str(i.get("finished_at") or i.get("started_at", "")), reverse=True)
+        ordered = running + finished
+
+        visible = ordered[:STACK_VISIBLE]
+        hidden = ordered[STACK_VISIBLE:]
+        visible_nodes = [_instance_node(i, recent_ids=recent_ids) for i in visible]
+        for depth, node in enumerate(reversed(visible_nodes)):
+            # depth 0 = back, last = front
+            node.stack_depth = depth
+            node.stack_role = "back" if depth == 0 and len(visible_nodes) > 1 else "front"
+            node.stack_parent_id = top.id
+
         template = list(top.children)
         template_edges = list(top.edges)
         if template:
-            # Shrink visual weight: keep template as one compact column.
             content_w, content_h = _layout_column(
                 template, origin_x=PAD_X, origin_y=HEADER_H + PAD_Y / 2
             )
         else:
             content_w, content_h = 0.0, 0.0
 
-        inst_origin_x = PAD_X + (content_w + INSTANCE_GAP if template else 0.0)
-        inst_w, inst_h = _layout_row(
-            instance_nodes,
-            origin_x=inst_origin_x,
-            origin_y=HEADER_H + PAD_Y / 2,
-        )
-        top.children = template + instance_nodes
+        stack_origin_x = PAD_X + (content_w + INSTANCE_GAP if template else 0.0)
+        stack_origin_y = HEADER_H + PAD_Y / 2
+        card_w = max((n.w for n in visible_nodes), default=LEAF_W)
+        card_h = max((n.h for n in visible_nodes), default=LEAF_H)
+        # Overlap along X: each back card peeks by (1 - 2/3) = 1/3 of width.
+        peek = card_w * STACK_OVERLAP
+        for i, node in enumerate(reversed(visible_nodes)):
+            # Draw back first at left, front on top offset right by peek each layer.
+            node.w = card_w
+            node.h = card_h
+            node.x = stack_origin_x + i * peek
+            node.y = stack_origin_y + i * 10
+            node.stack_depth = i
+
+        stack_w = card_w + peek * max(0, len(visible_nodes) - 1)
+        stack_h = card_h + 10 * max(0, len(visible_nodes) - 1)
+
+        extras: list[WorldNode] = []
+        if hidden:
+            hidden_running = any(i.get("status") == "running" for i in hidden)
+            badge = WorldNode(
+                id=f"{top.id}:stack-badge",
+                label=f"+{len(hidden)}",
+                kind="stack_badge",
+                shape="round_rect",
+                status="running" if hidden_running else "pending",
+                execution="running" if hidden_running else "pending",
+                detail="double-click for running instances",
+                x=stack_origin_x + stack_w + 12,
+                y=stack_origin_y + (stack_h - STACK_BADGE_H) / 2,
+                w=STACK_BADGE_W,
+                h=STACK_BADGE_H,
+                stack_role="badge",
+                stack_hidden=[str(i.get("run_id")) for i in ordered],
+                stack_parent_id=top.id,
+            )
+            extras.append(badge)
+            stack_w += 12 + STACK_BADGE_W
+
+        # Front card last in children list so SVG paints it on top.
+        stacked = list(reversed(visible_nodes))
+        top.children = template + stacked + extras
         top.edges = template_edges
-        top.w = max(LEAF_W, PAD_X * 2 + content_w + (INSTANCE_GAP if template and instance_nodes else 0) + inst_w)
-        top.h = max(LEAF_H, HEADER_H + PAD_Y + max(content_h, inst_h))
+        top.w = max(
+            LEAF_W,
+            PAD_X * 2
+            + content_w
+            + (INSTANCE_GAP if template and (visible_nodes or extras) else 0)
+            + stack_w,
+        )
+        top.h = max(LEAF_H, HEADER_H + PAD_Y + max(content_h, stack_h))
+        # Parent stays visually "running" while any instance beneath is live.
+        if any(i.get("status") == "running" for i in ordered):
+            top.status = "running"
+            top.execution = "running"
+
+
+def _propagate_running(node: WorldNode) -> bool:
+    """Mark ancestors running when any descendant is running (for collapsed zoom).
+
+    Finished stack instance cards are not re-lit from stale nested statuses.
+    """
+    self_running = node.execution == "running" or node.status == "running"
+    # Stack cards already carry authoritative instance status.
+    if node.stack_role in {"front", "back"}:
+        return self_running
+
+    child_running = False
+    for child in node.children:
+        if _propagate_running(child):
+            child_running = True
+    if child_running and not self_running:
+        node.execution = "running"
+        if node.status in {"pending", "succeeded", "dim", ""}:
+            node.status = "running"
+    return self_running or child_running
 
 
 def build_world_graph(
@@ -377,6 +470,8 @@ def build_world_graph(
         tops.sort(key=lambda n: n.id)
 
     _attach_instances(tops, instances or [], recent_ids=recent)
+    for top in tops:
+        _propagate_running(top)
 
     total_w = sum(n.w for n in tops) + GAP * max(0, len(tops) - 1)
     max_h = max((n.h for n in tops), default=LEAF_H)

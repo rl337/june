@@ -14,6 +14,14 @@ const viewport = new GraphViewport(canvas, {
       sub.dataset.selected = id;
     }
   },
+  onStackBadge: (node) => {
+    shell.openInstanceStackDialog(node);
+  },
+});
+
+shell.on("instance:watch", ({ runId }) => {
+  if (!runId) return;
+  viewport.select(runId, { zoomToward: true });
 });
 
 document.getElementById("btn-zoom-in")?.addEventListener("click", () => viewport.zoomIn());

@@ -74,7 +74,7 @@ body {
 }
 
 .view-workspace.has-bottom {
-  --row-bottom: min(140px, 22vh);
+  --row-bottom: min(168px, 26vh);
   --seam-h: var(--seam-gap);
 }
 
@@ -135,13 +135,15 @@ body {
   animation: slide-in-right var(--transition-pane);
 }
 
-.view-pane[data-view="legend"] {
+.view-pane[data-view="legend"],
+.view-pane[data-view="activity"] {
   grid-column: 1 / 6;
   grid-row: 3;
   transform-origin: bottom center;
 }
 
-.view-pane[data-view="legend"].is-open {
+.view-pane[data-view="legend"].is-open,
+.view-pane[data-view="activity"].is-open {
   animation: slide-in-bottom var(--transition-pane);
 }
 
@@ -800,4 +802,108 @@ body {
 
 .view-pane[data-view="events"] .view-body {
   padding: 0.35rem 0.5rem;
+}
+
+.view-pane[data-view="activity"] .view-body {
+  padding: 0.35rem 0.65rem 0.45rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.event-rate-chart {
+  flex: 1;
+  min-height: 72px;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 0.15rem 0;
+}
+
+.event-rate-bar {
+  flex: 1 1 0;
+  min-width: 0;
+  height: var(--bar-h, 4%);
+  max-height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 2px 2px 0 0;
+  background: rgba(124, 92, 191, 0.35);
+  cursor: pointer;
+  transition: background 120ms ease, height 180ms ease;
+}
+
+.event-rate-bar.has-events {
+  background: linear-gradient(180deg, #5eead4 0%, #7c5cbf 100%);
+}
+
+.event-rate-bar:hover {
+  background: #f5c542;
+}
+
+.event-rate-hint {
+  margin: 0;
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.instance-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  max-height: 50vh;
+  overflow: auto;
+}
+
+.instance-row {
+  margin: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.instance-watch {
+  display: grid;
+  grid-template-columns: 5.5rem 4.5rem 1fr;
+  gap: 0.5rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.45rem 0.35rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.instance-watch:hover {
+  background: rgba(245, 197, 66, 0.12);
+}
+
+.instance-row.is-running .instance-status {
+  color: var(--running);
+}
+
+.instance-id {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.78rem;
+}
+
+.instance-status,
+.instance-active {
+  font-size: 0.72rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dialog-event-list {
+  max-height: 50vh;
+  overflow: auto;
+  margin-top: 0.5rem;
+}
+
+.node[data-running="1"] .node-label {
+  fill: #f8fafc;
 }

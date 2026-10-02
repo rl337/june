@@ -7,9 +7,10 @@ const CONTENT_REVEAL_PX = 110; // screen height before interiors show
 const LABEL_MIN_PX = 10;
 
 export class GraphViewport {
-  constructor(svg, { onSelectNode } = {}) {
+  constructor(svg, { onSelectNode, onStackBadge } = {}) {
     this.svg = svg;
     this.onSelectNode = onSelectNode;
+    this.onStackBadge = onStackBadge;
     this.world = null;
     this.selectedId = null;
     this.zoom = 1;
@@ -236,6 +237,9 @@ export class GraphViewport {
         zoom: this.zoom,
         selectedId: this.selectedId,
         onSelect: (id) => this.select(id),
+        onStackBadge: (n) => {
+          if (this.onStackBadge) this.onStackBadge(n);
+        },
       });
     });
 
@@ -275,37 +279,76 @@ function drawEdges(layer, edges, index, depth) {
   }
 }
 
+function subtreeRunning(node) {
+  if (node.execution === "running" || node.status === "running") return true;
+  // Finished stack cards must not inherit stale nested "running" bits.
+  if (node.stack_role === "front" || node.stack_role === "back") return false;
+  return (node.children || []).some((c) => subtreeRunning(c));
+}
+
 function drawNodeTree(layer, node, ctx) {
   const absX = ctx.absX;
   const absY = ctx.absY;
   const screenH = node.h * ctx.zoom;
   const reveal = screenH >= CONTENT_REVEAL_PX && (node.children || []).length > 0;
   const selected = ctx.selectedId === node.id;
+  const running = subtreeRunning(node);
+  const role = node.stack_role || "";
 
   const g = el("g", {
-    class: `graph-node node ${node.execution || "pending"}${selected ? " is-selected" : ""}`,
+    class: `graph-node node ${running ? "running" : node.execution || "pending"}${
+      selected ? " is-selected" : ""
+    }${role ? ` stack-${role}` : ""}`,
     transform: `translate(${absX} ${absY})`,
   });
+  g.dataset.nodeId = node.id;
   g.style.cursor = "pointer";
   g.addEventListener("click", (e) => {
     e.stopPropagation();
+    if (role === "badge" && ctx.onStackBadge) {
+      ctx.onStackBadge(node);
+      return;
+    }
     ctx.onSelect(node.id);
   });
+  g.addEventListener("dblclick", (e) => {
+    e.stopPropagation();
+    if ((role === "badge" || role === "front" || role === "back") && ctx.onStackBadge) {
+      ctx.onStackBadge(node);
+    }
+  });
 
-  const fill = node.shape === "round_rect" ? "#7c5cbf" : "#3d6fb8";
+  // Idle purple vs running wash. When interiors un-render, keep a clear
+  // teal/cyan running fill — never the solid idle purple.
+  const soft = node.shape === "round_rect";
+  let fill;
+  let opacity;
+  if (running) {
+    if (reveal) {
+      fill = soft ? "#c4b5fd" : "#7dd3fc";
+      opacity = "0.30";
+    } else {
+      fill = soft ? "#5eead4" : "#38bdf8";
+      opacity = "0.72";
+    }
+  } else {
+    fill = soft ? "#7c5cbf" : "#3d6fb8";
+    opacity = reveal ? "0.22" : "0.92";
+  }
   const rect = el("rect", {
     x: 0,
     y: 0,
     width: node.w,
     height: node.h,
-    rx: node.shape === "round_rect" ? 16 : 4,
-    ry: node.shape === "round_rect" ? 16 : 4,
+    rx: soft ? 16 : 4,
+    ry: soft ? 16 : 4,
     fill,
-    "fill-opacity": reveal ? "0.22" : "0.92",
-    stroke: selected ? "#f5c542" : "#dfe7f5",
-    "stroke-width": selected ? 3 : 1.25,
+    "fill-opacity": opacity,
+    stroke: selected ? "#f5c542" : running ? "#5eead4" : "#dfe7f5",
+    "stroke-width": selected ? 3 : running ? 2.25 : 1.25,
   });
-  if (node.execution === "running") rect.setAttribute("filter", "url(#glow)");
+  if (running) rect.setAttribute("filter", "url(#glow)");
+  g.dataset.running = running ? "1" : "0";
   g.appendChild(rect);
 
   if (node.label && screenH >= LABEL_MIN_PX) {
@@ -338,13 +381,18 @@ function drawNodeTree(layer, node, ctx) {
         }),
       );
     }
-    for (const child of node.children || []) {
+    // Paint stacked cards back→front so overlap is correct.
+    const kids = [...(node.children || [])].sort(
+      (a, b) => (a.stack_depth || 0) - (b.stack_depth || 0),
+    );
+    for (const child of kids) {
       drawNodeTree(inner, child, {
         absX: child.x || 0,
         absY: child.y || 0,
         zoom: ctx.zoom,
         selectedId: ctx.selectedId,
         onSelect: ctx.onSelect,
+        onStackBadge: ctx.onStackBadge,
       });
     }
     g.appendChild(inner);

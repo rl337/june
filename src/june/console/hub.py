@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from june.console.event_format import serialize_event, serialize_journal_entry
+from june.console.event_rate import build_event_rate
 from june.console.scene import ROOT_SCENE_ID, SceneFrame, build_scene_frame
 from june.console.world import build_world_graph
 
@@ -27,6 +28,8 @@ class ConsoleSnapshot:
     scene: dict[str, Any]
     world: dict[str, Any] = field(default_factory=dict)
     event_log: list[dict[str, Any]] = field(default_factory=list)
+    event_rate: dict[str, Any] = field(default_factory=dict)
+    instances: list[dict[str, Any]] = field(default_factory=list)
     orchestrator: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -38,6 +41,8 @@ class ConsoleSnapshot:
             "scene": self.scene,
             "world": self.world,
             "event_log": self.event_log,
+            "event_rate": self.event_rate,
+            "instances": self.instances,
             "orchestrator": self.orchestrator,
         }
 
@@ -180,7 +185,8 @@ class ConsoleHub:
                 if i.get("status") not in {"running", "pending"}
             ]
             finished.sort(key=lambda i: str(i.get("finished_at", "")))
-            while len(finished) > 4:
+            # Keep finished trail short; UI stacks only the latest two visible.
+            while len(finished) > 6:
                 old = finished.pop(0)
                 self._instances.pop(str(old.get("run_id")), None)
             self._publish()
@@ -260,6 +266,19 @@ class ConsoleHub:
                 active_node_id=None,
             )
         instances = [dict(v) for v in self._instances.values()]
+        # Compact payloads for the client (omit full pipelines in the list).
+        instance_summaries = [
+            {
+                "run_id": i.get("run_id"),
+                "bucket": i.get("bucket"),
+                "parent_node_id": i.get("parent_node_id"),
+                "status": i.get("status"),
+                "started_at": i.get("started_at"),
+                "finished_at": i.get("finished_at"),
+                "active_node_id": i.get("active_node_id"),
+            }
+            for i in instances
+        ]
         world = (
             build_world_graph(
                 self._checkpoint,
@@ -278,6 +297,7 @@ class ConsoleHub:
                 "active_node_id": None,
             }
         )
+        event_log = self._event_log_entries()
         return ConsoleSnapshot(
             updated_at=datetime.now(timezone.utc).isoformat(),
             run_id=self._run_id,
@@ -285,7 +305,9 @@ class ConsoleHub:
             selected_node_id=self._selected_node_id,
             scene=scene.to_dict(),
             world=world,
-            event_log=self._event_log_entries(),
+            event_log=event_log,
+            event_rate=build_event_rate(event_log),
+            instances=instance_summaries,
             orchestrator=dict(self._orchestrator_status),
         )
 
