@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>June Console</title>
+    <link rel="stylesheet" href="/static/console.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div>
+        <h1>June Console</h1>
+        <p id="scene-title" class="subtitle">Connecting…</p>
+      </div>
+      <div class="meta">
+        <span id="run-status" class="pill">idle</span>
+        <span id="run-id" class="mono"></span>
+      </div>
+    </header>
+
+    <section class="legend">
+      <span><span class="shape hard"></span> hard node</span>
+      <span><span class="shape soft"></span> soft node</span>
+      <span class="glow-sample">running</span>
+      <span class="dim-sample">finished</span>
+    </section>
+
+    <main>
+      <div class="layer-label">Scene</div>
+      <svg id="canvas" viewBox="0 0 960 360" role="img" aria-label="Graph execution scene"></svg>
+    </main>
+
+    <footer>
+      <button type="button" id="btn-root">Overview</button>
+      <span id="updated-at" class="mono"></span>
+    </footer>
+    <script src="/static/console.js"></script>
+  </body>
+</html>

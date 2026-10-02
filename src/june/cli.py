@@ -77,6 +77,16 @@ def app(argv: list[str] | None = None) -> None:
     )
     graph_viz.set_defaults(func=_cmd_graph_viz)
 
+    serve = sub.add_parser("serve", help="Run the web graph console (container entrypoint)")
+    serve.add_argument("--host", default="0.0.0.0")
+    serve.add_argument("--port", type=int, default=8080)
+    serve.add_argument(
+        "--demo-graph",
+        action="store_true",
+        help="Run a sample MechaHarness graph on startup (also via JUNE_CONSOLE_DEMO=1)",
+    )
+    serve.set_defaults(func=_cmd_serve)
+
     args = parser.parse_args(argv)
     if not args.command:
         parser.print_help()
@@ -171,6 +181,46 @@ def _cmd_run(args: argparse.Namespace) -> None:
 def _cmd_dream(args: argparse.Namespace) -> None:
     proposals = _orch(args).dream()
     print(json.dumps([p.to_dict() for p in proposals], indent=2))
+
+
+def _cmd_serve(args: argparse.Namespace) -> None:
+    import asyncio
+    import os
+    import threading
+
+    from june.console.hub import ConsoleHub
+    from june.console.runtime import ConsoleRuntime
+    from june.console.server import serve_console
+
+    hub = ConsoleHub()
+    orch = _orch(args)
+    runtime = ConsoleRuntime(orch, hub)
+    runtime.refresh_status()
+    runtime.start_control_loop()
+
+    demo = args.demo_graph or os.environ.get("JUNE_CONSOLE_DEMO", "").lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+
+    def run_demo() -> None:
+        if not orch.client.connect():
+            return
+        run = orch.client.bind_template(
+            "console-demo",
+            bindings={"task": "console demo", "query": ""},
+            node_kinds=["june.task", "june.task", "june.task"],
+        )
+        orch.client.execute(run, driver="run")
+
+    if demo:
+        threading.Thread(target=run_demo, name="june-console-demo", daemon=True).start()
+
+    try:
+        asyncio.run(serve_console(hub, host=args.host, port=args.port))
+    finally:
+        runtime.stop()
 
 
 def _cmd_graph_viz(args: argparse.Namespace) -> None:

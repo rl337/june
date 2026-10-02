@@ -1,0 +1,163 @@
+:root {
+  color-scheme: dark;
+  --bg: #0f1419;
+  --panel: #1a2332;
+  --text: #e7ecf3;
+  --muted: #8b9bb4;
+  --accent: #f5c542;
+  --running: #5eead4;
+  --edge: #4b5c78;
+  --hard: #3d6fb8;
+  --soft: #7c5cbf;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  background: radial-gradient(circle at 20% 0%, #1b2838, var(--bg) 55%);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 1.25rem 1.5rem 0.5rem;
+}
+
+h1 {
+  margin: 0;
+  font-size: 1.35rem;
+  letter-spacing: 0.02em;
+}
+
+.subtitle {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+}
+
+.meta {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.pill {
+  background: var(--panel);
+  border: 1px solid #2f3f58;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
+.mono {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.legend {
+  display: flex;
+  gap: 1.25rem;
+  padding: 0 1.5rem 0.75rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.shape {
+  display: inline-block;
+  width: 1rem;
+  height: 0.65rem;
+  margin-right: 0.35rem;
+  vertical-align: middle;
+  border: 1px solid #fff3;
+}
+
+.shape.hard {
+  background: var(--hard);
+}
+
+.shape.soft {
+  background: var(--soft);
+  border-radius: 0.35rem;
+}
+
+.glow-sample {
+  color: var(--running);
+  text-shadow: 0 0 8px var(--running);
+}
+
+.dim-sample {
+  opacity: 0.45;
+}
+
+main {
+  margin: 0 1rem 1rem;
+  background: var(--panel);
+  border: 1px solid #2a3a52;
+  border-radius: 12px;
+  padding: 0.75rem 1rem 1rem;
+}
+
+.layer-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+#canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.node-label {
+  font-size: 11px;
+  fill: var(--text);
+  pointer-events: none;
+}
+
+.node.running {
+  filter: drop-shadow(0 0 8px var(--running));
+  stroke: var(--running);
+  stroke-width: 2.5;
+}
+
+.node.recent {
+  opacity: 0.55;
+}
+
+.node.dim {
+  opacity: 0.38;
+}
+
+.node.pending {
+  opacity: 0.9;
+}
+
+footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 1.5rem 1.25rem;
+}
+
+button {
+  background: #243247;
+  color: var(--text);
+  border: 1px solid #3a4f6d;
+  border-radius: 8px;
+  padding: 0.45rem 0.85rem;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--accent);
+}
