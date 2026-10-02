@@ -22,20 +22,47 @@ shell.on("snapshot:refresh", async () => {
   });
 });
 
+function applySnapshot(data) {
+  shell.setSnapshot(data);
+  renderGraph(canvas, data, {
+    onSelectNode: (id) => selectScene(id),
+  });
+}
+
+let pollTimer = null;
+function startPolling() {
+  if (pollTimer) return;
+  pollTimer = setInterval(async () => {
+    try {
+      const res = await fetch("/api/snapshot");
+      applySnapshot(await res.json());
+    } catch {
+      /* ignore transient poll errors */
+    }
+  }, 1000);
+}
+
+function stopPolling() {
+  if (!pollTimer) return;
+  clearInterval(pollTimer);
+  pollTimer = null;
+}
+
 function connect() {
   setWsState("connecting");
+  startPolling();
   const proto = location.protocol === "https:" ? "wss" : "ws";
   const ws = new WebSocket(`${proto}://${location.host}/ws`);
-  ws.onopen = () => setWsState("open");
+  ws.onopen = () => {
+    setWsState("open");
+    stopPolling();
+  };
   ws.onmessage = (msg) => {
-    const data = JSON.parse(msg.data);
-    shell.setSnapshot(data);
-    renderGraph(canvas, data, {
-      onSelectNode: (id) => selectScene(id),
-    });
+    applySnapshot(JSON.parse(msg.data));
   };
   ws.onclose = () => {
     setWsState("closed");
+    startPolling();
     setTimeout(connect, 1200);
   };
 }

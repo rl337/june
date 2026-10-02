@@ -10,32 +10,40 @@ from typing import Any
 
 from june.console.hub import ConsoleHub, ConsoleSnapshot
 
+try:
+    from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+    from fastapi.responses import FileResponse, JSONResponse
+    from fastapi.staticfiles import StaticFiles
+except ImportError:  # pragma: no cover - optional extra
+    FastAPI = None  # type: ignore[misc, assignment]
+    WebSocket = None  # type: ignore[misc, assignment]
+    WebSocketDisconnect = Exception  # type: ignore[misc, assignment]
+    FileResponse = None  # type: ignore[misc, assignment]
+    JSONResponse = None  # type: ignore[misc, assignment]
+    StaticFiles = None  # type: ignore[misc, assignment]
+
 
 def create_app(hub: ConsoleHub) -> Any:
-    try:
-        from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-        from fastapi.responses import FileResponse, JSONResponse
-        from fastapi.staticfiles import StaticFiles
-    except ImportError as exc:  # pragma: no cover - optional extra
+    if FastAPI is None or WebSocket is None:
         raise RuntimeError(
             "Web console requires the console extra: pip install 'june[console]'"
-        ) from exc
+        )
 
     app = FastAPI(title="June Console", version="0.1.0")
     static_root = _static_directory()
-    if static_root.is_dir():
+    if static_root.is_dir() and StaticFiles is not None:
         app.mount("/static", StaticFiles(directory=str(static_root)), name="static")
 
     @app.get("/")
-    async def index() -> FileResponse:
+    async def index() -> Any:
         return FileResponse(static_root / "index.html")
 
     @app.get("/api/snapshot")
-    async def api_snapshot() -> JSONResponse:
+    async def api_snapshot() -> Any:
         return JSONResponse(hub.snapshot().to_dict())
 
     @app.get("/api/status")
-    async def api_status() -> JSONResponse:
+    async def api_status() -> Any:
         snap = hub.snapshot()
         return JSONResponse(
             {
@@ -46,7 +54,7 @@ def create_app(hub: ConsoleHub) -> Any:
         )
 
     @app.post("/api/scene")
-    async def api_select_scene(body: dict[str, Any]) -> JSONResponse:
+    async def api_select_scene(body: dict[str, Any]) -> Any:
         from june.console.scene import ROOT_SCENE_ID
 
         node_id = body.get("node_id")
@@ -59,13 +67,20 @@ def create_app(hub: ConsoleHub) -> Any:
     @app.websocket("/ws")
     async def ws_console(websocket: WebSocket) -> None:
         await websocket.accept()
-        queue: asyncio.Queue[ConsoleSnapshot] = asyncio.Queue()
+        queue: asyncio.Queue[ConsoleSnapshot] = asyncio.Queue(maxsize=32)
 
         def push(snap: ConsoleSnapshot) -> None:
             try:
                 queue.put_nowait(snap)
             except asyncio.QueueFull:
-                pass
+                try:
+                    queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    pass
+                try:
+                    queue.put_nowait(snap)
+                except asyncio.QueueFull:
+                    pass
 
         hub.subscribe(push)
         try:

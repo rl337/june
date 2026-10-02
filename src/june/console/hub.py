@@ -73,6 +73,8 @@ class ConsoleHub:
             self._checkpoint = dict(checkpoint)
             self._run_id = str(checkpoint.get("id") or self._run_id)
             self._run_status = "scheduled"
+            # Keep the console on the full graph overview by default.
+            self._selected_node_id = ROOT_SCENE_ID
             self._publish()
 
     def begin_run(self, run_id: str, *, reset_journal: bool = False) -> None:

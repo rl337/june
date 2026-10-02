@@ -107,13 +107,41 @@ export class JuneConsoleShell {
     this.workspace = root.querySelector("#view-workspace");
     this.dialogLayer = root.querySelector("#dialog-layer");
     this.orbs = [];
-    this.openViews = new Set(["graph", "events"]);
+    /** @type {Record<string, string[]>} dock edge → stacked view ids (top is last) */
+    this.dockStacks = {
+      left: ["events"],
+      right: [],
+      bottom: [],
+      top: [],
+    };
     this.lastSnapshot = null;
     this.handlers = {};
     this._buildMenus();
     this._ensureViewPanes();
     this._layoutViews();
     document.addEventListener("mousemove", (e) => this._onPointerMove(e));
+  }
+
+  _dockFor(viewId) {
+    return (VIEW_SPECS[viewId] && VIEW_SPECS[viewId].dock) || "center";
+  }
+
+  _topView(dock) {
+    const stack = this.dockStacks[dock] || [];
+    return stack.length ? stack[stack.length - 1] : null;
+  }
+
+  _isOpen(viewId) {
+    if (viewId === "graph") return true;
+    const dock = this._dockFor(viewId);
+    if (dock === "center") return true;
+    return this._topView(dock) === viewId;
+  }
+
+  _isStacked(viewId) {
+    const dock = this._dockFor(viewId);
+    const stack = this.dockStacks[dock] || [];
+    return stack.includes(viewId) && this._topView(dock) !== viewId;
   }
 
   on(action, handler) {
@@ -329,37 +357,49 @@ export class JuneConsoleShell {
   }
 
   openView(id) {
-    this.openViews.add(id);
+    if (id === "graph" || !VIEW_SPECS[id]) return;
+    const dock = this._dockFor(id);
+    if (dock === "center") return;
+    const stack = this.dockStacks[dock];
+    const idx = stack.indexOf(id);
+    if (idx >= 0) stack.splice(idx, 1);
+    stack.push(id);
     this._layoutViews();
   }
 
   closeView(id) {
-    if (id === "graph") return;
-    this.openViews.delete(id);
+    if (id === "graph" || !VIEW_SPECS[id]) return;
+    const dock = this._dockFor(id);
+    if (dock === "center") return;
+    const stack = this.dockStacks[dock];
+    const idx = stack.indexOf(id);
+    if (idx >= 0) stack.splice(idx, 1);
     this._layoutViews();
   }
 
   toggleView(id) {
-    if (this.openViews.has(id)) this.closeView(id);
-    else this.openView(id);
+    if (id === "graph") return;
+    const dock = this._dockFor(id);
+    const stack = this.dockStacks[dock] || [];
+    if (this._topView(dock) === id) {
+      this.closeView(id);
+    } else if (stack.includes(id)) {
+      // Bring buried view to the top without discarding the stack.
+      this.openView(id);
+    } else {
+      this.openView(id);
+    }
   }
 
   _layoutViews() {
-    const leftPane =
-      this.openViews.has("events")
-        ? "events"
-        : this.openViews.has("inspector")
-          ? "inspector"
-          : null;
     const panes = [...this.workspace.querySelectorAll(".view-pane")];
     panes.forEach((pane) => {
       const id = pane.dataset.view;
-      let open = this.openViews.has(id);
-      if (id === "events" || id === "inspector") {
-        open = id === leftPane;
-      }
+      const open = this._isOpen(id);
+      const stacked = this._isStacked(id);
       pane.classList.toggle("is-open", open);
-      pane.classList.toggle("is-closed", !open);
+      pane.classList.toggle("is-closed", !open && !stacked);
+      pane.classList.toggle("is-stacked", stacked);
     });
 
     this.workspace.classList.remove(
@@ -368,18 +408,16 @@ export class JuneConsoleShell {
       "has-bottom",
       "has-top",
     );
-    if (this.openViews.has("events") || this.openViews.has("inspector")) {
-      this.workspace.classList.add("has-left");
-    }
-    if (this.openViews.has("status")) this.workspace.classList.add("has-right");
-    if (this.openViews.has("legend")) this.workspace.classList.add("has-bottom");
+    if (this._topView("left")) this.workspace.classList.add("has-left");
+    if (this._topView("right")) this.workspace.classList.add("has-right");
+    if (this._topView("bottom")) this.workspace.classList.add("has-bottom");
 
     this._injectSeams();
   }
 
   _injectSeams() {
     this.workspace.querySelectorAll(".view-seam").forEach((el) => el.remove());
-    if (this.openViews.has("events") || this.openViews.has("inspector")) {
+    if (this._topView("left")) {
       const seam = document.createElement("div");
       seam.className = "view-seam";
       seam.dataset.between = "events-graph";
@@ -387,7 +425,7 @@ export class JuneConsoleShell {
       seam.style.gridRow = "1";
       this.workspace.appendChild(seam);
     }
-    if (this.openViews.has("status")) {
+    if (this._topView("right")) {
       const seam = document.createElement("div");
       seam.className = "view-seam";
       seam.dataset.between = "graph-status";
@@ -395,7 +433,7 @@ export class JuneConsoleShell {
       seam.style.gridRow = "1";
       this.workspace.appendChild(seam);
     }
-    if (this.openViews.has("legend")) {
+    if (this._topView("bottom")) {
       const seam = document.createElement("div");
       seam.className = "view-seam";
       seam.dataset.between = "graph-legend";

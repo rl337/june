@@ -97,6 +97,10 @@ Environment:
 Task payloads may set `execute_graph: true` so the task runner drives a live
 `GraphExecutor` run (events stream to the console when using `june serve`).
 
+`june serve` also boots a **cron graph** (`june.console.cron`) with **10s** and
+**60s** bucket subgraphs whose `june.event_log` nodes append to the left-docked
+**Event log** view (MechaHarness lifecycle events + console log lines).
+
 ## First vertical slice
 
 ```bash

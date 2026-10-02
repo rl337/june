@@ -245,7 +245,8 @@ def build_scene_frame(
         active_node_id = active_node_from_events(events, run_id=run_id)
     recent_ids = recent_node_ids(events)
 
-    scene_node_id = selected_node_id or active_node_id or ROOT_SCENE_ID
+    # Explicit selection wins; do not auto-drill into the active node.
+    scene_node_id = selected_node_id if selected_node_id else ROOT_SCENE_ID
     nodes: list[SceneNode] = []
     edges: list[dict[str, str]] = []
 

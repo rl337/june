@@ -103,6 +103,11 @@ body {
   pointer-events: auto;
 }
 
+.view-pane.is-stacked {
+  /* Buried under another docked view; stack is retained in JS until closed. */
+  display: none;
+}
+
 .view-pane[data-view="graph"] {
   grid-column: 3;
   grid-row: 1;
