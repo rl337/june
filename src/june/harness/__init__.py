@@ -6,11 +6,17 @@ MechaHarness owns generic execution, linkage, envelopes, budgets, and checkpoint
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 from june.budget import SubgraphBudget
+from june.harness.visualization import (
+    ExecutionFocus,
+    execution_focus_from_events,
+    render_focus_ascii,
+)
 
 
 @dataclass
@@ -44,9 +50,15 @@ class RunResult:
 class MechaHarnessClient:
     """June-side facade over MechaHarness graph primitives."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        on_graph_event: Callable[[Any], None] | None = None,
+    ) -> None:
         self._available: bool | None = None
         self._graph_mod: Any | None = None
+        self._on_graph_event = on_graph_event
+        self._last_events: list[Any] = []
 
     def connect(self) -> bool:
         if self._available is not None:
@@ -142,13 +154,65 @@ class MechaHarnessClient:
             "budget_policy": run.budget.to_dict(),
         }
 
-    def execute(self, run: BoundRun) -> RunResult:
+    def execution_focus(
+        self,
+        run: BoundRun,
+        *,
+        checkpoint: dict[str, Any] | None = None,
+    ) -> ExecutionFocus | None:
+        """Snapshot of the active node within the bound graph (requires events)."""
+        if not self._last_events:
+            cp = checkpoint or run.bindings.get("graph_checkpoint")
+            if not isinstance(cp, dict):
+                return None
+            from june.harness.visualization import view_from_checkpoint
+
+            return ExecutionFocus(
+                root=view_from_checkpoint(cp, run_id=run.run_id),
+                nested=None,
+                active_run_id=run.run_id,
+                active_node_id=None,
+            )
+        return execution_focus_from_events(
+            self._last_events,
+            root_run_id=run.run_id,
+            root_checkpoint=checkpoint,
+        )
+
+    def render_execution_focus(
+        self,
+        run: BoundRun,
+        *,
+        checkpoint: dict[str, Any] | None = None,
+        style: Literal["ascii", "mermaid"] = "ascii",
+    ) -> str:
+        focus = self.execution_focus(run, checkpoint=checkpoint)
+        if focus is None:
+            return ""
+        if style == "ascii":
+            return render_focus_ascii(focus)
+        from june.harness.visualization import render_mermaid
+
+        lines = [render_mermaid(focus.root)]
+        if focus.nested is not None:
+            lines.append(render_mermaid(focus.nested))
+        return "\n\n".join(lines)
+
+    def execute(
+        self,
+        run: BoundRun,
+        *,
+        driver: Literal["plan", "run"] = "plan",
+    ) -> RunResult:
         """Realize a concrete graph with a required MechaHarness budget policy.
 
         June always attaches ``budget_policy`` for child runs. The control graph
         itself does not execute through GraphExecutor and stays uncapped.
         When MechaHarness is installed we build/checkpoint an ExecutionGraph
         carrying the policy for the host executor to enforce.
+
+        ``driver="run"`` executes through MechaHarness :class:`GraphExecutor` and
+        records lifecycle events for :meth:`execution_focus` / visualization.
         """
         if run.budget is None:  # pragma: no cover - dataclass default always set
             return RunResult(
@@ -209,19 +273,54 @@ class MechaHarnessClient:
                 },
             )
 
-        checkpoint = graph.checkpoint()
+        if driver == "plan":
+            checkpoint = graph.checkpoint()
+            return RunResult(
+                status="ready",
+                run_id=run.run_id,
+                template_name=run.template_name,
+                graph_checkpoint=checkpoint,
+                verification={"linkage": linkage},
+                budget=budget_info,
+                raw={
+                    "status": "ready",
+                    "mode": "execution_graph",
+                    "budget_policy": budget_info,
+                    "graph_executor_kwargs": {"budget_policy": budget_info},
+                },
+            )
+
+        from june.harness.execution import run_graph
+
+        def _remember(event: Any) -> None:
+            self._last_events.append(event)
+            if self._on_graph_event is not None:
+                self._on_graph_event(event)
+
+        self._last_events = []
+        graph_result = run_graph(graph, run, on_event=_remember)
+        checkpoint = graph_result.graph.checkpoint()
+        focus = execution_focus_from_events(
+            self._last_events,
+            root_run_id=run.run_id,
+            root_checkpoint=checkpoint,
+        )
         return RunResult(
-            status="ready",
+            status=graph_result.status,
             run_id=run.run_id,
             template_name=run.template_name,
             graph_checkpoint=checkpoint,
             verification={"linkage": linkage},
-            budget=budget_info,
+            budget={
+                **budget_info,
+                "spent": graph_result.budget_spent,
+                "level": graph_result.budget_level,
+            },
             raw={
-                "status": "ready",
-                "mode": "execution_graph",
+                "status": graph_result.status,
+                "mode": "graph_executor",
                 "budget_policy": budget_info,
-                # Hosts pass this into GraphExecutor.run(budget_policy=...).
-                "graph_executor_kwargs": {"budget_policy": budget_info},
+                "execution_focus": focus.to_dict(),
+                "error": graph_result.error,
             },
         )

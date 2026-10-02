@@ -59,6 +59,24 @@ def app(argv: list[str] | None = None) -> None:
     dream = sub.add_parser("dream", help="Mine durable traces for improvement proposals")
     dream.set_defaults(func=_cmd_dream)
 
+    graph_viz = sub.add_parser(
+        "graph-viz",
+        help="Execute a sample MechaHarness graph with live ASCII visualization",
+    )
+    graph_viz.add_argument(
+        "--nodes",
+        type=int,
+        default=3,
+        help="Number of sequential june.task nodes (default: 3)",
+    )
+    graph_viz.add_argument(
+        "--format",
+        choices=("ascii", "mermaid", "json"),
+        default="ascii",
+        help="Final snapshot format (live updates are always ASCII)",
+    )
+    graph_viz.set_defaults(func=_cmd_graph_viz)
+
     args = parser.parse_args(argv)
     if not args.command:
         parser.print_help()
@@ -153,6 +171,55 @@ def _cmd_run(args: argparse.Namespace) -> None:
 def _cmd_dream(args: argparse.Namespace) -> None:
     proposals = _orch(args).dream()
     print(json.dumps([p.to_dict() for p in proposals], indent=2))
+
+
+def _cmd_graph_viz(args: argparse.Namespace) -> None:
+    from june.harness import MechaHarnessClient
+    from june.harness.visualization import GRAPH_NODE_START
+
+    probe = MechaHarnessClient()
+    if not probe.connect():
+        print(
+            json.dumps(
+                {
+                    "error": "mechaharness_not_installed",
+                    "hint": "pip install 'june[harness]'",
+                },
+                indent=2,
+            ),
+            file=sys.stderr,
+        )
+        raise SystemExit(1)
+
+    run_holder: dict[str, object] = {}
+
+    def on_event(event: object) -> None:
+        etype = str(getattr(event, "type", ""))
+        if etype != GRAPH_NODE_START:
+            return
+        bound = run_holder.get("run")
+        if bound is None:
+            return
+        print(client.render_execution_focus(bound, style="ascii"), file=sys.stderr)
+        print(f"--- {etype} ---", file=sys.stderr)
+
+    client = MechaHarnessClient(on_graph_event=on_event)
+    if not client.connect():
+        raise SystemExit(1)
+    run = client.bind_template(
+        "graph-viz-demo",
+        bindings={"task": "visualize execution"},
+        node_kinds=["june.task"] * max(1, args.nodes),
+    )
+    run_holder["run"] = run
+    result = client.execute(run, driver="run")
+    if args.format == "json":
+        print(json.dumps(result.raw.get("execution_focus"), indent=2))
+    elif args.format == "mermaid":
+        print(client.render_execution_focus(run, checkpoint=result.graph_checkpoint, style="mermaid"))
+    else:
+        print(client.render_execution_focus(run, checkpoint=result.graph_checkpoint, style="ascii"))
+    print(json.dumps({"status": result.status, "run_id": result.run_id}, indent=2), file=sys.stderr)
 
 
 if __name__ == "__main__":
