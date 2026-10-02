@@ -253,7 +253,7 @@ body {
 .view-seam::after {
   content: "";
   position: absolute;
-  background: rgba(223, 231, 245, 0.22);
+  background: rgba(93, 255, 176, 0.22);
   border-radius: 1px;
 }
 
@@ -724,10 +724,12 @@ body {
   max-width: min(420px, 92vw);
   padding: 0.85rem 1rem 1rem;
   border-radius: var(--radius-menu);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(93, 255, 176, 0.28);
   background: var(--glass-strong);
   backdrop-filter: blur(14px);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  box-shadow:
+    0 0 24px rgba(93, 255, 176, 0.08),
+    0 20px 50px rgba(0, 0, 0, 0.55);
   opacity: 0;
   pointer-events: auto;
   transition:
