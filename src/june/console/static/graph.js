@@ -415,9 +415,9 @@ function appendBubbleTroubleDefs(defs) {
     r: "0.78",
     gradientUnits: "objectBoundingBox",
   });
-  sheen.appendChild(el("stop", { offset: "0%", "stop-color": "#f4fff9", "stop-opacity": "0.55" }));
-  sheen.appendChild(el("stop", { offset: "28%", "stop-color": "#9dffd4", "stop-opacity": "0.22" }));
-  sheen.appendChild(el("stop", { offset: "62%", "stop-color": "#1f6b45", "stop-opacity": "0.06" }));
+  sheen.appendChild(el("stop", { offset: "0%", "stop-color": "#ffffff", "stop-opacity": "0.7" }));
+  sheen.appendChild(el("stop", { offset: "22%", "stop-color": "#e8fff4", "stop-opacity": "0.28" }));
+  sheen.appendChild(el("stop", { offset: "55%", "stop-color": "#1f6b45", "stop-opacity": "0.05" }));
   sheen.appendChild(el("stop", { offset: "100%", "stop-color": "#040806", "stop-opacity": "0" }));
   defs.appendChild(sheen);
 
@@ -428,9 +428,9 @@ function appendBubbleTroubleDefs(defs) {
     r: "0.78",
     gradientUnits: "objectBoundingBox",
   });
-  sheenRun.appendChild(el("stop", { offset: "0%", "stop-color": "#ffffff", "stop-opacity": "0.62" }));
-  sheenRun.appendChild(el("stop", { offset: "30%", "stop-color": "#c8ffe8", "stop-opacity": "0.28" }));
-  sheenRun.appendChild(el("stop", { offset: "70%", "stop-color": "#5dffb0", "stop-opacity": "0.08" }));
+  sheenRun.appendChild(el("stop", { offset: "0%", "stop-color": "#ffffff", "stop-opacity": "0.78" }));
+  sheenRun.appendChild(el("stop", { offset: "24%", "stop-color": "#ffffff", "stop-opacity": "0.32" }));
+  sheenRun.appendChild(el("stop", { offset: "58%", "stop-color": "#c8ffe8", "stop-opacity": "0.1" }));
   sheenRun.appendChild(el("stop", { offset: "100%", "stop-color": "#041810", "stop-opacity": "0" }));
   defs.appendChild(sheenRun);
 
