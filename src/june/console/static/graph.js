@@ -222,7 +222,7 @@ export class GraphViewport {
     const defs = el("defs");
     const glow = el("filter", { id: "glow" });
     glow.innerHTML =
-      '<feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>';
+      '<feGaussianBlur stdDeviation="3.5" result="b"/><feColorMatrix in="b" type="matrix" values="0 0 0 0 0.36  0 0 0 0 1  0 0 0 0 0.69  0 0 0 0.75 0" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>';
     defs.appendChild(glow);
     svg.appendChild(defs);
 
@@ -270,7 +270,7 @@ function drawEdges(layer, edges, index, depth) {
       y1: a.absY + a.h / 2,
       x2: b.absX + b.w / 2,
       y2: b.absY + b.h / 2,
-      stroke: depth === 0 ? "#4b5c78" : "#6a7d99",
+      stroke: depth === 0 ? "#3d6b52" : "#5a8f6e",
       "stroke-width": depth === 0 ? 2 : 1.2,
       "stroke-opacity": "0.85",
       class: "graph-edge",
@@ -318,34 +318,33 @@ function drawNodeTree(layer, node, ctx) {
     }
   });
 
-  // Idle purple vs running wash. When interiors un-render, keep a clear
-  // teal/cyan running fill — never the solid idle purple.
+  // Bubble Trouble palette: membrane green idle, bright bubble cyan running.
   const soft = node.shape === "round_rect";
   let fill;
   let opacity;
   if (running) {
     if (reveal) {
-      fill = soft ? "#c4b5fd" : "#7dd3fc";
-      opacity = "0.30";
+      fill = soft ? "#5dffb0" : "#3de0ff";
+      opacity = "0.28";
     } else {
-      fill = soft ? "#5eead4" : "#38bdf8";
-      opacity = "0.72";
+      fill = soft ? "#5dffb0" : "#3de0ff";
+      opacity = "0.78";
     }
   } else {
-    fill = soft ? "#7c5cbf" : "#3d6fb8";
-    opacity = reveal ? "0.22" : "0.92";
+    fill = soft ? "#1f6b45" : "#1a5a66";
+    opacity = reveal ? "0.24" : "0.9";
   }
   const rect = el("rect", {
     x: 0,
     y: 0,
     width: node.w,
     height: node.h,
-    rx: soft ? 16 : 4,
-    ry: soft ? 16 : 4,
+    rx: soft ? 22 : 4,
+    ry: soft ? 22 : 4,
     fill,
     "fill-opacity": opacity,
-    stroke: selected ? "#f5c542" : running ? "#5eead4" : "#dfe7f5",
-    "stroke-width": selected ? 3 : running ? 2.25 : 1.25,
+    stroke: selected ? "#ffb347" : running ? "#c8ffe8" : "#7eab8f",
+    "stroke-width": selected ? 3 : running ? 2.35 : 1.25,
   });
   if (running) rect.setAttribute("filter", "url(#glow)");
   g.dataset.running = running ? "1" : "0";
@@ -375,7 +374,7 @@ function drawNodeTree(layer, node, ctx) {
           y1: a.y + a.h / 2,
           x2: b.x + b.w / 2,
           y2: b.y + b.h / 2,
-          stroke: "#8aa0c0",
+          stroke: "#5a8f6e",
           "stroke-width": 1.25,
           class: "graph-edge",
         }),
