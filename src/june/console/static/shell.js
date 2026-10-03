@@ -290,7 +290,7 @@ export class JuneConsoleShell {
     const dialog = this.openCustomDialog({
       kind: `stack-${parentId}`,
       title: "Running instances",
-      bodyHtml: `<p class="dialog-text">Double-clicked stack · watch an instance</p>${listHtml}`,
+      bodyHtml: `<p class="dialog-text">Stacked instances · click a run to watch its subgraph</p>${listHtml}`,
     });
     dialog.querySelectorAll(".instance-watch").forEach((btn) => {
       btn.addEventListener("click", () => {

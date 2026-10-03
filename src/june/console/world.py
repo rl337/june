@@ -387,12 +387,14 @@ def _attach_instances(
                 shape="round_rect",
                 status="running" if hidden_running else "pending",
                 execution="running" if hidden_running else "pending",
-                detail="double-click for running instances",
+                detail="click for instance list",
                 x=stack_origin_x + stack_w + 12,
                 y=stack_origin_y + (stack_h - STACK_BADGE_H) / 2,
                 w=STACK_BADGE_W,
                 h=STACK_BADGE_H,
                 stack_role="badge",
+                # Always paint above stacked cards for hit-testing.
+                stack_depth=10_000,
                 stack_hidden=[str(i.get("run_id")) for i in ordered],
                 stack_parent_id=top.id,
             )
