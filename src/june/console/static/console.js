@@ -95,3 +95,10 @@ function connect() {
 }
 
 connect();
+
+// Lightweight console hooks for watch dialogs / manual debugging.
+window.juneConsole = {
+  shell,
+  viewport,
+  openWatch: (runId) => shell.openInstanceWatchDialog(runId, { GraphViewport }),
+};
