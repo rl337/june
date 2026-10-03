@@ -60,8 +60,9 @@ export class GraphViewport {
   fit({ clearSelection = true } = {}) {
     if (!this.world) return;
     const rect = this.svg.getBoundingClientRect();
-    const vw = Math.max(rect.width, 1);
-    const vh = Math.max(rect.height, 1);
+    // Prefer laid-out size; fall back to attributes/parent when dialog first opens.
+    const vw = Math.max(rect.width, this.svg.clientWidth, this.svg.parentElement?.clientWidth || 0, 1);
+    const vh = Math.max(rect.height, this.svg.clientHeight, this.svg.parentElement?.clientHeight || 0, 1);
     const ww = Math.max(this.world.width || 400, 1);
     const wh = Math.max(this.world.height || 240, 1);
     this.zoom = clamp(Math.min(vw / ww, vh / wh) * 0.92, MIN_ZOOM, MAX_ZOOM);
