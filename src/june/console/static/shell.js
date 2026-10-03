@@ -372,7 +372,7 @@ export class JuneConsoleShell {
     return dialog;
   }
 
-  async showInstanceNodeDetail(runId, nodeId) {
+  async showInstanceNodeDetail(runId, nodeId, { quiet = false } = {}) {
     const entry = this._watchViewports?.[runId];
     if (!entry) return;
     const pane = entry.dialog.querySelector(".instance-watch-detail");
@@ -384,17 +384,22 @@ export class JuneConsoleShell {
     entry.selectedNodeId = id;
     if (hint) hint.hidden = true;
     body.hidden = false;
-    body.textContent = "Loading…";
-    if (title) {
-      const short = String(id).split(":").slice(-2).join(":");
-      title.textContent = `Node · ${short}`;
+    if (!quiet) {
+      body.textContent = "Loading…";
+      if (title) {
+        const short = String(id).split(":").slice(-2).join(":");
+        title.textContent = `Node · ${short}`;
+      }
     }
     try {
       const res = await fetch(
         `/api/instance/${encodeURIComponent(runId)}/node/${encodeURIComponent(id)}`,
       );
       if (!res.ok) {
-        body.textContent = res.status === 404 ? "Node not found in this run." : "Failed to load details.";
+        if (!quiet || !body.textContent || body.textContent === "Loading…") {
+          body.textContent =
+            res.status === 404 ? "Node not found in this run." : "Failed to load details.";
+        }
         return;
       }
       // Stale response if the user clicked another node meanwhile.
@@ -407,7 +412,7 @@ export class JuneConsoleShell {
         title.textContent = `Run · ${String(runId).slice(-8)}`;
       }
     } catch {
-      if (entry.selectedNodeId === id) {
+      if (entry.selectedNodeId === id && !quiet) {
         body.textContent = "Failed to load details.";
       }
     }
@@ -443,7 +448,7 @@ export class JuneConsoleShell {
         `;
       }
       if (entry.selectedNodeId) {
-        void this.showInstanceNodeDetail(runId, entry.selectedNodeId);
+        void this.showInstanceNodeDetail(runId, entry.selectedNodeId, { quiet: true });
       }
     } catch {
       /* ignore transient fetch errors while watching */
