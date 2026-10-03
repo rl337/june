@@ -290,7 +290,7 @@ export class JuneConsoleShell {
     const dialog = this.openCustomDialog({
       kind: `stack-${parentId}`,
       title: "Running instances",
-      bodyHtml: `<p class="dialog-text">Double-clicked stack · watch an instance</p>${listHtml}`,
+      bodyHtml: `<p class="dialog-text">Stacked instances · click a run to watch its subgraph</p>${listHtml}`,
     });
     dialog.querySelectorAll(".instance-watch").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -308,7 +308,12 @@ export class JuneConsoleShell {
   async openInstanceWatchDialog(runId, { GraphViewport }) {
     if (!runId || !GraphViewport) return null;
     this._watchViewports = this._watchViewports || {};
-    // Replace any prior watch for this run (dialog reopen).
+    // Only one watch dialog at a time — stacked SVG hit-targets steal clicks.
+    for (const [otherId, other] of Object.entries(this._watchViewports)) {
+      if (otherId === runId) continue;
+      other.dialog?.remove();
+      delete this._watchViewports[otherId];
+    }
     delete this._watchViewports[runId];
     const short = String(runId).slice(-8);
     const summary =
@@ -325,19 +330,38 @@ export class JuneConsoleShell {
           · bucket ${escapeHtml(summary.bucket || "—")}
           · active <code>${escapeHtml(summary.active_node_id || "—")}</code>
         </p>
-        <div class="instance-watch-graph">
-          <svg class="instance-watch-svg" role="img" aria-label="Instance subgraph ${escapeHtml(
-            short,
-          )}"></svg>
+        <div class="instance-watch-layout">
+          <div class="instance-watch-graph">
+            <svg class="instance-watch-svg" role="img" aria-label="Instance subgraph ${escapeHtml(
+              short,
+            )}"></svg>
+          </div>
+          <aside class="instance-watch-detail" aria-live="polite">
+            <h4 class="instance-watch-detail-title">Node details</h4>
+            <p class="instance-watch-detail-hint">Click a node in this run’s graph.</p>
+            <pre class="instance-watch-detail-body dialog-pre" hidden></pre>
+          </aside>
         </div>
-        <p class="event-rate-hint">Scroll to zoom · drag to pan · live with the run</p>
+        <p class="event-rate-hint">Scroll to zoom · drag to pan · click a node for details</p>
       `,
     });
     const svg = dialog.querySelector(".instance-watch-svg");
     const viewport = new GraphViewport(svg, {
-      onSelectNode: () => {},
+      onSelectNode: (nodeId) => {
+        void this.showInstanceNodeDetail(runId, nodeId);
+      },
     });
-    this._watchViewports[runId] = { viewport, dialog, fitted: false };
+    // Detail inspection should not re-center/zoom the watch camera on every click.
+    const _select = viewport.select.bind(viewport);
+    viewport.select = (nodeId, opts = {}) => _select(nodeId, { zoomToward: false, ...opts });
+    this._watchViewports[runId] = {
+      viewport,
+      dialog,
+      fitted: false,
+      selectedNodeId: null,
+      pipelineNodes: {},
+      instanceSummary: { ...summary, run_id: runId },
+    };
     dialog.querySelector(".dialog-close")?.addEventListener(
       "click",
       () => {
@@ -358,6 +382,101 @@ export class JuneConsoleShell {
     return dialog;
   }
 
+  _detailFromWatchCache(runId, nodeId) {
+    const entry = this._watchViewports?.[runId];
+    if (!entry) return null;
+    const id = !nodeId || nodeId === "root" ? runId : nodeId;
+    if (id === runId) {
+      const s = entry.instanceSummary || {};
+      const nodes = entry.pipelineNodes || {};
+      return {
+        run_id: runId,
+        node_id: runId,
+        kind: "instance",
+        status: s.status,
+        bucket: s.bucket,
+        parent_node_id: s.parent_node_id,
+        started_at: s.started_at,
+        finished_at: s.finished_at,
+        active_node_id: s.active_node_id,
+        node_count: Object.keys(nodes).length,
+      };
+    }
+    const raw = entry.pipelineNodes?.[id];
+    if (!raw) return null;
+    return { run_id: runId, node_id: id, node: raw };
+  }
+
+  _renderInstanceNodeDetail(entry, detail) {
+    const pane = entry.dialog.querySelector(".instance-watch-detail");
+    const title = pane?.querySelector(".instance-watch-detail-title");
+    const hint = pane?.querySelector(".instance-watch-detail-hint");
+    const body = pane?.querySelector(".instance-watch-detail-body");
+    if (!pane || !body) return;
+    if (hint) hint.hidden = true;
+    body.hidden = false;
+    body.textContent = JSON.stringify(detail, null, 2);
+    if (title && detail.node?.goal) {
+      title.textContent = String(detail.node.goal);
+    } else if (title && detail.kind === "instance") {
+      title.textContent = `Run · ${String(detail.run_id || "").slice(-8)}`;
+    } else if (title && detail.node_id) {
+      title.textContent = `Node · ${String(detail.node_id).split(":").slice(-2).join(":")}`;
+    }
+  }
+
+  async showInstanceNodeDetail(runId, nodeId, { quiet = false } = {}) {
+    const entry = this._watchViewports?.[runId];
+    if (!entry) return;
+    const pane = entry.dialog.querySelector(".instance-watch-detail");
+    const title = pane?.querySelector(".instance-watch-detail-title");
+    const hint = pane?.querySelector(".instance-watch-detail-hint");
+    const body = pane?.querySelector(".instance-watch-detail-body");
+    if (!pane || !body) return;
+    const id = !nodeId || nodeId === "root" ? runId : nodeId;
+    entry.selectedNodeId = id;
+    if (hint) hint.hidden = true;
+    body.hidden = false;
+
+    const cached = this._detailFromWatchCache(runId, id);
+    if (cached) {
+      this._renderInstanceNodeDetail(entry, cached);
+    } else if (!quiet) {
+      body.textContent = "Loading…";
+      if (title) {
+        const short = String(id).split(":").slice(-2).join(":");
+        title.textContent = `Node · ${short}`;
+      }
+    }
+
+    try {
+      const res = await fetch(
+        `/api/instance/${encodeURIComponent(runId)}/node/${encodeURIComponent(id)}`,
+      );
+      if (!res.ok) {
+        // Keep cached details when the hub has already pruned the finished run.
+        if (!cached && (!quiet || !body.textContent || body.textContent === "Loading…")) {
+          body.textContent =
+            res.status === 404 ? "Node not found in this run." : "Failed to load details.";
+        }
+        return;
+      }
+      if (entry.selectedNodeId !== id) return;
+      const detail = await res.json();
+      if (detail.node) {
+        entry.pipelineNodes = entry.pipelineNodes || {};
+        entry.pipelineNodes[id] = detail.node;
+      } else if (detail.kind === "instance") {
+        entry.instanceSummary = { ...entry.instanceSummary, ...detail };
+      }
+      this._renderInstanceNodeDetail(entry, detail);
+    } catch {
+      if (!cached && entry.selectedNodeId === id && !quiet) {
+        body.textContent = "Failed to load details.";
+      }
+    }
+  }
+
   async refreshInstanceWatch(runId) {
     const entry = this._watchViewports?.[runId];
     if (!entry) return;
@@ -365,10 +484,22 @@ export class JuneConsoleShell {
       const res = await fetch(`/api/instance/${encodeURIComponent(runId)}/world`);
       if (!res.ok) {
         const meta = entry.dialog.querySelector(".instance-watch-meta");
-        if (meta) meta.textContent = "Instance no longer available.";
+        if (meta && !entry.pipelineNodes) {
+          meta.textContent = "Instance no longer available.";
+        } else if (meta && entry.instanceSummary) {
+          const s = entry.instanceSummary;
+          meta.innerHTML = `
+            <span class="instance-status">${escapeHtml(s.status || "finished")}</span>
+            · bucket ${escapeHtml(s.bucket || "—")}
+            · cached graph
+          `;
+        }
         return;
       }
       const data = await res.json();
+      if (data.pipeline_nodes && typeof data.pipeline_nodes === "object") {
+        entry.pipelineNodes = data.pipeline_nodes;
+      }
       const svg = entry.viewport.svg;
       const sized = (svg.clientWidth || 0) > 40 && (svg.clientHeight || 0) > 40;
       entry.viewport.setWorld(data.world || {}, {
@@ -377,6 +508,11 @@ export class JuneConsoleShell {
       if (sized) entry.fitted = true;
       const summary =
         (this.lastSnapshot?.instances || []).find((i) => i.run_id === runId) || {};
+      entry.instanceSummary = {
+        ...entry.instanceSummary,
+        ...summary,
+        run_id: runId,
+      };
       const meta = entry.dialog.querySelector(".instance-watch-meta");
       if (meta) {
         meta.innerHTML = `
@@ -386,6 +522,9 @@ export class JuneConsoleShell {
           · bucket ${escapeHtml(summary.bucket || "—")}
           · active <code>${escapeHtml(summary.active_node_id || "—")}</code>
         `;
+      }
+      if (entry.selectedNodeId) {
+        void this.showInstanceNodeDetail(runId, entry.selectedNodeId, { quiet: true });
       }
     } catch {
       /* ignore transient fetch errors while watching */

@@ -784,13 +784,26 @@ body {
 }
 
 .console-dialog--graph {
-  min-width: min(640px, 94vw);
-  max-width: min(820px, 96vw);
-  width: min(780px, 94vw);
+  min-width: min(720px, 96vw);
+  max-width: min(980px, 98vw);
+  width: min(920px, 96vw);
+}
+
+.instance-watch-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(200px, 0.9fr);
+  gap: 0.65rem;
+  margin-top: 0.45rem;
+  align-items: stretch;
+}
+
+@media (max-width: 720px) {
+  .instance-watch-layout {
+    grid-template-columns: 1fr;
+  }
 }
 
 .instance-watch-graph {
-  margin-top: 0.45rem;
   height: min(420px, 52vh);
   border-radius: 14px;
   border: 1px solid rgba(255, 94, 176, 0.22);
@@ -806,6 +819,42 @@ body {
   display: block;
   touch-action: none;
   cursor: grab;
+}
+
+.instance-watch-detail {
+  min-height: min(420px, 52vh);
+  max-height: min(420px, 52vh);
+  border-radius: 14px;
+  border: 1px solid rgba(94, 234, 255, 0.18);
+  background:
+    linear-gradient(160deg, rgba(42, 212, 154, 0.06), transparent 55%),
+    rgba(0, 0, 0, 0.32);
+  padding: 0.65rem 0.75rem;
+  overflow: auto;
+}
+
+.instance-watch-detail-title {
+  margin: 0 0 0.35rem;
+  font-family: "Share Tech Mono", ui-monospace, monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--accent, #5eeaff);
+}
+
+.instance-watch-detail-hint {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.instance-watch-detail-body {
+  margin: 0;
+  max-height: none;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .instance-watch-meta {

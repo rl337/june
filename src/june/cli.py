@@ -267,9 +267,17 @@ def _cmd_graph_viz(args: argparse.Namespace) -> None:
     if args.format == "json":
         print(json.dumps(result.raw.get("execution_focus"), indent=2))
     elif args.format == "mermaid":
-        print(client.render_execution_focus(run, checkpoint=result.graph_checkpoint, style="mermaid"))
+        print(
+            client.render_execution_focus(
+                run, checkpoint=result.graph_checkpoint, style="mermaid"
+            )
+        )
     else:
-        print(client.render_execution_focus(run, checkpoint=result.graph_checkpoint, style="ascii"))
+        print(
+            client.render_execution_focus(
+                run, checkpoint=result.graph_checkpoint, style="ascii"
+            )
+        )
     print(json.dumps({"status": result.status, "run_id": result.run_id}, indent=2), file=sys.stderr)
 
 

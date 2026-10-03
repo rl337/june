@@ -156,8 +156,9 @@ class ConsoleHub:
                 payload = getattr(event, "payload", None)
                 etype = str(getattr(event, "type", ""))
                 if isinstance(payload, dict):
-                    if etype.endswith("graph_node_start") and isinstance(payload.get("node_id"), str):
-                        inst["active_node_id"] = payload["node_id"]
+                    node_id = payload.get("node_id")
+                    if etype.endswith("graph_node_start") and isinstance(node_id, str):
+                        inst["active_node_id"] = node_id
                     graph = payload.get("graph")
                     if isinstance(graph, dict):
                         inst["pipeline"] = graph
@@ -244,6 +245,22 @@ class ConsoleHub:
                 return None
             return build_instance_world(dict(inst)).to_dict()
 
+    def instance_pipeline_nodes(self, run_id: str) -> dict[str, Any] | None:
+        """Flat map of pipeline node id → raw checkpoint node for a run."""
+        with self._lock:
+            inst = self._instances.get(run_id)
+            if not isinstance(inst, dict):
+                return None
+            return _flatten_pipeline_nodes(inst.get("pipeline"))
+
+    def instance_node_detail(self, run_id: str, node_id: str) -> dict[str, Any] | None:
+        """Return raw node (or instance summary) for a watch-dialog selection."""
+        with self._lock:
+            inst = self._instances.get(run_id)
+            if not isinstance(inst, dict):
+                return None
+            return _instance_node_detail_from(inst, node_id)
+
     def _event_log_entries(self) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         for event in self._events:
@@ -326,6 +343,64 @@ class ConsoleHub:
 
     def snapshot_json(self) -> str:
         return json.dumps(self.snapshot().to_dict())
+
+
+def _flatten_pipeline_nodes(pipeline: Any) -> dict[str, Any]:
+    """Collect raw checkpoint nodes from a pipeline (including nested subgraphs)."""
+    out: dict[str, Any] = {}
+    if not isinstance(pipeline, dict):
+        return out
+    nodes = pipeline.get("nodes")
+    if not isinstance(nodes, dict):
+        return out
+    for node_id, raw in nodes.items():
+        if not isinstance(raw, dict):
+            continue
+        out[str(node_id)] = dict(raw)
+        nested = raw.get("subgraph")
+        if isinstance(nested, dict):
+            out.update(_flatten_pipeline_nodes(nested))
+        payload = raw.get("payload")
+        if isinstance(payload, dict):
+            nested = payload.get("subgraph")
+            if isinstance(nested, dict):
+                out.update(_flatten_pipeline_nodes(nested))
+    return out
+
+
+def _find_pipeline_node(pipeline: Any, node_id: str) -> dict[str, Any] | None:
+    """Locate a node by id in a pipeline checkpoint (recursive into subgraphs)."""
+    if not node_id:
+        return None
+    return _flatten_pipeline_nodes(pipeline).get(node_id)
+
+
+def _instance_node_detail_from(inst: dict[str, Any], node_id: str) -> dict[str, Any] | None:
+    run_id = str(inst.get("run_id") or "")
+    pipeline = inst.get("pipeline") if isinstance(inst.get("pipeline"), dict) else {}
+    if node_id in ("", "root", run_id):
+        return {
+            "run_id": run_id,
+            "node_id": run_id,
+            "kind": "instance",
+            "status": inst.get("status"),
+            "bucket": inst.get("bucket"),
+            "parent_node_id": inst.get("parent_node_id"),
+            "started_at": inst.get("started_at"),
+            "finished_at": inst.get("finished_at"),
+            "active_node_id": inst.get("active_node_id"),
+            "pipeline_goal": pipeline.get("goal"),
+            "pipeline_id": pipeline.get("id"),
+            "node_count": len(pipeline.get("nodes") or {}),
+        }
+    raw = _find_pipeline_node(pipeline, node_id)
+    if raw is None:
+        return None
+    return {
+        "run_id": run_id,
+        "node_id": node_id,
+        "node": dict(raw),
+    }
 
 
 def _deep_merge_graph(base: dict[str, Any], child: dict[str, Any]) -> dict[str, Any]:

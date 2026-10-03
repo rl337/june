@@ -301,20 +301,31 @@ function drawNodeTree(layer, node, ctx) {
   });
   g.dataset.nodeId = node.id;
   g.style.cursor = "pointer";
-  g.addEventListener("click", (e) => {
+  const openStack = (e) => {
+    e.preventDefault();
     e.stopPropagation();
-    if (role === "badge" && ctx.onStackBadge) {
-      ctx.onStackBadge(node);
-      return;
-    }
-    ctx.onSelect(node.id);
-  });
-  g.addEventListener("dblclick", (e) => {
-    e.stopPropagation();
-    if ((role === "badge" || role === "front" || role === "back") && ctx.onStackBadge) {
-      ctx.onStackBadge(node);
-    }
-  });
+    if (ctx.onStackBadge) ctx.onStackBadge(node);
+  };
+  if (role === "badge") {
+    // Pointerdown beats pan/drag races; click/dblclick both open the list.
+    g.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      openStack(e);
+    });
+    g.addEventListener("click", openStack);
+    g.addEventListener("dblclick", openStack);
+  } else {
+    g.addEventListener("click", (e) => {
+      e.stopPropagation();
+      ctx.onSelect(node.id);
+    });
+    g.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      if ((role === "front" || role === "back") && ctx.onStackBadge) {
+        ctx.onStackBadge(node);
+      }
+    });
+  }
 
   // Norfair palette: magenta membrane idle, coral bubble cores when running,
   // purple ridged hard blocks, teal edge accents.
@@ -383,10 +394,12 @@ function drawNodeTree(layer, node, ctx) {
         }),
       );
     }
-    // Paint stacked cards back→front so overlap is correct.
-    const kids = [...(node.children || [])].sort(
-      (a, b) => (a.stack_depth || 0) - (b.stack_depth || 0),
-    );
+    // Paint stacked cards back→front; badge last so it stays clickable.
+    const kids = [...(node.children || [])].sort((a, b) => {
+      const da = a.stack_role === "badge" ? 1e9 : a.stack_depth || 0;
+      const db = b.stack_role === "badge" ? 1e9 : b.stack_depth || 0;
+      return da - db;
+    });
     for (const child of kids) {
       drawNodeTree(inner, child, {
         absX: child.x || 0,
@@ -398,6 +411,23 @@ function drawNodeTree(layer, node, ctx) {
       });
     }
     g.appendChild(inner);
+  } else {
+    // Keep +N badge reachable even when interiors are collapsed.
+    const badge = (node.children || []).find((c) => c.stack_role === "badge");
+    if (badge) {
+      const inner = el("g", { class: "node-interior node-interior--badge-only" });
+      const bx = Math.max(6, node.w - badge.w - 6);
+      const by = Math.max(6, (node.h - badge.h) / 2);
+      drawNodeTree(inner, badge, {
+        absX: bx,
+        absY: by,
+        zoom: ctx.zoom,
+        selectedId: ctx.selectedId,
+        onSelect: ctx.onSelect,
+        onStackBadge: ctx.onStackBadge,
+      });
+      g.appendChild(inner);
+    }
   }
 
   layer.appendChild(g);
