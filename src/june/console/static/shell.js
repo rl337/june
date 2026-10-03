@@ -483,9 +483,10 @@ export class JuneConsoleShell {
         pane.querySelector(".view-body").innerHTML = `
           <ul class="legend-list">
             <li><span class="shape hard"></span> hard node (rect)</li>
-            <li><span class="shape soft"></span> soft node (round-rect)</li>
-            <li><span class="glow-sample">running</span> active execution</li>
+            <li><span class="shape soft"></span> soft bubble (round-rect)</li>
+            <li><span class="glow-sample">running</span> live bubble wash</li>
             <li><span class="dim-sample">dim</span> finished / trail</li>
+            <li>scheme: Bubble Trouble</li>
           </ul>
         `;
       }
