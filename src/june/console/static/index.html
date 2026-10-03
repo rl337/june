@@ -3,11 +3,17 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>June Console</title>
+    <title>June Console · Bubble Trouble</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Share+Tech+Mono&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/static/console.css" />
   </head>
   <body>
-    <div id="june-console" class="june-console">
+    <div id="june-console" class="june-console theme-bubble-trouble" data-ui-scheme="bubble-trouble">
       <div class="dock dock-top" data-dock="top" aria-label="Top menu dock"></div>
       <div class="dock dock-left" data-dock="left" aria-label="Left menu dock"></div>
       <div class="dock dock-right" data-dock="right" aria-label="Right menu dock"></div>
@@ -22,6 +28,7 @@
         >
           <header class="view-chrome">
             <span class="view-title">Graph</span>
+            <span class="scheme-mark" title="UI scheme">Bubble Trouble</span>
             <span id="ws-status" class="ws-status" title="WebSocket">●</span>
             <span id="scene-title" class="view-subtitle">Connecting…</span>
             <span id="run-status" class="pill">idle</span>

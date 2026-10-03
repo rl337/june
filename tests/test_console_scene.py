@@ -76,7 +76,11 @@ def test_recent_nodes_dim_after_end() -> None:
     }
     events = [
         _Event(type=GRAPH_NODE_START, run_id=run_id, payload={"node_id": "n0"}),
-        _Event(type=GRAPH_NODE_END, run_id=run_id, payload={"node_id": "n0", "status": "succeeded"}),
+        _Event(
+            type=GRAPH_NODE_END,
+            run_id=run_id,
+            payload={"node_id": "n0", "status": "succeeded"},
+        ),
         _Event(type=GRAPH_NODE_START, run_id=run_id, payload={"node_id": "n1"}),
     ]
     frame = build_scene_frame(checkpoint, events, run_id=run_id, selected_node_id=ROOT_SCENE_ID)
@@ -122,3 +126,98 @@ def test_console_api_snapshot() -> None:
     body = response.json()
     assert "scene" in body
     assert "event_log" in body
+
+
+def _sample_instance_pipeline(run_id: str) -> dict:
+    """Minimal pipeline checkpoint (no MechaHarness required)."""
+    steps = ("acquire window", "sample signals", "emit heartbeat", "flush buffers")
+    nodes = {}
+    edges = []
+    prev = None
+    for idx, goal in enumerate(steps):
+        nid = f"{run_id}:step:{idx}"
+        nodes[nid] = {
+            "id": nid,
+            "kind": "june.timed_log",
+            "goal": goal,
+            "status": "succeeded",
+            "payload": {"message": goal, "step_index": idx, "instance_id": run_id},
+        }
+        if prev is not None:
+            edges.append(
+                {
+                    "from_node": prev,
+                    "to_node": nid,
+                    "types": ["control"],
+                    "reason": "seq",
+                }
+            )
+        prev = nid
+    return {"id": run_id, "goal": "10s timed pipeline", "nodes": nodes, "edges": edges}
+
+
+def test_console_api_instance_world() -> None:
+    pytest = __import__("pytest")
+    fastapi = pytest.importorskip("fastapi")
+    del fastapi
+    from fastapi.testclient import TestClient
+
+    from june.console.hub import ConsoleHub
+    from june.console.server import create_app
+
+    hub = ConsoleHub()
+    run_id = "june.console.cron:10s:watchapi1"
+    hub.begin_instance(
+        run_id=run_id,
+        bucket="10s",
+        parent_node_id="june.console.cron:bucket:10s",
+        pipeline=_sample_instance_pipeline(run_id),
+    )
+    client = TestClient(create_app(hub))
+    missing = client.get("/api/instance/does-not-exist/world")
+    assert missing.status_code == 404
+    ok = client.get(f"/api/instance/{run_id}/world")
+    assert ok.status_code == 200
+    payload = ok.json()
+    assert payload["run_id"] == run_id
+    assert payload["world"]["nodes"][0]["id"] == run_id
+    assert len(payload["world"]["nodes"][0]["children"]) == 4
+    assert isinstance(payload.get("pipeline_nodes"), dict)
+    assert len(payload["pipeline_nodes"]) == 4
+
+
+def test_console_api_instance_node_detail() -> None:
+    pytest = __import__("pytest")
+    fastapi = pytest.importorskip("fastapi")
+    del fastapi
+    from fastapi.testclient import TestClient
+
+    from june.console.hub import ConsoleHub
+    from june.console.server import create_app
+
+    hub = ConsoleHub()
+    run_id = "june.console.cron:10s:nodedet01"
+    hub.begin_instance(
+        run_id=run_id,
+        bucket="10s",
+        parent_node_id="june.console.cron:bucket:10s",
+        pipeline=_sample_instance_pipeline(run_id),
+    )
+    client = TestClient(create_app(hub))
+
+    root = client.get(f"/api/instance/{run_id}/node/{run_id}")
+    assert root.status_code == 200
+    root_body = root.json()
+    assert root_body["kind"] == "instance"
+    assert root_body["node_count"] == 4
+
+    step_id = f"{run_id}:step:0"
+    step = client.get(f"/api/instance/{run_id}/node/{step_id}")
+    assert step.status_code == 200
+    step_body = step.json()
+    assert step_body["node_id"] == step_id
+    assert step_body["node"]["goal"] == "acquire window"
+    assert step_body["node"]["kind"] == "june.timed_log"
+
+    missing = client.get(f"/api/instance/{run_id}/node/does-not-exist")
+    assert missing.status_code == 404

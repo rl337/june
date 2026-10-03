@@ -21,7 +21,11 @@ const viewport = new GraphViewport(canvas, {
 
 shell.on("instance:watch", ({ runId }) => {
   if (!runId) return;
-  viewport.select(runId, { zoomToward: true });
+  // Prefer the dedicated subgraph watch dialog; also center main view if present.
+  void shell.openInstanceWatchDialog(runId, { GraphViewport });
+  if (viewport._index?.has(runId)) {
+    viewport.select(runId, { zoomToward: true });
+  }
 });
 
 document.getElementById("btn-zoom-in")?.addEventListener("click", () => viewport.zoomIn());
@@ -91,3 +95,10 @@ function connect() {
 }
 
 connect();
+
+// Lightweight console hooks for watch dialogs / manual debugging.
+window.juneConsole = {
+  shell,
+  viewport,
+  openWatch: (runId) => shell.openInstanceWatchDialog(runId, { GraphViewport }),
+};

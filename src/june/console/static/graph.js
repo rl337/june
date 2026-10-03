@@ -60,8 +60,9 @@ export class GraphViewport {
   fit({ clearSelection = true } = {}) {
     if (!this.world) return;
     const rect = this.svg.getBoundingClientRect();
-    const vw = Math.max(rect.width, 1);
-    const vh = Math.max(rect.height, 1);
+    // Prefer laid-out size; fall back to attributes/parent when dialog first opens.
+    const vw = Math.max(rect.width, this.svg.clientWidth, this.svg.parentElement?.clientWidth || 0, 1);
+    const vh = Math.max(rect.height, this.svg.clientHeight, this.svg.parentElement?.clientHeight || 0, 1);
     const ww = Math.max(this.world.width || 400, 1);
     const wh = Math.max(this.world.height || 240, 1);
     this.zoom = clamp(Math.min(vw / ww, vh / wh) * 0.92, MIN_ZOOM, MAX_ZOOM);
@@ -220,10 +221,7 @@ export class GraphViewport {
     svg.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
 
     const defs = el("defs");
-    const glow = el("filter", { id: "glow" });
-    glow.innerHTML =
-      '<feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>';
-    defs.appendChild(glow);
+    appendBubbleTroubleDefs(defs);
     svg.appendChild(defs);
 
     const root = el("g", { class: "world-root" });
@@ -270,7 +268,7 @@ function drawEdges(layer, edges, index, depth) {
       y1: a.absY + a.h / 2,
       x2: b.absX + b.w / 2,
       y2: b.absY + b.h / 2,
-      stroke: depth === 0 ? "#4b5c78" : "#6a7d99",
+      stroke: depth === 0 ? "#6a4cb8" : "#2ad49a",
       "stroke-width": depth === 0 ? 2 : 1.2,
       "stroke-opacity": "0.85",
       class: "graph-edge",
@@ -303,53 +301,68 @@ function drawNodeTree(layer, node, ctx) {
   });
   g.dataset.nodeId = node.id;
   g.style.cursor = "pointer";
-  g.addEventListener("click", (e) => {
+  const openStack = (e) => {
+    e.preventDefault();
     e.stopPropagation();
-    if (role === "badge" && ctx.onStackBadge) {
-      ctx.onStackBadge(node);
-      return;
-    }
-    ctx.onSelect(node.id);
-  });
-  g.addEventListener("dblclick", (e) => {
-    e.stopPropagation();
-    if ((role === "badge" || role === "front" || role === "back") && ctx.onStackBadge) {
-      ctx.onStackBadge(node);
-    }
-  });
+    if (ctx.onStackBadge) ctx.onStackBadge(node);
+  };
+  if (role === "badge") {
+    // Pointerdown beats pan/drag races; click/dblclick both open the list.
+    g.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      openStack(e);
+    });
+    g.addEventListener("click", openStack);
+    g.addEventListener("dblclick", openStack);
+  } else {
+    g.addEventListener("click", (e) => {
+      e.stopPropagation();
+      ctx.onSelect(node.id);
+    });
+    g.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      if ((role === "front" || role === "back") && ctx.onStackBadge) {
+        ctx.onStackBadge(node);
+      }
+    });
+  }
 
-  // Idle purple vs running wash. When interiors un-render, keep a clear
-  // teal/cyan running fill — never the solid idle purple.
+  // Norfair palette: magenta membrane idle, coral bubble cores when running,
+  // purple ridged hard blocks, teal edge accents.
   const soft = node.shape === "round_rect";
+  const rx = soft ? Math.min(26, Math.max(14, node.h * 0.28)) : 4;
   let fill;
   let opacity;
   if (running) {
-    if (reveal) {
-      fill = soft ? "#c4b5fd" : "#7dd3fc";
-      opacity = "0.30";
-    } else {
-      fill = soft ? "#5eead4" : "#38bdf8";
-      opacity = "0.72";
-    }
+    fill = soft ? "#e85a4f" : "#ff5eb0";
+    opacity = reveal ? "0.3" : "0.8";
   } else {
-    fill = soft ? "#7c5cbf" : "#3d6fb8";
-    opacity = reveal ? "0.22" : "0.92";
+    fill = soft ? "#4a1848" : "#3a2a6e";
+    opacity = reveal ? "0.26" : "0.9";
   }
   const rect = el("rect", {
     x: 0,
     y: 0,
     width: node.w,
     height: node.h,
-    rx: soft ? 16 : 4,
-    ry: soft ? 16 : 4,
+    rx,
+    ry: rx,
     fill,
     "fill-opacity": opacity,
-    stroke: selected ? "#f5c542" : running ? "#5eead4" : "#dfe7f5",
-    "stroke-width": selected ? 3 : running ? 2.25 : 1.25,
+    stroke: selected ? "#5eeaff" : running ? "#ffffff" : soft ? "#ff5eb0" : "#2ad49a",
+    "stroke-width": selected ? 3 : running ? 2.35 : 1.25,
   });
   if (running) rect.setAttribute("filter", "url(#glow)");
   g.dataset.running = running ? "1" : "0";
+  g.dataset.shape = soft ? "soft" : "hard";
   g.appendChild(rect);
+
+  // Soft: white crescent specular (coral bubble tiles). Hard: purple ridged doors.
+  if (soft) {
+    appendBubbleSpecular(g, node.w, node.h, rx, { running, reveal });
+  } else {
+    appendTileTexture(g, node.w, node.h, rx, { reveal });
+  }
 
   if (node.label && screenH >= LABEL_MIN_PX) {
     const label = el("text", {
@@ -375,16 +388,18 @@ function drawNodeTree(layer, node, ctx) {
           y1: a.y + a.h / 2,
           x2: b.x + b.w / 2,
           y2: b.y + b.h / 2,
-          stroke: "#8aa0c0",
+          stroke: "#6a4cb8",
           "stroke-width": 1.25,
           class: "graph-edge",
         }),
       );
     }
-    // Paint stacked cards back→front so overlap is correct.
-    const kids = [...(node.children || [])].sort(
-      (a, b) => (a.stack_depth || 0) - (b.stack_depth || 0),
-    );
+    // Paint stacked cards back→front; badge last so it stays clickable.
+    const kids = [...(node.children || [])].sort((a, b) => {
+      const da = a.stack_role === "badge" ? 1e9 : a.stack_depth || 0;
+      const db = b.stack_role === "badge" ? 1e9 : b.stack_depth || 0;
+      return da - db;
+    });
     for (const child of kids) {
       drawNodeTree(inner, child, {
         absX: child.x || 0,
@@ -396,9 +411,235 @@ function drawNodeTree(layer, node, ctx) {
       });
     }
     g.appendChild(inner);
+  } else {
+    // Keep +N badge reachable even when interiors are collapsed.
+    const badge = (node.children || []).find((c) => c.stack_role === "badge");
+    if (badge) {
+      const inner = el("g", { class: "node-interior node-interior--badge-only" });
+      const bx = Math.max(6, node.w - badge.w - 6);
+      const by = Math.max(6, (node.h - badge.h) / 2);
+      drawNodeTree(inner, badge, {
+        absX: bx,
+        absY: by,
+        zoom: ctx.zoom,
+        selectedId: ctx.selectedId,
+        onSelect: ctx.onSelect,
+        onStackBadge: ctx.onStackBadge,
+      });
+      g.appendChild(inner);
+    }
   }
 
   layer.appendChild(g);
+}
+
+function appendBubbleTroubleDefs(defs) {
+  // Magenta/coral running glow (Norfair energy, not green-only).
+  const glow = el("filter", { id: "glow" });
+  glow.innerHTML =
+    '<feGaussianBlur stdDeviation="3.5" result="b"/><feColorMatrix in="b" type="matrix" values="0 0 0 0 1  0 0 0 0 0.35  0 0 0 0 0.55  0 0 0 0.8 0" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>';
+  defs.appendChild(glow);
+
+  // Idle magenta membrane sheen.
+  const sheen = el("radialGradient", {
+    id: "bubbleSheen",
+    cx: "0.28",
+    cy: "0.24",
+    r: "0.78",
+    gradientUnits: "objectBoundingBox",
+  });
+  sheen.appendChild(el("stop", { offset: "0%", "stop-color": "#ffffff", "stop-opacity": "0.72" }));
+  sheen.appendChild(el("stop", { offset: "20%", "stop-color": "#ffb0d8", "stop-opacity": "0.28" }));
+  sheen.appendChild(el("stop", { offset: "55%", "stop-color": "#4a1848", "stop-opacity": "0.06" }));
+  sheen.appendChild(el("stop", { offset: "100%", "stop-color": "#050208", "stop-opacity": "0" }));
+  defs.appendChild(sheen);
+
+  // Running coral bubble-core sheen (red Norfair tiles).
+  const sheenRun = el("radialGradient", {
+    id: "bubbleSheenRun",
+    cx: "0.3",
+    cy: "0.28",
+    r: "0.72",
+    gradientUnits: "objectBoundingBox",
+  });
+  sheenRun.appendChild(el("stop", { offset: "0%", "stop-color": "#ffffff", "stop-opacity": "0.8" }));
+  sheenRun.appendChild(el("stop", { offset: "22%", "stop-color": "#ffc4b8", "stop-opacity": "0.35" }));
+  sheenRun.appendChild(el("stop", { offset: "55%", "stop-color": "#e85a4f", "stop-opacity": "0.12" }));
+  sheenRun.appendChild(el("stop", { offset: "100%", "stop-color": "#2a0810", "stop-opacity": "0" }));
+  defs.appendChild(sheenRun);
+
+  const hot = el("radialGradient", {
+    id: "bubbleHot",
+    cx: "0.5",
+    cy: "0.5",
+    r: "0.5",
+    gradientUnits: "objectBoundingBox",
+  });
+  hot.appendChild(el("stop", { offset: "0%", "stop-color": "#ffffff", "stop-opacity": "0.92" }));
+  hot.appendChild(el("stop", { offset: "40%", "stop-color": "#ffe8f4", "stop-opacity": "0.4" }));
+  hot.appendChild(el("stop", { offset: "100%", "stop-color": "#ffffff", "stop-opacity": "0" }));
+  defs.appendChild(hot);
+
+  const rim = el("linearGradient", {
+    id: "bubbleRim",
+    x1: "0",
+    y1: "0",
+    x2: "0",
+    y2: "1",
+    gradientUnits: "objectBoundingBox",
+  });
+  rim.appendChild(el("stop", { offset: "0%", "stop-color": "#ffffff", "stop-opacity": "0" }));
+  rim.appendChild(el("stop", { offset: "70%", "stop-color": "#ffffff", "stop-opacity": "0" }));
+  rim.appendChild(el("stop", { offset: "100%", "stop-color": "#ff5eb0", "stop-opacity": "0.22" }));
+  defs.appendChild(rim);
+
+  // Muted purple ridged doors + magenta fuzzy platform tiles (Norfair).
+  const tile = el("pattern", {
+    id: "metroidTile",
+    width: 16,
+    height: 16,
+    patternUnits: "userSpaceOnUse",
+  });
+  tile.appendChild(el("rect", { width: "16", height: "16", fill: "#1a1230" }));
+  tile.appendChild(
+    el("rect", {
+      x: "0.5",
+      y: "0.5",
+      width: "15",
+      height: "15",
+      fill: "#4a3a8a",
+      stroke: "#7a68c8",
+      "stroke-width": "1",
+    }),
+  );
+  // Horizontal door ridges
+  for (const y of [4, 8, 12]) {
+    tile.appendChild(
+      el("line", {
+        x1: "1.5",
+        y1: String(y),
+        x2: "14.5",
+        y2: String(y),
+        stroke: "#a02040",
+        "stroke-opacity": "0.45",
+        "stroke-width": "0.9",
+      }),
+    );
+  }
+  // Soft magenta “fuzzy” tile center (muted platform motif)
+  tile.appendChild(
+    el("circle", {
+      cx: "8",
+      cy: "8",
+      r: "3.2",
+      fill: "#2a1030",
+      stroke: "#c04090",
+      "stroke-opacity": "0.4",
+      "stroke-width": "0.8",
+    }),
+  );
+  tile.appendChild(
+    el("ellipse", {
+      cx: "6.8",
+      cy: "6.6",
+      rx: "1.1",
+      ry: "0.75",
+      fill: "#ffffff",
+      opacity: "0.22",
+    }),
+  );
+  defs.appendChild(tile);
+}
+
+function appendBubbleSpecular(g, w, h, rx, { running, reveal }) {
+  const sheen = el("rect", {
+    x: 0,
+    y: 0,
+    width: w,
+    height: h,
+    rx,
+    ry: rx,
+    fill: running ? "url(#bubbleSheenRun)" : "url(#bubbleSheen)",
+    "fill-opacity": reveal ? "0.95" : "1",
+    "pointer-events": "none",
+    class: "bubble-sheen",
+  });
+  g.appendChild(sheen);
+
+  const rim = el("rect", {
+    x: 0,
+    y: 0,
+    width: w,
+    height: h,
+    rx,
+    ry: rx,
+    fill: "url(#bubbleRim)",
+    "pointer-events": "none",
+    class: "bubble-rim",
+  });
+  g.appendChild(rim);
+
+  const glintR = Math.min(w, h);
+  // White crescent arc — hallmark of Norfair coral bubble tiles.
+  const crescent = el("path", {
+    d: crescentPath(w * 0.22, h * 0.2, Math.max(10, glintR * 0.2), Math.max(6, glintR * 0.12)),
+    fill: "none",
+    stroke: "#ffffff",
+    "stroke-width": Math.max(1.6, glintR * 0.025),
+    "stroke-linecap": "round",
+    "stroke-opacity": running ? "0.9" : "0.7",
+    "pointer-events": "none",
+    class: "bubble-crescent",
+  });
+  g.appendChild(crescent);
+
+  const hot = el("ellipse", {
+    cx: w * 0.24,
+    cy: h * 0.18,
+    rx: Math.max(7, glintR * 0.14),
+    ry: Math.max(4, glintR * 0.08),
+    fill: "url(#bubbleHot)",
+    "pointer-events": "none",
+    class: "bubble-hot",
+  });
+  g.appendChild(hot);
+
+  const hot2 = el("ellipse", {
+    cx: w * 0.36,
+    cy: h * 0.28,
+    rx: Math.max(2.8, glintR * 0.05),
+    ry: Math.max(1.8, glintR * 0.03),
+    fill: "#ffffff",
+    "fill-opacity": running ? "0.55" : "0.4",
+    "pointer-events": "none",
+    class: "bubble-hot-secondary",
+  });
+  g.appendChild(hot2);
+}
+
+function crescentPath(cx, cy, rx, ry) {
+  // Simple open arc in the upper-left quadrant.
+  const x1 = cx - rx * 0.15;
+  const y1 = cy + ry * 0.75;
+  const x2 = cx + rx * 0.85;
+  const y2 = cy - ry * 0.15;
+  return `M ${x1} ${y1} A ${rx} ${ry} 0 0 1 ${x2} ${y2}`;
+}
+
+function appendTileTexture(g, w, h, rx, { reveal }) {
+  const tex = el("rect", {
+    x: 0,
+    y: 0,
+    width: w,
+    height: h,
+    rx,
+    ry: rx,
+    fill: "url(#metroidTile)",
+    "fill-opacity": reveal ? "0.28" : "0.4",
+    "pointer-events": "none",
+    class: "tile-texture",
+  });
+  g.appendChild(tex);
 }
 
 function el(name, attrs = {}) {
