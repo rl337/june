@@ -15,6 +15,8 @@ from june.console.scene import ROOT_SCENE_ID, SceneFrame, build_scene_frame
 from june.console.world import build_instance_world, build_world_graph
 
 _EVENT_LOG_LIMIT = 800
+# Finished instance trail is per-bucket so a busy 10s schedule cannot erase 60s history.
+_FINISHED_PER_BUCKET = 4
 
 
 @dataclass
@@ -179,17 +181,19 @@ class ConsoleHub:
             inst["finished_at"] = datetime.now(timezone.utc).isoformat()
             if pipeline is not None:
                 inst["pipeline"] = pipeline
-            # Keep a short trail of finished instances, drop older ones.
-            finished = [
-                i
-                for i in self._instances.values()
-                if i.get("status") not in {"running", "pending"}
-            ]
-            finished.sort(key=lambda i: str(i.get("finished_at", "")))
-            # Keep finished trail short; UI stacks only the latest two visible.
-            while len(finished) > 6:
-                old = finished.pop(0)
-                self._instances.pop(str(old.get("run_id")), None)
+            # Keep a short finished trail per bucket (not global): 10s overlap
+            # must not prune the last 60s run the user wants to inspect.
+            finished_by_bucket: dict[str, list[dict[str, Any]]] = {}
+            for item in self._instances.values():
+                if item.get("status") in {"running", "pending"}:
+                    continue
+                bucket = str(item.get("bucket") or "")
+                finished_by_bucket.setdefault(bucket, []).append(item)
+            for group in finished_by_bucket.values():
+                group.sort(key=lambda i: str(i.get("finished_at", "")))
+                while len(group) > _FINISHED_PER_BUCKET:
+                    old = group.pop(0)
+                    self._instances.pop(str(old.get("run_id")), None)
             self._publish()
 
     def bucket_has_active_instances(self, bucket: str) -> bool:

@@ -7,10 +7,11 @@ const CONTENT_REVEAL_PX = 110; // screen height before interiors show
 const LABEL_MIN_PX = 10;
 
 export class GraphViewport {
-  constructor(svg, { onSelectNode, onStackBadge } = {}) {
+  constructor(svg, { onSelectNode, onStackBadge, onStackCard } = {}) {
     this.svg = svg;
     this.onSelectNode = onSelectNode;
     this.onStackBadge = onStackBadge;
+    this.onStackCard = onStackCard;
     this.world = null;
     this.selectedId = null;
     this.zoom = 1;
@@ -238,6 +239,9 @@ export class GraphViewport {
         onStackBadge: (n) => {
           if (this.onStackBadge) this.onStackBadge(n);
         },
+        onStackCard: (n) => {
+          if (this.onStackCard) this.onStackCard(n);
+        },
       });
     });
 
@@ -314,16 +318,29 @@ function drawNodeTree(layer, node, ctx) {
     });
     g.addEventListener("click", openStack);
     g.addEventListener("dblclick", openStack);
+  } else if (role === "front" || role === "back") {
+    // Stacked instance cards: open that run's watch view (not just select).
+    const openCard = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (ctx.onStackCard) ctx.onStackCard(node);
+      else if (ctx.onSelect) ctx.onSelect(node.id);
+    };
+    g.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      openCard(e);
+    });
+    g.addEventListener("click", openCard);
+    g.addEventListener("dblclick", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (ctx.onStackBadge) ctx.onStackBadge(node);
+      else openCard(e);
+    });
   } else {
     g.addEventListener("click", (e) => {
       e.stopPropagation();
       ctx.onSelect(node.id);
-    });
-    g.addEventListener("dblclick", (e) => {
-      e.stopPropagation();
-      if ((role === "front" || role === "back") && ctx.onStackBadge) {
-        ctx.onStackBadge(node);
-      }
     });
   }
 
