@@ -292,10 +292,16 @@ function drawNodeTree(layer, node, ctx) {
   const absX = ctx.absX;
   const absY = ctx.absY;
   const screenH = node.h * ctx.zoom;
-  const reveal = screenH >= CONTENT_REVEAL_PX && (node.children || []).length > 0;
+  const role = node.stack_role || "";
+  // Stacked instance cards are entry points to the watch dialog — keep them
+  // collapsed on the main graph so nested steps cannot steal the click.
+  const reveal =
+    role !== "front" &&
+    role !== "back" &&
+    screenH >= CONTENT_REVEAL_PX &&
+    (node.children || []).length > 0;
   const selected = ctx.selectedId === node.id;
   const running = subtreeRunning(node);
-  const role = node.stack_role || "";
 
   const g = el("g", {
     class: `graph-node node ${running ? "running" : node.execution || "pending"}${
@@ -425,6 +431,7 @@ function drawNodeTree(layer, node, ctx) {
         selectedId: ctx.selectedId,
         onSelect: ctx.onSelect,
         onStackBadge: ctx.onStackBadge,
+        onStackCard: ctx.onStackCard,
       });
     }
     g.appendChild(inner);
@@ -442,6 +449,7 @@ function drawNodeTree(layer, node, ctx) {
         selectedId: ctx.selectedId,
         onSelect: ctx.onSelect,
         onStackBadge: ctx.onStackBadge,
+        onStackCard: ctx.onStackCard,
       });
       g.appendChild(inner);
     }
