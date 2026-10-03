@@ -153,6 +153,7 @@ def test_console_api_instance_world() -> None:
     assert payload["run_id"] == run_id
     assert payload["world"]["nodes"][0]["id"] == run_id
     assert len(payload["world"]["nodes"][0]["children"]) == 4
+    assert isinstance(payload.get("pipeline_nodes"), dict)
 
 
 def test_console_api_instance_node_detail() -> None:

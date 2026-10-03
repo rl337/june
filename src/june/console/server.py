@@ -69,7 +69,10 @@ def create_app(hub: ConsoleHub) -> Any:
         world = hub.instance_world(run_id)
         if world is None:
             return JSONResponse({"error": "instance not found", "run_id": run_id}, status_code=404)
-        return JSONResponse({"run_id": run_id, "world": world})
+        pipeline_nodes = hub.instance_pipeline_nodes(run_id) or {}
+        return JSONResponse(
+            {"run_id": run_id, "world": world, "pipeline_nodes": pipeline_nodes}
+        )
 
     @app.get("/api/instance/{run_id}/node/{node_id:path}")
     async def api_instance_node(run_id: str, node_id: str) -> Any:
