@@ -2,10 +2,22 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from june.console.hub import ConsoleHub
 from june.console.spool import ConsoleSpool, safe_run_id
+
+
+class _Clock:
+    def __init__(self, start: datetime) -> None:
+        self.now = start
+
+    def __call__(self) -> datetime:
+        return self.now
+
+    def advance(self, **kwargs: int) -> None:
+        self.now = self.now + timedelta(**kwargs)
 
 
 def test_safe_run_id_encodes_colons() -> None:
@@ -13,24 +25,72 @@ def test_safe_run_id_encodes_colons() -> None:
     assert safe_run_id("june.console.cron:60s:abcd1234").startswith("june.console.cron")
 
 
-def test_rolling_jsonl_rotates_and_retains_segments(tmp_path: Path) -> None:
-    spool = ConsoleSpool(tmp_path, max_segment_bytes=200, max_segments=3)
-    for i in range(40):
+def test_hourly_rollover_and_age_retention(tmp_path: Path) -> None:
+    clock = _Clock(datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc))
+    spool = ConsoleSpool(
+        tmp_path,
+        min_segments=3,
+        max_age=timedelta(hours=4),
+        now=clock,
+    )
+    # Write across 10 hours → 10 segment files initially.
+    for hour in range(10):
+        clock.now = datetime(2026, 1, 1, hour, 5, tzinfo=timezone.utc)
         spool.append_event(
             {
-                "ts": f"2026-01-01T00:00:{i:02d}Z",
+                "ts": clock.now.isoformat(),
                 "type": "core:graph_node_start",
-                "run_id": f"run-{i // 10}",
-                "summary": f"event {i} " + ("x" * 40),
+                "run_id": f"run-{hour}",
+                "summary": f"hour {hour}",
             }
         )
     segments = sorted((tmp_path / "events").glob("events-*.jsonl"))
-    assert len(segments) == 3
-    # Oldest segments are trimmed; newest-first still yields retained rows.
-    rows = list(spool.iter_records(limit=10, newest_first=True))
-    assert 1 <= len(rows) <= 10
-    assert rows[0]["stream"] == "event"
-    assert rows[0]["ts"] >= rows[-1]["ts"]
+    # At ~09:05 with max_age=4h, cutoff is ~05:05. Hours 0..5 are older and
+    # surplus (count > min_segments=3), so they are removed; hours 6..9 remain.
+    names = [p.name for p in segments]
+    assert "events-20260101-00.jsonl" not in names
+    assert "events-20260101-05.jsonl" not in names
+    assert "events-20260101-06.jsonl" in names
+    assert "events-20260101-09.jsonl" in names
+    assert len(segments) == 4
+
+    rows = list(spool.iter_records(limit=3, newest_first=True))
+    assert len(rows) == 3
+    assert rows[0]["run_id"] == "run-9"
+
+
+def test_retention_keeps_min_segments_even_when_old(tmp_path: Path) -> None:
+    clock = _Clock(datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc))
+    spool = ConsoleSpool(
+        tmp_path,
+        min_segments=4,
+        max_age=timedelta(hours=1),
+        now=clock,
+    )
+    for hour in range(4):
+        clock.now = datetime(2026, 1, 1, hour, 0, tzinfo=timezone.utc)
+        spool.append_event(
+            {
+                "ts": clock.now.isoformat(),
+                "type": "core:graph_start",
+                "run_id": f"run-{hour}",
+                "summary": f"hour {hour}",
+            }
+        )
+    # Jump far ahead; all 4 files are older than max_age, but min_segments=4.
+    clock.now = datetime(2026, 1, 3, 0, 0, tzinfo=timezone.utc)
+    spool.append_event(
+        {
+            "ts": clock.now.isoformat(),
+            "type": "core:graph_start",
+            "run_id": "run-new",
+            "summary": "new hour",
+        }
+    )
+    segments = sorted((tmp_path / "events").glob("events-*.jsonl"))
+    # New hour file + keep at least 4 old ones that would otherwise expire.
+    assert len(segments) >= 4
+    assert any(p.name.startswith("events-20260103-00") for p in segments)
 
 
 def test_instance_roundtrip_and_hub_disk_fallback(tmp_path: Path) -> None:
