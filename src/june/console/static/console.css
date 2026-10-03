@@ -1,17 +1,30 @@
-:root {
+/* Bubble Trouble — Norfair-inspired across rooms:
+   magenta bubble columns, coral bubble tiles w/ white crescents,
+   teal bubbly walls, purple ridged doors, lava accents, void black. */
+:root,
+.theme-bubble-trouble {
   color-scheme: dark;
-  --bg: #0a0e14;
-  --glass: rgba(26, 35, 50, 0.72);
-  --glass-strong: rgba(26, 35, 50, 0.94);
-  --text: #e7ecf3;
-  --muted: #8b9bb4;
-  --accent: #f5c542;
-  --running: #5eead4;
-  --hard: #3d6fb8;
-  --soft: #7c5cbf;
-  --radius-pane: 16px;
-  --radius-menu: 14px;
-  --orb-size: 44px;
+  --bg: #050208;
+  --bg-mid: #120818;
+  --bg-lava: #3a0a10;
+  --glass: rgba(28, 12, 36, 0.82);
+  --glass-strong: rgba(18, 8, 28, 0.95);
+  --text: #f3e8ff;
+  --muted: #a894c4;
+  --accent: #5eeaff; /* EN / energy cyan */
+  --accent-lava: #ff3b2f;
+  --running: #ff5eb0; /* magenta bubble energy */
+  --running-coral: #e85a4f; /* coral bubble cores */
+  --running-deep: #b02070;
+  --hard: #5a48a8; /* purple door blocks */
+  --soft: #4a1848; /* magenta membrane */
+  --teal: #2ad49a; /* green-room bubble outlines */
+  --bubble-shine: #ffffff;
+  --danger: #ff3b2f;
+  --edge: #6a4cb8;
+  --radius-pane: 18px;
+  --radius-menu: 16px;
+  --orb-size: 46px;
   --dock-inset: 10px;
   --seam-gap: 5px;
   --transition-pane: 320ms cubic-bezier(0.22, 0.9, 0.3, 1);
@@ -30,9 +43,18 @@ body {
 }
 
 body {
-  font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
-  background: radial-gradient(ellipse 120% 80% at 30% -10%, #1a2838, var(--bg) 50%);
+  font-family: "Chakra Petch", "Segoe UI", sans-serif;
   color: var(--text);
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(circle at 14% 72%, rgba(255, 94, 176, 0.1) 0 2px, transparent 3px),
+    radial-gradient(circle at 30% 24%, rgba(42, 212, 154, 0.08) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 66% 60%, rgba(232, 90, 79, 0.08) 0 3px, transparent 4px),
+    radial-gradient(circle at 82% 16%, rgba(255, 255, 255, 0.05) 0 2px, transparent 3px),
+    radial-gradient(circle at 74% 88%, rgba(90, 72, 168, 0.14) 0 4px, transparent 6px),
+    radial-gradient(ellipse 110% 70% at 50% 120%, rgba(58, 10, 16, 0.55), transparent 55%),
+    radial-gradient(ellipse 90% 70% at 18% -12%, rgba(40, 12, 48, 0.95), var(--bg) 58%);
+  background-attachment: fixed;
 }
 
 .june-console {
@@ -40,6 +62,58 @@ body {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
+}
+
+.june-console::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.5;
+  background:
+    radial-gradient(circle at 16% 42%, rgba(255, 94, 176, 0.14) 0 16px, transparent 40px),
+    radial-gradient(circle at 70% 28%, rgba(42, 212, 154, 0.1) 0 14px, transparent 36px),
+    radial-gradient(circle at 52% 78%, rgba(232, 90, 79, 0.12) 0 20px, transparent 48px);
+  animation: bubble-drift 18s ease-in-out infinite alternate;
+}
+
+@keyframes bubble-drift {
+  from {
+    transform: translate3d(0, 6px, 0);
+  }
+  to {
+    transform: translate3d(0, -10px, 0);
+  }
+}
+
+.june-console > .dock,
+.june-console > .view-workspace,
+.june-console > .dialog-layer {
+  z-index: 1;
+}
+
+.scheme-mark {
+  font-family: "Share Tech Mono", ui-monospace, monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--running);
+  border: 1px solid rgba(255, 94, 176, 0.45);
+  background:
+    radial-gradient(circle at 28% 30%, rgba(255, 255, 255, 0.28), transparent 40%),
+    rgba(48, 12, 40, 0.75);
+  padding: 0.12rem 0.45rem;
+  border-radius: 999px;
+  text-shadow: 0 0 10px rgba(255, 94, 176, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+/* Soft graph nodes keep labels above bubble glints. */
+.graph-node .node-label {
+  paint-order: stroke fill;
+  stroke: rgba(8, 2, 12, 0.6);
+  stroke-width: 2.5px;
 }
 
 /* —— View workspace (IDE panes) —— */
@@ -74,7 +148,7 @@ body {
 }
 
 .view-workspace.has-bottom {
-  --row-bottom: min(140px, 22vh);
+  --row-bottom: min(168px, 26vh);
   --seam-h: var(--seam-gap);
 }
 
@@ -82,8 +156,11 @@ body {
   min-width: 0;
   min-height: 0;
   border-radius: var(--radius-pane);
-  border: 1px solid rgba(223, 231, 245, 0.14);
+  border: 1px solid rgba(255, 94, 176, 0.18);
   background: var(--glass);
+  box-shadow:
+    inset 0 0 0 1px rgba(200, 255, 232, 0.04),
+    0 10px 36px rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(10px);
   display: flex;
   flex-direction: column;
@@ -135,13 +212,15 @@ body {
   animation: slide-in-right var(--transition-pane);
 }
 
-.view-pane[data-view="legend"] {
+.view-pane[data-view="legend"],
+.view-pane[data-view="activity"] {
   grid-column: 1 / 6;
   grid-row: 3;
   transform-origin: bottom center;
 }
 
-.view-pane[data-view="legend"].is-open {
+.view-pane[data-view="legend"].is-open,
+.view-pane[data-view="activity"].is-open {
   animation: slide-in-bottom var(--transition-pane);
 }
 
@@ -188,7 +267,7 @@ body {
 .view-seam::after {
   content: "";
   position: absolute;
-  background: rgba(223, 231, 245, 0.22);
+  background: rgba(255, 94, 176, 0.24);
   border-radius: 1px;
 }
 
@@ -247,8 +326,9 @@ body {
   align-items: center;
   gap: 0.65rem;
   padding: 0.45rem 0.75rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 94, 176, 0.12);
   font-size: 0.82rem;
+  background: linear-gradient(180deg, rgba(255, 94, 176, 0.06), transparent);
 }
 
 .view-title {
@@ -348,13 +428,13 @@ body {
 .zoom-level {
   min-width: 3rem;
   text-align: center;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: "Share Tech Mono", ui-monospace, monospace;
   font-size: 0.72rem;
   color: var(--muted);
 }
 
 .graph-node.is-selected .node-label {
-  fill: #ffe8a3;
+  fill: var(--accent);
 }
 
 .ws-status {
@@ -374,7 +454,7 @@ body {
 }
 
 .ws-status[data-state="closed"] {
-  color: #f87171;
+  color: var(--danger);
 }
 
 @keyframes pulse {
@@ -393,11 +473,15 @@ body {
 }
 
 .pill {
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    radial-gradient(circle at 30% 25%, rgba(255, 255, 255, 0.16), transparent 42%),
+    rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 94, 176, 0.24);
   padding: 0.15rem 0.5rem;
   border-radius: 999px;
   font-size: 0.75rem;
+  font-family: "Share Tech Mono", ui-monospace, monospace;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 /* —— Docks & menu orbs —— */
@@ -447,12 +531,18 @@ body {
 }
 
 .menu-orb {
-  --orb-opacity: 0.22;
+  --orb-opacity: 0.28;
+  position: relative;
+  isolation: isolate;
   width: var(--orb-size);
   height: var(--orb-size);
   border-radius: 50%;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(36, 50, 71, var(--orb-opacity));
+  border: 1px solid rgba(255, 94, 176, 0.35);
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255, 255, 255, 0.5) 0 8%, transparent 34%),
+    radial-gradient(circle at 38% 34%, rgba(255, 180, 220, 0.28), transparent 48%),
+    radial-gradient(circle at 70% 78%, rgba(42, 212, 154, 0.14), transparent 42%),
+    rgba(40, 14, 48, var(--orb-opacity));
   backdrop-filter: blur(6px);
   color: var(--text);
   cursor: pointer;
@@ -460,6 +550,10 @@ body {
   align-items: center;
   justify-content: center;
   padding: 0;
+  box-shadow:
+    inset 0 -8px 14px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 0 0 1px rgba(255, 94, 176, 0.1);
   transition:
     background var(--transition-menu),
     border-color var(--transition-menu),
@@ -467,20 +561,40 @@ body {
     box-shadow var(--transition-menu);
 }
 
+.menu-orb::before {
+  content: "";
+  position: absolute;
+  left: 16%;
+  top: 12%;
+  width: 38%;
+  height: 26%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 40% 40%, rgba(255, 255, 255, 0.7), transparent 70%);
+  pointer-events: none;
+  z-index: 1;
+  transform: rotate(-18deg);
+}
+
 .menu-orb-short {
+  position: relative;
+  z-index: 2;
   font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.06em;
-  opacity: 0.85;
+  opacity: 0.9;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 
 .menu-orb.is-hovered,
 .menu-orb:hover,
 .menu-orb.is-active {
   --orb-opacity: 1;
-  border-color: rgba(245, 197, 66, 0.55);
-  box-shadow: 0 0 0 1px rgba(245, 197, 66, 0.2), 0 8px 24px rgba(0, 0, 0, 0.35);
-  transform: scale(1.05);
+  border-color: rgba(94, 234, 255, 0.65);
+  box-shadow:
+    0 0 0 1px rgba(94, 234, 255, 0.28),
+    0 0 18px rgba(255, 94, 176, 0.24),
+    0 8px 24px rgba(0, 0, 0, 0.4);
+  transform: scale(1.06);
 }
 
 .menu-orb::after {
@@ -651,10 +765,12 @@ body {
   max-width: min(420px, 92vw);
   padding: 0.85rem 1rem 1rem;
   border-radius: var(--radius-menu);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 94, 176, 0.3);
   background: var(--glass-strong);
   backdrop-filter: blur(14px);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  box-shadow:
+    0 0 24px rgba(255, 94, 176, 0.1),
+    0 20px 50px rgba(0, 0, 0, 0.55);
   opacity: 0;
   pointer-events: auto;
   transition:
@@ -665,6 +781,96 @@ body {
 .console-dialog.is-open {
   opacity: 1;
   transform: translate(-50%, -50%) scale(1);
+}
+
+.console-dialog--graph {
+  min-width: min(720px, 96vw);
+  max-width: min(980px, 98vw);
+  width: min(920px, 96vw);
+}
+
+.instance-watch-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(200px, 0.9fr);
+  gap: 0.65rem;
+  margin-top: 0.45rem;
+  align-items: stretch;
+}
+
+@media (max-width: 720px) {
+  .instance-watch-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.instance-watch-graph {
+  height: min(420px, 52vh);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 94, 176, 0.22);
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255, 94, 176, 0.08), transparent 45%),
+    rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.instance-watch-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: grab;
+}
+
+.instance-watch-detail {
+  min-height: min(420px, 52vh);
+  max-height: min(420px, 52vh);
+  border-radius: 14px;
+  border: 1px solid rgba(94, 234, 255, 0.18);
+  background:
+    linear-gradient(160deg, rgba(42, 212, 154, 0.06), transparent 55%),
+    rgba(0, 0, 0, 0.32);
+  padding: 0.65rem 0.75rem;
+  overflow: auto;
+}
+
+.instance-watch-detail-title {
+  margin: 0 0 0.35rem;
+  font-family: "Share Tech Mono", ui-monospace, monospace;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--accent, #5eeaff);
+}
+
+.instance-watch-detail-hint {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.instance-watch-detail-body {
+  margin: 0;
+  max-height: none;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.instance-watch-meta {
+  font-family: "Share Tech Mono", ui-monospace, monospace;
+  font-size: 0.75rem;
+}
+
+.instance-watch-meta .instance-status.is-running,
+.instance-watch-meta .is-running {
+  color: var(--running);
+}
+
+.instance-watch-meta code {
+  font-family: inherit;
+  color: var(--accent);
+  word-break: break-all;
 }
 
 .dialog-close {
@@ -686,10 +892,10 @@ body {
 
 .dialog-pre {
   margin: 0;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: "Share Tech Mono", ui-monospace, monospace;
   font-size: 0.72rem;
   white-space: pre-wrap;
-  color: #c5d0e0;
+  color: #c6ecd4;
 }
 
 .dialog-text {
@@ -706,7 +912,11 @@ body {
 }
 
 .node.running {
-  filter: drop-shadow(0 0 8px var(--running));
+  filter: drop-shadow(0 0 12px rgba(255, 94, 176, 0.7));
+}
+
+.node[data-shape="soft"][data-running="1"] {
+  filter: drop-shadow(0 0 14px rgba(232, 90, 79, 0.55));
 }
 
 .node.recent {
@@ -742,12 +952,23 @@ body {
 }
 
 .shape.hard {
-  background: var(--hard);
+  /* Purple ridged door + muted magenta tile hint */
+  background:
+    repeating-linear-gradient(
+      180deg,
+      #4a3a8a 0 2px,
+      #3a2a6e 2px 4px
+    );
+  opacity: 0.9;
 }
 
 .shape.soft {
-  background: var(--soft);
-  border-radius: 0.35rem;
+  background:
+    radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.55), transparent 36%),
+    radial-gradient(circle at 70% 80%, rgba(255, 94, 176, 0.22), transparent 45%),
+    var(--soft);
+  border-radius: 0.45rem;
+  box-shadow: inset 0 -2px 3px rgba(0, 0, 0, 0.35);
 }
 
 .glow-sample {
@@ -763,7 +984,7 @@ body {
   list-style: none;
   margin: 0;
   padding: 0;
-  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-family: "Share Tech Mono", ui-monospace, monospace;
   font-size: 0.72rem;
   line-height: 1.45;
 }
@@ -785,7 +1006,7 @@ body {
 }
 
 .event-log-row.is-console-log {
-  color: #d4c4ff;
+  color: var(--bubble-shine);
 }
 
 .event-log-ts {
@@ -800,4 +1021,110 @@ body {
 
 .view-pane[data-view="events"] .view-body {
   padding: 0.35rem 0.5rem;
+}
+
+.view-pane[data-view="activity"] .view-body {
+  padding: 0.35rem 0.65rem 0.45rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.event-rate-chart {
+  flex: 1;
+  min-height: 72px;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  padding: 0.15rem 0;
+}
+
+.event-rate-bar {
+  flex: 1 1 0;
+  min-width: 0;
+  height: var(--bar-h, 4%);
+  max-height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 3px 3px 1px 1px;
+  background: rgba(74, 58, 138, 0.45);
+  cursor: pointer;
+  transition: background 120ms ease, height 180ms ease;
+}
+
+.event-rate-bar.has-events {
+  background: linear-gradient(180deg, var(--running) 0%, var(--running-coral) 55%, #4a1848 100%);
+  box-shadow: 0 0 8px rgba(255, 94, 176, 0.28);
+}
+
+.event-rate-bar:hover {
+  background: var(--accent);
+  box-shadow: 0 0 10px rgba(94, 234, 255, 0.4);
+}
+
+.event-rate-hint {
+  margin: 0;
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.instance-list {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  max-height: 50vh;
+  overflow: auto;
+}
+
+.instance-row {
+  margin: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.instance-watch {
+  display: grid;
+  grid-template-columns: 5.5rem 4.5rem 1fr;
+  gap: 0.5rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.45rem 0.35rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.instance-watch:hover {
+  background: rgba(94, 234, 255, 0.12);
+}
+
+.instance-row.is-running .instance-status {
+  color: var(--running);
+}
+
+.instance-id {
+  font-family: "Share Tech Mono", ui-monospace, monospace;
+  font-size: 0.78rem;
+}
+
+.instance-status,
+.instance-active {
+  font-size: 0.72rem;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dialog-event-list {
+  max-height: 50vh;
+  overflow: auto;
+  margin-top: 0.5rem;
+}
+
+.node[data-running="1"] .node-label {
+  fill: var(--bubble-shine);
 }
