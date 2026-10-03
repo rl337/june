@@ -1,0 +1,13 @@
+services:
+  june:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      JUNE_DATA_DIR: /data
+      JUNE_CONSOLE_DEMO: "1"
+    volumes:
+      - june-data:/data
+
+volumes:
+  june-data:

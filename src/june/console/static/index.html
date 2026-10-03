@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>June Console · Bubble Trouble</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Share+Tech+Mono&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/console.css" />
+  </head>
+  <body>
+    <div id="june-console" class="june-console theme-bubble-trouble" data-ui-scheme="bubble-trouble">
+      <div class="dock dock-top" data-dock="top" aria-label="Top menu dock"></div>
+      <div class="dock dock-left" data-dock="left" aria-label="Left menu dock"></div>
+      <div class="dock dock-right" data-dock="right" aria-label="Right menu dock"></div>
+      <div class="dock dock-bottom" data-dock="bottom" aria-label="Bottom menu dock"></div>
+
+      <div id="view-workspace" class="view-workspace">
+        <section
+          class="view-pane view-pane--graph is-open"
+          data-view="graph"
+          data-dock-edge="center"
+          style="--natural-w: 1fr; --natural-h: 1fr"
+        >
+          <header class="view-chrome">
+            <span class="view-title">Graph</span>
+            <span class="scheme-mark" title="UI scheme">Bubble Trouble</span>
+            <span id="ws-status" class="ws-status" title="WebSocket">●</span>
+            <span id="scene-title" class="view-subtitle">Connecting…</span>
+            <span id="run-status" class="pill">idle</span>
+            <div class="zoom-controls" role="group" aria-label="Zoom controls">
+              <button type="button" id="btn-zoom-out" title="Zoom out">−</button>
+              <span id="zoom-level" class="zoom-level">100%</span>
+              <button type="button" id="btn-zoom-in" title="Zoom in">+</button>
+              <button type="button" id="btn-zoom-focus" title="Focus selected">◎</button>
+              <button type="button" id="btn-zoom-fit" title="Fit all">⤢</button>
+            </div>
+          </header>
+          <div class="view-body view-body--graph">
+            <svg id="canvas" viewBox="0 0 960 420" role="img" aria-label="Graph execution scene"></svg>
+            <p class="graph-hint">Scroll to zoom · drag to pan · click node to select · double-click empty to fit</p>
+          </div>
+        </section>
+      </div>
+
+      <div id="dialog-layer" class="dialog-layer" aria-live="polite"></div>
+    </div>
+    <script type="module" src="/static/console.js"></script>
+  </body>
+</html>

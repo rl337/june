@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "june"
-version = "0.3.0"
+version = "0.4.0"
 description = "Application-level orchestrator that schedules goals and runs work through MechaHarness"
 readme = "README.md"
 license = { text = "MIT" }
@@ -36,6 +36,15 @@ dependencies = [
 harness = [
   "mechaharness>=0.2.0",
 ]
+console = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+]
+container = [
+  "mechaharness>=0.2.0",
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+]
 dev = [
   "pytest>=8.2",
   "pytest-asyncio>=0.23",
@@ -56,6 +65,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 june = ["py.typed"]
+"june.console" = ["static/*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
