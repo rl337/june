@@ -267,7 +267,7 @@ function drawEdges(layer, edges, index, depth) {
       y1: a.absY + a.h / 2,
       x2: b.absX + b.w / 2,
       y2: b.absY + b.h / 2,
-      stroke: depth === 0 ? "#3d6b52" : "#5a8f6e",
+      stroke: depth === 0 ? "#6a4cb8" : "#2ad49a",
       "stroke-width": depth === 0 ? 2 : 1.2,
       "stroke-opacity": "0.85",
       class: "graph-edge",
@@ -315,17 +315,18 @@ function drawNodeTree(layer, node, ctx) {
     }
   });
 
-  // Bubble Trouble palette: membrane green idle, bright bubble cyan running.
+  // Norfair palette: magenta membrane idle, coral bubble cores when running,
+  // purple ridged hard blocks, teal edge accents.
   const soft = node.shape === "round_rect";
   const rx = soft ? Math.min(26, Math.max(14, node.h * 0.28)) : 4;
   let fill;
   let opacity;
   if (running) {
-    fill = soft ? "#5dffb0" : "#3de0ff";
-    opacity = reveal ? "0.28" : "0.78";
+    fill = soft ? "#e85a4f" : "#ff5eb0";
+    opacity = reveal ? "0.3" : "0.8";
   } else {
-    fill = soft ? "#1f6b45" : "#1a5a66";
-    opacity = reveal ? "0.24" : "0.9";
+    fill = soft ? "#4a1848" : "#3a2a6e";
+    opacity = reveal ? "0.26" : "0.9";
   }
   const rect = el("rect", {
     x: 0,
@@ -336,7 +337,7 @@ function drawNodeTree(layer, node, ctx) {
     ry: rx,
     fill,
     "fill-opacity": opacity,
-    stroke: selected ? "#ffb347" : running ? "#c8ffe8" : "#7eab8f",
+    stroke: selected ? "#5eeaff" : running ? "#ffffff" : soft ? "#ff5eb0" : "#2ad49a",
     "stroke-width": selected ? 3 : running ? 2.35 : 1.25,
   });
   if (running) rect.setAttribute("filter", "url(#glow)");
@@ -344,7 +345,7 @@ function drawNodeTree(layer, node, ctx) {
   g.dataset.shape = soft ? "soft" : "hard";
   g.appendChild(rect);
 
-  // Soft/circular-ish nodes: glass bubble specular. Hard rects: muted Metroid tiles.
+  // Soft: white crescent specular (coral bubble tiles). Hard: purple ridged doors.
   if (soft) {
     appendBubbleSpecular(g, node.w, node.h, rx, { running, reveal });
   } else {
@@ -375,7 +376,7 @@ function drawNodeTree(layer, node, ctx) {
           y1: a.y + a.h / 2,
           x2: b.x + b.w / 2,
           y2: b.y + b.h / 2,
-          stroke: "#5a8f6e",
+          stroke: "#6a4cb8",
           "stroke-width": 1.25,
           class: "graph-edge",
         }),
@@ -402,12 +403,13 @@ function drawNodeTree(layer, node, ctx) {
 }
 
 function appendBubbleTroubleDefs(defs) {
+  // Magenta/coral running glow (Norfair energy, not green-only).
   const glow = el("filter", { id: "glow" });
   glow.innerHTML =
-    '<feGaussianBlur stdDeviation="3.5" result="b"/><feColorMatrix in="b" type="matrix" values="0 0 0 0 0.36  0 0 0 0 1  0 0 0 0 0.69  0 0 0 0.75 0" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>';
+    '<feGaussianBlur stdDeviation="3.5" result="b"/><feColorMatrix in="b" type="matrix" values="0 0 0 0 1  0 0 0 0 0.35  0 0 0 0 0.55  0 0 0 0.8 0" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>';
   defs.appendChild(glow);
 
-  // Soft bubble body sheen (top-left light wrap).
+  // Idle magenta membrane sheen.
   const sheen = el("radialGradient", {
     id: "bubbleSheen",
     cx: "0.28",
@@ -415,26 +417,26 @@ function appendBubbleTroubleDefs(defs) {
     r: "0.78",
     gradientUnits: "objectBoundingBox",
   });
-  sheen.appendChild(el("stop", { offset: "0%", "stop-color": "#ffffff", "stop-opacity": "0.7" }));
-  sheen.appendChild(el("stop", { offset: "22%", "stop-color": "#e8fff4", "stop-opacity": "0.28" }));
-  sheen.appendChild(el("stop", { offset: "55%", "stop-color": "#1f6b45", "stop-opacity": "0.05" }));
-  sheen.appendChild(el("stop", { offset: "100%", "stop-color": "#040806", "stop-opacity": "0" }));
+  sheen.appendChild(el("stop", { offset: "0%", "stop-color": "#ffffff", "stop-opacity": "0.72" }));
+  sheen.appendChild(el("stop", { offset: "20%", "stop-color": "#ffb0d8", "stop-opacity": "0.28" }));
+  sheen.appendChild(el("stop", { offset: "55%", "stop-color": "#4a1848", "stop-opacity": "0.06" }));
+  sheen.appendChild(el("stop", { offset: "100%", "stop-color": "#050208", "stop-opacity": "0" }));
   defs.appendChild(sheen);
 
+  // Running coral bubble-core sheen (red Norfair tiles).
   const sheenRun = el("radialGradient", {
     id: "bubbleSheenRun",
-    cx: "0.28",
-    cy: "0.24",
-    r: "0.78",
+    cx: "0.3",
+    cy: "0.28",
+    r: "0.72",
     gradientUnits: "objectBoundingBox",
   });
-  sheenRun.appendChild(el("stop", { offset: "0%", "stop-color": "#ffffff", "stop-opacity": "0.78" }));
-  sheenRun.appendChild(el("stop", { offset: "24%", "stop-color": "#ffffff", "stop-opacity": "0.32" }));
-  sheenRun.appendChild(el("stop", { offset: "58%", "stop-color": "#c8ffe8", "stop-opacity": "0.1" }));
-  sheenRun.appendChild(el("stop", { offset: "100%", "stop-color": "#041810", "stop-opacity": "0" }));
+  sheenRun.appendChild(el("stop", { offset: "0%", "stop-color": "#ffffff", "stop-opacity": "0.8" }));
+  sheenRun.appendChild(el("stop", { offset: "22%", "stop-color": "#ffc4b8", "stop-opacity": "0.35" }));
+  sheenRun.appendChild(el("stop", { offset: "55%", "stop-color": "#e85a4f", "stop-opacity": "0.12" }));
+  sheenRun.appendChild(el("stop", { offset: "100%", "stop-color": "#2a0810", "stop-opacity": "0" }));
   defs.appendChild(sheenRun);
 
-  // Tight specular glint.
   const hot = el("radialGradient", {
     id: "bubbleHot",
     cx: "0.5",
@@ -442,12 +444,11 @@ function appendBubbleTroubleDefs(defs) {
     r: "0.5",
     gradientUnits: "objectBoundingBox",
   });
-  hot.appendChild(el("stop", { offset: "0%", "stop-color": "#ffffff", "stop-opacity": "0.85" }));
-  hot.appendChild(el("stop", { offset: "45%", "stop-color": "#e8fff4", "stop-opacity": "0.35" }));
+  hot.appendChild(el("stop", { offset: "0%", "stop-color": "#ffffff", "stop-opacity": "0.92" }));
+  hot.appendChild(el("stop", { offset: "40%", "stop-color": "#ffe8f4", "stop-opacity": "0.4" }));
   hot.appendChild(el("stop", { offset: "100%", "stop-color": "#ffffff", "stop-opacity": "0" }));
   defs.appendChild(hot);
 
-  // Lower rim refraction for bubble depth.
   const rim = el("linearGradient", {
     id: "bubbleRim",
     x1: "0",
@@ -457,59 +458,63 @@ function appendBubbleTroubleDefs(defs) {
     gradientUnits: "objectBoundingBox",
   });
   rim.appendChild(el("stop", { offset: "0%", "stop-color": "#ffffff", "stop-opacity": "0" }));
-  rim.appendChild(el("stop", { offset: "68%", "stop-color": "#ffffff", "stop-opacity": "0" }));
-  rim.appendChild(el("stop", { offset: "100%", "stop-color": "#9dffd4", "stop-opacity": "0.18" }));
+  rim.appendChild(el("stop", { offset: "70%", "stop-color": "#ffffff", "stop-opacity": "0" }));
+  rim.appendChild(el("stop", { offset: "100%", "stop-color": "#ff5eb0", "stop-opacity": "0.22" }));
   defs.appendChild(rim);
 
-  // Muted Metroid-style tiled blocks with bubbly column holes.
+  // Muted purple ridged doors + magenta fuzzy platform tiles (Norfair).
   const tile = el("pattern", {
     id: "metroidTile",
-    width: 14,
-    height: 14,
+    width: 16,
+    height: 16,
     patternUnits: "userSpaceOnUse",
   });
-  tile.appendChild(el("rect", { width: "14", height: "14", fill: "#081912" }));
+  tile.appendChild(el("rect", { width: "16", height: "16", fill: "#1a1230" }));
   tile.appendChild(
     el("rect", {
       x: "0.5",
       y: "0.5",
-      width: "13",
-      height: "13",
-      fill: "#154030",
-      stroke: "#2d6b4c",
-      "stroke-width": "1.1",
+      width: "15",
+      height: "15",
+      fill: "#4a3a8a",
+      stroke: "#7a68c8",
+      "stroke-width": "1",
     }),
   );
-  tile.appendChild(
-    el("line", {
-      x1: "0.5",
-      y1: "0.5",
-      x2: "13.5",
-      y2: "0.5",
-      stroke: "#3a7d5a",
-      "stroke-opacity": "0.35",
-      "stroke-width": "0.7",
-    }),
-  );
-  // Bubble cutout in the block (classic Metroid wall motif).
+  // Horizontal door ridges
+  for (const y of [4, 8, 12]) {
+    tile.appendChild(
+      el("line", {
+        x1: "1.5",
+        y1: String(y),
+        x2: "14.5",
+        y2: String(y),
+        stroke: "#a02040",
+        "stroke-opacity": "0.45",
+        "stroke-width": "0.9",
+      }),
+    );
+  }
+  // Soft magenta “fuzzy” tile center (muted platform motif)
   tile.appendChild(
     el("circle", {
-      cx: "7",
-      cy: "7",
-      r: "3.4",
-      fill: "#040d09",
-      stroke: "#3f8a5e",
-      "stroke-width": "0.9",
+      cx: "8",
+      cy: "8",
+      r: "3.2",
+      fill: "#2a1030",
+      stroke: "#c04090",
+      "stroke-opacity": "0.4",
+      "stroke-width": "0.8",
     }),
   );
   tile.appendChild(
     el("ellipse", {
-      cx: "5.9",
-      cy: "5.8",
-      rx: "1.15",
-      ry: "0.8",
-      fill: "#5aa876",
-      opacity: "0.32",
+      cx: "6.8",
+      cy: "6.6",
+      rx: "1.1",
+      ry: "0.75",
+      fill: "#ffffff",
+      opacity: "0.22",
     }),
   );
   defs.appendChild(tile);
@@ -544,29 +549,50 @@ function appendBubbleSpecular(g, w, h, rx, { running, reveal }) {
   g.appendChild(rim);
 
   const glintR = Math.min(w, h);
+  // White crescent arc — hallmark of Norfair coral bubble tiles.
+  const crescent = el("path", {
+    d: crescentPath(w * 0.22, h * 0.2, Math.max(10, glintR * 0.2), Math.max(6, glintR * 0.12)),
+    fill: "none",
+    stroke: "#ffffff",
+    "stroke-width": Math.max(1.6, glintR * 0.025),
+    "stroke-linecap": "round",
+    "stroke-opacity": running ? "0.9" : "0.7",
+    "pointer-events": "none",
+    class: "bubble-crescent",
+  });
+  g.appendChild(crescent);
+
   const hot = el("ellipse", {
     cx: w * 0.24,
     cy: h * 0.18,
-    rx: Math.max(8, glintR * 0.16),
-    ry: Math.max(4.5, glintR * 0.09),
+    rx: Math.max(7, glintR * 0.14),
+    ry: Math.max(4, glintR * 0.08),
     fill: "url(#bubbleHot)",
     "pointer-events": "none",
     class: "bubble-hot",
   });
   g.appendChild(hot);
 
-  // Secondary smaller glint for glass depth.
   const hot2 = el("ellipse", {
     cx: w * 0.36,
     cy: h * 0.28,
-    rx: Math.max(3, glintR * 0.055),
-    ry: Math.max(2, glintR * 0.032),
+    rx: Math.max(2.8, glintR * 0.05),
+    ry: Math.max(1.8, glintR * 0.03),
     fill: "#ffffff",
-    "fill-opacity": running ? "0.55" : "0.38",
+    "fill-opacity": running ? "0.55" : "0.4",
     "pointer-events": "none",
     class: "bubble-hot-secondary",
   });
   g.appendChild(hot2);
+}
+
+function crescentPath(cx, cy, rx, ry) {
+  // Simple open arc in the upper-left quadrant.
+  const x1 = cx - rx * 0.15;
+  const y1 = cy + ry * 0.75;
+  const x2 = cx + rx * 0.85;
+  const y2 = cy - ry * 0.15;
+  return `M ${x1} ${y1} A ${rx} ${ry} 0 0 1 ${x2} ${y2}`;
 }
 
 function appendTileTexture(g, w, h, rx, { reveal }) {
@@ -578,8 +604,7 @@ function appendTileTexture(g, w, h, rx, { reveal }) {
     rx,
     ry: rx,
     fill: "url(#metroidTile)",
-    // Muted enough for labels; pattern still reads as bubbly wall tiles.
-    "fill-opacity": reveal ? "0.26" : "0.38",
+    "fill-opacity": reveal ? "0.28" : "0.4",
     "pointer-events": "none",
     class: "tile-texture",
   });
