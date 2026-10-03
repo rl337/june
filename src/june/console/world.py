@@ -261,6 +261,25 @@ def _build_node(
     )
 
 
+def build_instance_world(inst: dict[str, Any]) -> WorldGraph:
+    """Layout a single stacked instance as its own zoomable world (watch dialog)."""
+    run_id = str(inst.get("run_id") or "instance")
+    active = inst.get("active_node_id") if isinstance(inst.get("active_node_id"), str) else None
+    node = _instance_node(inst, recent_ids=set())
+    _propagate_running(node)
+    node.x = PAD_X
+    node.y = PAD_Y
+    return WorldGraph(
+        root_id=run_id,
+        goal=node.label,
+        width=node.w + PAD_X * 2,
+        height=node.h + PAD_Y * 2,
+        nodes=[node],
+        edges=[],
+        active_node_id=active,
+    )
+
+
 def _instance_node(inst: dict[str, Any], *, recent_ids: set[str]) -> WorldNode:
     run_id = str(inst.get("run_id"))
     status = str(inst.get("status", "running"))

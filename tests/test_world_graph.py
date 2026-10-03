@@ -106,6 +106,45 @@ def test_propagate_running_marks_idle_parent_when_child_runs() -> None:
     assert bucket_node.status == "running"
 
 
+def test_build_instance_world_exposes_pipeline_children() -> None:
+    from june.console.world import build_instance_world
+
+    checkpoint = build_console_cron_graph().checkpoint()
+    pipeline = checkpoint["nodes"]["june.console.cron:bucket:10s"]["subgraph"]
+    inst = {
+        "run_id": "june.console.cron:10s:watch0001",
+        "bucket": "10s",
+        "parent_node_id": "june.console.cron:bucket:10s",
+        "status": "running",
+        "pipeline": pipeline,
+        "started_at": "2026-01-01T00:00:00+00:00",
+        "active_node_id": None,
+    }
+    world = build_instance_world(inst)
+    assert world.root_id.endswith("watch0001")
+    assert len(world.nodes) == 1
+    assert len(world.nodes[0].children) == 4
+    assert world.nodes[0].execution == "running"
+
+
+def test_hub_instance_world_endpoint_payload() -> None:
+    from june.console.hub import ConsoleHub
+
+    hub = ConsoleHub()
+    checkpoint = build_console_cron_graph().checkpoint()
+    pipeline = checkpoint["nodes"]["june.console.cron:bucket:10s"]["subgraph"]
+    hub.begin_instance(
+        run_id="june.console.cron:10s:api0001",
+        bucket="10s",
+        parent_node_id="june.console.cron:bucket:10s",
+        pipeline=pipeline,
+    )
+    world = hub.instance_world("june.console.cron:10s:api0001")
+    assert world is not None
+    assert world["nodes"][0]["id"].endswith("api0001")
+    assert hub.instance_world("missing") is None
+
+
 def test_world_included_in_hub_snapshot() -> None:
     from june.console.hub import ConsoleHub
 

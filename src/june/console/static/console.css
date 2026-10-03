@@ -783,6 +783,47 @@ body {
   transform: translate(-50%, -50%) scale(1);
 }
 
+.console-dialog--graph {
+  min-width: min(640px, 94vw);
+  max-width: min(820px, 96vw);
+  width: min(780px, 94vw);
+}
+
+.instance-watch-graph {
+  margin-top: 0.45rem;
+  height: min(420px, 52vh);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 94, 176, 0.22);
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255, 94, 176, 0.08), transparent 45%),
+    rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.instance-watch-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: grab;
+}
+
+.instance-watch-meta {
+  font-family: "Share Tech Mono", ui-monospace, monospace;
+  font-size: 0.75rem;
+}
+
+.instance-watch-meta .instance-status.is-running,
+.instance-watch-meta .is-running {
+  color: var(--running);
+}
+
+.instance-watch-meta code {
+  font-family: inherit;
+  color: var(--accent);
+  word-break: break-all;
+}
+
 .dialog-close {
   position: absolute;
   top: 0.35rem;

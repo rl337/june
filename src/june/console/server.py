@@ -64,6 +64,13 @@ def create_app(hub: ConsoleHub) -> Any:
             hub.select_node(str(node_id))
         return JSONResponse(hub.snapshot().to_dict())
 
+    @app.get("/api/instance/{run_id}/world")
+    async def api_instance_world(run_id: str) -> Any:
+        world = hub.instance_world(run_id)
+        if world is None:
+            return JSONResponse({"error": "instance not found", "run_id": run_id}, status_code=404)
+        return JSONResponse({"run_id": run_id, "world": world})
+
     @app.websocket("/ws")
     async def ws_console(websocket: WebSocket) -> None:
         await websocket.accept()

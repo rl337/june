@@ -12,7 +12,7 @@ from typing import Any
 from june.console.event_format import serialize_event, serialize_journal_entry
 from june.console.event_rate import build_event_rate
 from june.console.scene import ROOT_SCENE_ID, SceneFrame, build_scene_frame
-from june.console.world import build_world_graph
+from june.console.world import build_instance_world, build_world_graph
 
 _EVENT_LOG_LIMIT = 800
 
@@ -235,6 +235,14 @@ class ConsoleHub:
     def snapshot(self) -> ConsoleSnapshot:
         with self._lock:
             return self._build_snapshot()
+
+    def instance_world(self, run_id: str) -> dict[str, Any] | None:
+        """Return a zoomable world graph for one stacked instance, or None."""
+        with self._lock:
+            inst = self._instances.get(run_id)
+            if not isinstance(inst, dict):
+                return None
+            return build_instance_world(dict(inst)).to_dict()
 
     def _event_log_entries(self) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []

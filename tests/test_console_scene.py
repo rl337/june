@@ -122,3 +122,34 @@ def test_console_api_snapshot() -> None:
     body = response.json()
     assert "scene" in body
     assert "event_log" in body
+
+
+def test_console_api_instance_world() -> None:
+    pytest = __import__("pytest")
+    fastapi = pytest.importorskip("fastapi")
+    del fastapi
+    from fastapi.testclient import TestClient
+
+    from june.console.hub import ConsoleHub
+    from june.console.server import create_app
+    from june.harness.cron_graph import build_console_cron_graph
+
+    hub = ConsoleHub()
+    checkpoint = build_console_cron_graph().checkpoint()
+    pipeline = checkpoint["nodes"]["june.console.cron:bucket:10s"]["subgraph"]
+    run_id = "june.console.cron:10s:watchapi1"
+    hub.begin_instance(
+        run_id=run_id,
+        bucket="10s",
+        parent_node_id="june.console.cron:bucket:10s",
+        pipeline=pipeline,
+    )
+    client = TestClient(create_app(hub))
+    missing = client.get("/api/instance/does-not-exist/world")
+    assert missing.status_code == 404
+    ok = client.get(f"/api/instance/{run_id}/world")
+    assert ok.status_code == 200
+    payload = ok.json()
+    assert payload["run_id"] == run_id
+    assert payload["world"]["nodes"][0]["id"] == run_id
+    assert len(payload["world"]["nodes"][0]["children"]) == 4

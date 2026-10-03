@@ -193,6 +193,8 @@ export class JuneConsoleShell {
       rateEl.textContent = String(n);
       rateEl.hidden = n === 0;
     }
+    // Keep open instance watch dialogs in sync with live pipelines.
+    void this.refreshOpenWatches();
   }
 
   _renderEventLog(entries) {
@@ -294,27 +296,99 @@ export class JuneConsoleShell {
       btn.addEventListener("click", () => {
         const runId = btn.getAttribute("data-run-id");
         this.emit("instance:watch", { runId, parentId });
-        this.openCustomDialog({
-          kind: `watch-${runId}`,
-          title: `Watch · ${String(runId || "").slice(-8)}`,
-          bodyHtml: `<pre class="dialog-pre">${escapeHtml(
-            JSON.stringify(
-              (snap.instances || []).find((i) => i.run_id === runId) || { run_id: runId },
-              null,
-              2,
-            ),
-          )}</pre>`,
-        });
       });
     });
   }
 
-  openCustomDialog({ kind, title, bodyHtml, anchorEl = null }) {
+  /**
+   * Open a live subgraph viewer for a stacked instance.
+   * @param {string} runId
+   * @param {{ GraphViewport: typeof import('./graph.js').GraphViewport }} deps
+   */
+  async openInstanceWatchDialog(runId, { GraphViewport }) {
+    if (!runId || !GraphViewport) return null;
+    this._watchViewports = this._watchViewports || {};
+    // Replace any prior watch for this run (dialog reopen).
+    delete this._watchViewports[runId];
+    const short = String(runId).slice(-8);
+    const summary =
+      (this.lastSnapshot?.instances || []).find((i) => i.run_id === runId) || {};
+    const dialog = this.openCustomDialog({
+      kind: `watch-${runId}`,
+      title: `Watch · ${short}`,
+      className: "console-dialog--graph",
+      bodyHtml: `
+        <p class="dialog-text instance-watch-meta">
+          <span class="instance-status ${summary.status === "running" ? "is-running" : ""}">${escapeHtml(
+            summary.status || "…",
+          )}</span>
+          · bucket ${escapeHtml(summary.bucket || "—")}
+          · active <code>${escapeHtml(summary.active_node_id || "—")}</code>
+        </p>
+        <div class="instance-watch-graph">
+          <svg class="instance-watch-svg" role="img" aria-label="Instance subgraph ${escapeHtml(
+            short,
+          )}"></svg>
+        </div>
+        <p class="event-rate-hint">Scroll to zoom · drag to pan · live with the run</p>
+      `,
+    });
+    const svg = dialog.querySelector(".instance-watch-svg");
+    const viewport = new GraphViewport(svg, {
+      onSelectNode: () => {},
+    });
+    this._watchViewports[runId] = { viewport, dialog };
+    dialog.querySelector(".dialog-close")?.addEventListener(
+      "click",
+      () => {
+        delete this._watchViewports[runId];
+      },
+      { once: true },
+    );
+    await this.refreshInstanceWatch(runId);
+    return dialog;
+  }
+
+  async refreshInstanceWatch(runId) {
+    const entry = this._watchViewports?.[runId];
+    if (!entry) return;
+    try {
+      const res = await fetch(`/api/instance/${encodeURIComponent(runId)}/world`);
+      if (!res.ok) {
+        const meta = entry.dialog.querySelector(".instance-watch-meta");
+        if (meta) meta.textContent = "Instance no longer available.";
+        return;
+      }
+      const data = await res.json();
+      entry.viewport.setWorld(data.world || {}, { preserveCamera: true });
+      const summary =
+        (this.lastSnapshot?.instances || []).find((i) => i.run_id === runId) || {};
+      const meta = entry.dialog.querySelector(".instance-watch-meta");
+      if (meta) {
+        meta.innerHTML = `
+          <span class="instance-status ${summary.status === "running" ? "is-running" : ""}">${escapeHtml(
+            summary.status || "…",
+          )}</span>
+          · bucket ${escapeHtml(summary.bucket || "—")}
+          · active <code>${escapeHtml(summary.active_node_id || "—")}</code>
+        `;
+      }
+    } catch {
+      /* ignore transient fetch errors while watching */
+    }
+  }
+
+  async refreshOpenWatches() {
+    const ids = Object.keys(this._watchViewports || {});
+    await Promise.all(ids.map((id) => this.refreshInstanceWatch(id)));
+  }
+
+  openCustomDialog({ kind, title, bodyHtml, anchorEl = null, className = "" }) {
     for (const existing of [...this.dialogLayer.querySelectorAll(".console-dialog")]) {
       if (existing.dataset.dialog === kind) existing.remove();
     }
     const dialog = document.createElement("div");
-    dialog.className = "console-dialog";
+    dialog.className = `console-dialog${className ? ` ${className}` : ""}`;
     dialog.dataset.dialog = kind;
     if (anchorEl) {
       const rect = anchorEl.getBoundingClientRect();
