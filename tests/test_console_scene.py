@@ -128,6 +128,34 @@ def test_console_api_snapshot() -> None:
     assert "event_log" in body
 
 
+def _sample_instance_pipeline(run_id: str) -> dict:
+    """Minimal pipeline checkpoint (no MechaHarness required)."""
+    steps = ("acquire window", "sample signals", "emit heartbeat", "flush buffers")
+    nodes = {}
+    edges = []
+    prev = None
+    for idx, goal in enumerate(steps):
+        nid = f"{run_id}:step:{idx}"
+        nodes[nid] = {
+            "id": nid,
+            "kind": "june.timed_log",
+            "goal": goal,
+            "status": "succeeded",
+            "payload": {"message": goal, "step_index": idx, "instance_id": run_id},
+        }
+        if prev is not None:
+            edges.append(
+                {
+                    "from_node": prev,
+                    "to_node": nid,
+                    "types": ["control"],
+                    "reason": "seq",
+                }
+            )
+        prev = nid
+    return {"id": run_id, "goal": "10s timed pipeline", "nodes": nodes, "edges": edges}
+
+
 def test_console_api_instance_world() -> None:
     pytest = __import__("pytest")
     fastapi = pytest.importorskip("fastapi")
@@ -136,17 +164,14 @@ def test_console_api_instance_world() -> None:
 
     from june.console.hub import ConsoleHub
     from june.console.server import create_app
-    from june.harness.cron_graph import build_console_cron_graph
 
     hub = ConsoleHub()
-    checkpoint = build_console_cron_graph().checkpoint()
-    pipeline = checkpoint["nodes"]["june.console.cron:bucket:10s"]["subgraph"]
     run_id = "june.console.cron:10s:watchapi1"
     hub.begin_instance(
         run_id=run_id,
         bucket="10s",
         parent_node_id="june.console.cron:bucket:10s",
-        pipeline=pipeline,
+        pipeline=_sample_instance_pipeline(run_id),
     )
     client = TestClient(create_app(hub))
     missing = client.get("/api/instance/does-not-exist/world")
@@ -158,6 +183,7 @@ def test_console_api_instance_world() -> None:
     assert payload["world"]["nodes"][0]["id"] == run_id
     assert len(payload["world"]["nodes"][0]["children"]) == 4
     assert isinstance(payload.get("pipeline_nodes"), dict)
+    assert len(payload["pipeline_nodes"]) == 4
 
 
 def test_console_api_instance_node_detail() -> None:
@@ -168,18 +194,14 @@ def test_console_api_instance_node_detail() -> None:
 
     from june.console.hub import ConsoleHub
     from june.console.server import create_app
-    from june.harness.cron_graph import build_console_cron_graph, clone_pipeline_for_instance
 
     hub = ConsoleHub()
-    checkpoint = build_console_cron_graph().checkpoint()
-    template = checkpoint["nodes"]["june.console.cron:bucket:10s"]["subgraph"]
     run_id = "june.console.cron:10s:nodedet01"
-    pipeline = clone_pipeline_for_instance(template, run_id)
     hub.begin_instance(
         run_id=run_id,
         bucket="10s",
         parent_node_id="june.console.cron:bucket:10s",
-        pipeline=pipeline,
+        pipeline=_sample_instance_pipeline(run_id),
     )
     client = TestClient(create_app(hub))
 

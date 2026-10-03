@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+
+pytest.importorskip("mechaharness")
+
 from june.harness.cron_graph import (
     BUCKET_10S_STEPS,
     CONSOLE_CRON_RUN_ID,
