@@ -12,10 +12,12 @@ from typing import Any
 from june.console.event_format import serialize_event, serialize_journal_entry
 from june.console.event_rate import build_event_rate
 from june.console.scene import ROOT_SCENE_ID, SceneFrame, build_scene_frame
+from june.console.spool import ConsoleSpool
 from june.console.world import build_instance_world, build_world_graph
 
 _EVENT_LOG_LIMIT = 800
 # Finished instance trail is per-bucket so a busy 10s schedule cannot erase 60s history.
+# Older finished runs remain on the ConsoleSpool for disk-backed lookup.
 _FINISHED_PER_BUCKET = 4
 
 
@@ -50,10 +52,16 @@ class ConsoleSnapshot:
 
 
 class ConsoleHub:
-    """Thread-safe store of the latest graph scene and event stream."""
+    """Thread-safe store of the latest graph scene and event stream.
 
-    def __init__(self) -> None:
+    Hot state stays in memory (bounded). When a ``ConsoleSpool`` is attached,
+    every event/journal/instance write is also appended to disk so pruned
+    runs remain inspectable via memory-first, disk-fallback lookups.
+    """
+
+    def __init__(self, spool: ConsoleSpool | None = None) -> None:
         self._lock = threading.Lock()
+        self._spool = spool
         self._events: list[Any] = []
         self._journal: list[dict[str, Any]] = []
         self._structure_checkpoint: dict[str, Any] = {}
@@ -99,9 +107,11 @@ class ConsoleHub:
 
     def ingest_journal(self, entry: dict[str, Any]) -> None:
         with self._lock:
-            self._journal.append(dict(entry))
+            row = dict(entry)
+            self._journal.append(row)
             if len(self._journal) > _EVENT_LOG_LIMIT:
                 self._journal = self._journal[-_EVENT_LOG_LIMIT:]
+            self._spool_journal(row)
             self._publish()
 
     def ingest_event(self, event: Any) -> None:
@@ -109,6 +119,7 @@ class ConsoleHub:
             self._events.append(event)
             if len(self._events) > _EVENT_LOG_LIMIT:
                 self._events = self._events[-_EVENT_LOG_LIMIT:]
+            self._spool_event(event)
             # Instance pipeline checkpoints are tracked via touch_instance /
             # complete_instance so overlapping runs do not clobber the master graph.
             if not self._structure_checkpoint:
@@ -138,7 +149,7 @@ class ConsoleHub:
         pipeline: dict[str, Any],
     ) -> None:
         with self._lock:
-            self._instances[run_id] = {
+            inst = {
                 "run_id": run_id,
                 "bucket": bucket,
                 "parent_node_id": parent_node_id,
@@ -147,6 +158,8 @@ class ConsoleHub:
                 "pipeline": pipeline,
                 "active_node_id": None,
             }
+            self._instances[run_id] = inst
+            self._spool_instance(inst)
             self._publish()
 
     def touch_instance(self, run_id: str, *, event: Any | None = None) -> None:
@@ -164,6 +177,7 @@ class ConsoleHub:
                     graph = payload.get("graph")
                     if isinstance(graph, dict):
                         inst["pipeline"] = graph
+            self._spool_instance(inst)
             self._publish()
 
     def complete_instance(
@@ -181,8 +195,11 @@ class ConsoleHub:
             inst["finished_at"] = datetime.now(timezone.utc).isoformat()
             if pipeline is not None:
                 inst["pipeline"] = pipeline
+            # Persist final checkpoint before pruning hot memory.
+            self._spool_instance(inst)
             # Keep a short finished trail per bucket (not global): 10s overlap
             # must not prune the last 60s run the user wants to inspect.
+            # Evicted runs remain on the spool for disk-backed watch/detail APIs.
             finished_by_bucket: dict[str, list[dict[str, Any]]] = {}
             for item in self._instances.values():
                 if item.get("status") in {"running", "pending"}:
@@ -244,7 +261,7 @@ class ConsoleHub:
     def instance_world(self, run_id: str) -> dict[str, Any] | None:
         """Return a zoomable world graph for one stacked instance, or None."""
         with self._lock:
-            inst = self._instances.get(run_id)
+            inst = self._resolve_instance(run_id)
             if not isinstance(inst, dict):
                 return None
             return build_instance_world(dict(inst)).to_dict()
@@ -252,7 +269,7 @@ class ConsoleHub:
     def instance_pipeline_nodes(self, run_id: str) -> dict[str, Any] | None:
         """Flat map of pipeline node id → raw checkpoint node for a run."""
         with self._lock:
-            inst = self._instances.get(run_id)
+            inst = self._resolve_instance(run_id)
             if not isinstance(inst, dict):
                 return None
             return _flatten_pipeline_nodes(inst.get("pipeline"))
@@ -260,10 +277,49 @@ class ConsoleHub:
     def instance_node_detail(self, run_id: str, node_id: str) -> dict[str, Any] | None:
         """Return raw node (or instance summary) for a watch-dialog selection."""
         with self._lock:
-            inst = self._instances.get(run_id)
+            inst = self._resolve_instance(run_id)
             if not isinstance(inst, dict):
                 return None
             return _instance_node_detail_from(inst, node_id)
+
+    def _resolve_instance(self, run_id: str) -> dict[str, Any] | None:
+        """Memory-first instance lookup with disk spool fallback."""
+        inst = self._instances.get(run_id)
+        if isinstance(inst, dict):
+            return inst
+        if self._spool is None:
+            return None
+        try:
+            return self._spool.get_instance(run_id)
+        except OSError:
+            return None
+
+    def _spool_event(self, event: Any) -> None:
+        if self._spool is None:
+            return
+        try:
+            self._spool.append_event(serialize_event(event))
+        except OSError:
+            return
+
+    def _spool_journal(self, entry: dict[str, Any]) -> None:
+        if self._spool is None:
+            return
+        try:
+            self._spool.append_journal(serialize_journal_entry(entry))
+        except OSError:
+            return
+
+    def _spool_instance(self, inst: dict[str, Any]) -> None:
+        if self._spool is None:
+            return
+        run_id = str(inst.get("run_id") or "")
+        if not run_id:
+            return
+        try:
+            self._spool.put_instance(run_id, dict(inst))
+        except OSError:
+            return
 
     def _event_log_entries(self) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []

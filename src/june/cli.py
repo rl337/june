@@ -191,8 +191,14 @@ def _cmd_serve(args: argparse.Namespace) -> None:
     from june.console.hub import ConsoleHub
     from june.console.runtime import ConsoleRuntime
     from june.console.server import serve_console
+    from june.console.spool import ConsoleSpool
 
-    hub = ConsoleHub()
+    # Console observability spool: rolling JSONL events + instance checkpoints.
+    # Defaults under .june/ so pruned in-memory runs stay inspectable from disk.
+    data_root = Path(args.data_dir) if args.data_dir else Path(
+        os.environ.get("JUNE_DATA_DIR", ".june")
+    )
+    hub = ConsoleHub(spool=ConsoleSpool(data_root / "console" / "spool"))
     orch = _orch(args)
     runtime = ConsoleRuntime(orch, hub)
     runtime.refresh_status()
