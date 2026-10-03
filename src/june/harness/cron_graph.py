@@ -137,7 +137,9 @@ def new_bucket_run_id(bucket: str) -> str:
     return f"{CONSOLE_CRON_RUN_ID}:{bucket}:{uuid4().hex[:8]}"
 
 
-def clone_pipeline_for_instance(template_subgraph: dict[str, Any], instance_id: str) -> dict[str, Any]:
+def clone_pipeline_for_instance(
+    template_subgraph: dict[str, Any], instance_id: str
+) -> dict[str, Any]:
     """Clone a bucket pipeline checkpoint with instance-scoped node ids."""
     from mechaharness.graph import ExecutionGraph
 

@@ -7,7 +7,6 @@ from typing import Any, Literal
 
 from june.harness.visualization import (
     GRAPH_NODE_END,
-    GRAPH_NODE_START,
     active_node_from_events,
     execution_focus_from_events,
     view_from_checkpoint,

@@ -76,7 +76,11 @@ def test_recent_nodes_dim_after_end() -> None:
     }
     events = [
         _Event(type=GRAPH_NODE_START, run_id=run_id, payload={"node_id": "n0"}),
-        _Event(type=GRAPH_NODE_END, run_id=run_id, payload={"node_id": "n0", "status": "succeeded"}),
+        _Event(
+            type=GRAPH_NODE_END,
+            run_id=run_id,
+            payload={"node_id": "n0", "status": "succeeded"},
+        ),
         _Event(type=GRAPH_NODE_START, run_id=run_id, payload={"node_id": "n1"}),
     ]
     frame = build_scene_frame(checkpoint, events, run_id=run_id, selected_node_id=ROOT_SCENE_ID)

@@ -156,8 +156,9 @@ class ConsoleHub:
                 payload = getattr(event, "payload", None)
                 etype = str(getattr(event, "type", ""))
                 if isinstance(payload, dict):
-                    if etype.endswith("graph_node_start") and isinstance(payload.get("node_id"), str):
-                        inst["active_node_id"] = payload["node_id"]
+                    node_id = payload.get("node_id")
+                    if etype.endswith("graph_node_start") and isinstance(node_id, str):
+                        inst["active_node_id"] = node_id
                     graph = payload.get("graph")
                     if isinstance(graph, dict):
                         inst["pipeline"] = graph
