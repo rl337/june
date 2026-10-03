@@ -145,6 +145,31 @@ def test_hub_instance_world_endpoint_payload() -> None:
     assert hub.instance_world("missing") is None
 
 
+def test_hub_instance_node_detail() -> None:
+    from june.console.hub import ConsoleHub
+    from june.harness.cron_graph import clone_pipeline_for_instance
+
+    hub = ConsoleHub()
+    checkpoint = build_console_cron_graph().checkpoint()
+    template = checkpoint["nodes"]["june.console.cron:bucket:10s"]["subgraph"]
+    run_id = "june.console.cron:10s:detail01"
+    pipeline = clone_pipeline_for_instance(template, run_id)
+    hub.begin_instance(
+        run_id=run_id,
+        bucket="10s",
+        parent_node_id="june.console.cron:bucket:10s",
+        pipeline=pipeline,
+    )
+    root = hub.instance_node_detail(run_id, run_id)
+    assert root is not None
+    assert root["kind"] == "instance"
+    step = hub.instance_node_detail(run_id, f"{run_id}:step:2")
+    assert step is not None
+    assert step["node"]["goal"] == "emit heartbeat"
+    assert hub.instance_node_detail(run_id, "missing") is None
+    assert hub.instance_node_detail("missing", "x") is None
+
+
 def test_world_included_in_hub_snapshot() -> None:
     from june.console.hub import ConsoleHub
 

@@ -325,19 +325,33 @@ export class JuneConsoleShell {
           · bucket ${escapeHtml(summary.bucket || "—")}
           · active <code>${escapeHtml(summary.active_node_id || "—")}</code>
         </p>
-        <div class="instance-watch-graph">
-          <svg class="instance-watch-svg" role="img" aria-label="Instance subgraph ${escapeHtml(
-            short,
-          )}"></svg>
+        <div class="instance-watch-layout">
+          <div class="instance-watch-graph">
+            <svg class="instance-watch-svg" role="img" aria-label="Instance subgraph ${escapeHtml(
+              short,
+            )}"></svg>
+          </div>
+          <aside class="instance-watch-detail" aria-live="polite">
+            <h4 class="instance-watch-detail-title">Node details</h4>
+            <p class="instance-watch-detail-hint">Click a node in this run’s graph.</p>
+            <pre class="instance-watch-detail-body dialog-pre" hidden></pre>
+          </aside>
         </div>
-        <p class="event-rate-hint">Scroll to zoom · drag to pan · live with the run</p>
+        <p class="event-rate-hint">Scroll to zoom · drag to pan · click a node for details</p>
       `,
     });
     const svg = dialog.querySelector(".instance-watch-svg");
     const viewport = new GraphViewport(svg, {
-      onSelectNode: () => {},
+      onSelectNode: (nodeId) => {
+        void this.showInstanceNodeDetail(runId, nodeId);
+      },
     });
-    this._watchViewports[runId] = { viewport, dialog, fitted: false };
+    this._watchViewports[runId] = {
+      viewport,
+      dialog,
+      fitted: false,
+      selectedNodeId: null,
+    };
     dialog.querySelector(".dialog-close")?.addEventListener(
       "click",
       () => {
@@ -356,6 +370,47 @@ export class JuneConsoleShell {
       });
     });
     return dialog;
+  }
+
+  async showInstanceNodeDetail(runId, nodeId) {
+    const entry = this._watchViewports?.[runId];
+    if (!entry) return;
+    const pane = entry.dialog.querySelector(".instance-watch-detail");
+    const title = pane?.querySelector(".instance-watch-detail-title");
+    const hint = pane?.querySelector(".instance-watch-detail-hint");
+    const body = pane?.querySelector(".instance-watch-detail-body");
+    if (!pane || !body) return;
+    const id = !nodeId || nodeId === "root" ? runId : nodeId;
+    entry.selectedNodeId = id;
+    if (hint) hint.hidden = true;
+    body.hidden = false;
+    body.textContent = "Loading…";
+    if (title) {
+      const short = String(id).split(":").slice(-2).join(":");
+      title.textContent = `Node · ${short}`;
+    }
+    try {
+      const res = await fetch(
+        `/api/instance/${encodeURIComponent(runId)}/node/${encodeURIComponent(id)}`,
+      );
+      if (!res.ok) {
+        body.textContent = res.status === 404 ? "Node not found in this run." : "Failed to load details.";
+        return;
+      }
+      // Stale response if the user clicked another node meanwhile.
+      if (entry.selectedNodeId !== id) return;
+      const detail = await res.json();
+      body.textContent = JSON.stringify(detail, null, 2);
+      if (title && detail.node?.goal) {
+        title.textContent = String(detail.node.goal);
+      } else if (title && detail.kind === "instance") {
+        title.textContent = `Run · ${String(runId).slice(-8)}`;
+      }
+    } catch {
+      if (entry.selectedNodeId === id) {
+        body.textContent = "Failed to load details.";
+      }
+    }
   }
 
   async refreshInstanceWatch(runId) {
@@ -386,6 +441,9 @@ export class JuneConsoleShell {
           · bucket ${escapeHtml(summary.bucket || "—")}
           · active <code>${escapeHtml(summary.active_node_id || "—")}</code>
         `;
+      }
+      if (entry.selectedNodeId) {
+        void this.showInstanceNodeDetail(runId, entry.selectedNodeId);
       }
     } catch {
       /* ignore transient fetch errors while watching */

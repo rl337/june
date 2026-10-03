@@ -153,3 +153,44 @@ def test_console_api_instance_world() -> None:
     assert payload["run_id"] == run_id
     assert payload["world"]["nodes"][0]["id"] == run_id
     assert len(payload["world"]["nodes"][0]["children"]) == 4
+
+
+def test_console_api_instance_node_detail() -> None:
+    pytest = __import__("pytest")
+    fastapi = pytest.importorskip("fastapi")
+    del fastapi
+    from fastapi.testclient import TestClient
+
+    from june.console.hub import ConsoleHub
+    from june.console.server import create_app
+    from june.harness.cron_graph import build_console_cron_graph, clone_pipeline_for_instance
+
+    hub = ConsoleHub()
+    checkpoint = build_console_cron_graph().checkpoint()
+    template = checkpoint["nodes"]["june.console.cron:bucket:10s"]["subgraph"]
+    run_id = "june.console.cron:10s:nodedet01"
+    pipeline = clone_pipeline_for_instance(template, run_id)
+    hub.begin_instance(
+        run_id=run_id,
+        bucket="10s",
+        parent_node_id="june.console.cron:bucket:10s",
+        pipeline=pipeline,
+    )
+    client = TestClient(create_app(hub))
+
+    root = client.get(f"/api/instance/{run_id}/node/{run_id}")
+    assert root.status_code == 200
+    root_body = root.json()
+    assert root_body["kind"] == "instance"
+    assert root_body["node_count"] == 4
+
+    step_id = f"{run_id}:step:0"
+    step = client.get(f"/api/instance/{run_id}/node/{step_id}")
+    assert step.status_code == 200
+    step_body = step.json()
+    assert step_body["node_id"] == step_id
+    assert step_body["node"]["goal"] == "acquire window"
+    assert step_body["node"]["kind"] == "june.timed_log"
+
+    missing = client.get(f"/api/instance/{run_id}/node/does-not-exist")
+    assert missing.status_code == 404

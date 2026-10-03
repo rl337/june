@@ -244,6 +244,38 @@ class ConsoleHub:
                 return None
             return build_instance_world(dict(inst)).to_dict()
 
+    def instance_node_detail(self, run_id: str, node_id: str) -> dict[str, Any] | None:
+        """Return raw node (or instance summary) for a watch-dialog selection."""
+        with self._lock:
+            inst = self._instances.get(run_id)
+            if not isinstance(inst, dict):
+                return None
+            # Selecting the instance root shows the run summary + pipeline meta.
+            if node_id in ("", "root", run_id):
+                pipeline = inst.get("pipeline") if isinstance(inst.get("pipeline"), dict) else {}
+                return {
+                    "run_id": run_id,
+                    "node_id": run_id,
+                    "kind": "instance",
+                    "status": inst.get("status"),
+                    "bucket": inst.get("bucket"),
+                    "parent_node_id": inst.get("parent_node_id"),
+                    "started_at": inst.get("started_at"),
+                    "finished_at": inst.get("finished_at"),
+                    "active_node_id": inst.get("active_node_id"),
+                    "pipeline_goal": pipeline.get("goal"),
+                    "pipeline_id": pipeline.get("id"),
+                    "node_count": len(pipeline.get("nodes") or {}),
+                }
+            raw = _find_pipeline_node(inst.get("pipeline"), node_id)
+            if raw is None:
+                return None
+            return {
+                "run_id": run_id,
+                "node_id": node_id,
+                "node": dict(raw),
+            }
+
     def _event_log_entries(self) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
         for event in self._events:
@@ -326,6 +358,33 @@ class ConsoleHub:
 
     def snapshot_json(self) -> str:
         return json.dumps(self.snapshot().to_dict())
+
+
+def _find_pipeline_node(pipeline: Any, node_id: str) -> dict[str, Any] | None:
+    """Locate a node by id in a pipeline checkpoint (recursive into subgraphs)."""
+    if not isinstance(pipeline, dict) or not node_id:
+        return None
+    nodes = pipeline.get("nodes")
+    if isinstance(nodes, dict):
+        raw = nodes.get(node_id)
+        if isinstance(raw, dict):
+            return raw
+        for child in nodes.values():
+            if not isinstance(child, dict):
+                continue
+            nested = child.get("subgraph")
+            if isinstance(nested, dict):
+                found = _find_pipeline_node(nested, node_id)
+                if found is not None:
+                    return found
+            payload = child.get("payload")
+            if isinstance(payload, dict):
+                nested = payload.get("subgraph")
+                if isinstance(nested, dict):
+                    found = _find_pipeline_node(nested, node_id)
+                    if found is not None:
+                        return found
+    return None
 
 
 def _deep_merge_graph(base: dict[str, Any], child: dict[str, Any]) -> dict[str, Any]:
