@@ -337,7 +337,7 @@ export class JuneConsoleShell {
     const viewport = new GraphViewport(svg, {
       onSelectNode: () => {},
     });
-    this._watchViewports[runId] = { viewport, dialog };
+    this._watchViewports[runId] = { viewport, dialog, fitted: false };
     dialog.querySelector(".dialog-close")?.addEventListener(
       "click",
       () => {
@@ -346,6 +346,15 @@ export class JuneConsoleShell {
       { once: true },
     );
     await this.refreshInstanceWatch(runId);
+    // SVG may still be 0×0 on first paint — refit after layout.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const entry = this._watchViewports?.[runId];
+        if (!entry) return;
+        entry.viewport.fit({ clearSelection: false });
+        entry.fitted = true;
+      });
+    });
     return dialog;
   }
 
@@ -360,7 +369,12 @@ export class JuneConsoleShell {
         return;
       }
       const data = await res.json();
-      entry.viewport.setWorld(data.world || {}, { preserveCamera: true });
+      const svg = entry.viewport.svg;
+      const sized = (svg.clientWidth || 0) > 40 && (svg.clientHeight || 0) > 40;
+      entry.viewport.setWorld(data.world || {}, {
+        preserveCamera: Boolean(entry.fitted && sized),
+      });
+      if (sized) entry.fitted = true;
       const summary =
         (this.lastSnapshot?.instances || []).find((i) => i.run_id === runId) || {};
       const meta = entry.dialog.querySelector(".instance-watch-meta");
