@@ -1128,3 +1128,94 @@ body {
 .node[data-running="1"] .node-label {
   fill: var(--bubble-shine);
 }
+
+/* Chat pane (june.chat / junespark) */
+.view-body--chat {
+  display: flex;
+  flex-direction: column;
+  padding: 0.6rem 0.75rem 0.75rem;
+  gap: 0.5rem;
+  min-height: 0;
+}
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-height: 0;
+  flex: 1;
+}
+.chat-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.7rem;
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.chat-meta select {
+  font: inherit;
+  color: inherit;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  padding: 0.15rem 0.35rem;
+}
+.chat-caps { font-family: "Share Tech Mono", ui-monospace, monospace; }
+.chat-messages {
+  flex: 1;
+  min-height: 10rem;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.chat-msg {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 0.55rem 0.7rem;
+  max-width: 95%;
+  white-space: pre-wrap;
+  line-height: 1.4;
+  background: rgba(0, 0, 0, 0.22);
+}
+.chat-msg--user { align-self: flex-end; }
+.chat-msg--assistant { align-self: flex-start; }
+.chat-role {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 0.25rem;
+  font-family: "Share Tech Mono", ui-monospace, monospace;
+}
+.chat-notes { margin-top: 0.35rem; font-size: 0.72rem; color: var(--muted); }
+.chat-msg img, .chat-msg video { max-width: 100%; border-radius: 6px; margin-top: 0.35rem; display: block; }
+.chat-msg audio { width: 100%; margin-top: 0.35rem; }
+.chat-form {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.45rem;
+}
+.chat-form textarea {
+  font: inherit;
+  color: inherit;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+  resize: vertical;
+  min-height: 4rem;
+}
+.chat-form button {
+  font: inherit;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  padding: 0.55rem 0.85rem;
+  background: rgba(94, 234, 255, 0.85);
+  color: #041018;
+  cursor: pointer;
+  align-self: end;
+}
+.chat-form button:disabled { opacity: 0.5; cursor: wait; }
+.chat-error { color: #ff8e8e; font-size: 0.78rem; margin: 0; }

@@ -8,6 +8,8 @@ from typing import Any, Callable
 
 from june.advisor import AdvisorOrchestrator, AdvisorRequest
 from june.budget import budget_for_decision, budget_from_payload
+from june.channels import ChannelMessage
+from june.chat import CHAT_TEMPLATE
 from june.documents import DocumentStore
 from june.goals import GoalStatus, GoalStore
 from june.harness import BoundRun, MechaHarnessClient, RunResult
@@ -46,6 +48,7 @@ class TaskRunner:
         advisor: AdvisorOrchestrator | None = None,
         outcomes: OutcomeLedger | None = None,
         approval_callback: Callable[[PolicyDecision, RunnableWork], bool] | None = None,
+        chat_runner: Any | None = None,
     ) -> None:
         self.client = client or MechaHarnessClient()
         self.goals = goals or GoalStore()
@@ -58,6 +61,7 @@ class TaskRunner:
         self.advisor = advisor or AdvisorOrchestrator()
         self.outcomes = outcomes or OutcomeLedger()
         self.approval_callback = approval_callback
+        self.chat_runner = chat_runner
 
     def run(self, work: RunnableWork, *, template_name: str | None = None) -> TaskOutcome:
         started = datetime.now(timezone.utc)
@@ -65,6 +69,8 @@ class TaskRunner:
         issue = self.issues.get(work.issue_id) if work.issue_id else None
 
         action = str(work.payload.get("action", "task"))
+        if action == "chat" or str(work.payload.get("template", "")) == CHAT_TEMPLATE:
+            return self._run_chat(work, started=started)
         decision = self.policy.classify(action)
         if decision.require_approval:
             approved = True
@@ -191,6 +197,79 @@ class TaskRunner:
                 "reason": decision.reason,
                 "budget_policy": budget.to_dict(),
             },
+        )
+
+    def _run_chat(self, work: RunnableWork, *, started: datetime) -> TaskOutcome:
+        self.templates.record_use(CHAT_TEMPLATE)
+        raw_msg = work.payload.get("channel_message") or {}
+        message = (
+            raw_msg
+            if isinstance(raw_msg, ChannelMessage)
+            else ChannelMessage.from_dict(dict(raw_msg))
+        )
+        if self.chat_runner is None:
+            return TaskOutcome(
+                work_id=work.id,
+                status="failed",
+                result={"error": "chat_runner_not_configured", "reply": {"text": ""}},
+                decision="escalate",
+            )
+
+        # Prefer June-local sequential graph (same node functions). When MH is
+        # available the harness client can still checkpoint the topology.
+        reply = self.chat_runner.run(message)
+        bound = self.client.bind_template(
+            CHAT_TEMPLATE,
+            bindings={
+                "task": work.payload.get("task") or message.text(),
+                "channel_message": message.to_dict(),
+                "reply": reply.to_dict(),
+            },
+            node_kinds=[
+                "june.chat.refine_input",
+                "june.chat.context_optimize",
+                "june.chat.tool_loop",
+                "june.chat.render_reply",
+            ],
+            budget=budget_from_payload(work.payload)
+            or budget_for_decision(self.policy.classify("chat")),
+        )
+        run_result = self.client.execute(bound)
+        # Chat success is the reply, not merely graph readiness.
+        status = "ok" if reply.text() else run_result.status
+        if run_result.status == "failed":
+            status = "failed"
+
+        elapsed = (datetime.now(timezone.utc) - started).total_seconds()
+        self.outcomes.record(
+            OutcomeRecord(
+                goal_id=work.goal_id,
+                issue_id=work.issue_id,
+                run_ids=[reply.run_id or run_result.run_id],
+                goal_completed=False,
+                graph_succeeded=status in {"ok", "ready", "scaffolded"},
+                orchestration_success=bool(reply.text()),
+                elapsed_seconds=elapsed,
+                retries=work.attempt,
+                approval_burden=0,
+                policy_version=self.policy.version,
+                harness_version=str(run_result.raw.get("mode")),
+                notes="; ".join(reply.notes),
+            )
+        )
+        return TaskOutcome(
+            work_id=work.id,
+            status=status,
+            result={
+                "reply": reply.to_dict(),
+                "run": run_result.raw,
+                "checkpoint": run_result.graph_checkpoint,
+                "template": CHAT_TEMPLATE,
+                "budget_policy": run_result.budget,
+            },
+            run_id=reply.run_id or run_result.run_id,
+            decision="complete" if status != "failed" else "escalate",
+            policy={"action": "chat", "template": CHAT_TEMPLATE},
         )
 
     def _write_back(

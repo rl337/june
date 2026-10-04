@@ -38,6 +38,8 @@ credentials/
 
 # Runtime / local data
 june_data/
+.june-data/
+config.yaml
 *.db
 *.sqlite3
 tmp/

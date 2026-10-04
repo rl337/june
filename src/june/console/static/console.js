@@ -1,10 +1,12 @@
 import { JuneConsoleShell } from "./shell.js";
 import { GraphViewport, selectScene } from "./graph.js";
+import { mountChatPanel } from "./chat.js";
 
 const root = document.getElementById("june-console");
 const canvas = document.getElementById("canvas");
 const wsStatus = document.getElementById("ws-status");
 const shell = new JuneConsoleShell(root);
+mountChatPanel(root);
 
 const viewport = new GraphViewport(canvas, {
   onSelectNode: (id) => {

@@ -68,11 +68,12 @@ def budget_from_payload(payload: dict[str, Any] | None) -> SubgraphBudget | None
     raw = payload.get("budget_policy") or payload.get("budget")
     if not isinstance(raw, dict):
         return None
-    unit = raw.get("unit", "units")
-    if unit not in ("units", "usd", "tokens"):
-        unit = "units"
+    unit_raw = raw.get("unit", "units")
+    unit: Literal["units", "usd", "tokens"] = (
+        unit_raw if unit_raw in ("units", "usd", "tokens") else "units"
+    )
     return SubgraphBudget(
         soft_limit=raw.get("soft_limit"),
         hard_limit=raw.get("hard_limit", 64.0),
-        unit=unit,  # type: ignore[arg-type]
+        unit=unit,
     )

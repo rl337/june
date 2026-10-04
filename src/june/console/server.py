@@ -8,7 +8,11 @@ from importlib import resources
 from pathlib import Path
 from typing import Any
 
+from june.channels import ChatService
+from june.config import JuneSettings
 from june.console.hub import ConsoleHub, ConsoleSnapshot
+from june.orchestrator import Orchestrator
+from june.providers.junespark import JunesparkProvider
 
 try:
     from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -23,7 +27,14 @@ except ImportError:  # pragma: no cover - optional extra
     StaticFiles = None  # type: ignore[misc, assignment]
 
 
-def create_app(hub: ConsoleHub) -> Any:
+def create_app(
+    hub: ConsoleHub,
+    *,
+    orchestrator: Orchestrator | None = None,
+    provider: JunesparkProvider | None = None,
+    chat_service: ChatService | None = None,
+    settings: JuneSettings | None = None,
+) -> Any:
     if FastAPI is None or WebSocket is None:
         raise RuntimeError(
             "Web console requires the console extra: pip install 'june[console]'"
@@ -33,6 +44,22 @@ def create_app(hub: ConsoleHub) -> Any:
     static_root = _static_directory()
     if static_root.is_dir() and StaticFiles is not None:
         app.mount("/static", StaticFiles(directory=str(static_root)), name="static")
+
+    if (
+        orchestrator is not None
+        and provider is not None
+        and chat_service is not None
+        and settings is not None
+    ):
+        from june.console.chat_api import mount_chat_routes
+
+        mount_chat_routes(
+            app,
+            settings=settings,
+            orchestrator=orchestrator,
+            provider=provider,
+            chat_service=chat_service,
+        )
 
     @app.get("/")
     async def index() -> Any:
@@ -128,10 +155,20 @@ async def serve_console(
     *,
     host: str = "0.0.0.0",
     port: int = 8080,
+    orchestrator: Orchestrator | None = None,
+    provider: JunesparkProvider | None = None,
+    chat_service: ChatService | None = None,
+    settings: JuneSettings | None = None,
 ) -> None:
     import uvicorn
 
-    app = create_app(hub)
+    app = create_app(
+        hub,
+        orchestrator=orchestrator,
+        provider=provider,
+        chat_service=chat_service,
+        settings=settings,
+    )
     config = uvicorn.Config(app, host=host, port=port, log_level="info")
     server = uvicorn.Server(config)
     await server.serve()

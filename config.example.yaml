@@ -1,0 +1,19 @@
+# Copy to config.yaml (or set JUNE_CONFIG) and adjust for your LAN.
+# Env overlays win: JUNESPARK_BASE_URL, JUNESPARK_API_KEY, JUNESPARK_MODEL, JUNE_* 
+
+junespark:
+  base_url: http://192.168.1.21:8000/v1
+  api_key: junespark
+  # model: optional; omit to pick from GET /v1/models
+  timeout: 120
+
+data_dir: .june-data
+
+console:
+  host: 0.0.0.0
+  port: 8080
+
+chat:
+  max_tool_turns: 4
+  context_token_budget: 6000
+  max_part_bytes: 5000000

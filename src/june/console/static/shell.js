@@ -33,6 +33,7 @@ const MENU_CATALOG = {
       tip: "Open or close workspace panes",
       items: [
         { id: "graph", label: "Graph (main)", action: "view:open:graph" },
+        { id: "chat", label: "Chat", action: "view:toggle:chat" },
         { id: "status", label: "Orchestrator status", action: "view:toggle:status" },
         { id: "activity", label: "Event activity", action: "view:toggle:activity" },
         { id: "events", label: "Event log (list)", action: "view:toggle:events" },
@@ -48,6 +49,7 @@ const MENU_CATALOG = {
       tip: "Active run metadata",
       items: [
         { id: "run-info", label: "Run details…", action: "dialog:run-details" },
+        { id: "chat", label: "Open chat", action: "view:toggle:chat" },
       ],
     },
   ],
@@ -108,6 +110,13 @@ const VIEW_SPECS = {
     naturalHeight: null,
     defaultOpen: false,
   },
+  chat: {
+    title: "Chat",
+    dock: "right",
+    naturalWidth: 380,
+    naturalHeight: null,
+    defaultOpen: true,
+  },
 };
 
 export class JuneConsoleShell {
@@ -119,7 +128,7 @@ export class JuneConsoleShell {
     /** @type {Record<string, string[]>} dock edge → stacked view ids (top is last) */
     this.dockStacks = {
       left: [],
-      right: [],
+      right: ["chat"],
       bottom: ["activity"],
       top: [],
     };
@@ -715,6 +724,28 @@ export class JuneConsoleShell {
             <li><span class="dim-sample">dim</span> finished / trail</li>
             <li>scheme: Bubble Trouble</li>
           </ul>
+        `;
+      }
+      if (id === "chat") {
+        pane.querySelector(".view-body").classList.add("view-body--chat");
+        pane.querySelector(".view-body").innerHTML = `
+          <div class="chat-panel" id="chat-panel">
+            <div class="chat-meta">
+              <label>Model
+                <select id="chat-model"></select>
+              </label>
+              <span id="chat-caps" class="chat-caps"></span>
+              <label id="chat-attach-label" class="chat-attach" hidden>Attach
+                <input id="chat-file" type="file" accept="image/*,audio/*,video/*,*/*" />
+              </label>
+            </div>
+            <div id="chat-messages" class="chat-messages" aria-live="polite"></div>
+            <form id="chat-form" class="chat-form">
+              <textarea id="chat-input" rows="3" placeholder="Message June…"></textarea>
+              <button type="submit" id="chat-send">Send</button>
+            </form>
+            <p id="chat-error" class="chat-error" hidden></p>
+          </div>
         `;
       }
       this.workspace.appendChild(pane);

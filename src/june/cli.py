@@ -6,9 +6,9 @@ import argparse
 import json
 import signal
 import sys
-from pathlib import Path
 
 from june import __version__
+from june.config import JuneSettings, load_settings
 from june.orchestrator import Orchestrator
 from june.scheduler import WakeReason
 
@@ -22,7 +22,12 @@ def app(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--data-dir",
         default=None,
-        help="Durable state directory (JSON store)",
+        help="Durable state directory (JSON store); overrides config data_dir",
+    )
+    parser.add_argument(
+        "--config",
+        default=None,
+        help="Path to config.yaml (default: $JUNE_CONFIG or ./config.yaml)",
     )
     sub = parser.add_subparsers(dest="command")
 
@@ -77,9 +82,21 @@ def app(argv: list[str] | None = None) -> None:
     )
     graph_viz.set_defaults(func=_cmd_graph_viz)
 
-    serve = sub.add_parser("serve", help="Run the web graph console (container entrypoint)")
-    serve.add_argument("--host", default="0.0.0.0")
-    serve.add_argument("--port", type=int, default=8080)
+    serve = sub.add_parser(
+        "serve",
+        help="Run the web graph console (chat + live graph; container entrypoint)",
+    )
+    serve.add_argument(
+        "--host",
+        default=None,
+        help="Bind host (default: console.host from config, else 0.0.0.0)",
+    )
+    serve.add_argument(
+        "--port",
+        type=int,
+        default=None,
+        help="Bind port (default: console.port from config, else 8080)",
+    )
     serve.add_argument(
         "--demo-graph",
         action="store_true",
@@ -94,9 +111,19 @@ def app(argv: list[str] | None = None) -> None:
     args.func(args)
 
 
+def _settings(args: argparse.Namespace) -> JuneSettings:
+    settings = load_settings(getattr(args, "config", None))
+    if args.data_dir:
+        settings = settings.model_copy(update={"data_dir": args.data_dir})
+    return settings
+
+
 def _orch(args: argparse.Namespace) -> Orchestrator:
-    data_dir = Path(args.data_dir) if args.data_dir else None
-    return Orchestrator(data_dir)
+    from june.bootstrap import build_app
+
+    settings = _settings(args)
+    built = build_app(settings)
+    return built[Orchestrator]
 
 
 def _cmd_status(args: argparse.Namespace) -> None:
@@ -188,12 +215,22 @@ def _cmd_serve(args: argparse.Namespace) -> None:
     import os
     import threading
 
+    from june.bootstrap import build_app
+    from june.channels import ChatService
     from june.console.hub import ConsoleHub
     from june.console.runtime import ConsoleRuntime
     from june.console.server import serve_console
+    from june.providers.junespark import JunesparkProvider
 
+    settings = _settings(args)
+    host = args.host or settings.console.host or "0.0.0.0"
+    port = args.port if args.port is not None else (settings.console.port or 8080)
+    settings = settings.model_copy(
+        update={"console": settings.console.model_copy(update={"host": host, "port": port})}
+    )
+    built = build_app(settings)
+    orch = built[Orchestrator]
     hub = ConsoleHub()
-    orch = _orch(args)
     runtime = ConsoleRuntime(orch, hub)
     runtime.refresh_status()
     runtime.start_control_loop()
@@ -219,7 +256,17 @@ def _cmd_serve(args: argparse.Namespace) -> None:
         threading.Thread(target=run_demo, name="june-console-demo", daemon=True).start()
 
     try:
-        asyncio.run(serve_console(hub, host=args.host, port=args.port))
+        asyncio.run(
+            serve_console(
+                hub,
+                host=settings.console.host,
+                port=settings.console.port,
+                orchestrator=orch,
+                provider=built[JunesparkProvider],
+                chat_service=built[ChatService],
+                settings=settings,
+            )
+        )
     finally:
         runtime.stop()
 
