@@ -422,6 +422,12 @@ def _attach_instances(
         if any(i.get("status") == "running" for i in ordered):
             top.status = "running"
             top.execution = "running"
+        elif ordered:
+            # Keep finished buckets lit as "recent" so a quiet 60s run remains
+            # clickable/visible next to a chronically busy 10s stack.
+            top.execution = "recent"
+            if top.status in {"pending", "succeeded", "dim", ""}:
+                top.status = str(ordered[0].get("status") or top.status or "succeeded")
 
 
 def _propagate_running(node: WorldNode) -> bool:

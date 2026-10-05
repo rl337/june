@@ -6,6 +6,7 @@ import argparse
 import json
 import signal
 import sys
+from pathlib import Path
 
 from june import __version__
 from june.config import JuneSettings, load_settings
@@ -220,6 +221,7 @@ def _cmd_serve(args: argparse.Namespace) -> None:
     from june.console.hub import ConsoleHub
     from june.console.runtime import ConsoleRuntime
     from june.console.server import serve_console
+    from june.console.spool import ConsoleSpool
     from june.providers.junespark import JunesparkProvider
 
     settings = _settings(args)
@@ -230,7 +232,14 @@ def _cmd_serve(args: argparse.Namespace) -> None:
     )
     built = build_app(settings)
     orch = built[Orchestrator]
-    hub = ConsoleHub()
+    # Console observability spool: hourly JSONL events + instance checkpoints.
+    # Prefer settings.data_dir, then JUNE_DATA_DIR, then .env/data.
+    data_root = (
+        Path(settings.data_dir)
+        if settings.data_dir
+        else Path(os.environ.get("JUNE_DATA_DIR", ".env/data"))
+    )
+    hub = ConsoleHub(spool=ConsoleSpool(data_root / "console" / "spool"))
     runtime = ConsoleRuntime(orch, hub)
     runtime.refresh_status()
     runtime.start_control_loop()
