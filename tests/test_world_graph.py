@@ -155,6 +155,60 @@ def test_hub_instance_world_endpoint_payload() -> None:
     assert hub.instance_world("missing") is None
 
 
+def test_finished_bucket_stays_recent_when_instances_remain() -> None:
+    checkpoint = _cron_checkpoint()
+    checkpoint["nodes"]["june.console.cron:bucket:60s"]["status"] = "succeeded"
+    pipeline = checkpoint["nodes"]["june.console.cron:bucket:60s"]["subgraph"]
+    instances = [
+        {
+            "run_id": "june.console.cron:60s:done0001",
+            "bucket": "60s",
+            "parent_node_id": "june.console.cron:bucket:60s",
+            "status": "ok",
+            "pipeline": pipeline,
+            "started_at": "2026-01-01T00:00:00+00:00",
+            "finished_at": "2026-01-01T00:00:02+00:00",
+        }
+    ]
+    world = build_world_graph(
+        checkpoint, [], run_id="june.console.cron", instances=instances
+    )
+    bucket = next(n for n in world.nodes if n.id.endswith(":bucket:60s"))
+    assert bucket.execution == "recent"
+    assert any(c.id.endswith("done0001") for c in bucket.children)
+
+
+def test_hub_keeps_finished_instances_per_bucket() -> None:
+    from june.console.hub import ConsoleHub
+
+    hub = ConsoleHub()
+    pipeline = {"id": "p", "goal": "t", "nodes": {}, "edges": []}
+    # Flood 10s finished runs past the old global cap of 6.
+    for i in range(8):
+        rid = f"june.console.cron:10s:keep{i:04d}"
+        hub.begin_instance(
+            run_id=rid,
+            bucket="10s",
+            parent_node_id="june.console.cron:bucket:10s",
+            pipeline=pipeline,
+        )
+        hub.complete_instance(run_id=rid, status="ok", pipeline=pipeline)
+    hub.begin_instance(
+        run_id="june.console.cron:60s:keepme01",
+        bucket="60s",
+        parent_node_id="june.console.cron:bucket:60s",
+        pipeline=pipeline,
+    )
+    hub.complete_instance(
+        run_id="june.console.cron:60s:keepme01", status="ok", pipeline=pipeline
+    )
+    snap = hub.snapshot().to_dict()
+    ids = {i["run_id"] for i in snap["instances"]}
+    assert "june.console.cron:60s:keepme01" in ids
+    ten = [i for i in snap["instances"] if i["bucket"] == "10s"]
+    assert len(ten) == 4  # per-bucket finished cap
+
+
 def test_hub_instance_node_detail() -> None:
     from june.console.hub import ConsoleHub
 

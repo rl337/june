@@ -17,6 +17,16 @@ const viewport = new GraphViewport(canvas, {
   onStackBadge: (node) => {
     shell.openInstanceStackDialog(node);
   },
+  onStackCard: (node) => {
+    const runId = node?.id;
+    if (!runId) return;
+    // Selecting alone only updates the structure scene (unknown for instances).
+    // Open the live/finished subgraph watch so 60s runs stay inspectable.
+    void shell.openInstanceWatchDialog(runId, { GraphViewport });
+    if (viewport._index?.has(runId)) {
+      viewport.select(runId, { zoomToward: true });
+    }
+  },
 });
 
 shell.on("instance:watch", ({ runId }) => {

@@ -7,10 +7,11 @@ const CONTENT_REVEAL_PX = 110; // screen height before interiors show
 const LABEL_MIN_PX = 10;
 
 export class GraphViewport {
-  constructor(svg, { onSelectNode, onStackBadge } = {}) {
+  constructor(svg, { onSelectNode, onStackBadge, onStackCard } = {}) {
     this.svg = svg;
     this.onSelectNode = onSelectNode;
     this.onStackBadge = onStackBadge;
+    this.onStackCard = onStackCard;
     this.world = null;
     this.selectedId = null;
     this.zoom = 1;
@@ -238,6 +239,9 @@ export class GraphViewport {
         onStackBadge: (n) => {
           if (this.onStackBadge) this.onStackBadge(n);
         },
+        onStackCard: (n) => {
+          if (this.onStackCard) this.onStackCard(n);
+        },
       });
     });
 
@@ -288,10 +292,16 @@ function drawNodeTree(layer, node, ctx) {
   const absX = ctx.absX;
   const absY = ctx.absY;
   const screenH = node.h * ctx.zoom;
-  const reveal = screenH >= CONTENT_REVEAL_PX && (node.children || []).length > 0;
+  const role = node.stack_role || "";
+  // Stacked instance cards are entry points to the watch dialog — keep them
+  // collapsed on the main graph so nested steps cannot steal the click.
+  const reveal =
+    role !== "front" &&
+    role !== "back" &&
+    screenH >= CONTENT_REVEAL_PX &&
+    (node.children || []).length > 0;
   const selected = ctx.selectedId === node.id;
   const running = subtreeRunning(node);
-  const role = node.stack_role || "";
 
   const g = el("g", {
     class: `graph-node node ${running ? "running" : node.execution || "pending"}${
@@ -314,16 +324,29 @@ function drawNodeTree(layer, node, ctx) {
     });
     g.addEventListener("click", openStack);
     g.addEventListener("dblclick", openStack);
+  } else if (role === "front" || role === "back") {
+    // Stacked instance cards: open that run's watch view (not just select).
+    const openCard = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (ctx.onStackCard) ctx.onStackCard(node);
+      else if (ctx.onSelect) ctx.onSelect(node.id);
+    };
+    g.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      openCard(e);
+    });
+    g.addEventListener("click", openCard);
+    g.addEventListener("dblclick", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (ctx.onStackBadge) ctx.onStackBadge(node);
+      else openCard(e);
+    });
   } else {
     g.addEventListener("click", (e) => {
       e.stopPropagation();
       ctx.onSelect(node.id);
-    });
-    g.addEventListener("dblclick", (e) => {
-      e.stopPropagation();
-      if ((role === "front" || role === "back") && ctx.onStackBadge) {
-        ctx.onStackBadge(node);
-      }
     });
   }
 
@@ -408,6 +431,7 @@ function drawNodeTree(layer, node, ctx) {
         selectedId: ctx.selectedId,
         onSelect: ctx.onSelect,
         onStackBadge: ctx.onStackBadge,
+        onStackCard: ctx.onStackCard,
       });
     }
     g.appendChild(inner);
@@ -425,6 +449,7 @@ function drawNodeTree(layer, node, ctx) {
         selectedId: ctx.selectedId,
         onSelect: ctx.onSelect,
         onStackBadge: ctx.onStackBadge,
+        onStackCard: ctx.onStackCard,
       });
       g.appendChild(inner);
     }
