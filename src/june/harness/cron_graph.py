@@ -109,11 +109,19 @@ def build_console_cron_graph(run_id: str | None = None) -> Any:
         goal="cron",
         payload={"firmness": "soft"},
     )
+    chat = GraphNode(
+        id=f"{rid}:chat",
+        kind="subgraph",
+        goal="chat",
+        payload={"firmness": "soft", "channel": "webapp", "template": "june.chat"},
+        subgraph=_chat_pipeline_template(rid),
+    )
 
-    # Left-to-right: cron → 10s → 60s for a cleaner zoom path.
+    # Left-to-right: cron → 10s → 60s, with chat as a parallel soft lane.
     graph.add_node(cron_hub)
     graph.add_node(bucket_10s)
     graph.add_node(bucket_60s)
+    graph.add_node(chat)
     graph.add_dependency(
         DependencyEdge(
             from_node=cron_hub.id,
@@ -130,7 +138,63 @@ def build_console_cron_graph(run_id: str | None = None) -> Any:
             reason="minute rollup after short ticks",
         )
     )
+    graph.add_dependency(
+        DependencyEdge(
+            from_node=cron_hub.id,
+            to_node=chat.id,
+            types=["control"],
+            reason="interactive chat lane",
+        )
+    )
     return graph
+
+
+CHAT_PARENT_NODE_ID = f"{CONSOLE_CRON_RUN_ID}:chat"
+
+
+def _chat_pipeline_template(rid: str) -> dict[str, Any]:
+    """Structure template for the incubating june.chat phases."""
+    from mechaharness.graph import DependencyEdge, ExecutionGraph, GraphNode
+
+    steps = (
+        ("refine", "june.chat.refine_input", "refine input"),
+        ("context", "june.chat.context_optimize", "context optimize"),
+        ("tools", "june.chat.tool_loop", "tool loop"),
+        ("render", "june.chat.render_reply", "render reply"),
+    )
+    sub = ExecutionGraph(id=f"{rid}:chat:pipeline", goal="june.chat")
+    prev: str | None = None
+    for key, kind, title in steps:
+        node_id = f"{rid}:chat:step:{key}"
+        sub.add_node(
+            GraphNode(
+                id=node_id,
+                kind=kind,
+                goal=title,
+                payload={"firmness": "soft", "phase": key},
+            )
+        )
+        if prev is not None:
+            sub.add_dependency(
+                DependencyEdge(
+                    from_node=prev,
+                    to_node=node_id,
+                    types=["control"],
+                    reason="chat phase",
+                )
+            )
+        prev = node_id
+    return sub.checkpoint()
+
+
+def new_chat_run_id() -> str:
+    return f"{CONSOLE_CRON_RUN_ID}:chat:{uuid4().hex[:8]}"
+
+
+def chat_pipeline_for_instance(instance_id: str) -> dict[str, Any]:
+    """Clone the chat phase template with instance-scoped node ids."""
+    template = _chat_pipeline_template(CONSOLE_CRON_RUN_ID)
+    return clone_pipeline_for_instance(template, instance_id)
 
 
 def new_bucket_run_id(bucket: str) -> str:

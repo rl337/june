@@ -33,6 +33,7 @@ def mount_chat_routes(
     orchestrator: Orchestrator,
     provider: JunesparkProvider,
     chat_service: ChatService,
+    hub: Any | None = None,
 ) -> None:
     """Attach /api/health, /api/models, /api/chat, upload routes to an existing app."""
     if JSONResponse is None:
@@ -90,7 +91,7 @@ def mount_chat_routes(
             history=list(body.get("history") or []),
         )
         try:
-            reply = chat_service.handle(message)
+            reply = _handle_chat_with_console(hub, orchestrator, chat_service, message)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except Exception as exc:  # noqa: BLE001
@@ -167,3 +168,62 @@ def mount_chat_routes(
         return JSONResponse(
             {"id": ref.id, "title": ref.title, "media_type": ref.media_type, "text": payload}
         )
+
+
+def _handle_chat_with_console(
+    hub: Any | None,
+    orchestrator: Orchestrator,
+    chat_service: ChatService,
+    message: ChannelMessage,
+) -> Any:
+    """Run chat and mirror phases onto the console graph when a hub is present."""
+    runner = orchestrator.chat_runner
+    if hub is None or runner is None:
+        return chat_service.handle(message)
+
+    from june.harness.cron_graph import (
+        CHAT_PARENT_NODE_ID,
+        chat_pipeline_for_instance,
+        new_chat_run_id,
+    )
+
+    run_id = new_chat_run_id()
+    pipeline = chat_pipeline_for_instance(run_id)
+    hub.begin_instance(
+        run_id=run_id,
+        bucket="chat",
+        parent_node_id=CHAT_PARENT_NODE_ID,
+        pipeline=pipeline,
+    )
+    hub.mark_bucket_running(CHAT_PARENT_NODE_ID)
+
+    phase_keys = ("refine", "context", "tools", "render")
+
+    def _set_phase_status(phase: str, status: str) -> None:
+        node_id = f"{run_id}:step:{phase}"
+        nodes = pipeline.get("nodes")
+        if isinstance(nodes, dict) and node_id in nodes and isinstance(nodes[node_id], dict):
+            nodes[node_id]["status"] = status
+        hub.set_instance_progress(run_id, active_node_id=node_id, pipeline=pipeline)
+
+    def on_phase(phase: str, _state: Any) -> None:
+        # Mark prior phases succeeded, current running.
+        for key in phase_keys:
+            if key == phase:
+                _set_phase_status(key, "running")
+                break
+            _set_phase_status(key, "succeeded")
+
+    try:
+        reply = runner.run(message, on_phase=on_phase)
+        for key in phase_keys:
+            _set_phase_status(key, "succeeded")
+        # Prefer console-scoped run id so the graph stack matches the reply.
+        reply.run_id = run_id
+        hub.complete_instance(run_id=run_id, status="ok", pipeline=pipeline)
+        hub.mark_bucket_succeeded(CHAT_PARENT_NODE_ID)
+        return reply
+    except Exception:
+        hub.complete_instance(run_id=run_id, status="failed", pipeline=pipeline)
+        hub.mark_bucket_failed(CHAT_PARENT_NODE_ID, error="chat turn failed")
+        raise

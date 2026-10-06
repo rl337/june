@@ -59,6 +59,7 @@ def create_app(
             orchestrator=orchestrator,
             provider=provider,
             chat_service=chat_service,
+            hub=hub,
         )
 
     @app.get("/")

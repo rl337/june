@@ -19,12 +19,17 @@ def test_cron_graph_has_timed_10s_pipeline() -> None:
     assert graph.id == CONSOLE_CRON_RUN_ID
     assert f"{CONSOLE_CRON_RUN_ID}:bucket:10s" in graph.nodes
     assert f"{CONSOLE_CRON_RUN_ID}:bucket:60s" in graph.nodes
+    assert f"{CONSOLE_CRON_RUN_ID}:chat" in graph.nodes
     bucket = graph.nodes[f"{CONSOLE_CRON_RUN_ID}:bucket:10s"]
     assert bucket.subgraph is not None
     sub_nodes = bucket.subgraph.get("nodes") or {}
     kinds = {raw.get("kind") for raw in sub_nodes.values() if isinstance(raw, dict)}
     assert kinds == {"june.timed_log"}
     assert len(sub_nodes) == len(BUCKET_10S_STEPS)
+    chat = graph.nodes[f"{CONSOLE_CRON_RUN_ID}:chat"]
+    assert chat.subgraph is not None
+    chat_nodes = chat.subgraph.get("nodes") or {}
+    assert len(chat_nodes) == 4
 
 
 def test_clone_pipeline_scopes_instance_ids() -> None:

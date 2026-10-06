@@ -56,12 +56,23 @@ class ChatGraphRunner:
         self.documents = documents
         self.knowledge = knowledge
 
-    def run(self, message: ChannelMessage) -> ChannelReply:
+    def run(
+        self,
+        message: ChannelMessage,
+        *,
+        on_phase: Any | None = None,
+    ) -> ChannelReply:
         state = ChatGraphState(message=message)
-        self.refine_input(state)
-        self.context_optimize(state)
-        self.tool_loop(state)
-        self.render_reply(state)
+        phases = (
+            ("refine", self.refine_input),
+            ("context", self.context_optimize),
+            ("tools", self.tool_loop),
+            ("render", self.render_reply),
+        )
+        for phase, fn in phases:
+            if on_phase is not None:
+                on_phase(phase, state)
+            fn(state)
         return ChannelReply(
             parts=state.reply_parts,
             run_id=state.run_id,

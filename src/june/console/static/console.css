@@ -202,13 +202,15 @@ body {
   animation: slide-in-left var(--transition-pane);
 }
 
-.view-pane[data-view="status"] {
+.view-pane[data-view="status"],
+.view-pane[data-view="chat"] {
   grid-column: 5;
   grid-row: 1;
   transform-origin: right center;
 }
 
-.view-pane[data-view="status"].is-open {
+.view-pane[data-view="status"].is-open,
+.view-pane[data-view="chat"].is-open {
   animation: slide-in-right var(--transition-pane);
 }
 
