@@ -251,7 +251,38 @@ class ConsoleHub:
             self._run_id = run_id
             self._run_status = status
             if checkpoint:
-                self._checkpoint = checkpoint
+                if self._structure_checkpoint:
+                    # Ephemeral top-level runs (e.g. --demo-graph) must not replace
+                    # the console structure that hosts stacked cron/chat instances.
+                    self._checkpoint = dict(self._structure_checkpoint)
+                    if self._selected_node_id not in {None, ROOT_SCENE_ID}:
+                        nodes = self._checkpoint.get("nodes")
+                        if not isinstance(nodes, dict) or self._selected_node_id not in nodes:
+                            self._selected_node_id = ROOT_SCENE_ID
+                else:
+                    self._checkpoint = checkpoint
+            self._publish()
+
+    def set_instance_progress(
+        self,
+        run_id: str,
+        *,
+        active_node_id: str | None = None,
+        pipeline: dict[str, Any] | None = None,
+        status: str | None = None,
+    ) -> None:
+        """Update a live instance's focus/pipeline without a MechaHarness event."""
+        with self._lock:
+            inst = self._instances.get(run_id)
+            if inst is None:
+                return
+            if active_node_id is not None:
+                inst["active_node_id"] = active_node_id
+            if pipeline is not None:
+                inst["pipeline"] = pipeline
+            if status is not None:
+                inst["status"] = status
+            self._spool_instance(inst)
             self._publish()
 
     def snapshot(self) -> ConsoleSnapshot:

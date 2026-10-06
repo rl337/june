@@ -67,6 +67,31 @@ class TemplateRegistry:
                 soft_points=[asdict(SoftPoint("bindings", "June task bindings"))],
             )
         )
+        self.register(
+            GraphTemplateSpec(
+                name="june.chat",
+                description=(
+                    "Interactive chat subgraph: refine input, optimize context, "
+                    "tool loop, render multimodal reply"
+                ),
+                status=TemplateStatus.INCUBATING,
+                node_kinds=[
+                    "june.chat.refine_input",
+                    "june.chat.context_optimize",
+                    "june.chat.tool_loop",
+                    "june.chat.render_reply",
+                ],
+                soft_points=[
+                    asdict(SoftPoint("model", "Junespark served model id")),
+                    asdict(SoftPoint("tools", "June tool registry")),
+                    asdict(SoftPoint("context", "Documents / KG providers")),
+                    asdict(SoftPoint("budget", "Subgraph BudgetPolicy")),
+                    asdict(SoftPoint("prompts", "System / skills prompts")),
+                    asdict(SoftPoint("media", "Multimodal encoders / renderers")),
+                ],
+                provenance={"owns": "june", "entry": "ChatService"},
+            )
+        )
 
     def register(self, spec: GraphTemplateSpec) -> GraphTemplateSpec:
         self._templates[spec.name] = spec

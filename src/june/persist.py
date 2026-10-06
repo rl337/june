@@ -21,7 +21,8 @@ class JsonStore:
         path = self._path(collection)
         if not path.exists():
             return {}
-        return json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
 
     def save(self, collection: str, data: dict[str, Any]) -> None:
         path = self._path(collection)

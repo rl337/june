@@ -17,7 +17,7 @@ def _cron_checkpoint():
 def test_world_graph_sizes_buckets_by_subgraph_content() -> None:
     checkpoint = _cron_checkpoint()
     world = build_world_graph(checkpoint, [], run_id="june.console.cron")
-    assert len(world.nodes) == 3
+    assert len(world.nodes) == 4
     by_id = {n.id: n for n in world.nodes}
     bucket = by_id["june.console.cron:bucket:10s"]
     leaf = by_id["june.console.cron:cron"]
@@ -256,7 +256,38 @@ def test_world_included_in_hub_snapshot() -> None:
     hub.set_structure_checkpoint(_cron_checkpoint())
     snap = hub.snapshot().to_dict()
     assert "world" in snap
-    assert len(snap["world"]["nodes"]) == 3
+    assert len(snap["world"]["nodes"]) == 4
+
+
+def test_complete_run_preserves_structure_checkpoint() -> None:
+    from june.console.hub import ConsoleHub
+
+    hub = ConsoleHub()
+    hub.set_structure_checkpoint(_cron_checkpoint())
+    hub.complete_run(
+        run_id="demo-run",
+        status="succeeded",
+        checkpoint={
+            "id": "demo-run",
+            "goal": "console demo",
+            "nodes": {
+                "demo-run:0": {
+                    "id": "demo-run:0",
+                    "kind": "june.task",
+                    "goal": "console demo",
+                    "status": "succeeded",
+                    "payload": {},
+                }
+            },
+            "edges": [],
+        },
+    )
+    snap = hub.snapshot().to_dict()
+    ids = {n["id"] for n in snap["world"]["nodes"]}
+    assert "june.console.cron:bucket:10s" in ids
+    assert "june.console.cron:chat" in ids
+    assert "demo-run:0" not in ids
+    assert snap["status"] == "succeeded"
     assert "event_rate" in snap
     assert "bins" in snap["event_rate"]
     assert "instances" in snap

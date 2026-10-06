@@ -5,10 +5,12 @@ from __future__ import annotations
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 from june.advisor import AdvisorOrchestrator
+from june.channels import ChannelMessage, ChannelReply, ContentPart
+from june.chat import CHAT_TEMPLATE
 from june.control import ControlGraph, WorkQueue
 from june.documents import DocumentStore
 from june.dreaming import DreamingService
@@ -23,13 +25,25 @@ from june.runner import TaskOutcome, TaskRunner
 from june.scheduler import RunnableWork, Scheduler, ScheduleSpec, WakeReason
 from june.templates import GraphTemplateSpec, SoftPoint, TemplateRegistry, TemplateStatus
 
+if TYPE_CHECKING:
+    from june.chat import ChatGraphRunner
+    from june.config import JuneSettings
+    from june.providers.junespark import JunesparkProvider
+    from june.tools import ToolRegistry
+
 
 class Orchestrator:
     """Application brain: goals, schedule, issues, policy, MechaHarness binding."""
 
-    def __init__(self, data_dir: Path | str | None = None) -> None:
+    def __init__(
+        self,
+        data_dir: Path | str | None = None,
+        *,
+        settings: JuneSettings | None = None,
+    ) -> None:
         store = JsonStore(data_dir) if data_dir is not None else None
         self.store = store
+        self.settings = settings
         self.goals = GoalStore(store)
         self.issues = IssueTracker(store)
         self.documents = DocumentStore(store)
@@ -42,6 +56,9 @@ class Orchestrator:
         self.dreaming = DreamingService(store)
         self.outcomes = OutcomeLedger(store)
         self.client = MechaHarnessClient()
+        self.provider: JunesparkProvider | None = None
+        self.tools: ToolRegistry | None = None
+        self.chat_runner: ChatGraphRunner | None = None
         self.runner = TaskRunner(
             client=self.client,
             goals=self.goals,
@@ -53,6 +70,7 @@ class Orchestrator:
             scheduler=self.scheduler,
             advisor=self.advisor,
             outcomes=self.outcomes,
+            chat_runner=None,
         )
         self.control = ControlGraph(
             queue=WorkQueue(store),
@@ -61,6 +79,50 @@ class Orchestrator:
             on_execute_work=self._on_execute_work,
         )
         self._ensure_control_template()
+
+    def attach_chat(
+        self,
+        *,
+        provider: JunesparkProvider,
+        tools: ToolRegistry,
+        chat_runner: ChatGraphRunner,
+    ) -> None:
+        self.provider = provider
+        self.tools = tools
+        self.chat_runner = chat_runner
+        self.runner.chat_runner = chat_runner
+
+    def handle_chat(self, message: ChannelMessage) -> ChannelReply:
+        """Process a channel message through the incubating june.chat subgraph."""
+        work = RunnableWork(
+            goal_id=None,
+            issue_id=None,
+            reason=WakeReason.EVENT,
+            payload={
+                "action": "chat",
+                "template": CHAT_TEMPLATE,
+                "channel_message": message.to_dict(),
+                "task": message.text() or "chat",
+            },
+        )
+        outcome = self.runner.run(work)
+        reply_raw = outcome.result.get("reply") or {}
+        if isinstance(reply_raw, dict) and reply_raw.get("parts") is not None:
+            return ChannelReply(
+                parts=[ContentPart.from_dict(p) for p in reply_raw.get("parts") or []],
+                run_id=outcome.run_id or reply_raw.get("run_id"),
+                model=reply_raw.get("model"),
+                tool_trace=list(reply_raw.get("tool_trace") or []),
+                notes=list(reply_raw.get("notes") or []),
+                raw={"outcome_status": outcome.status, **dict(reply_raw.get("raw") or {})},
+            )
+        text = str(reply_raw.get("text") if isinstance(reply_raw, dict) else reply_raw or "")
+        return ChannelReply(
+            parts=[ContentPart.text_part(text or f"chat status={outcome.status}")],
+            run_id=outcome.run_id,
+            model=None,
+            notes=[f"decision={outcome.decision}"],
+        )
 
     def _ensure_control_template(self) -> None:
         if self.templates.get(ControlGraph.GRAPH_NAME) is not None:
@@ -195,17 +257,25 @@ class Orchestrator:
         )
 
     def status(self) -> dict[str, Any]:
+        junespark: dict[str, Any] = {}
+        if self.settings is not None:
+            junespark = {
+                "base_url": self.settings.junespark.base_url,
+                "model": self.settings.junespark.model,
+                "configured": bool(self.settings.junespark.base_url),
+            }
         return {
             "goals": len(self.goals.list()),
             "active_goals": len(self.goals.list(status=GoalStatus.ACTIVE)),
             "issues": len(self.issues.list()),
             "pending_work": len(self.scheduler.pending()),
             "control": self.control.describe(),
-            "templates": [t.name for t in self.templates.list()],
+            "templates": [spec.name for spec in self.templates.list()],
             "promotion_candidates": [
-                t.name for t in self.templates.candidates_for_promotion()
+                spec.name for spec in self.templates.candidates_for_promotion()
             ],
             "outcomes": self.outcomes.summary(),
             "policy_version": self.policy.version,
             "mechaharness": self.client.connect(),
+            "junespark": junespark,
         }

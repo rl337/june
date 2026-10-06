@@ -48,12 +48,18 @@ pip install -U pip setuptools wheel
 pip install -e ".[dev]"
 # Optional MechaHarness client dependency (BudgetPolicy / GraphExecutor):
 # pip install -e ".[harness]"   # mechaharness>=0.2.0
-# Web graph console:
+# Web graph console + chat:
 # pip install -e ".[harness,console]"
+cp config.example.yaml config.yaml   # set junespark.base_url
 june status
 june goal-create "First vertical slice" --criteria "runner writes goal/issue state"
 pytest
 ```
+
+Configuration is layered: `config.yaml` then `.env` / process env
+(`JUNESPARK_BASE_URL`, `JUNESPARK_API_KEY`, `JUNESPARK_MODEL`, `JUNE_*`).
+Point `--config` or `$JUNE_CONFIG` at a yaml file. File→`pyiv.Config` binding
+is June-prototyped for now.
 
 ## Control graph entrypoint
 
@@ -77,10 +83,19 @@ The console renders MechaHarness execution as a **scene** with **foreground**
 (context, bindings, advisor material as soft round-rect nodes). The active node
 glows; recently finished nodes dim as execution moves.
 
+A right-docked **Chat** pane sends turns through shared channel intake
+(`ChatService` → incubating `june.chat`: refine → context → tool loop → render)
+against the configured junespark OpenAI-compat endpoint. Telegram/Discord
+adapters stay stubbed but can reuse the same `ChannelMessage` / `ChannelReply`
+types later.
+
 ```bash
+# Operator-side (not June): load a reason profile on junespark first
+# ~/dev/home_network/junespark/inference/infer load reason-fast
+
 pip install -e ".[container]"
-june serve --demo-graph
-# open http://localhost:8080
+june --config config.yaml serve --demo-graph
+# open http://localhost:8080  (Chat dock + Graph)
 ```
 
 Docker:
@@ -93,6 +108,7 @@ Environment:
 
 - `JUNE_DATA_DIR` — durable JSON state (default in container: `/data`)
 - `JUNE_CONSOLE_DEMO=1` — run a sample graph on startup
+- `JUNESPARK_BASE_URL` — OpenAI-compat base (e.g. `http://192.168.1.21:8000/v1`)
 
 Task payloads may set `execute_graph: true` so the task runner drives a live
 `GraphExecutor` run (events stream to the console when using `june serve`).
@@ -120,6 +136,7 @@ june --data-dir /tmp/june-data dream
 | Documents / KG / issues / goals | ContextProvider protocol, checkpoints, traces |
 | Product autonomy & Advisor triggers | CapabilityEnvelope, Advisor interface |
 | Concrete template bindings | Reusable parameterized templates |
+| Channel intake + june.chat realization | Generic graph execution / budgets |
 
 See the inspiration doc for requirements language and the monitoring protocol
 for how this boundary evolves.
