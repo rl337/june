@@ -16,16 +16,17 @@ not a second harness.
 
 **June:** scheduler, task runner, documents, knowledge graph, issues, persistent
 goals, application policy, provider implementations, concrete graph realization
-and template selection/binding/composition.
+and Agentic Recipe selection/binding/tiling/composition.
 
 **MechaHarness:** reusable primitives/protocols, graph semantics/linkage,
 capability/context/verification/delegation/advisor interfaces, checkpoints,
-generic eval/observability, parameterized `GraphTemplate` definitions.
+generic eval/observability, parameterized `GraphTemplate` / Agentic Recipe
+definitions.
 
-A MechaHarness template is abstract. June fills soft points (tools, providers,
-prompts/skills, model choices, budgets, persistence adapters, goal/issue state,
-policies). The resulting executable graph belongs in June even though
-MechaHarness validates and runs it.
+An Agentic Recipe is a named control pattern on the `GraphTemplate` substrate.
+June fills soft points (tools, providers, prompts/skills, model choices,
+budgets, persistence adapters, goal/issue state, policies). The resulting
+executable graph belongs in June even though MechaHarness validates and runs it.
 
 ## Working rules
 
@@ -34,10 +35,12 @@ MechaHarness validates and runs it.
   MechaHarness. Do not premature-generalize.
 - Do not open a June PR merely because MechaHarness changed; only when June-side
   consumption/policy requirements change.
+- MechaHarness call sites SHOULD read as recipe bind + run; remaining host
+  boilerplate belongs in `docs/requirements/mechaharness-host-friction.md`.
 - Keep dependencies lean. Inference backends, GPU containers, and messaging
   infrastructure are out of scope for this repository.
 
 ## First vertical slice
 
-Persistent goal + scheduler wake → task runner → bind MechaHarness template →
+Persistent goal + scheduler wake → task runner → bind MechaHarness recipe →
 translate results back into goal/issue state.

@@ -149,8 +149,20 @@ def build_graph_executor(
     grants: list[str] | None = None,
     on_event: Callable[[Any], None] | None = None,
     on_console_log: Callable[[dict[str, Any]], None] | None = None,
+    checkpoint_path: str | None = None,
+    runners: Any | None = None,
 ) -> tuple[Any, Any]:
-    """Return ``(executor, event_log)`` wired for June child-graph runs."""
+    """Return ``(executor, event_log)`` wired for June child-graph runs.
+
+    When ``checkpoint_path`` is set, use durable SQLite checkpoints; otherwise
+    an ephemeral EventLog-backed store (fine for tests / short demos).
+
+    Prefer ``mechaharness.host_kit.host_graph_executor`` for new paths that do
+    not need event tapping (remote-task dispatch already does). This hand-wired
+    helper remains for ``MechaHarnessClient`` / console event taps — see
+    ``docs/requirements/mechaharness-host-friction.md`` HF-01 / HF-05.
+    """
+    from mechaharness.checkpoint_store import EventLogCheckpointStore
     from mechaharness.core.access import (
         AccessPolicy,
         GraphEscalate,
@@ -159,6 +171,8 @@ def build_graph_executor(
     )
     from mechaharness.core.environment import NoOpInferenceEnvironment
     from mechaharness.core.events import InMemoryEventLog
+    from mechaharness.external_effect import NoopCrashProbe
+    from mechaharness.graph import GraphStore
     from mechaharness.graph_executor import (
         DefaultGraphFailurePolicy,
         GraphExecutor,
@@ -173,21 +187,39 @@ def build_graph_executor(
         GraphEscalate.key(),
         *(grants or []),
     }
-    access = InMemoryAccessControl(event_log, AccessPolicy(grants=sorted(grant_keys)))
-    runners = _june_runner_registry(on_console_log=on_console_log)
+    access = InMemoryAccessControl(
+        event_log,  # type: ignore[arg-type]
+        AccessPolicy(grants=sorted(grant_keys)),
+    )
+    runner_registry = runners if runners is not None else _june_runner_registry(
+        on_console_log=on_console_log
+    )
     linkage = DefaultLinkageResolver(
-        runners,
+        runner_registry,
         access,
         NoOpInferenceEnvironment(),
         require_execute_grant=True,
     )
+    if checkpoint_path:
+        from mechaharness.sqlite_checkpoint_store import SqliteCheckpointStore
+
+        checkpoint_store: Any = SqliteCheckpointStore(checkpoint_path)
+    else:
+        checkpoint_store = EventLogCheckpointStore(
+            GraphStore(store, agent_id="june"),
+            event_log=store,
+            agent_id="june",
+        )
+    # TappingEventLog mirrors EventLog; MH types expect the Protocol.
     executor = GraphExecutor(
-        event_log,
+        event_log,  # type: ignore[arg-type]
         access,
-        runners,
+        runner_registry,
         DefaultGraphFailurePolicy(),
         RejectGraphEscalation(),
         linkage,
+        checkpoint_store,
+        NoopCrashProbe(),
         agent_id="june",
     )
     return executor, event_log
@@ -199,12 +231,17 @@ def run_graph(
     *,
     on_event: Callable[[Any], None] | None = None,
     on_console_log: Callable[[dict[str, Any]], None] | None = None,
+    checkpoint_path: str | None = None,
+    runners: Any | None = None,
+    resume: bool = False,
 ) -> Any:
     """Execute ``graph`` with June's default runners and budget policy."""
     executor, _event_log = build_graph_executor(
         grants=run.grants,
         on_event=on_event,
         on_console_log=on_console_log,
+        checkpoint_path=checkpoint_path,
+        runners=runners,
     )
     budget_policy = run.budget.to_mechaharness()
 
@@ -213,6 +250,7 @@ def run_graph(
             graph,
             budget_policy=budget_policy,
             run_id=run.run_id,
+            resume=resume,
         )
 
     return asyncio.run(_run())

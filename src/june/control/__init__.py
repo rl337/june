@@ -25,6 +25,9 @@ class ControlJobKind(str, Enum):
     POLL_DISCORD = "control.poll_discord"
     POLL_WEBAPP = "control.poll_webapp"
     EXECUTE_WORK = "control.execute_work"
+    DISPATCH_REMOTE_TASK = "control.dispatch_remote_task"
+    OBSERVE_REMOTE_TASK = "control.observe_remote_task"
+    RECONCILE_REMOTE_TASKS = "control.reconcile_remote_tasks"
 
 
 @dataclass(order=True)
@@ -188,6 +191,9 @@ class ControlGraph:
         ControlJobKind.POLL_DISCORD.value,
         ControlJobKind.POLL_WEBAPP.value,
         ControlJobKind.EXECUTE_WORK.value,
+        ControlJobKind.DISPATCH_REMOTE_TASK.value,
+        ControlJobKind.OBSERVE_REMOTE_TASK.value,
+        ControlJobKind.RECONCILE_REMOTE_TASKS.value,
     ]
 
     def __init__(
@@ -199,6 +205,9 @@ class ControlGraph:
         poll_interval_seconds: float = MAX_TICK_SECONDS,
         on_cron_tick: Callable[[], list[dict[str, Any]]] | None = None,
         on_execute_work: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+        on_dispatch_remote_task: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+        on_observe_remote_task: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
+        on_reconcile_remote_tasks: Callable[[dict[str, Any]], dict[str, Any]] | None = None,
         pollers: dict[str, ChannelPoller] | None = None,
         sleeper: Callable[[float], None] = time.sleep,
         clock: Callable[[], datetime] | None = None,
@@ -208,6 +217,9 @@ class ControlGraph:
         self.poll_interval_seconds = poll_interval_seconds
         self.on_cron_tick = on_cron_tick
         self.on_execute_work = on_execute_work
+        self.on_dispatch_remote_task = on_dispatch_remote_task
+        self.on_observe_remote_task = on_observe_remote_task
+        self.on_reconcile_remote_tasks = on_reconcile_remote_tasks
         self.pollers = pollers or {
             ControlJobKind.POLL_TELEGRAM.value: NullPoller("telegram"),
             ControlJobKind.POLL_DISCORD.value: NullPoller("discord"),
@@ -216,6 +228,7 @@ class ControlGraph:
         self.sleeper = sleeper
         self.clock = clock or (lambda: datetime.now(timezone.utc))
         self._started = False
+        self._reconcile_scheduled = False
 
     def bootstrap(self) -> None:
         """Ensure the recurring control nodes are on the queue."""
@@ -237,6 +250,14 @@ class ControlGraph:
                 recurring_every_seconds=self.poll_interval_seconds,
                 job_id=f"control:{kind.value}",
             )
+        if not self._reconcile_scheduled:
+            self.queue.schedule(
+                ControlJobKind.RECONCILE_REMOTE_TASKS,
+                run_at=now,
+                payload={},
+                job_id="control:reconcile_remote_tasks",
+            )
+            self._reconcile_scheduled = True
         self._started = True
 
     def schedule_work(
@@ -249,6 +270,34 @@ class ControlGraph:
             ControlJobKind.EXECUTE_WORK,
             run_at=run_at or self.clock(),
             payload=payload,
+        )
+
+    def schedule_remote_dispatch(
+        self,
+        task_id: str,
+        *,
+        run_at: datetime | None = None,
+    ) -> TimedJob:
+        return self.queue.schedule(
+            ControlJobKind.DISPATCH_REMOTE_TASK,
+            run_at=run_at or self.clock(),
+            payload={"task_id": task_id},
+            job_id=f"remote-dispatch:{task_id}",
+        )
+
+    def schedule_remote_observe(
+        self,
+        task_id: str,
+        *,
+        run_at: datetime | None = None,
+        delay_seconds: float = 0.05,
+    ) -> TimedJob:
+        when = run_at or (self.clock() + timedelta(seconds=delay_seconds))
+        return self.queue.schedule(
+            ControlJobKind.OBSERVE_REMOTE_TASK,
+            run_at=when,
+            payload={"task_id": task_id},
+            job_id=f"remote-observe:{task_id}",
         )
 
     def _reschedule_if_recurring(self, job: TimedJob) -> None:
@@ -273,6 +322,18 @@ class ControlGraph:
             if self.on_execute_work is None:
                 return {"kind": job.kind, "status": "no_handler", "payload": job.payload}
             return {"kind": job.kind, "outcome": self.on_execute_work(job.payload)}
+        if job.kind == ControlJobKind.DISPATCH_REMOTE_TASK.value:
+            if self.on_dispatch_remote_task is None:
+                return {"kind": job.kind, "status": "no_handler", "payload": job.payload}
+            return {"kind": job.kind, "outcome": self.on_dispatch_remote_task(job.payload)}
+        if job.kind == ControlJobKind.OBSERVE_REMOTE_TASK.value:
+            if self.on_observe_remote_task is None:
+                return {"kind": job.kind, "status": "no_handler", "payload": job.payload}
+            return {"kind": job.kind, "outcome": self.on_observe_remote_task(job.payload)}
+        if job.kind == ControlJobKind.RECONCILE_REMOTE_TASKS.value:
+            if self.on_reconcile_remote_tasks is None:
+                return {"kind": job.kind, "status": "no_handler", "payload": job.payload}
+            return {"kind": job.kind, "outcome": self.on_reconcile_remote_tasks(job.payload)}
         return {"kind": job.kind, "status": "unknown_kind"}
 
     def step(self) -> ControlStepResult:

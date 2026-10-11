@@ -87,9 +87,11 @@ External execution backend
       +---- future Spark-backed node
 ```
 
-The **orchestration itself should remain represented as a MechaHarness graph**. Remote intake creates durable June work; June selects/binds the appropriate graph; a graph node delegates implementation to an execution backend; subsequent graph/control work observes completion and advances state.
+The **orchestration itself should remain represented as a MechaHarness graph**. Remote intake creates durable June work; June selects/binds an appropriate recipe (or June-incubated graph); a graph node delegates implementation to an execution backend; subsequent graph/control work observes completion and advances state.
 
-June owns concrete task/project state and backend selection. MechaHarness owns reusable graph execution semantics. Cursor is an execution resource, not June's state store.
+**Incubation note:** the first bootstrap shape is recorded in June as the incubating recipe candidate `june.remote_task` (`GraphTemplateSpec` + local graph builder). It is **not** a MechaHarness catalog Agentic Recipe yet. MechaHarness owns only the generic effect/checkpoint/resume contracts used by the `june.coding_job` effectful node. Promote the reusable skeleton into the MH catalog only after a second June workflow wants the same shape (see `docs/inspiration/dev-blog-inspiration.md` §5 and `docs/requirements/mechaharness-host-friction.md`).
+
+June owns concrete task/project state and backend selection. MechaHarness owns reusable graph / recipe execution semantics. Cursor is an execution resource, not June's state store.
 
 ## Functional requirements
 
@@ -167,9 +169,9 @@ A Cursor backend MAY be the first concrete implementation.
 
 ### R6. MechaHarness graph integration
 
-External-agent dispatch MUST be reachable through a reusable MechaHarness graph/node contract rather than bypassing the graph system.
+External-agent dispatch MUST be reachable through a MechaHarness graph/node contract rather than bypassing the graph system.
 
-The first implementation graph SHOULD make the phases visible, for example:
+The first implementation uses the June-incubated recipe candidate `june.remote_task` and SHOULD make the phases visible, for example:
 
 ```text
 validate task
@@ -182,6 +184,8 @@ validate task
 ```
 
 Waiting MUST be resumable. A graph must not consume a worker thread merely to sleep until Cursor finishes.
+
+Long-running observation of an accepted external run MAY remain June control-loop work (`observe` / `reconcile` jobs) rather than a MechaHarness sleep node. MechaHarness owns durable effect intent for the non-idempotent `submit` boundary; June owns task lifecycle after the backend accepts the run.
 
 ### R7. Scheduling and observation
 

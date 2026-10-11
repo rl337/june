@@ -2,15 +2,17 @@
 
 > Living design notes for June as an application-level orchestrator and client of MechaHarness. External developer material is evidence and inspiration, not specification.
 
-Last reviewed: 2026-09-29
+Last reviewed: 2026-10-11 (mechaharness 0.4.0 host kit + Agentic Recipes floor)
 
 ## Purpose and ownership boundary
 
-June is its own orchestrator. It owns the scheduler, task runner, document manager, knowledge graph, issue/work tracker, persistent goals, application policy, provider implementations, and the concrete decision about which reusable MechaHarness graph templates to instantiate, bind, sequence, schedule, and compose.
+June is its own orchestrator. It owns the scheduler, task runner, document manager, knowledge graph, issue/work tracker, persistent goals, application policy, provider implementations, and the concrete decision about which reusable MechaHarness **Agentic Recipes** (parameterized `GraphTemplate` catalog entries) to instantiate, bind, tile, sequence, schedule, and compose.
 
-MechaHarness owns the reusable execution vocabulary beneath June: primitives, injectable protocols, graph execution semantics, linkage/validation, capability envelopes, context-provider interfaces, verification/delegation/advisor mechanisms, durable execution contracts, generic observability/evaluation hooks, and parameterized reusable graph-template definitions such as fan-out/aggregate, verify/repair, independent review, and environment repair.
+MechaHarness owns the reusable execution vocabulary beneath June: primitives, injectable protocols, graph execution semantics, linkage/validation, capability envelopes, context-provider interfaces, verification/delegation/advisor mechanisms, durable execution contracts, generic observability/evaluation hooks, and parameterized reusable graph-template / **Agentic Recipe** definitions such as `decision_plane`, `bounded_retry`, fan-out/aggregate, verify/repair, independent review, and environment repair.
 
-June MUST NOT duplicate a generic MechaHarness primitive or template merely to own orchestration. Conversely, MechaHarness MUST NOT absorb June-specific scheduling, persistent-goal policy, knowledge/document semantics, issue workflow, or product-specific template composition.
+**Agentic Recipe** is the shared product name for a named control pattern larger than a node and smaller than an app graph. The substrate remains MechaHarness `GraphTemplate` (soft points, `instantiate` / `tile` / `instance_key`). June's concrete realization ledger remains `GraphTemplateSpec` + `BoundRun` — not a second recipe runtime.
+
+June MUST NOT duplicate a generic MechaHarness primitive or recipe merely to own orchestration. Conversely, MechaHarness MUST NOT absorb June-specific scheduling, persistent-goal policy, knowledge/document semantics, issue workflow, or product-specific template composition.
 
 A finding from the source corpus can therefore imply:
 - a June-only orchestration requirement;
@@ -37,7 +39,7 @@ The existing June repository is evidence about current behavior, not an authorit
 - Waking a goal SHOULD create or resume bounded task-runner work rather than simulate an indefinitely open conversation.
 - User steering SHOULD be incorporated at safe orchestration boundaries and MUST be recorded as a state transition.
 
-**MechaHarness boundary:** June consumes checkpoint/resume, graph-template and linkage interfaces. Goal persistence and wake policy remain June-owned.
+**MechaHarness boundary:** June consumes checkpoint/resume, recipe/`GraphTemplate`, and linkage interfaces. Goal persistence and wake policy remain June-owned.
 
 ### 2. Scheduler decides when work becomes runnable
 
@@ -63,33 +65,35 @@ The existing June repository is evidence about current behavior, not an authorit
 **Requirements**
 For each runnable task, June SHOULD:
 1. Load the persistent goal/task/issue state.
-2. Select an appropriate reusable MechaHarness GraphTemplate or direct graph construction strategy.
-3. Bind June tools, ContextProviders, model/provider capabilities, budgets and product policy.
+2. Select an appropriate MechaHarness Agentic Recipe (catalog `GraphTemplate`) or a June-incubated graph construction strategy.
+3. Bind June tools, ContextProviders, model/provider capabilities, budgets and product policy into recipe soft points.
 4. Ask MechaHarness to resolve runtime linkage before substantive execution.
 5. Execute/checkpoint through MechaHarness.
 6. Translate structured results, verification state, failures and side effects back into June task/goal/issue state.
 7. Decide whether to complete, reschedule, retry, create follow-up work, request user input, or escalate.
 
-June owns steps 1, 2, 3, 6 and 7 as orchestration policy. MechaHarness owns generic semantics for graph instantiation/execution, linkage, envelopes, verification and checkpoints.
+June owns steps 1, 2, 3, 6 and 7 as orchestration policy. MechaHarness owns generic semantics for recipe instantiation/execution, linkage, envelopes, verification and checkpoints.
 
-### 4. June owns concrete graph realization; MechaHarness owns generic template definitions
+### 4. June owns concrete graph realization; MechaHarness owns generic recipes
 
 **Sources**
 - Claude, **Introducing dynamic workflows in Claude Code** (2026-05-28): https://claude.com/blog/introducing-dynamic-workflows-in-claude-code
 - Claude, **A harness for every task: dynamic workflows in Claude Code** (2026-06-02): https://claude.com/blog/a-harness-for-every-task-dynamic-workflows-in-claude-code
+- MechaHarness 0.4.0, **host kit + Agentic Recipes** — https://pypi.org/project/mechaharness/0.4.0/
 
 **Requirements**
-- June SHOULD prefer reusable MechaHarness `GraphTemplate` definitions for generally useful patterns.
-- June MUST own the product decision about which templates are selected, parameterized, sequenced and nested for a goal.
-- June MUST own the concrete executable realization created by filling template soft points with June-specific tools, providers, prompts/skills, model choices/capabilities, budgets, persistence adapters, task/goal state and application policies.
-- June-specific code MAY add nodes, edges, bindings or composition around a reusable template when those details express June semantics rather than generic harness behavior.
+- June SHOULD prefer reusable MechaHarness Agentic Recipes (`GraphTemplate` catalog ids such as `decision_plane`, `bounded_retry`, `verify_repair`) for generally useful patterns.
+- June MUST own the product decision about which recipes are selected, parameterized, sequenced, tiled and nested for a goal.
+- June MUST own the concrete executable realization created by filling recipe soft points with June-specific tools, providers, prompts/skills, model choices/capabilities, budgets, persistence adapters, task/goal state and application policies.
+- June-specific code MAY add nodes, edges, bindings or composition around a reusable recipe when those details express June semantics rather than generic harness behavior.
 - The resulting concrete graph/workflow MAY live as June code or June durable configuration even though MechaHarness validates and executes it.
 - June SHOULD NOT move concrete application bindings into MechaHarness merely because the execution engine needs to consume them.
-- June SHOULD NOT fork a generic template merely to adjust application policy that can be expressed through parameters/providers.
+- June SHOULD NOT fork a generic recipe merely to adjust application policy that can be expressed through parameters/providers.
+- Host MechaHarness call sites SHOULD read as recipe bind + run stories; remaining boilerplate MUST be recorded in `docs/requirements/mechaharness-host-friction.md` rather than grown into a permanent June wrapper empire.
 
-This is the central seam: **MechaHarness owns reusable graph grammar and patterns; June writes and stores the concrete sentences.**
+This is the central seam: **MechaHarness owns reusable graph grammar and recipes; June writes and stores the concrete sentences.**
 
-### 5. Template incubation and promotion are evidence-driven
+### 5. Recipe incubation and promotion are evidence-driven
 
 **Sources**
 - Claude, **Introducing dynamic workflows in Claude Code** (2026-05-28): https://claude.com/blog/introducing-dynamic-workflows-in-claude-code
@@ -97,16 +101,16 @@ This is the central seam: **MechaHarness owns reusable graph grammar and pattern
 - Cursor, **Continually improving our agent harness** (2026-04-30): https://cursor.com/blog/continually-improving-agent-harness
 
 **Requirements**
-- A graph/workflow MAY originate entirely in June when its topology, bindings or semantics are still entangled with June.
+- A graph/workflow MAY originate entirely in June when its topology, bindings or semantics are still entangled with June (a June-incubated recipe candidate).
 - June SHOULD allow such workflows to mature locally rather than forcing premature abstraction into MechaHarness.
 - Repeated use, repeated duplication, stable topology across distinct June tasks, or clear reuse outside June SHOULD trigger an abstraction review.
 - Promotion MUST identify the reusable skeleton and the June-specific soft points separately.
-- A promoted pattern SHOULD move only its generic template definition into MechaHarness; June SHOULD retain its concrete bindings, composition and operational policy.
-- After promotion, June SHOULD refactor its concrete workflow to consume the MechaHarness template rather than maintain a divergent local copy.
-- Promotion SHOULD carry tests/provenance showing that the generic template can reproduce the relevant behavior when rebound by June.
-- If a MechaHarness template later proves to encode June-specific assumptions, June SHOULD support moving those assumptions back to the application boundary rather than preserving accidental framework coupling.
+- A promoted pattern SHOULD move only its generic recipe/`GraphTemplate` definition into MechaHarness; June SHOULD retain its concrete bindings, composition and operational policy.
+- After promotion, June SHOULD refactor its concrete workflow to consume the MechaHarness catalog recipe rather than maintain a divergent local copy.
+- Promotion SHOULD carry tests/provenance showing that the generic recipe can reproduce the relevant behavior when rebound by June.
+- If a MechaHarness recipe later proves to encode June-specific assumptions, June SHOULD support moving those assumptions back to the application boundary rather than preserving accidental framework coupling.
 
-The intended path is: **June-specific executable graph → observed reusable pattern → soft-point extraction → MechaHarness template → June rebinding**.
+The intended path is: **June-specific executable graph → observed reusable pattern → soft-point extraction → MechaHarness Agentic Recipe → June rebinding**.
 
 ### 6. Document manager is a durable information substrate
 
@@ -219,12 +223,12 @@ The intended path is: **June-specific executable graph → observed reusable pat
 | June concern | June owns | Expected MechaHarness surface |
 |---|---|---|
 | Scheduler | wake/event/retry policy | bounded/resumable execution entry points |
-| Task runner | task lifecycle and graph selection | GraphTemplate registry, GraphExecutor, LinkageResolver |
+| Task runner | task lifecycle and recipe selection | Agentic Recipe / GraphTemplate registry, GraphExecutor, LinkageResolver |
 | Documents | lifecycle/index/version/access semantics | ContextProvider protocol |
 | Knowledge graph | graph schema, provenance, promotion/query policy | scoped ContextProvider protocol |
 | Issue tracker | durable work model and transitions | structured execution/failure/trace outputs |
 | Persistent goals | identity, triggers, completion policy | checkpoints, OutcomeContract-compatible signals |
-| Concrete orchestration | template selection/binding/composition and concrete executable graph realization | reusable parameterized GraphTemplates + graph validation/execution |
+| Concrete orchestration | recipe selection/binding/tiling/composition and concrete executable graph realization | reusable Agentic Recipes (`GraphTemplate`) + graph validation/execution |
 | Subgraph budgets | select soft/hard `BudgetPolicy` per child run (control graph uncapped) | `mechaharness.budget.BudgetPolicy` / `Budget` enforcement on `GraphExecutor.run` |
 | Autonomy | product consequence/approval policy | grants, CapabilityEnvelope, verification primitives |
 | Advisor use | product triggers and evidence selection | Advisor / AdvisorPolicy |
