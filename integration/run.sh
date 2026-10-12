@@ -8,7 +8,10 @@ cd "$ROOT"
 MODE="${1:-offline}" # offline | live | all
 
 # Host bind for container /artifacts (gitignored; inspect after the run).
+# World-writable so the image's non-root `june` user (uid 10001) can create
+# per-test dirs when this path is bind-mounted over /artifacts in CI.
 mkdir -p "$ROOT/artifacts"
+chmod a+rwx "$ROOT/artifacts"
 
 BUILD_ARGS=(docker compose -f docker-compose.yml -f integration/docker-compose.yml build integration)
 RUN_BASE=(docker compose -f docker-compose.yml -f integration/docker-compose.yml run --rm)
