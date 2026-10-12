@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Protocol, Sequence
+from collections.abc import Sequence
+from typing import Any, Protocol
 
 from june.providers.junespark import JunesparkProvider
 from june.recipes.codegen.problem import REFERENCE_SOLUTION

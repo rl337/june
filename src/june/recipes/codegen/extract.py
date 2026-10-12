@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 import re
 import sys
-from typing import Iterable
+from collections.abc import Iterable
 
 _FENCE_RE = re.compile(r"```(?:python|py)?\s*\n(.*?)```", re.IGNORECASE | re.DOTALL)
 _FENCE_PATH_RE = re.compile(
@@ -119,7 +119,7 @@ def extract_python_files(
             continue
         local.add(top)
 
-    for path, source in files.items():
+    for _path, source in files.items():
         assert_stdlib_only(source, allowed_local_packages=local)
     return files
 

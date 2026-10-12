@@ -35,7 +35,6 @@ def assert_successful_codegen_harness(
 ) -> None:
     """Assert MH host contracts after a successful codegen recipe run."""
     kind: RecipeKind = recipe or result.recipe  # type: ignore[assignment]
-    nodes = expected_node_order(kind)
 
     assert result.ok, (
         f"graph={result.graph_status} error={result.error} "
