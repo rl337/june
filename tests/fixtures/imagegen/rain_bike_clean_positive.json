@@ -1,0 +1,7 @@
+{
+  "id": "rain_bike_clean_positive",
+  "source": "artifacts/imagegen/test_imagegen_critique_refine_live_repairs/image_00.png",
+  "captured": "2026-10-12",
+  "note": "Clean sunny red bicycle (incomplete first craft before refine). Positive control for artifact-gate eval: must NOT be rejected.",
+  "purpose": "True-negative for anomaly gate acceptance bar."
+}

@@ -1,0 +1,35 @@
+{
+  "id": "rain_bike_hydrant_malformed",
+  "source": "artifacts/imagegen/test_imagegen_critique_refine_live_dual_backend/image.png",
+  "captured": "2026-10-12",
+  "backend": "qwen_image",
+  "problem_id": "rain_bike_hydrant",
+  "image_prompt": "photorealistic urban sidewalk scene, red bicycle leaning against a bright yellow fire hydrant, steady rainfall, wet pavement with clear reflections, overcast daylight, highly detailed, no people, no text, no watermarks, no logos",
+  "checklist_expected": {
+    "passed": true,
+    "note": "Element checklist alone is not enough — this image satisfies required objects while being geometrically broken."
+  },
+  "known_anomalies": [
+    {
+      "region": "front wheel",
+      "issue": "rim/tire severed or melted into pavement; spokes do not meet a coherent hub"
+    },
+    {
+      "region": "forks / handlebars",
+      "issue": "duplicated or fused steering assembly (two forks / two handlebar sets)"
+    },
+    {
+      "region": "frame",
+      "issue": "ghosted / overlapping second red frame behind the primary bike"
+    }
+  ],
+  "views": [
+    {"name": "full", "file": "rain_bike_hydrant_malformed.png"},
+    {
+      "name": "front",
+      "file": "rain_bike_hydrant_malformed_front.png",
+      "note": "Zoom on steering/front wheel — full-frame VL often misses anomalies that this crop surfaces."
+    }
+  ],
+  "purpose": "Golden negative for artifact-gate eval. Checklist may pass; Qwen3-VL-8B often misses the geometry bug. Gate is not green until acceptance bar in docs/requirements/imagegen-integration.md passes without coerce."
+}

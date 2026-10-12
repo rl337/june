@@ -25,6 +25,14 @@ class JunesparkSettings(BaseModel):
     timeout: float = 120.0
 
 
+class ComfySettings(BaseModel):
+    """ComfyUI media backend (Flux / Qwen Image workflows)."""
+
+    base_url: str | None = None
+    timeout: float = 600.0
+    poll_interval: float = 1.0
+
+
 class ConsoleSettings(BaseModel):
     host: str = "0.0.0.0"
     port: int = 8080
@@ -51,6 +59,7 @@ class JuneSettings(BaseSettings):
 
     data_dir: str | None = None
     junespark: JunesparkSettings = Field(default_factory=JunesparkSettings)
+    comfy: ComfySettings = Field(default_factory=ComfySettings)
     console: ConsoleSettings = Field(default_factory=ConsoleSettings)
     chat: ChatSettings = Field(default_factory=ChatSettings)
 
@@ -60,6 +69,15 @@ class JuneSettings(BaseSettings):
             raise ValueError(
                 "junespark.base_url is required (set in config.yaml or "
                 "JUNESPARK_BASE_URL / JUNE_JUNESPARK__BASE_URL)"
+            )
+        return url.rstrip("/")
+
+    def require_comfy_base_url(self) -> str:
+        url = (self.comfy.base_url or "").strip()
+        if not url:
+            raise ValueError(
+                "comfy.base_url is required (set in config.yaml or "
+                "COMFY_BASE_URL / JUNE_COMFY__BASE_URL)"
             )
         return url.rstrip("/")
 
@@ -113,6 +131,8 @@ def load_settings(
         alias_overlay.setdefault("junespark", {})["api_key"] = os.environ["JUNESPARK_API_KEY"]
     if os.environ.get("JUNESPARK_MODEL"):
         alias_overlay.setdefault("junespark", {})["model"] = os.environ["JUNESPARK_MODEL"]
+    if os.environ.get("COMFY_BASE_URL"):
+        alias_overlay.setdefault("comfy", {})["base_url"] = os.environ["COMFY_BASE_URL"]
     if alias_overlay:
         yaml_data = _deep_merge(yaml_data, alias_overlay)
 
