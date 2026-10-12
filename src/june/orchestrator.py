@@ -100,6 +100,7 @@ class Orchestrator:
         )
         self._ensure_control_template()
         self._ensure_remote_task_template()
+        self._ensure_codegen_template()
 
     def attach_chat(
         self,
@@ -191,6 +192,32 @@ class Orchestrator:
                     asdict(SoftPoint("verify", "Acceptance criteria verification")),
                 ],
                 provenance={"owns": "june", "slice": "remote-task-orchestration"},
+            )
+        )
+
+    def _ensure_codegen_template(self) -> None:
+        if self.templates.get("june.codegen") is not None:
+            return
+        self.templates.register(
+            GraphTemplateSpec(
+                name="june.codegen",
+                description=(
+                    "Incubating code-generation recipe: prompt → generate → "
+                    "extract → execute → verify against fixed fixtures"
+                ),
+                status=TemplateStatus.INCUBATING,
+                node_kinds=[
+                    "june.codegen.prompt",
+                    "june.codegen.generate",
+                    "june.codegen.extract",
+                    "june.codegen.execute",
+                    "june.codegen.verify",
+                ],
+                soft_points=[
+                    asdict(SoftPoint("completer", "CodegenCompleter / JuneSpark model")),
+                    asdict(SoftPoint("problem", "CodingProblem fixtures and statement")),
+                ],
+                provenance={"owns": "june", "suite": "integration/codegen"},
             )
         )
 

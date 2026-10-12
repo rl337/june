@@ -76,6 +76,13 @@ june = ["py.typed"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+  "integration: end-to-end recipe tests for the integration container",
+  "junespark_live: requires a reachable JuneSpark OpenAI-compat endpoint",
+]
+# Default developer/CI unit run skips the container E2E package; run via
+# ./integration/run.sh (or pytest tests/integration -o addopts=).
+addopts = "--ignore=tests/integration"
 
 [tool.ruff]
 line-length = 100

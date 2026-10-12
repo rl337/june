@@ -104,6 +104,21 @@ Docker:
 docker compose up --build
 ```
 
+### Integration suite (codegen recipe)
+
+Containerized E2E for the incubating `june.codegen` recipe (generate Python →
+execute → verify). See `docs/requirements/codegen-integration.md`.
+
+```bash
+# Offline (fixed completer) — CI default
+./integration/run.sh offline
+
+# Live JuneSpark reason/heavy model
+JUNESPARK_BASE_URL=http://host.docker.internal:8000/v1 \
+JUNESPARK_MODEL=your-reason-model \
+  ./integration/run.sh live
+```
+
 Environment:
 
 - `JUNE_DATA_DIR` — durable JSON state (default in container: `/data`)

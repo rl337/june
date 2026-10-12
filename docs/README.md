@@ -9,6 +9,9 @@
   June-sourced asks for a more readable MH host API.
 - **[pyiv DI asks](requirements/pyiv-di-asks.md)** — pull-based DI promotion
   backlog shared with MechaHarness.
+- **[Codegen integration suite](requirements/codegen-integration.md)** —
+  containerized `june.codegen` / `.refine` / `.package` recipe E2E
+  (offline DI completers + live JuneSpark; stdlib-only generated code).
 - **[Eval research brief](inspiration/eval-research.md)** — application-level
   evaluation research handoff.
 - **[README](../README.md)** — project overview and setup.
