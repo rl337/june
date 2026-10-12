@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -12,14 +13,32 @@ RAIN_BIKE_CLEAN_POSITIVE = "rain_bike_clean_positive"
 
 
 def fixtures_dir() -> Path:
+    """Resolve ``tests/fixtures/imagegen`` from checkout or integration CWD.
+
+    In the integration container june is installed into site-packages, so
+    walking from ``__file__`` never reaches ``/app/tests``. Prefer an explicit
+    override, then CWD (pytest ``/app``), then source-tree parents.
+    """
+    candidates: list[Path] = []
+    override = (os.environ.get("JUNE_IMAGEGEN_FIXTURES") or "").strip()
+    if override:
+        candidates.append(Path(override))
+    cwd = Path.cwd().resolve()
+    for parent in (cwd, *cwd.parents):
+        candidates.append(parent / "tests" / "fixtures" / "imagegen")
     here = Path(__file__).resolve()
     for parent in here.parents:
-        candidate = parent / "tests" / "fixtures" / "imagegen"
+        candidates.append(parent / "tests" / "fixtures" / "imagegen")
+    seen: set[Path] = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
         if candidate.is_dir():
             return candidate
     raise FileNotFoundError(
-        "tests/fixtures/imagegen not found from "
-        f"{here} (run from a June checkout)"
+        "tests/fixtures/imagegen not found "
+        f"(cwd={cwd}, module={here}; set JUNE_IMAGEGEN_FIXTURES or run from checkout)"
     )
 
 
