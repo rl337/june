@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Annotated, Any
 from uuid import uuid4
 
-from june.channels import Channel, ChannelMessage, ChatService, ContentPart, PartKind
+from june.channels import ChannelMessage, ChatService, PartKind
+from june.channels.adapters import RestChatAdapter, WebappAdapter
 from june.config import JuneSettings
 from june.documents import DocumentRef
 from june.orchestrator import Orchestrator
@@ -71,32 +72,35 @@ def mount_chat_routes(
             }
         )
 
+    webapp = WebappAdapter()
+    rest = RestChatAdapter()
+
     @app.post("/api/chat")
     async def api_chat(body: dict[str, Any]) -> Any:
         if not settings.junespark.base_url:
             raise HTTPException(status_code=503, detail="junespark.base_url not configured")
-        parts_raw = list(body.get("parts") or [])
-        text = body.get("text")
-        parts = [ContentPart.from_dict(p) for p in parts_raw]
-        if text and not any(p.kind is PartKind.TEXT and p.text == text for p in parts):
-            parts.insert(0, ContentPart.text_part(str(text)))
-        if not parts:
-            raise HTTPException(status_code=400, detail="empty chat message")
-        message = ChannelMessage(
-            channel=Channel.WEBAPP,
-            session_id=str(body.get("session_id") or "default"),
-            parts=parts,
-            model=body.get("model"),
-            user_ref=body.get("user_ref"),
-            history=list(body.get("history") or []),
-        )
         try:
+            message = webapp.to_message(body)
             reply = _handle_chat_with_console(hub, orchestrator, chat_service, message)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except Exception as exc:  # noqa: BLE001
             raise HTTPException(status_code=502, detail=str(exc)) from exc
-        return JSONResponse(reply.to_dict())
+        return JSONResponse(webapp.from_reply(reply))
+
+    @app.post("/v1/chat")
+    async def api_v1_chat(body: dict[str, Any]) -> Any:
+        """Channel-agnostic REST front (same DTO as console; no hub mirroring)."""
+        if not settings.junespark.base_url:
+            raise HTTPException(status_code=503, detail="junespark.base_url not configured")
+        try:
+            message = rest.to_message(body)
+            reply = chat_service.handle(message)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        return JSONResponse(rest.from_reply(reply))
 
     @app.post("/api/upload")
     async def api_upload(file: Annotated[UploadFile, File()]) -> Any:
@@ -176,9 +180,9 @@ def _handle_chat_with_console(
     chat_service: ChatService,
     message: ChannelMessage,
 ) -> Any:
-    """Run chat and mirror phases onto the console graph when a hub is present."""
-    runner = orchestrator.chat_runner
-    if hub is None or runner is None:
+    """Run chat via ChatService; mirror recipe phases onto the console hub."""
+    del orchestrator  # entry is always ChatService (recipe bind+run)
+    if hub is None:
         return chat_service.handle(message)
 
     from june.harness.cron_graph import (
@@ -207,7 +211,7 @@ def _handle_chat_with_console(
         hub.set_instance_progress(run_id, active_node_id=node_id, pipeline=pipeline)
 
     def on_phase(phase: str, _state: Any) -> None:
-        # Mark prior phases succeeded, current running.
+        # Driven by recipe node runners (host_kit), not a parallel Python loop.
         for key in phase_keys:
             if key == phase:
                 _set_phase_status(key, "running")
@@ -215,10 +219,9 @@ def _handle_chat_with_console(
             _set_phase_status(key, "succeeded")
 
     try:
-        reply = runner.run(message, on_phase=on_phase)
+        reply = chat_service.handle(message, on_phase=on_phase, run_id=run_id)
         for key in phase_keys:
             _set_phase_status(key, "succeeded")
-        # Prefer console-scoped run id so the graph stack matches the reply.
         reply.run_id = run_id
         hub.complete_instance(run_id=run_id, status="ok", pipeline=pipeline)
         hub.mark_bucket_succeeded(CHAT_PARENT_NODE_ID)

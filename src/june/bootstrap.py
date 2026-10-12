@@ -18,7 +18,11 @@ def build_app(settings: JuneSettings) -> dict[type, Any]:
     data_dir = Path(settings.data_dir) if settings.data_dir else None
     orch = Orchestrator(data_dir, settings=settings)
     provider = JunesparkProvider(settings)
-    tools = build_default_tools(documents=orch.documents, knowledge=orch.knowledge)
+    tools = build_default_tools(
+        documents=orch.documents,
+        knowledge=orch.knowledge,
+        settings=settings,
+    )
     chat_runner = ChatGraphRunner(
         provider=provider,
         tools=tools,

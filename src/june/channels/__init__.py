@@ -123,7 +123,51 @@ class ChatService:
     def __init__(self, orchestrator: Any) -> None:
         self.orchestrator = orchestrator
 
-    def handle(self, message: ChannelMessage) -> ChannelReply:
-        reply = self.orchestrator.handle_chat(message)
+    def handle(
+        self,
+        message: ChannelMessage,
+        *,
+        on_phase: Any | None = None,
+        run_id: str | None = None,
+        checkpoint_path: str | None = None,
+    ) -> ChannelReply:
+        reply = self.orchestrator.handle_chat(
+            message,
+            on_phase=on_phase,
+            run_id=run_id,
+            checkpoint_path=checkpoint_path,
+        )
         assert isinstance(reply, ChannelReply)
         return reply
+
+
+def __getattr__(name: str) -> Any:
+    # Lazy re-exports avoid circular import with june.channels.adapters.
+    if name in {
+        "ChannelAdapter",
+        "DiscordAdapter",
+        "RestChatAdapter",
+        "TelegramAdapter",
+        "WebappAdapter",
+        "adapter_for",
+    }:
+        from june.channels import adapters as _adapters
+
+        return getattr(_adapters, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+__all__ = [
+    "Channel",
+    "ChannelAdapter",
+    "ChannelMessage",
+    "ChannelReply",
+    "ChatService",
+    "ContentPart",
+    "DiscordAdapter",
+    "PartKind",
+    "RestChatAdapter",
+    "TelegramAdapter",
+    "WebappAdapter",
+    "adapter_for",
+]

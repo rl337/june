@@ -14,6 +14,8 @@
   (offline DI completers + live JuneSpark; stdlib-only generated code).
 - **[Imagegen integration suite](requirements/imagegen-integration.md)** —
   incubating `june.imagegen` against ComfyUI (Flux2 / Qwen Image).
+- **[Interactive chat + channels](requirements/interactive-chat-channels.md)** —
+  channel-agnostic `june.chat` recipe, `generate_image` tool, REST/console fronts.
 - **[Eval research brief](inspiration/eval-research.md)** — application-level
   evaluation research handoff.
 - **[README](../README.md)** — project overview and setup.
