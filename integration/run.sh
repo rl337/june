@@ -20,7 +20,7 @@ case "$MODE" in
   offline)
     "${BUILD_ARGS[@]}"
     "${RUN_BASE[@]}" integration \
-      pytest -q tests/integration -o addopts= -m "integration and not junespark_live"
+      pytest -q tests/integration -o addopts= -m "integration and not junespark_live and not comfy_live and not vision_live"
     ;;
   live)
     if [[ -z "${JUNESPARK_BASE_URL:-}" ]]; then

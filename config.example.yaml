@@ -7,6 +7,12 @@ junespark:
   # model: optional; omit to pick from GET /v1/models
   timeout: 120
 
+# ComfyUI media backend (Flux2 / Qwen Image). Env: COMFY_BASE_URL
+comfy:
+  base_url: http://192.168.1.21:8188
+  timeout: 600
+  poll_interval: 1.0
+
 data_dir: .june-data
 
 console:

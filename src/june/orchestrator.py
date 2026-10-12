@@ -101,6 +101,7 @@ class Orchestrator:
         self._ensure_control_template()
         self._ensure_remote_task_template()
         self._ensure_codegen_template()
+        self._ensure_imagegen_template()
 
     def attach_chat(
         self,
@@ -220,6 +221,120 @@ class Orchestrator:
                 provenance={"owns": "june", "suite": "integration/codegen"},
             )
         )
+
+    def _ensure_imagegen_template(self) -> None:
+        if self.templates.get("june.imagegen") is not None:
+            return
+        self.templates.register(
+            GraphTemplateSpec(
+                name="june.imagegen",
+                description=(
+                    "Incubating image-generation recipe: prompt → Comfy generate → "
+                    "persist → verify (Flux2 / Qwen Image backends)"
+                ),
+                status=TemplateStatus.INCUBATING,
+                node_kinds=[
+                    "june.imagegen.prompt",
+                    "june.imagegen.generate",
+                    "june.imagegen.persist",
+                    "june.imagegen.verify",
+                ],
+                soft_points=[
+                    asdict(SoftPoint("generator", "ImageGenerator / ComfyUI workflow")),
+                    asdict(SoftPoint("backend", "flux2 or qwen_image workflow binding")),
+                    asdict(SoftPoint("problem", "ImageProblem prompt and verify bounds")),
+                ],
+                provenance={"owns": "june", "suite": "integration/imagegen"},
+            )
+        )
+        if self.templates.get("june.imagegen.critique_refine") is None:
+            self.templates.register(
+                GraphTemplateSpec(
+                    name="june.imagegen.critique_refine",
+                    description=(
+                        "Incubating image critique-refine: craft prompt → Comfy "
+                        "generate → VL critique → optional repair → verify"
+                    ),
+                    status=TemplateStatus.INCUBATING,
+                    node_kinds=[
+                        "june.imagegen.goal",
+                        "june.imagegen.craft_prompt",
+                        "june.imagegen.generate",
+                        "june.imagegen.persist",
+                        "june.imagegen.critique",
+                        "june.imagegen.diagnose",
+                        "june.imagegen.refine_prompt",
+                        "june.imagegen.repair_generate",
+                        "june.imagegen.repair_persist",
+                        "june.imagegen.verify_critique",
+                    ],
+                    soft_points=[
+                        asdict(SoftPoint("generator", "ComfyImageGenerator")),
+                        asdict(SoftPoint("crafter", "text LLM prompt crafter")),
+                        asdict(SoftPoint("critic", "multimodal VL vision critic")),
+                        asdict(SoftPoint("problem", "ImageProblem + acceptance checklist")),
+                    ],
+                    provenance={"owns": "june", "suite": "integration/imagegen"},
+                )
+            )
+        if self.templates.get("june.imagegen.evaluate_criteria") is None:
+            self.templates.register(
+                GraphTemplateSpec(
+                    name="june.imagegen.evaluate_criteria",
+                    description=(
+                        "Incubating evaluate-criteria: expand acceptance spec → "
+                        "VL score each criterion → summarize"
+                    ),
+                    status=TemplateStatus.INCUBATING,
+                    node_kinds=[
+                        "june.imagegen.expand_spec",
+                        "june.imagegen.score_criteria",
+                        "june.imagegen.summarize_eval",
+                    ],
+                    soft_points=[
+                        asdict(SoftPoint("spec_crafter", "AcceptanceSpecCrafter")),
+                        asdict(SoftPoint("criteria_scorer", "CriteriaScorer / VL")),
+                        asdict(SoftPoint("problem", "ImageProblem + image bytes")),
+                    ],
+                    provenance={"owns": "june", "suite": "integration/imagegen"},
+                )
+            )
+        if self.templates.get("june.imagegen.criteria_refine") is None:
+            self.templates.register(
+                GraphTemplateSpec(
+                    name="june.imagegen.criteria_refine",
+                    description=(
+                        "Host compose loop: craft → (generate → bind "
+                        "evaluate_criteria → refine?)×max_retries → verify"
+                    ),
+                    status=TemplateStatus.INCUBATING,
+                    node_kinds=[
+                        "june.imagegen.craft_prompt",
+                        "june.imagegen.generate",
+                        "june.imagegen.evaluate",
+                        "june.imagegen.refine_prompt",
+                        "june.imagegen.verify",
+                    ],
+                    soft_points=[
+                        asdict(SoftPoint("generator", "ComfyImageGenerator")),
+                        asdict(SoftPoint("crafter", "text LLM prompt crafter")),
+                        asdict(
+                            SoftPoint(
+                                "evaluator",
+                                "ImageEvaluator → run_evaluate_criteria_recipe",
+                            )
+                        ),
+                        asdict(SoftPoint("max_retries", "int repair attempts after first")),
+                        asdict(SoftPoint("problem", "ImageProblem")),
+                    ],
+                    provenance={
+                        "owns": "june",
+                        "suite": "integration/imagegen",
+                        "compose": "binds june.imagegen.evaluate_criteria",
+                        "hf": "HF-03 no MH tile; June host loop",
+                    },
+                )
+            )
 
     def _on_remote_task_queued(self, task: RemoteTask) -> None:
         self.control.schedule_remote_dispatch(task.id)

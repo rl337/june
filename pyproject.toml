@@ -79,6 +79,8 @@ pythonpath = ["."]
 markers = [
   "integration: end-to-end recipe tests for the integration container",
   "junespark_live: requires a reachable JuneSpark OpenAI-compat endpoint",
+  "comfy_live: requires a reachable ComfyUI media endpoint",
+  "vision_live: requires a reachable multimodal VL chat model",
 ]
 # Default developer/CI unit run skips the container E2E package; run via
 # ./integration/run.sh (or pytest tests/integration -o addopts=).
