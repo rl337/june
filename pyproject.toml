@@ -36,7 +36,7 @@ dependencies = [
 
 [project.optional-dependencies]
 harness = [
-  "mechaharness>=0.2.0",
+  "mechaharness>=0.4.0",
 ]
 console = [
   "fastapi>=0.115",
@@ -44,7 +44,7 @@ console = [
   "python-multipart>=0.0.9",
 ]
 container = [
-  "mechaharness>=0.2.0",
+  "mechaharness>=0.4.0",
   "fastapi>=0.115",
   "uvicorn[standard]>=0.30",
   "python-multipart>=0.0.9",
@@ -76,6 +76,13 @@ june = ["py.typed"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+  "integration: end-to-end recipe tests for the integration container",
+  "junespark_live: requires a reachable JuneSpark OpenAI-compat endpoint",
+]
+# Default developer/CI unit run skips the container E2E package; run via
+# ./integration/run.sh (or pytest tests/integration -o addopts=).
+addopts = "--ignore=tests/integration"
 
 [tool.ruff]
 line-length = 100

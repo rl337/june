@@ -46,6 +46,10 @@ tmp/
 temp/
 *.log
 
+# Integration suite outputs (host ↔ container /artifacts)
+/artifacts/**
+!/artifacts/.gitkeep
+
 # Packaging
 *.tar.gz
 *.zip

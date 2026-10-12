@@ -47,7 +47,7 @@ source .venv/bin/activate
 pip install -U pip setuptools wheel
 pip install -e ".[dev]"
 # Optional MechaHarness client dependency (BudgetPolicy / GraphExecutor):
-# pip install -e ".[harness]"   # mechaharness>=0.2.0
+# pip install -e ".[harness]"   # mechaharness>=0.4.0
 # Web graph console + chat:
 # pip install -e ".[harness,console]"
 cp config.example.yaml config.yaml   # set junespark.base_url
@@ -102,6 +102,21 @@ Docker:
 
 ```bash
 docker compose up --build
+```
+
+### Integration suite (codegen recipe)
+
+Containerized E2E for the incubating `june.codegen` recipe (generate Python →
+execute → verify). See `docs/requirements/codegen-integration.md`.
+
+```bash
+# Offline (fixed completer) — CI default
+./integration/run.sh offline
+
+# Live JuneSpark reason/heavy model
+JUNESPARK_BASE_URL=http://host.docker.internal:8000/v1 \
+JUNESPARK_MODEL=your-reason-model \
+  ./integration/run.sh live
 ```
 
 Environment:

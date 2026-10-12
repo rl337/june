@@ -1,0 +1,25 @@
+# Overlay: containerized integration suite.
+# Usage: ./integration/run.sh offline
+#    or: JUNESPARK_BASE_URL=http://host.docker.internal:8000/v1 ./integration/run.sh live
+services:
+  integration:
+    build:
+      # Project directory is the repo root when invoked via ./integration/run.sh
+      context: .
+      dockerfile: integration/Dockerfile
+    environment:
+      JUNE_INTEGRATION: "1"
+      JUNE_INTEGRATION_ARTIFACTS: /artifacts
+      JUNESPARK_BASE_URL: ${JUNESPARK_BASE_URL:-}
+      JUNESPARK_API_KEY: ${JUNESPARK_API_KEY:-junespark}
+      JUNESPARK_MODEL: ${JUNESPARK_MODEL:-}
+    # Reach LAN / host JuneSpark from Docker Desktop / Linux with host gateway.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - integration-tmp:/tmp/june-integration
+      # Host ./artifacts (gitignored) ↔ container /artifacts
+      - ./artifacts:/artifacts
+
+volumes:
+  integration-tmp:

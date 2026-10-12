@@ -23,6 +23,14 @@ from june.persist import JsonStore
 from june.policy import PolicyStore
 from june.runner import TaskOutcome, TaskRunner
 from june.scheduler import RunnableWork, Scheduler, ScheduleSpec, WakeReason
+from june.tasks import RemoteTask, RemoteTaskService, TaskState, TaskStore
+from june.tasks.backend import ExecutionBackend, FakeExecutionBackend
+from june.tasks.dispatch import (
+    bound_run_for_task,
+    build_remote_task_graph,
+    make_coding_job_runner,
+)
+from june.tasks.worker import BackgroundGraphWorker
 from june.templates import GraphTemplateSpec, SoftPoint, TemplateRegistry, TemplateStatus
 
 if TYPE_CHECKING:
@@ -40,8 +48,10 @@ class Orchestrator:
         data_dir: Path | str | None = None,
         *,
         settings: JuneSettings | None = None,
+        execution_backend: ExecutionBackend | None = None,
     ) -> None:
-        store = JsonStore(data_dir) if data_dir is not None else None
+        self.data_dir = Path(data_dir) if data_dir is not None else None
+        store = JsonStore(self.data_dir) if self.data_dir is not None else None
         self.store = store
         self.settings = settings
         self.goals = GoalStore(store)
@@ -59,6 +69,13 @@ class Orchestrator:
         self.provider: JunesparkProvider | None = None
         self.tools: ToolRegistry | None = None
         self.chat_runner: ChatGraphRunner | None = None
+        self.execution_backend: ExecutionBackend = execution_backend or FakeExecutionBackend()
+        self.remote_worker = BackgroundGraphWorker()
+        self.tasks = RemoteTaskService(
+            TaskStore(store),
+            backend=self.execution_backend,
+            on_queued=self._on_remote_task_queued,
+        )
         self.runner = TaskRunner(
             client=self.client,
             goals=self.goals,
@@ -77,8 +94,13 @@ class Orchestrator:
             store=store,
             on_cron_tick=self._on_cron_tick,
             on_execute_work=self._on_execute_work,
+            on_dispatch_remote_task=self._on_dispatch_remote_task,
+            on_observe_remote_task=self._on_observe_remote_task,
+            on_reconcile_remote_tasks=self._on_reconcile_remote_tasks,
         )
         self._ensure_control_template()
+        self._ensure_remote_task_template()
+        self._ensure_codegen_template()
 
     def attach_chat(
         self,
@@ -140,9 +162,238 @@ class Orchestrator:
                     asdict(SoftPoint("pollers", "Telegram/Discord/webapp adapters")),
                     asdict(SoftPoint("cron", "June ScheduleSpec materialization")),
                     asdict(SoftPoint("execute_work", "TaskRunner / MechaHarness binding")),
+                    asdict(SoftPoint("remote_tasks", "Durable remote task dispatch/observe")),
                 ],
                 provenance={"owns": "june", "entry": "june run"},
             )
+        )
+
+    def _ensure_remote_task_template(self) -> None:
+        if self.templates.get("june.remote_task") is not None:
+            return
+        self.templates.register(
+            GraphTemplateSpec(
+                name="june.remote_task",
+                description=(
+                    "Remote task bootstrap graph: validate, resolve workspace, "
+                    "effectful coding-job dispatch, collect, verify, persist"
+                ),
+                status=TemplateStatus.INCUBATING,
+                node_kinds=[
+                    "june.task",
+                    "june.task",
+                    "june.coding_job",
+                    "june.task",
+                    "june.task",
+                    "june.task",
+                ],
+                soft_points=[
+                    asdict(SoftPoint("backend", "ExecutionBackend implementation")),
+                    asdict(SoftPoint("verify", "Acceptance criteria verification")),
+                ],
+                provenance={"owns": "june", "slice": "remote-task-orchestration"},
+            )
+        )
+
+    def _ensure_codegen_template(self) -> None:
+        if self.templates.get("june.codegen") is not None:
+            return
+        self.templates.register(
+            GraphTemplateSpec(
+                name="june.codegen",
+                description=(
+                    "Incubating code-generation recipe: prompt → generate → "
+                    "extract → execute → verify against fixed fixtures"
+                ),
+                status=TemplateStatus.INCUBATING,
+                node_kinds=[
+                    "june.codegen.prompt",
+                    "june.codegen.generate",
+                    "june.codegen.extract",
+                    "june.codegen.execute",
+                    "june.codegen.verify",
+                ],
+                soft_points=[
+                    asdict(SoftPoint("completer", "CodegenCompleter / JuneSpark model")),
+                    asdict(SoftPoint("problem", "CodingProblem fixtures and statement")),
+                ],
+                provenance={"owns": "june", "suite": "integration/codegen"},
+            )
+        )
+
+    def _on_remote_task_queued(self, task: RemoteTask) -> None:
+        self.control.schedule_remote_dispatch(task.id)
+
+    def _checkpoint_path(self) -> str | None:
+        if self.data_dir is None:
+            return None
+        path = self.data_dir / "checkpoints.sqlite"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return str(path)
+
+    def _on_dispatch_remote_task(self, payload: dict[str, Any]) -> dict[str, Any]:
+        task_id = str(payload.get("task_id") or "")
+        if not task_id:
+            return {"status": "error", "error": "missing_task_id"}
+        task = self.tasks.get_task(task_id)
+        if task is None:
+            return {"status": "error", "error": "not_found", "task_id": task_id}
+        if task.is_terminal:
+            return {"status": task.state.value, "task_id": task_id}
+        if task.external_run_id:
+            # Already dispatched — observe only; never duplicate.
+            self.control.schedule_remote_observe(task_id, delay_seconds=0.0)
+            return {
+                "status": "already_dispatched",
+                "task_id": task_id,
+                "external_run_id": task.external_run_id,
+            }
+        self.tasks.mark_dispatching(task_id)
+        submitted = self.remote_worker.submit(
+            f"dispatch:{task_id}",
+            lambda: self._run_remote_dispatch(task_id),
+        )
+        return {
+            "status": "dispatch_submitted" if submitted else "dispatch_inflight",
+            "task_id": task_id,
+        }
+
+    def _run_remote_dispatch(self, task_id: str) -> dict[str, Any]:
+        task = self.tasks.get_task(task_id)
+        if task is None or task.is_terminal:
+            return {"status": "skipped", "task_id": task_id}
+        if task.external_run_id:
+            self.control.schedule_remote_observe(task_id, delay_seconds=0.0)
+            return {"status": "already_dispatched", "task_id": task_id}
+
+        import asyncio
+
+        from mechaharness.host_kit import effectful_external_handle, host_graph_executor
+
+        from june.harness.execution import _june_runner_registry
+
+        bound = bound_run_for_task(task_id)
+        payload = {
+            "task_id": task.id,
+            "instruction": task.instruction,
+            "acceptance_criteria": list(task.acceptance_criteria),
+            "workspace": dict(task.workspace),
+            "metadata": dict(task.metadata),
+            "backend": task.backend,
+        }
+        # Incubating june.remote_task recipe bind + run (HF-03 still open).
+        graph = build_remote_task_graph(payload, run_id=bound.run_id)
+        self.tasks.record_mechaharness_run(task_id, bound.run_id)
+
+        registry = _june_runner_registry()
+        registry.register(make_coding_job_runner(self.execution_backend))
+        # Prefer MH host_kit over hand-wired GraphExecutor (HF-01/HF-02/HF-04).
+        executor = host_graph_executor(
+            runners=registry,
+            checkpoint_path=self._checkpoint_path(),
+            agent_id="june",
+        )
+        budget_policy = bound.budget.to_mechaharness()
+        try:
+            result = asyncio.run(
+                executor.run(
+                    graph,
+                    budget_policy=budget_policy,
+                    run_id=bound.run_id,
+                    resume=False,
+                )
+            )
+        except Exception as exc:  # noqa: BLE001
+            self.tasks.mark_needs_attention(
+                task_id,
+                error=str(exc),
+                reason="dispatch_exception",
+                failure_class="dispatch_error",
+            )
+            return {"status": "error", "task_id": task_id, "error": str(exc)}
+
+        external_run_id = effectful_external_handle(result, "coding_job")
+
+        if result.status == "ok" and external_run_id:
+            self.tasks.mark_running(
+                task_id,
+                external_run_id=str(external_run_id),
+                mechaharness_run_id=bound.run_id,
+            )
+            self.control.schedule_remote_observe(
+                task_id,
+                delay_seconds=self.tasks.observe_backoff_seconds,
+            )
+            return {
+                "status": "running",
+                "task_id": task_id,
+                "external_run_id": external_run_id,
+                "mechaharness_run_id": bound.run_id,
+            }
+
+        self.tasks.mark_needs_attention(
+            task_id,
+            error=getattr(result, "error", None) or "dispatch_graph_failed",
+            reason="dispatch_graph_failed",
+            failure_class="dispatch_graph_failed",
+        )
+        return {
+            "status": "needs_attention",
+            "task_id": task_id,
+            "graph_status": getattr(result, "status", None),
+            "error": getattr(result, "error", None),
+        }
+
+    def _on_observe_remote_task(self, payload: dict[str, Any]) -> dict[str, Any]:
+        task_id = str(payload.get("task_id") or "")
+        task = self.tasks.observe_task(task_id)
+        if task is None:
+            return {"status": "not_found", "task_id": task_id}
+        if not task.is_terminal and task.state is TaskState.RUNNING:
+            # Backoff between observes; 0 means schedule immediately (tests).
+            base = max(0.0, float(self.tasks.observe_backoff_seconds))
+            delay = 0.0 if base == 0.0 else min(1.0, base * 2)
+            self.control.schedule_remote_observe(task_id, delay_seconds=delay)
+        return {
+            "status": task.state.value,
+            "task_id": task_id,
+            "external_run_id": task.external_run_id,
+            "result_summary": task.result_summary,
+        }
+
+    def _on_reconcile_remote_tasks(self, payload: dict[str, Any]) -> dict[str, Any]:
+        del payload
+        reconciled = self.tasks.reconcile_all()
+        for task in reconciled:
+            if task.state is TaskState.QUEUED and not task.external_run_id:
+                self.control.schedule_remote_dispatch(task.id)
+            elif task.state is TaskState.RUNNING and task.external_run_id:
+                self.control.schedule_remote_observe(task.id, delay_seconds=0.0)
+        return {
+            "status": "reconciled",
+            "count": len(reconciled),
+            "task_ids": [t.id for t in reconciled],
+        }
+
+    def submit_remote_task(
+        self,
+        *,
+        instruction: str,
+        acceptance_criteria: list[str] | None = None,
+        workspace: dict[str, Any] | None = None,
+        backend: str | None = None,
+        goal_id: str | None = None,
+        issue_id: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> RemoteTask:
+        return self.tasks.submit_task(
+            instruction=instruction,
+            acceptance_criteria=acceptance_criteria,
+            workspace=workspace,
+            backend=backend,
+            goal_id=goal_id,
+            issue_id=issue_id,
+            metadata=metadata,
         )
 
     def _enqueue_control_work(self, work: RunnableWork) -> None:
@@ -264,6 +515,20 @@ class Orchestrator:
                 "model": self.settings.junespark.model,
                 "configured": bool(self.settings.junespark.base_url),
             }
+        remote = self.tasks.get_status()
+        recent = [
+            {
+                "task_id": t.id,
+                "state": t.state.value,
+                "backend": t.backend,
+                "external_run_id": t.external_run_id,
+                "updated_at": t.updated_at,
+                "error": t.error,
+                "mechaharness_run_ids": list(t.mechaharness_run_ids),
+                "result_summary": t.result_summary,
+            }
+            for t in self.tasks.list_tasks()[:20]
+        ]
         return {
             "goals": len(self.goals.list()),
             "active_goals": len(self.goals.list(status=GoalStatus.ACTIVE)),
@@ -278,4 +543,6 @@ class Orchestrator:
             "policy_version": self.policy.version,
             "mechaharness": self.client.connect(),
             "junespark": junespark,
+            "remote_tasks": remote,
+            "remote_task_recent": recent,
         }
