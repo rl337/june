@@ -5,11 +5,11 @@ Generation recipes bind this via soft point rather than inlining expand/score no
 
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 from uuid import uuid4
 
+from june.async_util import run_coro_sync
 from june.budget import SubgraphBudget
 from june.harness import BoundRun
 from june.recipes.imagegen.acceptance import (
@@ -375,7 +375,7 @@ def run_evaluate_criteria_recipe(
         agent_id="june-imagegen-eval",
         grants=grants,
     )
-    exec_result = asyncio.run(
+    exec_result = run_coro_sync(
         executor.run(
             graph,
             budget_policy=bound.budget.to_mechaharness(),

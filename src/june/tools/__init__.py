@@ -68,6 +68,8 @@ def build_default_tools(
     *,
     documents: DocumentStore | None = None,
     knowledge: KnowledgeGraph | None = None,
+    settings: Any | None = None,
+    image_generator: Any | None = None,
 ) -> ToolRegistry:
     registry = ToolRegistry()
 
@@ -86,6 +88,15 @@ def build_default_tools(
             description="Return June orchestrator status clock and health ping.",
             handler=status,
         )
+    )
+
+    from june.tools.imagegen import register_generate_image_tool
+
+    register_generate_image_tool(
+        registry,
+        documents=documents,
+        settings=settings,
+        generator=image_generator,
     )
 
     if documents is not None:

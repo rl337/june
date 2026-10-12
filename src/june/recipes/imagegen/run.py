@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass, field
 from typing import Any
 from uuid import uuid4
 
+from june.async_util import run_coro_sync
 from june.recipes.imagegen.critics import PromptCrafter, VisionCritic
 from june.recipes.imagegen.evaluate import EvaluateResult, ImageEvaluator
 from june.recipes.imagegen.generators import ImageGenerator
@@ -117,7 +117,7 @@ def run_imagegen_recipe(
         agent_id="june-imagegen",
         grants=grants,
     )
-    result = asyncio.run(
+    result = run_coro_sync(
         executor.run(
             graph,
             budget_policy=bound.budget.to_mechaharness(),

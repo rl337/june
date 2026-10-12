@@ -115,36 +115,26 @@ class Orchestrator:
         self.chat_runner = chat_runner
         self.runner.chat_runner = chat_runner
 
-    def handle_chat(self, message: ChannelMessage) -> ChannelReply:
-        """Process a channel message through the incubating june.chat subgraph."""
-        work = RunnableWork(
-            goal_id=None,
-            issue_id=None,
-            reason=WakeReason.EVENT,
-            payload={
-                "action": "chat",
-                "template": CHAT_TEMPLATE,
-                "channel_message": message.to_dict(),
-                "task": message.text() or "chat",
-            },
-        )
-        outcome = self.runner.run(work)
-        reply_raw = outcome.result.get("reply") or {}
-        if isinstance(reply_raw, dict) and reply_raw.get("parts") is not None:
+    def handle_chat(
+        self,
+        message: ChannelMessage,
+        *,
+        on_phase: Any | None = None,
+        run_id: str | None = None,
+        checkpoint_path: str | None = None,
+    ) -> ChannelReply:
+        """Process a channel message through the incubating june.chat recipe."""
+        if self.chat_runner is None:
             return ChannelReply(
-                parts=[ContentPart.from_dict(p) for p in reply_raw.get("parts") or []],
-                run_id=outcome.run_id or reply_raw.get("run_id"),
-                model=reply_raw.get("model"),
-                tool_trace=list(reply_raw.get("tool_trace") or []),
-                notes=list(reply_raw.get("notes") or []),
-                raw={"outcome_status": outcome.status, **dict(reply_raw.get("raw") or {})},
+                parts=[ContentPart.text_part("chat_runner_not_configured")],
+                notes=["chat_runner_not_configured"],
             )
-        text = str(reply_raw.get("text") if isinstance(reply_raw, dict) else reply_raw or "")
-        return ChannelReply(
-            parts=[ContentPart.text_part(text or f"chat status={outcome.status}")],
-            run_id=outcome.run_id,
-            model=None,
-            notes=[f"decision={outcome.decision}"],
+        self.templates.record_use(CHAT_TEMPLATE)
+        return self.chat_runner.run(
+            message,
+            on_phase=on_phase,
+            run_id=run_id,
+            checkpoint_path=checkpoint_path,
         )
 
     def _ensure_control_template(self) -> None:

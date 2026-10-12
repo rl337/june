@@ -215,45 +215,24 @@ class TaskRunner:
                 decision="escalate",
             )
 
-        # Prefer June-local sequential graph (same node functions). When MH is
-        # available the harness client can still checkpoint the topology.
+        # Recipe bind+run via host_kit (ChatGraphRunner → run_chat_recipe).
         reply = self.chat_runner.run(message)
-        bound = self.client.bind_template(
-            CHAT_TEMPLATE,
-            bindings={
-                "task": work.payload.get("task") or message.text(),
-                "channel_message": message.to_dict(),
-                "reply": reply.to_dict(),
-            },
-            node_kinds=[
-                "june.chat.refine_input",
-                "june.chat.context_optimize",
-                "june.chat.tool_loop",
-                "june.chat.render_reply",
-            ],
-            budget=budget_from_payload(work.payload)
-            or budget_for_decision(self.policy.classify("chat")),
-        )
-        run_result = self.client.execute(bound)
-        # Chat success is the reply, not merely graph readiness.
-        status = "ok" if reply.text() else run_result.status
-        if run_result.status == "failed":
-            status = "failed"
+        status = "ok" if (reply.text() or reply.parts) else "failed"
 
         elapsed = (datetime.now(timezone.utc) - started).total_seconds()
         self.outcomes.record(
             OutcomeRecord(
                 goal_id=work.goal_id,
                 issue_id=work.issue_id,
-                run_ids=[reply.run_id or run_result.run_id],
+                run_ids=[reply.run_id or work.id],
                 goal_completed=False,
-                graph_succeeded=status in {"ok", "ready", "scaffolded"},
-                orchestration_success=bool(reply.text()),
+                graph_succeeded=status == "ok",
+                orchestration_success=bool(reply.text() or reply.parts),
                 elapsed_seconds=elapsed,
                 retries=work.attempt,
                 approval_burden=0,
                 policy_version=self.policy.version,
-                harness_version=str(run_result.raw.get("mode")),
+                harness_version="host_kit",
                 notes="; ".join(reply.notes),
             )
         )
@@ -262,12 +241,9 @@ class TaskRunner:
             status=status,
             result={
                 "reply": reply.to_dict(),
-                "run": run_result.raw,
-                "checkpoint": run_result.graph_checkpoint,
                 "template": CHAT_TEMPLATE,
-                "budget_policy": run_result.budget,
             },
-            run_id=reply.run_id or run_result.run_id,
+            run_id=reply.run_id,
             decision="complete" if status != "failed" else "escalate",
             policy={"action": "chat", "template": CHAT_TEMPLATE},
         )
