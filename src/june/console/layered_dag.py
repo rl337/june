@@ -11,7 +11,8 @@ expose ``id``, ``w``, ``h``, ``x``, ``y``.
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Any, Iterable, Literal, Protocol, runtime_checkable
+from collections.abc import Iterable
+from typing import Any, Literal, Protocol, runtime_checkable
 
 
 @runtime_checkable

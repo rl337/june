@@ -128,7 +128,7 @@ def seed_hub(hub: ConsoleHub) -> None:
     hub.set_structure_checkpoint(sample_structure_checkpoint())
     hub.begin_run("ui-demo")
     now = datetime.now(timezone.utc)
-    for i in range(6):
+    for _i in range(6):
         hub.ingest_event(
             _Event(
                 type="core:graph_node_start",

@@ -248,7 +248,10 @@ def _handle_chat_with_console(
         )
         reply = result.reply
         reply.run_id = run_id
-        final_pipeline = result.graph if isinstance(result.graph, dict) and result.graph else pipeline
+        if isinstance(result.graph, dict) and result.graph:
+            final_pipeline = result.graph
+        else:
+            final_pipeline = pipeline
         status = "ok" if result.ok else "failed"
         hub.complete_instance(run_id=run_id, status=status, pipeline=final_pipeline)
         if status == "ok":
