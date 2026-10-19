@@ -2,11 +2,14 @@
 
 Loads ``config.yaml`` then overlays process env / ``.env``. Promote a generic
 file→Config helper into pyiv/pyiv-common only after this pattern stabilizes.
+
+``JuneConfig`` registers pyiv ≥ 1.1 use-case injectables (``Environment``,
+time, files, log, ``HttpClient``) so hosts/tests can override via
+``register_instance`` / ``pyiv.override`` instead of monkeypatching OS edges.
 """
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any, Callable
 
@@ -14,6 +17,11 @@ import yaml
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pyiv import Config, get_injector
+from pyiv.files import Filesystem, RealFilesystem
+from pyiv.http import HttpClient, UrllibHttpClient
+from pyiv.log import LoggerFactory, StdlibLoggerFactory
+from pyiv.process import Environment, OsEnvironment
+from pyiv.time import Clock, DateTimeService, PythonDateTimeService, RealClock
 
 DEFAULT_CONFIG_NAMES = ("config.yaml", "june.yaml")
 
@@ -92,52 +100,69 @@ def _deep_merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]
     return out
 
 
-def _load_yaml(path: Path) -> dict[str, Any]:
-    if not path.is_file():
+def _load_yaml(path: Path, *, filesystem: Filesystem | None = None) -> dict[str, Any]:
+    fs = filesystem or RealFilesystem()
+    if not fs.is_file(str(path)):
         return {}
-    raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    raw = yaml.safe_load(fs.read_text(str(path))) or {}
     if not isinstance(raw, dict):
         raise ValueError(f"config file must be a mapping: {path}")
     return raw
 
 
-def resolve_config_path(explicit: str | Path | None = None) -> Path | None:
+def resolve_config_path(
+    explicit: str | Path | None = None,
+    *,
+    env: Environment | None = None,
+    filesystem: Filesystem | None = None,
+) -> Path | None:
+    fs = filesystem or RealFilesystem()
+    environment = env or OsEnvironment()
     if explicit is not None:
         return Path(explicit)
-    env = os.environ.get("JUNE_CONFIG")
-    if env:
-        return Path(env)
+    config_env = environment.get("JUNE_CONFIG")
+    if config_env:
+        return Path(config_env)
     for name in DEFAULT_CONFIG_NAMES:
         candidate = Path.cwd() / name
-        if candidate.is_file():
+        if fs.is_file(str(candidate)):
             return candidate
     return None
+
+
+def _alias_overlay_from_env(env: Environment) -> dict[str, Any]:
+    """Allow JUNESPARK_* / COMFY_* aliases without nesting."""
+    alias_overlay: dict[str, Any] = {}
+    if env.get("JUNESPARK_BASE_URL"):
+        alias_overlay.setdefault("junespark", {})["base_url"] = env.get("JUNESPARK_BASE_URL")
+    if env.get("JUNESPARK_API_KEY"):
+        alias_overlay.setdefault("junespark", {})["api_key"] = env.get("JUNESPARK_API_KEY")
+    if env.get("JUNESPARK_MODEL"):
+        alias_overlay.setdefault("junespark", {})["model"] = env.get("JUNESPARK_MODEL")
+    if env.get("COMFY_BASE_URL"):
+        alias_overlay.setdefault("comfy", {})["base_url"] = env.get("COMFY_BASE_URL")
+    return alias_overlay
 
 
 def load_settings(
     config_path: str | Path | None = None,
     *,
     env_file: str | Path | None = ".env",
+    env: Environment | None = None,
+    filesystem: Filesystem | None = None,
 ) -> JuneSettings:
     """Merge yaml config with env/.env (env wins via pydantic-settings)."""
-    path = resolve_config_path(config_path)
-    yaml_data = _load_yaml(path) if path is not None else {}
+    environment = env or OsEnvironment()
+    fs = filesystem or RealFilesystem()
+    path = resolve_config_path(config_path, env=environment, filesystem=fs)
+    yaml_data = _load_yaml(path, filesystem=fs) if path is not None else {}
 
-    # Allow JUNESPARK_* aliases without nesting.
-    alias_overlay: dict[str, Any] = {}
-    if os.environ.get("JUNESPARK_BASE_URL"):
-        alias_overlay.setdefault("junespark", {})["base_url"] = os.environ["JUNESPARK_BASE_URL"]
-    if os.environ.get("JUNESPARK_API_KEY"):
-        alias_overlay.setdefault("junespark", {})["api_key"] = os.environ["JUNESPARK_API_KEY"]
-    if os.environ.get("JUNESPARK_MODEL"):
-        alias_overlay.setdefault("junespark", {})["model"] = os.environ["JUNESPARK_MODEL"]
-    if os.environ.get("COMFY_BASE_URL"):
-        alias_overlay.setdefault("comfy", {})["base_url"] = os.environ["COMFY_BASE_URL"]
+    alias_overlay = _alias_overlay_from_env(environment)
     if alias_overlay:
         yaml_data = _deep_merge(yaml_data, alias_overlay)
 
     env_path = None if env_file is None else Path(env_file)
-    if env_path is not None and not env_path.is_file():
+    if env_path is not None and not fs.is_file(str(env_path)):
         env_path = None
     if env_path is not None:
         return JuneSettings(_env_file=str(env_path), **yaml_data)
@@ -153,8 +178,16 @@ class JuneConfig(Config):
         *,
         config_path: str | Path | None = None,
         build: Callable[[JuneSettings], dict[type, Any]] | None = None,
+        env: Environment | None = None,
+        filesystem: Filesystem | None = None,
     ) -> None:
-        self._settings = settings or load_settings(config_path)
+        self._env = env
+        self._filesystem = filesystem
+        self._settings = settings or load_settings(
+            config_path,
+            env=env,
+            filesystem=filesystem,
+        )
         self._build = build
         self._instances: dict[type, Any] = {}
         super().__init__()  # type: ignore[no-untyped-call]
@@ -166,7 +199,19 @@ class JuneConfig(Config):
     def configure(self) -> None:
         from june.bootstrap import build_app
 
-        built: dict[type, Any] = (self._build or build_app)(self._settings)
+        # pyiv ≥ 1.1 use-case injectables (same leaf edges MechaHarness registers).
+        self.register_instance(Environment, self._env or OsEnvironment())
+        self.register(DateTimeService, PythonDateTimeService, singleton=True)
+        self.register_instance(Filesystem, self._filesystem or RealFilesystem())
+        self.register(Clock, RealClock, singleton=True)
+        self.register(LoggerFactory, StdlibLoggerFactory, singleton=True)
+        http = UrllibHttpClient(timeout=self._settings.junespark.timeout)
+        self.register_instance(HttpClient, http)
+
+        if self._build is not None:
+            built = self._build(self._settings)
+        else:
+            built = build_app(self._settings, http_client=http)
         self._instances = built
         for abstract, instance in built.items():
             self.register_instance(abstract, instance)

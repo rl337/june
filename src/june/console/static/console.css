@@ -87,10 +87,16 @@ body {
   }
 }
 
-.june-console > .dock,
-.june-console > .view-workspace,
-.june-console > .dialog-layer {
+/* Docks must stack above the workspace so expanded menus remain clickable
+   over graph panes (menu panels hang into the center). */
+.june-console > .dock {
+  z-index: 40;
+}
+.june-console > .view-workspace {
   z-index: 1;
+}
+.june-console > .dialog-layer {
+  z-index: 60;
 }
 
 .scheme-mark {
@@ -917,6 +923,14 @@ body {
   filter: drop-shadow(0 0 12px rgba(255, 94, 176, 0.7));
 }
 
+.node.occupied {
+  filter: drop-shadow(0 0 8px rgba(255, 142, 200, 0.4));
+}
+
+.node.failed {
+  filter: drop-shadow(0 0 10px rgba(255, 59, 47, 0.55));
+}
+
 .node[data-shape="soft"][data-running="1"] {
   filter: drop-shadow(0 0 14px rgba(232, 90, 79, 0.55));
 }
@@ -931,6 +945,16 @@ body {
 
 .node.pending {
   opacity: 0.9;
+}
+
+.edge-label {
+  fill: var(--muted);
+  font-family: "Share Tech Mono", ui-monospace, monospace;
+  pointer-events: none;
+}
+
+.graph-edge.is-live {
+  filter: drop-shadow(0 0 4px rgba(255, 94, 176, 0.55));
 }
 
 .legend-list {
@@ -978,8 +1002,120 @@ body {
   text-shadow: 0 0 8px var(--running);
 }
 
+.occupied-sample {
+  color: #ff8ec8;
+  text-shadow: 0 0 6px rgba(255, 142, 200, 0.5);
+}
+
+.failed-sample {
+  color: var(--danger);
+  text-shadow: 0 0 6px rgba(255, 59, 47, 0.45);
+}
+
 .dim-sample {
   opacity: 0.45;
+}
+
+.inspector-hint {
+  margin: 0.6rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.inspector-card {
+  padding: 0.55rem 0.7rem 0.85rem;
+}
+
+.inspector-title {
+  margin: 0 0 0.55rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.inspector-sub {
+  margin: 0.75rem 0 0.35rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.inspector-dl {
+  margin: 0;
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+}
+
+.inspector-dl > div {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: 0.4rem;
+  align-items: baseline;
+}
+
+.inspector-dl dt {
+  margin: 0;
+  color: var(--muted);
+  font-family: "Share Tech Mono", ui-monospace, monospace;
+  font-size: 0.7rem;
+}
+
+.inspector-dl dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.inspector-dl code {
+  font-family: "Share Tech Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  color: var(--accent);
+}
+
+.inspector-role,
+.inspector-frontier {
+  font-family: "Share Tech Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.inspector-frontier.frontier-running {
+  color: var(--running);
+  border-color: rgba(255, 94, 176, 0.45);
+}
+
+.inspector-frontier.frontier-occupied {
+  color: #ff8ec8;
+  border-color: rgba(255, 142, 200, 0.4);
+}
+
+.inspector-frontier.frontier-failed {
+  color: var(--danger);
+  border-color: rgba(255, 59, 47, 0.45);
+}
+
+.inspector-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: "Share Tech Mono", ui-monospace, monospace;
+  font-size: 0.7rem;
+}
+
+.inspector-table th,
+.inspector-table td {
+  text-align: left;
+  padding: 0.25rem 0.3rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  vertical-align: top;
+}
+
+.inspector-table th {
+  color: var(--muted);
+  font-weight: 500;
 }
 
 .event-log-list {
@@ -1050,19 +1186,30 @@ body {
   padding: 0;
   border: 0;
   border-radius: 3px 3px 1px 1px;
-  background: rgba(74, 58, 138, 0.45);
-  cursor: pointer;
-  transition: background 120ms ease, height 180ms ease;
+  background: rgba(74, 58, 138, 0.35);
+  cursor: default;
+  /* Height transitions fight live WS updates and feel like flicker. */
+  transition: background 120ms ease, box-shadow 120ms ease;
+}
+
+.event-rate-bar:disabled {
+  pointer-events: none;
+  opacity: 0.55;
 }
 
 .event-rate-bar.has-events {
   background: linear-gradient(180deg, var(--running) 0%, var(--running-coral) 55%, #4a1848 100%);
   box-shadow: 0 0 8px rgba(255, 94, 176, 0.28);
+  cursor: pointer;
+  pointer-events: auto;
+  opacity: 1;
 }
 
-.event-rate-bar:hover {
+.event-rate-bar.has-events:hover,
+.event-rate-bar.has-events:focus-visible {
   background: var(--accent);
   box-shadow: 0 0 10px rgba(94, 234, 255, 0.4);
+  outline: none;
 }
 
 .event-rate-hint {

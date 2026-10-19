@@ -1,5 +1,5 @@
-import { JuneConsoleShell } from "./shell.js";
-import { GraphViewport, selectScene } from "./graph.js";
+import { JuneConsoleShell } from "./shell.js?v=bt-activity";
+import { GraphViewport, selectScene } from "./graph.js?v=bt-activity";
 import { mountChatPanel } from "./chat.js";
 
 const root = document.getElementById("june-console");
@@ -15,6 +15,8 @@ const viewport = new GraphViewport(canvas, {
     if (sub && id && id !== "root") {
       sub.dataset.selected = id;
     }
+    const node = id && id !== "root" ? viewport._index?.get(id) : null;
+    shell.showNodeInspector(node || null, { open: Boolean(node) });
   },
   onStackBadge: (node) => {
     shell.openInstanceStackDialog(node);
@@ -23,7 +25,7 @@ const viewport = new GraphViewport(canvas, {
     const runId = node?.id;
     if (!runId) return;
     // Selecting alone only updates the structure scene (unknown for instances).
-    // Open the live/finished subgraph watch so 60s runs stay inspectable.
+    // Open the live/finished subgraph watch so cron runs stay inspectable.
     void shell.openInstanceWatchDialog(runId, { GraphViewport });
     if (viewport._index?.has(runId)) {
       viewport.select(runId, { zoomToward: true });
@@ -55,6 +57,7 @@ shell.on("scene:root", () => {
   viewport.clearSelection();
   viewport.fit();
   selectScene("root");
+  shell.showNodeInspector(null);
 });
 shell.on("snapshot:refresh", async () => {
   const res = await fetch("/api/snapshot");

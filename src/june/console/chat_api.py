@@ -5,10 +5,12 @@ from __future__ import annotations
 import base64
 import mimetypes
 import tempfile
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Any
 from uuid import uuid4
 
+from june.async_util import run_sync_in_thread
 from june.channels import ChannelMessage, ChatService, PartKind
 from june.channels.adapters import RestChatAdapter, WebappAdapter
 from june.config import JuneSettings
@@ -81,7 +83,13 @@ def mount_chat_routes(
             raise HTTPException(status_code=503, detail="junespark.base_url not configured")
         try:
             message = webapp.to_message(body)
-            reply = _handle_chat_with_console(hub, orchestrator, chat_service, message)
+            # Host_kit + tools (Comfy) are blocking; keep the event loop free so
+            # snapshot/WS observability keeps updating during long runs.
+            reply = await run_sync_in_thread(
+                lambda: _handle_chat_with_console(
+                    hub, orchestrator, chat_service, message
+                )
+            )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except Exception as exc:  # noqa: BLE001
@@ -95,7 +103,7 @@ def mount_chat_routes(
             raise HTTPException(status_code=503, detail="junespark.base_url not configured")
         try:
             message = rest.to_message(body)
-            reply = chat_service.handle(message)
+            reply = await run_sync_in_thread(lambda: chat_service.handle(message))
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         except Exception as exc:  # noqa: BLE001
@@ -180,19 +188,17 @@ def _handle_chat_with_console(
     chat_service: ChatService,
     message: ChannelMessage,
 ) -> Any:
-    """Run chat via ChatService; mirror recipe phases onto the console hub."""
-    del orchestrator  # entry is always ChatService (recipe bind+run)
+    """Run chat via ChatService; console observes live MH graph + events."""
+    del orchestrator
     if hub is None:
         return chat_service.handle(message)
 
-    from june.harness.cron_graph import (
-        CHAT_PARENT_NODE_ID,
-        chat_pipeline_for_instance,
-        new_chat_run_id,
-    )
+    from june.harness.cron_graph import CHAT_PARENT_NODE_ID, new_chat_run_id
+    from june.recipes.chat.graph import build_chat_graph
 
     run_id = new_chat_run_id()
-    pipeline = chat_pipeline_for_instance(run_id)
+    # Instance pipeline is the real recipe graph (HF-07 expands tools.subgraph).
+    pipeline = build_chat_graph(message, run_id=run_id).checkpoint()
     hub.begin_instance(
         run_id=run_id,
         bucket="chat",
@@ -200,33 +206,86 @@ def _handle_chat_with_console(
         pipeline=pipeline,
     )
     hub.mark_bucket_running(CHAT_PARENT_NODE_ID)
+    hub.ingest_journal(
+        {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "type": "june.console.log",
+            "run_id": run_id,
+            "message": "chat turn started",
+            "summary": f"▶ chat {run_id[-8:]}",
+            "bucket": "chat",
+            "instance_id": run_id,
+        }
+    )
 
-    phase_keys = ("refine", "context", "tools", "render")
-
-    def _set_phase_status(phase: str, status: str) -> None:
-        node_id = f"{run_id}:step:{phase}"
-        nodes = pipeline.get("nodes")
-        if isinstance(nodes, dict) and node_id in nodes and isinstance(nodes[node_id], dict):
-            nodes[node_id]["status"] = status
-        hub.set_instance_progress(run_id, active_node_id=node_id, pipeline=pipeline)
+    def on_event(event: Any) -> None:
+        hub.ingest_event(event)
+        hub.touch_instance(run_id, event=event)
 
     def on_phase(phase: str, _state: Any) -> None:
-        # Driven by recipe node runners (host_kit), not a parallel Python loop.
-        for key in phase_keys:
-            if key == phase:
-                _set_phase_status(key, "running")
-                break
-            _set_phase_status(key, "succeeded")
+        hub.ingest_journal(
+            {
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "type": "june.console.log",
+                "run_id": run_id,
+                "message": f"chat phase {phase}",
+                "summary": f"● chat:{phase}",
+                "bucket": "chat",
+                "instance_id": run_id,
+                "phase": phase,
+            }
+        )
+        node_id = phase if phase in {"refine", "context", "tools", "render"} else None
+        if node_id:
+            hub.set_instance_progress(run_id, active_node_id=node_id)
 
     try:
-        reply = chat_service.handle(message, on_phase=on_phase, run_id=run_id)
-        for key in phase_keys:
-            _set_phase_status(key, "succeeded")
+        result = chat_service.handle_detailed(
+            message,
+            on_phase=on_phase,
+            on_event=on_event,
+            run_id=run_id,
+        )
+        reply = result.reply
         reply.run_id = run_id
-        hub.complete_instance(run_id=run_id, status="ok", pipeline=pipeline)
-        hub.mark_bucket_succeeded(CHAT_PARENT_NODE_ID)
+        if isinstance(result.graph, dict) and result.graph:
+            final_pipeline = result.graph
+        else:
+            final_pipeline = pipeline
+        status = "ok" if result.ok else "failed"
+        hub.complete_instance(run_id=run_id, status=status, pipeline=final_pipeline)
+        if status == "ok":
+            hub.mark_bucket_succeeded(CHAT_PARENT_NODE_ID)
+        else:
+            hub.mark_bucket_failed(
+                CHAT_PARENT_NODE_ID, error=result.error or "chat turn failed"
+            )
+        hub.ingest_journal(
+            {
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "type": "june.console.log",
+                "run_id": run_id,
+                "message": f"chat turn finished ({status})",
+                "summary": f"{'■' if status == 'ok' else '✕'} chat {run_id[-8:]} {status}",
+                "bucket": "chat",
+                "instance_id": run_id,
+                "status": status,
+            }
+        )
         return reply
-    except Exception:
+    except Exception as exc:
         hub.complete_instance(run_id=run_id, status="failed", pipeline=pipeline)
         hub.mark_bucket_failed(CHAT_PARENT_NODE_ID, error="chat turn failed")
+        hub.ingest_journal(
+            {
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "type": "june.console.log",
+                "run_id": run_id,
+                "message": str(exc),
+                "summary": f"✕ chat {run_id[-8:]} failed",
+                "bucket": "chat",
+                "instance_id": run_id,
+                "status": "failed",
+            }
+        )
         raise

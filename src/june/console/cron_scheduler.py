@@ -1,4 +1,4 @@
-"""Drive 10s / 60s bucket subgraph runs for the console cron graph."""
+"""Drive minute / hourly empty-event bucket runs for the console cron graph."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from june.console.hub import ConsoleHub
 from june.harness import BoundRun, MechaHarnessClient
 from june.harness.cron_graph import (
     CONSOLE_CRON_RUN_ID,
+    CRON_BUCKETS,
     build_console_cron_graph,
     clone_pipeline_for_instance,
     new_bucket_run_id,
@@ -19,11 +20,7 @@ from june.harness.cron_graph import (
 
 
 class ConsoleCronScheduler:
-    """Periodically executes bucket subgraphs and streams events to the hub.
-
-    The 10s bucket pipeline takes longer than 10s, so ticks are launched on
-    daemon threads and may overlap.
-    """
+    """Periodically executes empty minute/hourly tick subgraphs into the hub."""
 
     def __init__(
         self,
@@ -39,8 +36,7 @@ class ConsoleCronScheduler:
         self._thread: threading.Thread | None = None
         self._workers: list[threading.Thread] = []
         self._master = build_console_cron_graph(CONSOLE_CRON_RUN_ID)
-        self._last_10s = 0.0
-        self._last_60s = 0.0
+        self._last_tick: dict[str, float] = {key: 0.0 for key, _, _ in CRON_BUCKETS}
         self.hub.set_structure_checkpoint(self._master.checkpoint())
 
     def start(self) -> None:
@@ -59,18 +55,18 @@ class ConsoleCronScheduler:
         self._workers.clear()
 
     def _loop(self) -> None:
-        self._spawn_bucket("10s", f"{CONSOLE_CRON_RUN_ID}:bucket:10s", blocking=False)
-        self._spawn_bucket("60s", f"{CONSOLE_CRON_RUN_ID}:bucket:60s", blocking=True)
-        self._last_10s = time.monotonic()
-        self._last_60s = time.monotonic()
+        # Fire each bucket once at startup, then on interval.
+        for bucket_key, _interval_seconds, _message in CRON_BUCKETS:
+            node_id = f"{CONSOLE_CRON_RUN_ID}:bucket:{bucket_key}"
+            self._spawn_bucket(bucket_key, node_id, blocking=True)
+            self._last_tick[bucket_key] = time.monotonic()
         while not self._stop.is_set():
             now = time.monotonic()
-            if now - self._last_10s >= 10.0:
-                self._last_10s = now
-                self._spawn_bucket("10s", f"{CONSOLE_CRON_RUN_ID}:bucket:10s", blocking=False)
-            if now - self._last_60s >= 60.0:
-                self._last_60s = now
-                self._spawn_bucket("60s", f"{CONSOLE_CRON_RUN_ID}:bucket:60s", blocking=False)
+            for bucket_key, interval_seconds, _message in CRON_BUCKETS:
+                if now - self._last_tick[bucket_key] >= float(interval_seconds):
+                    self._last_tick[bucket_key] = now
+                    node_id = f"{CONSOLE_CRON_RUN_ID}:bucket:{bucket_key}"
+                    self._spawn_bucket(bucket_key, node_id, blocking=False)
             self._reap_workers()
             if self._stop.wait(timeout=0.25):
                 break
@@ -106,7 +102,7 @@ class ConsoleCronScheduler:
         bound = BoundRun(
             template_name="console.cron.bucket",
             bindings={"bucket": bucket_key, "instance_id": run_id},
-            node_kinds=["june.timed_log", "june.event_log"],
+            node_kinds=["june.event_log"],
             budget=SubgraphBudget(soft_limit=64.0, hard_limit=128.0),
             run_id=run_id,
         )
@@ -149,7 +145,6 @@ class ConsoleCronScheduler:
                 status=result.status,
                 pipeline=result.graph.checkpoint(),
             )
-            # Bucket node stays "running" while any instance is active.
             if not self.hub.bucket_has_active_instances(bucket_key):
                 self.hub.mark_bucket_succeeded(node_id)
             self.hub.ingest_journal(

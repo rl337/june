@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from june.recipes.imagegen.critics import PromptCrafter, VisionCritic
@@ -14,14 +15,20 @@ def make_imagegen_runners(
     generator: ImageGenerator,
     *,
     state: dict[str, Any] | None = None,
+    on_phase: Callable[[str], None] | None = None,
 ) -> list[Any]:
     from mechaharness.graph import NodeStatus
     from mechaharness.graph_executor import CallableGraphNodeRunner, NodeOutcome
 
     shared: dict[str, Any] = state if state is not None else {}
 
+    def _notify(phase: str) -> None:
+        if on_phase is not None:
+            on_phase(phase)
+
     async def prompt_node(node: Any, context: Any) -> Any:
         del context
+        _notify("prompt")
         problem = _problem_from_payload(node.payload, shared)
         text = problem.prompt_text()
         shared["problem"] = problem
@@ -35,14 +42,17 @@ def make_imagegen_runners(
 
     async def generate_node(node: Any, context: Any) -> Any:
         del context, node
+        _notify("generate")
         return _generate(shared, generator, NodeStatus, NodeOutcome, cost_units=1.0)
 
     async def persist_node(node: Any, context: Any) -> Any:
         del context, node
+        _notify("persist")
         return _persist(shared, NodeStatus, NodeOutcome)
 
     async def verify_node(node: Any, context: Any) -> Any:
         del context, node
+        _notify("verify")
         problem = shared.get("problem")
         data = shared.get("image_bytes") or b""
         if not isinstance(problem, ImageProblem):
@@ -78,14 +88,20 @@ def make_critique_refine_runners(
     critic: VisionCritic,
     *,
     state: dict[str, Any] | None = None,
+    on_phase: Callable[[str], None] | None = None,
 ) -> list[Any]:
     from mechaharness.graph import NodeStatus
     from mechaharness.graph_executor import CallableGraphNodeRunner, NodeOutcome
 
     shared: dict[str, Any] = state if state is not None else {}
 
+    def _notify(phase: str) -> None:
+        if on_phase is not None:
+            on_phase(phase)
+
     async def goal_node(node: Any, context: Any) -> Any:
         del context
+        _notify("goal")
         problem = _problem_from_payload(node.payload, shared)
         text = problem.prompt_text()
         shared["problem"] = problem
@@ -98,6 +114,7 @@ def make_critique_refine_runners(
 
     async def craft_prompt_node(node: Any, context: Any) -> Any:
         del context, node
+        _notify("craft_prompt")
         problem = shared.get("problem")
         if not isinstance(problem, ImageProblem):
             return NodeOutcome(
@@ -113,14 +130,17 @@ def make_critique_refine_runners(
 
     async def generate_node(node: Any, context: Any) -> Any:
         del context, node
+        _notify("generate")
         return _generate(shared, generator, NodeStatus, NodeOutcome, cost_units=1.0)
 
     async def persist_node(node: Any, context: Any) -> Any:
         del context, node
+        _notify("persist")
         return _persist(shared, NodeStatus, NodeOutcome)
 
     async def critique_node(node: Any, context: Any) -> Any:
         del context, node
+        _notify("critique")
         problem = shared.get("problem")
         data = shared.get("image_bytes") or b""
         image_prompt = str(shared.get("image_prompt") or "")
@@ -140,6 +160,7 @@ def make_critique_refine_runners(
 
     async def diagnose_node(node: Any, context: Any) -> Any:
         del context, node
+        _notify("diagnose")
         critique = dict(shared.get("critique") or {})
         passed = bool(critique.get("passed"))
         shared["first_pass_passed"] = passed
@@ -158,6 +179,7 @@ def make_critique_refine_runners(
 
     async def refine_prompt_node(node: Any, context: Any) -> Any:
         del context, node
+        _notify("refine_prompt")
         problem = shared.get("problem")
         if not isinstance(problem, ImageProblem):
             return NodeOutcome(
@@ -182,6 +204,7 @@ def make_critique_refine_runners(
 
     async def repair_generate_node(node: Any, context: Any) -> Any:
         del context, node
+        _notify("repair_generate")
         if shared.get("skip_repair"):
             return NodeOutcome(
                 status=NodeStatus.SUCCEEDED,
@@ -192,6 +215,7 @@ def make_critique_refine_runners(
 
     async def repair_persist_node(node: Any, context: Any) -> Any:
         del context, node
+        _notify("repair_persist")
         if shared.get("skip_repair"):
             return NodeOutcome(
                 status=NodeStatus.SUCCEEDED,
@@ -202,6 +226,7 @@ def make_critique_refine_runners(
 
     async def verify_critique_node(node: Any, context: Any) -> Any:
         del context, node
+        _notify("verify_critique")
         problem = shared.get("problem")
         data = shared.get("image_bytes") or b""
         image_prompt = str(shared.get("image_prompt") or "")

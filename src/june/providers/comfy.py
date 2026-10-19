@@ -2,72 +2,23 @@
 
 from __future__ import annotations
 
-import json
 import time
-import urllib.error
-import urllib.request
 import uuid
 from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlencode
 
-import httpx
+from pyiv.http import HttpClient, UrllibHttpClient
 
 from june.config import ComfySettings, JuneSettings
 
-
-@dataclass
-class _UrllibResponse:
-    status_code: int
-    content: bytes
-
-    def raise_for_status(self) -> None:
-        if self.status_code >= 400:
-            raise httpx.HTTPStatusError(
-                f"HTTP {self.status_code}",
-                request=httpx.Request("GET", "http://comfy.local"),
-                response=httpx.Response(self.status_code, content=self.content),
-            )
-
-    def json(self) -> Any:
-        return json.loads(self.content.decode("utf-8"))
-
-
-class UrllibHttpClient:
-    """httpx-shaped client using stdlib urllib (works under some agent allowlists)."""
-
-    def __init__(self, *, timeout: float = 600.0) -> None:
-        self.timeout = timeout
-
-    def get(self, url: str) -> _UrllibResponse:
-        return self._request("GET", url)
-
-    def post(self, url: str, *, content: str | bytes) -> _UrllibResponse:
-        body = content if isinstance(content, bytes) else content.encode("utf-8")
-        return self._request(
-            "POST",
-            url,
-            data=body,
-            headers={"Content-Type": "application/json"},
-        )
-
-    def close(self) -> None:
-        return None
-
-    def _request(
-        self,
-        method: str,
-        url: str,
-        *,
-        data: bytes | None = None,
-        headers: dict[str, str] | None = None,
-    ) -> _UrllibResponse:
-        req = urllib.request.Request(url, data=data, method=method, headers=headers or {})
-        try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
-                return _UrllibResponse(status_code=int(resp.status), content=resp.read())
-        except urllib.error.HTTPError as exc:
-            return _UrllibResponse(status_code=int(exc.code), content=exc.read() or b"")
+# Re-export for integration fixtures that imported the old June-local client.
+__all__ = [
+    "ComfyImageRef",
+    "ComfyJobResult",
+    "ComfyProvider",
+    "UrllibHttpClient",
+]
 
 
 @dataclass(frozen=True)
@@ -95,7 +46,11 @@ class ComfyJobResult:
 
 
 class ComfyProvider:
-    """Minimal ComfyUI API client for text-to-image workflow submission."""
+    """Minimal ComfyUI API client for text-to-image workflow submission.
+
+    Defaults to pyiv ``UrllibHttpClient``. Tests may inject ``MemoryHttpClient``
+    or an httpx ``Client`` that accepts ``json=``.
+    """
 
     def __init__(
         self,
@@ -104,7 +59,7 @@ class ComfyProvider:
         base_url: str | None = None,
         timeout: float = 600.0,
         poll_interval: float = 1.0,
-        client: httpx.Client | None = None,
+        client: HttpClient | Any | None = None,
     ) -> None:
         if isinstance(settings, JuneSettings):
             cfg = settings.comfy
@@ -124,7 +79,7 @@ class ComfyProvider:
             self.timeout = timeout
             self.poll_interval = poll_interval
         self._owns_client = client is None
-        self._client = client or httpx.Client(timeout=self.timeout)
+        self._client = client or UrllibHttpClient(timeout=self.timeout)
         self.client_id = f"june-{uuid.uuid4().hex[:8]}"
 
     def close(self) -> None:
@@ -154,7 +109,7 @@ class ComfyProvider:
 
     def queue_prompt(self, workflow: dict[str, Any]) -> str:
         body = {"prompt": workflow, "client_id": self.client_id}
-        resp = self._client.post(self._url("/prompt"), content=json.dumps(body))
+        resp = self._client.post(self._url("/prompt"), json=body)
         resp.raise_for_status()
         payload = resp.json()
         if not isinstance(payload, dict):

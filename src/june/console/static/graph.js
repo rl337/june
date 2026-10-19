@@ -228,13 +228,15 @@ export class GraphViewport {
     const root = el("g", { class: "world-root" });
     svg.appendChild(root);
 
-    drawEdges(root, world.edges || [], this._index, 0);
+    const runningIds = new Set(world.running_node_ids || []);
+    drawEdges(root, world.edges || [], this._index, 0, { runningIds });
     (world.nodes || []).forEach((node) => {
       drawNodeTree(root, node, {
         absX: node.x,
         absY: node.y,
         zoom: this.zoom,
         selectedId: this.selectedId,
+        runningIds,
         onSelect: (id) => this.select(id),
         onStackBadge: (n) => {
           if (this.onStackBadge) this.onStackBadge(n);
@@ -262,30 +264,160 @@ function indexNodes(nodes, absX = 0, absY = 0, map = new Map()) {
   return map;
 }
 
-function drawEdges(layer, edges, index, depth) {
+/**
+ * Orthogonal conduit routing: attach to box sides and elbow through the gap
+ * between nodes so paths never cut across sibling bodies.
+ */
+function boxOf(node, ox = 0, oy = 0) {
+  return {
+    id: node.id,
+    x: ox + (node.absX != null ? node.absX : node.x || 0),
+    y: oy + (node.absY != null ? node.absY : node.y || 0),
+    w: node.w,
+    h: node.h,
+  };
+}
+
+function clamp(v, lo, hi) {
+  return Math.max(lo, Math.min(hi, v));
+}
+
+function routeOrthogonal(a, b, { lane = 0 } = {}) {
+  const acx = a.x + a.w / 2;
+  const acy = a.y + a.h / 2;
+  const bcx = b.x + b.w / 2;
+  const bcy = b.y + b.h / 2;
+  const dx = bcx - acx;
+  const dy = bcy - acy;
+  const pad = 6;
+  const laneNudge = lane * 10;
+
+  // Prefer the dominant axis; layered top-level graphs are left→right.
+  if (Math.abs(dx) >= Math.abs(dy) * 0.55) {
+    const leftToRight = dx >= 0;
+    const x1 = leftToRight ? a.x + a.w : a.x;
+    const x2 = leftToRight ? b.x : b.x + b.w;
+    const y1 = clamp(bcy, a.y + pad, a.y + a.h - pad) + laneNudge;
+    const y2 = clamp(bcy, b.y + pad, b.y + b.h - pad);
+    // Channel midX sits strictly between the two boxes.
+    const gapLeft = leftToRight ? a.x + a.w : b.x + b.w;
+    const gapRight = leftToRight ? b.x : a.x;
+    let midX = (gapLeft + gapRight) / 2 + laneNudge;
+    if (gapRight - gapLeft > pad * 2) {
+      midX = clamp(midX, gapLeft + pad, gapRight - pad);
+    }
+    if (Math.abs(y1 - y2) < 1.5) {
+      return {
+        d: `M ${x1} ${y1} L ${x2} ${y2}`,
+        labelX: (x1 + x2) / 2,
+        labelY: y1 - 8,
+      };
+    }
+    return {
+      d: `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`,
+      labelX: midX + 8,
+      labelY: (y1 + y2) / 2,
+    };
+  }
+
+  // Vertical primary (column interiors).
+  const topToBottom = dy >= 0;
+  const y1 = topToBottom ? a.y + a.h : a.y;
+  const y2 = topToBottom ? b.y : b.y + b.h;
+  const x1 = clamp(acx, a.x + pad, a.x + a.w - pad) + laneNudge;
+  const x2 = clamp(bcx, b.x + pad, b.x + b.w - pad);
+  const gapTop = topToBottom ? a.y + a.h : b.y + b.h;
+  const gapBottom = topToBottom ? b.y : a.y;
+  let midY = (gapTop + gapBottom) / 2 + laneNudge;
+  if (gapBottom - gapTop > pad * 2) {
+    midY = clamp(midY, gapTop + pad, gapBottom - pad);
+  }
+  if (Math.abs(x1 - x2) < 1.5) {
+    return {
+      d: `M ${x1} ${y1} L ${x2} ${y2}`,
+      labelX: x1 + 8,
+      labelY: (y1 + y2) / 2,
+    };
+  }
+  return {
+    d: `M ${x1} ${y1} L ${x1} ${midY} L ${x2} ${midY} L ${x2} ${y2}`,
+    labelX: (x1 + x2) / 2,
+    labelY: midY - 8,
+  };
+}
+
+function drawEdges(layer, edges, index, depth, { runningIds = new Set() } = {}) {
+  // Group fan-out from the same source so elbows take distinct lanes.
+  const fanCount = new Map();
+  for (const edge of edges) {
+    fanCount.set(edge.from, (fanCount.get(edge.from) || 0) + 1);
+  }
+  const fanSeen = new Map();
   for (const edge of edges) {
     const a = index.get(edge.from);
     const b = index.get(edge.to);
     if (!a || !b) continue;
-    const line = el("line", {
-      x1: a.absX + a.w / 2,
-      y1: a.absY + a.h / 2,
-      x2: b.absX + b.w / 2,
-      y2: b.absY + b.h / 2,
-      stroke: depth === 0 ? "#6a4cb8" : "#2ad49a",
-      "stroke-width": depth === 0 ? 2 : 1.2,
-      "stroke-opacity": "0.85",
-      class: "graph-edge",
+    const live =
+      runningIds.has(edge.to) ||
+      b.execution === "running" ||
+      b.execution === "occupied" ||
+      a.execution === "running";
+    let lane = 0;
+    if ((fanCount.get(edge.from) || 0) > 1) {
+      const seen = fanSeen.get(edge.from) || 0;
+      fanSeen.set(edge.from, seen + 1);
+      // Center lanes around 0: … -1, 0, 1 …
+      const n = fanCount.get(edge.from);
+      lane = seen - (n - 1) / 2;
+    }
+    const route = routeOrthogonal(boxOf(a), boxOf(b), { lane });
+    const path = el("path", {
+      d: route.d,
+      fill: "none",
+      stroke: live ? "#ff5eb0" : depth === 0 ? "#6a4cb8" : "#2ad49a",
+      "stroke-width": live ? 2.4 : depth === 0 ? 2 : 1.2,
+      "stroke-opacity": live ? "0.95" : "0.85",
+      "stroke-linejoin": "round",
+      "stroke-linecap": "round",
+      class: `graph-edge${live ? " is-live" : ""}`,
+      "marker-end": live ? "url(#edgeArrowLive)" : "url(#edgeArrow)",
     });
-    layer.appendChild(line);
+    layer.appendChild(path);
+    if (edge.label) {
+      const label = el("text", {
+        x: route.labelX,
+        y: route.labelY,
+        class: "edge-label",
+        "font-size": depth === 0 ? 10 : 9,
+      });
+      label.textContent = truncate(edge.label, depth === 0 ? 28 : 20);
+      layer.appendChild(label);
+    }
   }
 }
 
 function subtreeRunning(node) {
-  if (node.execution === "running" || node.status === "running") return true;
+  if (
+    node.execution === "running" ||
+    node.execution === "occupied" ||
+    node.status === "running"
+  ) {
+    return true;
+  }
   // Finished stack cards must not inherit stale nested "running" bits.
   if (node.stack_role === "front" || node.stack_role === "back") return false;
   return (node.children || []).some((c) => subtreeRunning(c));
+}
+
+function nodeFrontier(node) {
+  if (node.execution === "failed" || node.status === "failed" || node.status === "cancelled") {
+    return "failed";
+  }
+  if (node.execution === "running" || node.status === "running") return "running";
+  if (node.execution === "occupied") return "occupied";
+  if (node.execution === "recent") return "recent";
+  if (node.execution === "dim") return "dim";
+  return node.execution || "pending";
 }
 
 function drawNodeTree(layer, node, ctx) {
@@ -301,15 +433,19 @@ function drawNodeTree(layer, node, ctx) {
     screenH >= CONTENT_REVEAL_PX &&
     (node.children || []).length > 0;
   const selected = ctx.selectedId === node.id;
-  const running = subtreeRunning(node);
+  const frontier = nodeFrontier(node);
+  const live = frontier === "running" || frontier === "occupied" || subtreeRunning(node);
+  const glyph = node.role || (node.shape === "round_rect" ? "chamber" : "door");
 
   const g = el("g", {
-    class: `graph-node node ${running ? "running" : node.execution || "pending"}${
-      selected ? " is-selected" : ""
-    }${role ? ` stack-${role}` : ""}`,
+    class: `graph-node node role-${glyph} ${frontier}${selected ? " is-selected" : ""}${
+      role ? ` stack-${role}` : ""
+    }`,
     transform: `translate(${absX} ${absY})`,
   });
   g.dataset.nodeId = node.id;
+  g.dataset.role = glyph;
+  g.dataset.frontier = frontier;
   g.style.cursor = "pointer";
   const openStack = (e) => {
     e.preventDefault();
@@ -317,7 +453,6 @@ function drawNodeTree(layer, node, ctx) {
     if (ctx.onStackBadge) ctx.onStackBadge(node);
   };
   if (role === "badge") {
-    // Pointerdown beats pan/drag races; click/dblclick both open the list.
     g.addEventListener("pointerdown", (e) => {
       if (e.button !== 0) return;
       openStack(e);
@@ -325,7 +460,6 @@ function drawNodeTree(layer, node, ctx) {
     g.addEventListener("click", openStack);
     g.addEventListener("dblclick", openStack);
   } else if (role === "front" || role === "back") {
-    // Stacked instance cards: open that run's watch view (not just select).
     const openCard = (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -350,19 +484,47 @@ function drawNodeTree(layer, node, ctx) {
     });
   }
 
-  // Norfair palette: magenta membrane idle, coral bubble cores when running,
-  // purple ridged hard blocks, teal edge accents.
-  const soft = node.shape === "round_rect";
-  const rx = soft ? Math.min(26, Math.max(14, node.h * 0.28)) : 4;
+  // Role → Bubble Trouble glyph. Chambers/dives are soft membranes; doors are
+  // ridged tiles; beads are compact coral/magenta pills.
+  const soft = glyph !== "door";
+  let rx;
+  if (glyph === "dive") rx = Math.min(28, Math.max(16, node.h * 0.36));
+  else if (glyph === "bead") rx = Math.min(18, Math.max(12, node.h * 0.42));
+  else if (glyph === "chamber" || glyph === "badge")
+    rx = Math.min(26, Math.max(14, node.h * 0.28));
+  else if (glyph === "plaque") rx = 10;
+  else rx = 4;
+
   let fill;
   let opacity;
-  if (running) {
+  if (frontier === "failed") {
+    fill = "#7a1020";
+    opacity = reveal ? "0.45" : "0.88";
+  } else if (frontier === "running") {
     fill = soft ? "#e85a4f" : "#ff5eb0";
-    opacity = reveal ? "0.3" : "0.8";
+    opacity = reveal ? "0.28" : "0.85";
+  } else if (frontier === "occupied") {
+    fill = soft ? "#8a2858" : "#6a3a90";
+    opacity = reveal ? "0.22" : "0.7";
+  } else if (frontier === "recent") {
+    fill = soft ? "#5a2048" : "#4a3a7a";
+    opacity = reveal ? "0.24" : "0.75";
   } else {
     fill = soft ? "#4a1848" : "#3a2a6e";
     opacity = reveal ? "0.26" : "0.9";
   }
+  const stroke =
+    selected
+      ? "#5eeaff"
+      : frontier === "failed"
+        ? "#ff3b2f"
+        : frontier === "running"
+          ? "#ffffff"
+          : frontier === "occupied"
+            ? "#ff8ec8"
+            : soft
+              ? "#ff5eb0"
+              : "#2ad49a";
   const rect = el("rect", {
     x: 0,
     y: 0,
@@ -372,17 +534,21 @@ function drawNodeTree(layer, node, ctx) {
     ry: rx,
     fill,
     "fill-opacity": opacity,
-    stroke: selected ? "#5eeaff" : running ? "#ffffff" : soft ? "#ff5eb0" : "#2ad49a",
-    "stroke-width": selected ? 3 : running ? 2.35 : 1.25,
+    stroke,
+    "stroke-width": selected ? 3 : live ? 2.35 : 1.25,
   });
-  if (running) rect.setAttribute("filter", "url(#glow)");
-  g.dataset.running = running ? "1" : "0";
+  if (frontier === "running") rect.setAttribute("filter", "url(#glow)");
+  else if (frontier === "occupied") rect.setAttribute("filter", "url(#glowOccupied)");
+  g.dataset.running = frontier === "running" ? "1" : "0";
   g.dataset.shape = soft ? "soft" : "hard";
   g.appendChild(rect);
 
-  // Soft: white crescent specular (coral bubble tiles). Hard: purple ridged doors.
   if (soft) {
-    appendBubbleSpecular(g, node.w, node.h, rx, { running, reveal });
+    appendBubbleSpecular(g, node.w, node.h, rx, {
+      running: frontier === "running",
+      reveal,
+      occupied: frontier === "occupied",
+    });
   } else {
     appendTileTexture(g, node.w, node.h, rx, { reveal });
   }
@@ -401,23 +567,57 @@ function drawNodeTree(layer, node, ctx) {
 
   if (reveal) {
     const inner = el("g", { class: "node-interior" });
+    const interiorKids = (node.children || []).filter(
+      (c) => c.stack_role !== "front" && c.stack_role !== "back" && c.stack_role !== "badge",
+    );
+    const fanCount = new Map();
     for (const edge of node.edges || []) {
-      const a = (node.children || []).find((c) => c.id === edge.from);
-      const b = (node.children || []).find((c) => c.id === edge.to);
+      fanCount.set(edge.from, (fanCount.get(edge.from) || 0) + 1);
+    }
+    const fanSeen = new Map();
+    for (const edge of node.edges || []) {
+      const a = interiorKids.find((c) => c.id === edge.from);
+      const b = interiorKids.find((c) => c.id === edge.to);
       if (!a || !b) continue;
+      const childLive =
+        b.execution === "running" ||
+        b.execution === "occupied" ||
+        a.execution === "running";
+      let lane = 0;
+      if ((fanCount.get(edge.from) || 0) > 1) {
+        const seen = fanSeen.get(edge.from) || 0;
+        fanSeen.set(edge.from, seen + 1);
+        const n = fanCount.get(edge.from);
+        lane = seen - (n - 1) / 2;
+      }
+      const route = routeOrthogonal(
+        { id: a.id, x: a.x || 0, y: a.y || 0, w: a.w, h: a.h },
+        { id: b.id, x: b.x || 0, y: b.y || 0, w: b.w, h: b.h },
+        { lane },
+      );
       inner.appendChild(
-        el("line", {
-          x1: a.x + a.w / 2,
-          y1: a.y + a.h / 2,
-          x2: b.x + b.w / 2,
-          y2: b.y + b.h / 2,
-          stroke: "#6a4cb8",
-          "stroke-width": 1.25,
-          class: "graph-edge",
+        el("path", {
+          d: route.d,
+          fill: "none",
+          stroke: childLive ? "#ff5eb0" : "#6a4cb8",
+          "stroke-width": childLive ? 1.8 : 1.25,
+          "stroke-linejoin": "round",
+          "stroke-linecap": "round",
+          class: `graph-edge${childLive ? " is-live" : ""}`,
+          "marker-end": childLive ? "url(#edgeArrowLive)" : "url(#edgeArrow)",
         }),
       );
+      if (edge.label) {
+        const t = el("text", {
+          x: route.labelX,
+          y: route.labelY,
+          class: "edge-label",
+          "font-size": 9,
+        });
+        t.textContent = truncate(edge.label, 20);
+        inner.appendChild(t);
+      }
     }
-    // Paint stacked cards back→front; badge last so it stays clickable.
     const kids = [...(node.children || [])].sort((a, b) => {
       const da = a.stack_role === "badge" ? 1e9 : a.stack_depth || 0;
       const db = b.stack_role === "badge" ? 1e9 : b.stack_depth || 0;
@@ -429,6 +629,7 @@ function drawNodeTree(layer, node, ctx) {
         absY: child.y || 0,
         zoom: ctx.zoom,
         selectedId: ctx.selectedId,
+        runningIds: ctx.runningIds,
         onSelect: ctx.onSelect,
         onStackBadge: ctx.onStackBadge,
         onStackCard: ctx.onStackCard,
@@ -436,7 +637,6 @@ function drawNodeTree(layer, node, ctx) {
     }
     g.appendChild(inner);
   } else {
-    // Keep +N badge reachable even when interiors are collapsed.
     const badge = (node.children || []).find((c) => c.stack_role === "badge");
     if (badge) {
       const inner = el("g", { class: "node-interior node-interior--badge-only" });
@@ -447,6 +647,7 @@ function drawNodeTree(layer, node, ctx) {
         absY: by,
         zoom: ctx.zoom,
         selectedId: ctx.selectedId,
+        runningIds: ctx.runningIds,
         onSelect: ctx.onSelect,
         onStackBadge: ctx.onStackBadge,
         onStackCard: ctx.onStackCard,
@@ -464,6 +665,34 @@ function appendBubbleTroubleDefs(defs) {
   glow.innerHTML =
     '<feGaussianBlur stdDeviation="3.5" result="b"/><feColorMatrix in="b" type="matrix" values="0 0 0 0 1  0 0 0 0 0.35  0 0 0 0 0.55  0 0 0 0.8 0" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>';
   defs.appendChild(glow);
+
+  const glowOcc = el("filter", { id: "glowOccupied" });
+  glowOcc.innerHTML =
+    '<feGaussianBlur stdDeviation="2.2" result="b"/><feColorMatrix in="b" type="matrix" values="0 0 0 0 1  0 0 0 0 0.45  0 0 0 0 0.7  0 0 0 0.45 0" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>';
+  defs.appendChild(glowOcc);
+
+  const arrow = el("marker", {
+    id: "edgeArrow",
+    viewBox: "0 0 10 10",
+    refX: "9",
+    refY: "5",
+    markerWidth: "6",
+    markerHeight: "6",
+    orient: "auto-start-reverse",
+  });
+  arrow.appendChild(el("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "#6a4cb8" }));
+  defs.appendChild(arrow);
+  const arrowLive = el("marker", {
+    id: "edgeArrowLive",
+    viewBox: "0 0 10 10",
+    refX: "9",
+    refY: "5",
+    markerWidth: "7",
+    markerHeight: "7",
+    orient: "auto-start-reverse",
+  });
+  arrowLive.appendChild(el("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "#ff5eb0" }));
+  defs.appendChild(arrowLive);
 
   // Idle magenta membrane sheen.
   const sheen = el("radialGradient", {
@@ -576,7 +805,7 @@ function appendBubbleTroubleDefs(defs) {
   defs.appendChild(tile);
 }
 
-function appendBubbleSpecular(g, w, h, rx, { running, reveal }) {
+function appendBubbleSpecular(g, w, h, rx, { running, reveal, occupied = false }) {
   const sheen = el("rect", {
     x: 0,
     y: 0,
@@ -585,7 +814,7 @@ function appendBubbleSpecular(g, w, h, rx, { running, reveal }) {
     rx,
     ry: rx,
     fill: running ? "url(#bubbleSheenRun)" : "url(#bubbleSheen)",
-    "fill-opacity": reveal ? "0.95" : "1",
+    "fill-opacity": reveal ? "0.95" : occupied ? "0.85" : "1",
     "pointer-events": "none",
     class: "bubble-sheen",
   });
@@ -680,10 +909,6 @@ function el(name, attrs = {}) {
 function truncate(text, max) {
   const s = String(text || "");
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;
-}
-
-function clamp(v, lo, hi) {
-  return Math.max(lo, Math.min(hi, v));
 }
 
 /** @deprecated use GraphViewport */
