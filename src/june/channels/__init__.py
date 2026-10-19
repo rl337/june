@@ -128,17 +128,37 @@ class ChatService:
         message: ChannelMessage,
         *,
         on_phase: Any | None = None,
+        on_event: Any | None = None,
         run_id: str | None = None,
         checkpoint_path: str | None = None,
     ) -> ChannelReply:
         reply = self.orchestrator.handle_chat(
             message,
             on_phase=on_phase,
+            on_event=on_event,
             run_id=run_id,
             checkpoint_path=checkpoint_path,
         )
         assert isinstance(reply, ChannelReply)
         return reply
+
+    def handle_detailed(
+        self,
+        message: ChannelMessage,
+        *,
+        on_phase: Any | None = None,
+        on_event: Any | None = None,
+        run_id: str | None = None,
+        checkpoint_path: str | None = None,
+    ) -> Any:
+        """Return full ``ChatRecipeResult`` (live graph for console zoom)."""
+        return self.orchestrator.handle_chat_detailed(
+            message,
+            on_phase=on_phase,
+            on_event=on_event,
+            run_id=run_id,
+            checkpoint_path=checkpoint_path,
+        )
 
 
 def __getattr__(name: str) -> Any:

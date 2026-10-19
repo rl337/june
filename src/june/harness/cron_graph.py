@@ -1,4 +1,4 @@
-"""Console cron graph: 10s / 60s buckets with event-log subgraph nodes."""
+"""Console cron graph: minute / hourly empty-event buckets + soft lanes."""
 
 from __future__ import annotations
 
@@ -7,15 +7,11 @@ from uuid import uuid4
 
 CONSOLE_CRON_RUN_ID = "june.console.cron"
 
-# Four sequential steps × 3s each ≈ 12s, longer than the 10s cron interval so
-# overlapping bucket instances are expected under load.
-BUCKET_10S_STEPS = (
-    "acquire window",
-    "sample signals",
-    "emit heartbeat",
-    "flush buffers",
+# Empty tick buckets only — no overlapping timed pipelines.
+CRON_BUCKETS = (
+    ("minute", 60, "minute tick"),
+    ("hourly", 3600, "hourly tick"),
 )
-BUCKET_10S_STEP_SECONDS = 3.0
 
 
 def build_console_cron_graph(run_id: str | None = None) -> Any:
@@ -25,90 +21,55 @@ def build_console_cron_graph(run_id: str | None = None) -> Any:
     rid = run_id or CONSOLE_CRON_RUN_ID
     graph = ExecutionGraph(id=rid, goal="June console cron scheduler")
 
-    def _timed_pipeline(bucket_key: str, title: str, steps: tuple[str, ...]) -> dict[str, Any]:
-        sub = ExecutionGraph(id=f"{rid}:bucket:{bucket_key}:pipeline", goal=title)
-        prev: str | None = None
-        for idx, message in enumerate(steps):
-            node_id = f"{rid}:bucket:{bucket_key}:step:{idx}"
-            node = GraphNode(
-                id=node_id,
-                kind="june.timed_log",
+    def _empty_tick(bucket_key: str, message: str) -> dict[str, Any]:
+        sub = ExecutionGraph(
+            id=f"{rid}:bucket:{bucket_key}:pipeline",
+            goal=f"{bucket_key} tick",
+        )
+        sub.add_node(
+            GraphNode(
+                id=f"{rid}:bucket:{bucket_key}:log:0",
+                kind="june.event_log",
                 goal=message,
                 payload={
                     "message": message,
                     "firmness": "hard",
                     "bucket": bucket_key,
-                    "duration_seconds": BUCKET_10S_STEP_SECONDS,
-                    "step_index": idx,
                 },
             )
-            sub.add_node(node)
-            if prev is not None:
-                sub.add_dependency(
-                    DependencyEdge(
-                        from_node=prev,
-                        to_node=node_id,
-                        types=["control"],
-                        reason=f"{bucket_key} pipeline step",
-                    )
-                )
-            prev = node_id
+        )
         return sub.checkpoint()
 
-    def _quick_logs(bucket_key: str, title: str, messages: list[str]) -> dict[str, Any]:
-        sub = ExecutionGraph(id=f"{rid}:bucket:{bucket_key}:pipeline", goal=title)
-        prev: str | None = None
-        for idx, message in enumerate(messages):
-            node_id = f"{rid}:bucket:{bucket_key}:log:{idx}"
-            node = GraphNode(
-                id=node_id,
-                kind="june.event_log",
-                goal=message,
-                payload={"message": message, "firmness": "hard", "bucket": bucket_key},
-            )
-            sub.add_node(node)
-            if prev is not None:
-                sub.add_dependency(
-                    DependencyEdge(
-                        from_node=prev,
-                        to_node=node_id,
-                        types=["control"],
-                        reason=f"{bucket_key} bucket sequence",
-                    )
-                )
-            prev = node_id
-        return sub.checkpoint()
-
-    bucket_10s = GraphNode(
-        id=f"{rid}:bucket:10s",
-        kind="subgraph",
-        goal="10s bucket",
-        payload={
-            "firmness": "soft",
-            "interval_seconds": 10,
-            "bucket": "10s",
-            "overlap_expected": True,
-            "pipeline_seconds": BUCKET_10S_STEP_SECONDS * len(BUCKET_10S_STEPS),
-        },
-        subgraph=_timed_pipeline("10s", "10s timed pipeline", BUCKET_10S_STEPS),
-    )
-    bucket_60s = GraphNode(
-        id=f"{rid}:bucket:60s",
-        kind="subgraph",
-        goal="60s bucket",
-        payload={"firmness": "soft", "interval_seconds": 60, "bucket": "60s"},
-        subgraph=_quick_logs(
-            "60s",
-            "60s rollup",
-            ["rollup minute metrics", "snapshot graph scene"],
-        ),
-    )
     cron_hub = GraphNode(
         id=f"{rid}:cron",
         kind="june.cron",
         goal="cron",
         payload={"firmness": "soft"},
     )
+    graph.add_node(cron_hub)
+
+    for bucket_key, interval_seconds, message in CRON_BUCKETS:
+        node = GraphNode(
+            id=f"{rid}:bucket:{bucket_key}",
+            kind="subgraph",
+            goal=f"{bucket_key} bucket",
+            payload={
+                "firmness": "soft",
+                "interval_seconds": interval_seconds,
+                "bucket": bucket_key,
+            },
+            subgraph=_empty_tick(bucket_key, message),
+        )
+        graph.add_node(node)
+        graph.add_dependency(
+            DependencyEdge(
+                from_node=cron_hub.id,
+                to_node=node.id,
+                types=["control"],
+                reason=f"dispatch {bucket_key} bucket",
+            )
+        )
+
     chat = GraphNode(
         id=f"{rid}:chat",
         kind="subgraph",
@@ -116,28 +77,8 @@ def build_console_cron_graph(run_id: str | None = None) -> Any:
         payload={"firmness": "soft", "channel": "webapp", "template": "june.chat"},
         subgraph=_chat_pipeline_template(rid),
     )
-
-    # Left-to-right: cron → 10s → 60s, with chat as a parallel soft lane.
-    graph.add_node(cron_hub)
-    graph.add_node(bucket_10s)
-    graph.add_node(bucket_60s)
+    # Imagegen nests under chat tools → tool_call (HF-08); no parallel soft lane.
     graph.add_node(chat)
-    graph.add_dependency(
-        DependencyEdge(
-            from_node=cron_hub.id,
-            to_node=bucket_10s.id,
-            types=["control"],
-            reason="dispatch 10s bucket",
-        )
-    )
-    graph.add_dependency(
-        DependencyEdge(
-            from_node=bucket_10s.id,
-            to_node=bucket_60s.id,
-            types=["control"],
-            reason="minute rollup after short ticks",
-        )
-    )
     graph.add_dependency(
         DependencyEdge(
             from_node=cron_hub.id,
@@ -152,20 +93,19 @@ def build_console_cron_graph(run_id: str | None = None) -> Any:
 CHAT_PARENT_NODE_ID = f"{CONSOLE_CRON_RUN_ID}:chat"
 
 
-def _chat_pipeline_template(rid: str) -> dict[str, Any]:
-    """Structure template for the incubating june.chat phases."""
+def _linear_soft_pipeline(
+    rid: str,
+    *,
+    lane: str,
+    goal: str,
+    steps: tuple[tuple[str, str, str], ...],
+) -> dict[str, Any]:
     from mechaharness.graph import DependencyEdge, ExecutionGraph, GraphNode
 
-    steps = (
-        ("refine", "june.chat.refine_input", "refine input"),
-        ("context", "june.chat.context_optimize", "context optimize"),
-        ("tools", "june.chat.tool_loop", "tool loop"),
-        ("render", "june.chat.render_reply", "render reply"),
-    )
-    sub = ExecutionGraph(id=f"{rid}:chat:pipeline", goal="june.chat")
+    sub = ExecutionGraph(id=f"{rid}:{lane}:pipeline", goal=goal)
     prev: str | None = None
     for key, kind, title in steps:
-        node_id = f"{rid}:chat:step:{key}"
+        node_id = f"{rid}:{lane}:step:{key}"
         sub.add_node(
             GraphNode(
                 id=node_id,
@@ -180,11 +120,26 @@ def _chat_pipeline_template(rid: str) -> dict[str, Any]:
                     from_node=prev,
                     to_node=node_id,
                     types=["control"],
-                    reason="chat phase",
+                    reason=f"{lane} phase",
                 )
             )
         prev = node_id
     return sub.checkpoint()
+
+
+def _chat_pipeline_template(rid: str) -> dict[str, Any]:
+    """Structure template for the incubating june.chat phases."""
+    return _linear_soft_pipeline(
+        rid,
+        lane="chat",
+        goal="june.chat",
+        steps=(
+            ("refine", "june.chat.refine_input", "refine input"),
+            ("context", "june.chat.context_optimize", "context optimize"),
+            ("tools", "conversational_tool_loop", "tool loop"),
+            ("render", "june.chat.render_reply", "render reply"),
+        ),
+    )
 
 
 def new_chat_run_id() -> str:
@@ -211,7 +166,6 @@ def clone_pipeline_for_instance(
     cloned = ExecutionGraph(id=instance_id, goal=template.goal)
     id_map: dict[str, str] = {}
     for old_id, node in template.nodes.items():
-        new_id = f"{instance_id}:{old_id.split(':')[-2]}:{old_id.split(':')[-1]}"
         # Prefer stable step suffix: ...:step:N or ...:log:N
         parts = old_id.rsplit(":", 2)
         if len(parts) >= 3:

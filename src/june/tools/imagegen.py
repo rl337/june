@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import json
+from contextvars import ContextVar
 from typing import Any
 from uuid import uuid4
 
@@ -17,6 +18,102 @@ from june.recipes.imagegen.run import (
 )
 from june.tools import ToolRegistry, ToolSpec
 
+# Last child graph from generate_image in this context (HF-08 nest under tool_call).
+_last_child_graph: ContextVar[dict[str, Any] | None] = ContextVar(
+    "june_generate_image_graph", default=None
+)
+
+
+def last_generate_image_graph() -> dict[str, Any] | None:
+    return _last_child_graph.get()
+
+
+def execute_generate_image(
+    args: dict[str, Any],
+    *,
+    documents: DocumentStore | None = None,
+    settings: JuneSettings | None = None,
+    generator: ImageGenerator | None = None,
+) -> tuple[str, dict[str, Any] | None]:
+    """Run june.imagegen and return ``(tool_json, child_graph_checkpoint)``.
+
+    The checkpoint is attached under the HF-07 ``tool_call`` node (HF-08
+    recipe-as-tool nesting) so the console can zoom into imagegen phases.
+    """
+    prompt = str(args.get("prompt") or "").strip()
+    if not prompt:
+        return json.dumps({"error": "prompt is required"}), None
+    recipe = str(args.get("recipe") or "oneshot").strip() or "oneshot"
+    if recipe not in {"oneshot", "criteria_refine"}:
+        return json.dumps({"error": "recipe must be oneshot or criteria_refine"}), None
+    backend = str(args.get("backend") or "qwen_image").strip() or "qwen_image"
+    max_retries = int(args.get("max_retries") or DEFAULT_CRITERIA_MAX_RETRIES)
+    negative = str(args.get("negative_prompt") or "")
+    width = int(args.get("width") or 768)
+    height = int(args.get("height") or 768)
+
+    problem = ImageProblem(
+        id=f"chat-{uuid4().hex[:8]}",
+        title="chat generate_image",
+        prompt=prompt,
+        negative_prompt=negative,
+        backend=backend,  # type: ignore[arg-type]
+        width=width,
+        height=height,
+        metadata={"source": "chat_tool", "recipe": recipe},
+    )
+
+    gen = generator if generator is not None else _live_or_fixed_generator(settings)
+
+    kwargs: dict[str, Any] = {"recipe": recipe}
+    if recipe == "criteria_refine":
+        from june.recipes.imagegen.critics import FixedPromptCrafter
+        from june.recipes.imagegen.evaluate import FixedImageEvaluator
+
+        kwargs["crafter"] = FixedPromptCrafter()
+        kwargs["evaluator"] = FixedImageEvaluator(results=None)
+        kwargs["max_retries"] = max_retries
+        live_eval = _try_bound_evaluator(settings)
+        if live_eval is not None:
+            kwargs["crafter"] = live_eval[0]
+            kwargs["evaluator"] = live_eval[1]
+
+    result = run_imagegen_recipe(problem, gen, **kwargs)
+    child_graph = result.graph if isinstance(result.graph, dict) else None
+    _last_child_graph.set(child_graph)
+    if not result.image_bytes:
+        return (
+            json.dumps(
+                {
+                    "ok": False,
+                    "error": result.error or "no_image",
+                    "failures": result.failures,
+                    "recipe": recipe,
+                }
+            ),
+            child_graph,
+        )
+
+    media = _persist_or_data_url(
+        result.image_bytes,
+        documents=documents,
+        name=f"{problem.id}.png",
+    )
+    return (
+        json.dumps(
+            {
+                "ok": bool(result.ok or result.image_bytes),
+                "recipe": recipe,
+                "backend": backend,
+                "verified": result.verified,
+                "image_prompt": result.image_prompt,
+                "media": media,
+                "failures": result.failures,
+            }
+        ),
+        child_graph,
+    )
+
 
 def register_generate_image_tool(
     registry: ToolRegistry,
@@ -28,78 +125,13 @@ def register_generate_image_tool(
     """Register chat tool that binds ``june.imagegen`` and returns media JSON."""
 
     def generate_image(args: dict[str, Any]) -> str:
-        prompt = str(args.get("prompt") or "").strip()
-        if not prompt:
-            return json.dumps({"error": "prompt is required"})
-        recipe = str(args.get("recipe") or "oneshot").strip() or "oneshot"
-        if recipe not in {"oneshot", "criteria_refine"}:
-            return json.dumps(
-                {"error": "recipe must be oneshot or criteria_refine"}
-            )
-        backend = str(args.get("backend") or "qwen_image").strip() or "qwen_image"
-        max_retries = int(args.get("max_retries") or DEFAULT_CRITERIA_MAX_RETRIES)
-        negative = str(args.get("negative_prompt") or "")
-        width = int(args.get("width") or 768)
-        height = int(args.get("height") or 768)
-
-        problem = ImageProblem(
-            id=f"chat-{uuid4().hex[:8]}",
-            title="chat generate_image",
-            prompt=prompt,
-            negative_prompt=negative,
-            backend=backend,  # type: ignore[arg-type]
-            width=width,
-            height=height,
-            metadata={"source": "chat_tool", "recipe": recipe},
-        )
-
-        gen = generator
-        if gen is None:
-            gen = _live_or_fixed_generator(settings)
-
-        kwargs: dict[str, Any] = {"recipe": recipe}
-        if recipe == "criteria_refine":
-            from june.recipes.imagegen.critics import FixedPromptCrafter
-            from june.recipes.imagegen.evaluate import FixedImageEvaluator
-
-            kwargs["crafter"] = FixedPromptCrafter()
-            kwargs["evaluator"] = FixedImageEvaluator(
-                results=None  # default fail-then-pass for offline; live overridden below
-            )
-            kwargs["max_retries"] = max_retries
-            # Live path: bind Junespark expand/score when configured.
-            live_eval = _try_bound_evaluator(settings)
-            if live_eval is not None:
-                kwargs["crafter"] = live_eval[0]
-                kwargs["evaluator"] = live_eval[1]
-
-        result = run_imagegen_recipe(problem, gen, **kwargs)
-        if not result.image_bytes:
-            return json.dumps(
-                {
-                    "ok": False,
-                    "error": result.error or "no_image",
-                    "failures": result.failures,
-                    "recipe": recipe,
-                }
-            )
-
-        media = _persist_or_data_url(
-            result.image_bytes,
+        raw, _ckpt = execute_generate_image(
+            args,
             documents=documents,
-            name=f"{problem.id}.png",
+            settings=settings,
+            generator=generator,
         )
-        return json.dumps(
-            {
-                "ok": bool(result.ok or result.image_bytes),
-                "recipe": recipe,
-                "backend": backend,
-                "verified": result.verified,
-                "image_prompt": result.image_prompt,
-                "media": media,
-                "failures": result.failures,
-            }
-        )
+        return raw
 
     registry.register(
         ToolSpec(

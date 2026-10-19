@@ -16,7 +16,7 @@ from june.console.spool import ConsoleSpool
 from june.console.world import build_instance_world, build_world_graph
 
 _EVENT_LOG_LIMIT = 800
-# Finished instance trail is per-bucket so a busy 10s schedule cannot erase 60s history.
+# Finished instance trail is per-bucket so a busy minute schedule cannot erase hourly history.
 # Older finished runs remain on the ConsoleSpool for disk-backed lookup.
 _FINISHED_PER_BUCKET = 4
 
@@ -197,8 +197,8 @@ class ConsoleHub:
                 inst["pipeline"] = pipeline
             # Persist final checkpoint before pruning hot memory.
             self._spool_instance(inst)
-            # Keep a short finished trail per bucket (not global): 10s overlap
-            # must not prune the last 60s run the user wants to inspect.
+            # Keep a short finished trail per bucket (not global): a burst of
+            # minute ticks must not prune the last hourly run.
             # Evicted runs remain on the spool for disk-backed watch/detail APIs.
             finished_by_bucket: dict[str, list[dict[str, Any]]] = {}
             for item in self._instances.values():

@@ -170,6 +170,61 @@ export class JuneConsoleShell {
     if (this.handlers[action]) this.handlers[action](detail);
   }
 
+  /**
+   * Structured selection inspector (P0): kind / status / role / tool / nest / bindings.
+   * @param {Record<string, any> | null} node World node from the viewport index
+   * @param {{ open?: boolean }} [opts]
+   */
+  showNodeInspector(node, { open = true } = {}) {
+    const body = this.workspace.querySelector('[data-view="inspector"] .view-body');
+    if (!body) return;
+    if (!node || node.id === "root") {
+      body.dataset.hasSelection = "";
+      body.innerHTML =
+        '<p class="inspector-hint">Select a graph node for kind, status, tool, nest, and bindings.</p>';
+      return;
+    }
+    body.dataset.hasSelection = "1";
+    const bindings = node.bindings && typeof node.bindings === "object" ? node.bindings : {};
+    const bindRows = Object.keys(bindings)
+      .map(
+        (k) =>
+          `<tr><td><code>${escapeHtml(k)}</code></td><td><code>${escapeHtml(
+            String(bindings[k]).slice(0, 80),
+          )}</code></td></tr>`,
+      )
+      .join("");
+    body.innerHTML = `
+      <div class="inspector-card">
+        <h3 class="inspector-title">${escapeHtml(node.label || node.id)}</h3>
+        <dl class="inspector-dl">
+          <div><dt>id</dt><dd><code>${escapeHtml(node.id)}</code></dd></div>
+          <div><dt>kind</dt><dd><code>${escapeHtml(node.kind || "—")}</code></dd></div>
+          <div><dt>role</dt><dd><span class="inspector-role role-${escapeHtml(
+            node.role || "door",
+          )}">${escapeHtml(node.role || "door")}</span></dd></div>
+          <div><dt>status</dt><dd>${escapeHtml(node.status || "—")}</dd></div>
+          <div><dt>frontier</dt><dd><span class="inspector-frontier frontier-${escapeHtml(
+            node.execution || "pending",
+          )}">${escapeHtml(node.execution || "pending")}</span></dd></div>
+          <div><dt>tool</dt><dd><code>${escapeHtml(node.tool_name || "—")}</code></dd></div>
+          <div><dt>child run</dt><dd><code>${escapeHtml(node.child_run_id || "—")}</code></dd></div>
+          <div><dt>detail</dt><dd>${escapeHtml(node.detail || "—")}</dd></div>
+        </dl>
+        ${
+          bindRows
+            ? `<h4 class="inspector-sub">Bindings</h4>
+               <table class="inspector-table"><thead><tr><th>name</th><th>value</th></tr></thead>
+               <tbody>${bindRows}</tbody></table>`
+            : ""
+        }
+      </div>
+    `;
+    if (open && !this._isOpen("inspector")) {
+      this.openView("inspector");
+    }
+  }
+
   setSnapshot(snapshot) {
     this.lastSnapshot = snapshot;
     const sub = this.root.querySelector("#scene-title");
@@ -183,9 +238,11 @@ export class JuneConsoleShell {
     if (statusBody) {
       statusBody.textContent = JSON.stringify(snapshot.orchestrator || {}, null, 2);
     }
+    // Inspector is driven by selection (`showNodeInspector`); keep hint if empty.
     const insp = this.workspace.querySelector('[data-view="inspector"] .view-body');
-    if (insp) {
-      insp.textContent = JSON.stringify(scene, null, 2);
+    if (insp && !insp.dataset.hasSelection) {
+      insp.innerHTML =
+        '<p class="inspector-hint">Select a graph node for kind, status, tool, nest, and bindings.</p>';
     }
     this._renderEventLog(snapshot.event_log || []);
     this._renderActivityChart(snapshot.event_rate || {}, snapshot.event_log || []);
@@ -236,29 +293,66 @@ export class JuneConsoleShell {
       chart = body.querySelector(".event-rate-chart");
     }
     const bins = rate.bins || [];
-    const max = Math.max(1, ...bins.map((b) => b.count || 0));
-    chart.innerHTML = "";
-    bins.forEach((bin, idx) => {
-      const bar = document.createElement("button");
-      bar.type = "button";
-      bar.className = "event-rate-bar";
-      if ((bin.count || 0) > 0) bar.classList.add("has-events");
-      const pct = Math.max(4, Math.round(((bin.count || 0) / max) * 100));
-      bar.style.setProperty("--bar-h", `${pct}%`);
-      bar.title = `${bin.count || 0} events · ${(bin.start || "").slice(11, 19)}–${(bin.end || "").slice(11, 19)}`;
-      bar.dataset.binIndex = String(idx);
-      bar.addEventListener("click", () => {
-        this.openEventBinDialog(bin, eventLog);
+    // Keep latest bins/log for delegated clicks — closures go stale while WS ticks.
+    this._activityBins = bins;
+    this._activityEventLog = eventLog || [];
+
+    if (!chart.dataset.boundClick) {
+      chart.dataset.boundClick = "1";
+      chart.addEventListener("click", (e) => {
+        const bar = e.target.closest(".event-rate-bar");
+        if (!bar || bar.disabled) return;
+        const idx = Number(bar.dataset.binIndex);
+        const bin = this._activityBins?.[idx];
+        if (bin && (bin.count || 0) > 0) this.openEventBinDialog(bin);
       });
-      chart.appendChild(bar);
+    }
+
+    const max = Math.max(1, ...bins.map((b) => b.count || 0));
+    let bars = chart.querySelectorAll(".event-rate-bar");
+    // Rebuilding every snapshot steals hover and flickers; update in place.
+    if (bars.length !== bins.length) {
+      chart.replaceChildren();
+      for (let idx = 0; idx < bins.length; idx += 1) {
+        const bar = document.createElement("button");
+        bar.type = "button";
+        bar.className = "event-rate-bar";
+        chart.appendChild(bar);
+      }
+      bars = chart.querySelectorAll(".event-rate-bar");
+    }
+    bins.forEach((bin, idx) => {
+      const bar = bars[idx];
+      if (!bar) return;
+      const count = bin.count || 0;
+      const has = count > 0;
+      bar.classList.toggle("has-events", has);
+      bar.disabled = !has;
+      bar.tabIndex = has ? 0 : -1;
+      // Empty bins stay a hairline so the strip reads continuous, not clickable.
+      const pct = has ? Math.max(8, Math.round((count / max) * 100)) : 3;
+      bar.style.setProperty("--bar-h", `${pct}%`);
+      bar.title = has
+        ? `${count} events · ${(bin.start || "").slice(11, 19)}–${(bin.end || "").slice(11, 19)}`
+        : `${(bin.start || "").slice(11, 19)}–${(bin.end || "").slice(11, 19)} · empty`;
+      bar.dataset.binIndex = String(idx);
+      bar.setAttribute("aria-label", bar.title);
     });
   }
 
-  openEventBinDialog(bin, eventLog) {
+  openEventBinDialog(bin) {
+    const eventLog = this._activityEventLog || this.lastSnapshot?.event_log || [];
     const indices = bin.event_indices || [];
-    const rows = indices
-      .map((i) => eventLog[i])
-      .filter(Boolean);
+    let rows = indices.map((i) => eventLog[i]).filter(Boolean);
+    // Fallback if the rolling window shifted indices between paint and click.
+    if (!rows.length && bin.start && bin.end) {
+      const start = String(bin.start);
+      const end = String(bin.end);
+      rows = eventLog.filter((row) => {
+        const ts = String(row?.ts || "");
+        return ts >= start && ts < end;
+      });
+    }
     this.openCustomDialog({
       kind: `events-bin-${bin.index}`,
       title: `Events · ${(bin.start || "").slice(11, 19)}–${(bin.end || "").slice(11, 19)}`,
@@ -718,13 +812,19 @@ export class JuneConsoleShell {
       if (id === "legend") {
         pane.querySelector(".view-body").innerHTML = `
           <ul class="legend-list">
-            <li><span class="shape hard"></span> hard node (rect)</li>
-            <li><span class="shape soft"></span> soft bubble (round-rect)</li>
-            <li><span class="glow-sample">running</span> live bubble wash</li>
-            <li><span class="dim-sample">dim</span> finished / trail</li>
-            <li>scheme: Bubble Trouble</li>
+            <li><span class="shape hard"></span> door (hard step)</li>
+            <li><span class="shape soft"></span> chamber / dive / bead</li>
+            <li><span class="glow-sample">running</span> live locus</li>
+            <li><span class="occupied-sample">occupied</span> ancestor of live work</li>
+            <li><span class="dim-sample">dim</span> finished</li>
+            <li><span class="failed-sample">failed</span> fault</li>
+            <li>scheme: Bubble Trouble · spatial > log</li>
           </ul>
         `;
+      }
+      if (id === "inspector") {
+        pane.querySelector(".view-body").innerHTML =
+          '<p class="inspector-hint">Select a graph node for kind, status, tool, nest, and bindings.</p>';
       }
       if (id === "chat") {
         pane.querySelector(".view-body").classList.add("view-body--chat");

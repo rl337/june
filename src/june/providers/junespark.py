@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
 from typing import Any
 
-import httpx
+from pyiv.http import HttpClient, UrllibHttpClient
 
 from june.config import JuneSettings, JunesparkSettings
 
@@ -55,7 +54,11 @@ def infer_capabilities(model_id: str, raw: dict[str, Any] | None = None) -> Mode
 
 
 class JunesparkProvider:
-    """HTTP client for junespark OpenAI-compatible inference."""
+    """HTTP client for junespark OpenAI-compatible inference.
+
+    Defaults to pyiv ``UrllibHttpClient`` (stdlib). Tests may inject
+    ``MemoryHttpClient`` or an httpx ``Client`` that accepts ``json=``.
+    """
 
     def __init__(
         self,
@@ -65,7 +68,7 @@ class JunesparkProvider:
         api_key: str | None = None,
         model: str | None = None,
         timeout: float = 120.0,
-        client: httpx.Client | None = None,
+        client: HttpClient | Any | None = None,
     ) -> None:
         if isinstance(settings, JuneSettings):
             js = settings.junespark
@@ -84,7 +87,7 @@ class JunesparkProvider:
             self.default_model = model
             self.timeout = timeout
         self._owns_client = client is None
-        self._client = client or httpx.Client(timeout=self.timeout)
+        self._client = client or UrllibHttpClient(timeout=self.timeout)
 
     def close(self) -> None:
         if self._owns_client:
@@ -167,7 +170,7 @@ class JunesparkProvider:
         resp = self._client.post(
             self._url("/chat/completions"),
             headers=self._headers(),
-            content=json.dumps(body),
+            json=body,
         )
         resp.raise_for_status()
         payload = resp.json()

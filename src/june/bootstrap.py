@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from pyiv.http import HttpClient, UrllibHttpClient
+
 from june.channels import ChatService
 from june.chat import ChatGraphRunner
 from june.config import JuneSettings
@@ -13,11 +15,16 @@ from june.providers.junespark import JunesparkProvider
 from june.tools import ToolRegistry, build_default_tools
 
 
-def build_app(settings: JuneSettings) -> dict[type, Any]:
+def build_app(
+    settings: JuneSettings,
+    *,
+    http_client: HttpClient | None = None,
+) -> dict[type, Any]:
     """Return type→instance map for pyiv ``register_instance``."""
     data_dir = Path(settings.data_dir) if settings.data_dir else None
     orch = Orchestrator(data_dir, settings=settings)
-    provider = JunesparkProvider(settings)
+    client = http_client or UrllibHttpClient(timeout=settings.junespark.timeout)
+    provider = JunesparkProvider(settings, client=client)
     tools = build_default_tools(
         documents=orch.documents,
         knowledge=orch.knowledge,

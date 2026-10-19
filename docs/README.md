@@ -23,4 +23,4 @@
 
 Companion harness documentation lives in the
 [mechaharness](https://github.com/rl337/mechaharness) repository. Floor:
-`mechaharness>=0.4.0`.
+`mechaharness>=0.5.0` (requires `pyiv>=1.1.0`).

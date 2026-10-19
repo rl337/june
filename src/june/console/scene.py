@@ -14,11 +14,19 @@ from june.harness.visualization import (
 
 Layer = Literal["foreground", "background"]
 Shape = Literal["rect", "round_rect"]
-ExecutionVisual = Literal["running", "recent", "dim", "pending"]
+ExecutionVisual = Literal["running", "occupied", "recent", "dim", "pending", "failed"]
 ROOT_SCENE_ID = "__root__"
 
 _SOFT_KINDS = frozenset({"subgraph", "soft_point", "context", "june.soft"})
 _SOFT_KIND_PREFIXES = ("soft.", "june.soft.")
+_CHAMBER_KINDS = frozenset(
+    {
+        "conversational_tool_loop",
+        "harness_loop",
+        "subgraph",
+        "tools",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -76,11 +84,11 @@ def node_shape(kind: str, payload: dict[str, Any] | None = None) -> Shape:
         return "round_rect"
     if firmness == "hard":
         return "rect"
-    if kind in _SOFT_KINDS:
+    if kind in _SOFT_KINDS or kind in _CHAMBER_KINDS or kind.endswith("_loop"):
         return "round_rect"
     if any(kind.startswith(prefix) for prefix in _SOFT_KIND_PREFIXES):
         return "round_rect"
-    if kind == "subgraph":
+    if kind in {"subgraph", "tool_call", "child_graph"}:
         return "round_rect"
     return "rect"
 
@@ -92,11 +100,14 @@ def _execution_visual(
     active_node_id: str | None,
     recent_ids: set[str],
 ) -> ExecutionVisual:
-    if active_node_id == node_id or status == "running":
+    # Multi-locus: any running status counts, not only the single active spotlight.
+    if status == "running" or active_node_id == node_id:
         return "running"
+    if status in {"failed", "cancelled"}:
+        return "failed"
     if node_id in recent_ids:
         return "recent"
-    if status in {"succeeded", "failed", "cancelled"}:
+    if status in {"succeeded", "ok"}:
         return "dim"
     return "pending"
 

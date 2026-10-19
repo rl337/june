@@ -33,6 +33,7 @@ class ChatRecipeResult:
     event_types: list[str] = field(default_factory=list)
     events: list[dict[str, Any]] = field(default_factory=list)
     node_statuses: dict[str, str] = field(default_factory=dict)
+    graph: dict[str, Any] = field(default_factory=dict)
     budget_spent: float = 0.0
     graph_status: str | None = None
     error: str | None = None
@@ -54,10 +55,11 @@ def run_chat_recipe(
     checkpoint_path: str | None = None,
     grants: list[object] | None = None,
     on_phase: Callable[[str, ChatGraphState], None] | None = None,
+    on_event: Callable[[Any], None] | None = None,
     run_id: str | None = None,
 ) -> ChatRecipeResult:
-    """Bind + run ``june.chat`` (host_kit)."""
-    from mechaharness.host_kit import host_graph_executor
+    """Bind + run ``june.chat`` (host_kit + HF-07 conversational tool loop)."""
+    from mechaharness.host_kit import host_graph_executor, tapping_event_log
 
     engine = ChatEngine(
         provider=provider,
@@ -71,15 +73,32 @@ def run_chat_recipe(
         state.run_id = run_id
     bound = bound_run_for_chat(message.session_id)
     if run_id:
-        # Keep console hub instance id aligned with the MH graph id.
         bound.run_id = run_id
     graph = build_chat_graph(message, run_id=bound.run_id)
+    # Align tools max_iterations with chat settings.
+    tools_node = graph.nodes.get("tools")
+    if tools_node is not None:
+        max_turns = max(1, engine.chat.max_tool_turns)
+        tools_node.payload = {
+            **dict(tools_node.payload or {}),
+            "max_iterations": max_turns,
+        }
+        from mechaharness.stop_contract import StopContract
+
+        tools_node.stop_contract = StopContract(
+            version="1", max_iterations=max_turns
+        ).model_dump(mode="json")
+
     runners = make_chat_runners(engine, state=state, on_phase=on_phase)
+    event_log = (
+        tapping_event_log(on_event=on_event) if on_event is not None else None
+    )
     executor = host_graph_executor(
         runners=runners,
         checkpoint_path=checkpoint_path,
         agent_id="june-chat",
         grants=grants,
+        event_log=event_log,
     )
     result = run_coro_sync(
         executor.run(
@@ -98,6 +117,11 @@ def run_chat_recipe(
         node_id: str(getattr(node.status, "value", node.status))
         for node_id, node in result.graph.nodes.items()
     }
+    graph_ckpt = (
+        result.graph.checkpoint()
+        if hasattr(result.graph, "checkpoint")
+        else {}
+    )
     ok = result.status == "ok" and bool(reply.text() or reply.parts)
     return ChatRecipeResult(
         status="ok" if ok else "failed",
@@ -106,12 +130,15 @@ def run_chat_recipe(
         event_types=event_types,
         events=events,
         node_statuses=node_statuses,
+        graph=graph_ckpt if isinstance(graph_ckpt, dict) else {},
         budget_spent=float(getattr(result, "budget_spent", 0.0) or 0.0),
         graph_status=getattr(result, "status", None),
         error=None if ok else (getattr(result, "error", None) or "chat_failed"),
         diagnostics={
             "template": CHAT_TEMPLATE,
             "compose": "host_kit",
+            "tool_loop": "conversational_tool_loop",
+            "mh": "0.5.0 host_kit+HF-07",
             **dict(getattr(result, "diagnostics", None) or {}),
         },
     )

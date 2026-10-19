@@ -115,27 +115,55 @@ class Orchestrator:
         self.chat_runner = chat_runner
         self.runner.chat_runner = chat_runner
 
+    def handle_chat_detailed(
+        self,
+        message: ChannelMessage,
+        *,
+        on_phase: Any | None = None,
+        on_event: Any | None = None,
+        run_id: str | None = None,
+        checkpoint_path: str | None = None,
+    ) -> Any:
+        """Run ``june.chat`` and return the full recipe result (graph + events)."""
+        from june.recipes.chat.run import ChatRecipeResult
+
+        if self.chat_runner is None:
+            reply = ChannelReply(
+                parts=[ContentPart.text_part("chat_runner_not_configured")],
+                notes=["chat_runner_not_configured"],
+            )
+            return ChatRecipeResult(
+                status="failed",
+                reply=reply,
+                run_id=run_id or "",
+                error="chat_runner_not_configured",
+            )
+        self.templates.record_use(CHAT_TEMPLATE)
+        return self.chat_runner.run_detailed(
+            message,
+            on_phase=on_phase,
+            on_event=on_event,
+            run_id=run_id,
+            checkpoint_path=checkpoint_path,
+        )
+
     def handle_chat(
         self,
         message: ChannelMessage,
         *,
         on_phase: Any | None = None,
+        on_event: Any | None = None,
         run_id: str | None = None,
         checkpoint_path: str | None = None,
     ) -> ChannelReply:
         """Process a channel message through the incubating june.chat recipe."""
-        if self.chat_runner is None:
-            return ChannelReply(
-                parts=[ContentPart.text_part("chat_runner_not_configured")],
-                notes=["chat_runner_not_configured"],
-            )
-        self.templates.record_use(CHAT_TEMPLATE)
-        return self.chat_runner.run(
+        return self.handle_chat_detailed(
             message,
             on_phase=on_phase,
+            on_event=on_event,
             run_id=run_id,
             checkpoint_path=checkpoint_path,
-        )
+        ).reply
 
     def _ensure_control_template(self) -> None:
         if self.templates.get(ControlGraph.GRAPH_NAME) is not None:
