@@ -27,19 +27,28 @@ All fronts normalize to `ChannelMessage` → `ChatService.handle` →
 
 Soft points: Junespark provider, `ToolRegistry`, documents/KG, chat settings.
 
+### Nested tool / recipe topology (MH 0.4.1+)
+
+`tools` is a `conversational_tool_loop` node (HF-07). Runtime expands
+`tools.subgraph` with `round_i → {inference, tool_call*}`. `generate_image`
+attaches the live imagegen checkpoint under the matching `tool_call` (HF-08).
+Console chat instances use the live MH checkpoint + tapped events (HF-05); there
+is no parallel imagegen soft lane.
+
+See [`mechaharness-dynamic-tool-graph.md`](./mechaharness-dynamic-tool-graph.md).
+
 ## Imagegen soft point
 
 Tool `generate_image` binds `run_imagegen_recipe` (oneshot or criteria_refine).
 Tool JSON includes `{ "media": { "kind": "image", ... } }`; `render_reply` appends
-a `ContentPart`. Prefer DocumentStore ids when available.
-
-Nested recipe compose (HF-03) is deferred; tool bind keeps chat topology linear.
+a `ContentPart`. Prefer DocumentStore ids when available. Nested topology under
+the tool call is the console zoom surface.
 
 ## Promotion bar
 
 Promote a generic MH conversational recipe only after reuse evidence outside June
-and a clean split of soft points vs control skeleton. Until then IDs stay
-`june.chat.*`.
+and a clean split of soft points vs control skeleton (HF-07 pattern). Until then
+IDs stay `june.chat.*`.
 
 ## Out of scope
 

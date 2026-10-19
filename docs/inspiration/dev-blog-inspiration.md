@@ -2,7 +2,7 @@
 
 > Living design notes for June as an application-level orchestrator and client of MechaHarness. External developer material is evidence and inspiration, not specification.
 
-Last reviewed: 2026-10-11 (mechaharness 0.4.0 host kit + Agentic Recipes floor)
+Last reviewed: 2026-10-18 (mechaharness 0.5.0 + pyiv 1.1 HTTP/stdlib DI floor)
 
 ## Purpose and ownership boundary
 
@@ -79,7 +79,7 @@ June owns steps 1, 2, 3, 6 and 7 as orchestration policy. MechaHarness owns gene
 **Sources**
 - Claude, **Introducing dynamic workflows in Claude Code** (2026-05-28): https://claude.com/blog/introducing-dynamic-workflows-in-claude-code
 - Claude, **A harness for every task: dynamic workflows in Claude Code** (2026-06-02): https://claude.com/blog/a-harness-for-every-task-dynamic-workflows-in-claude-code
-- MechaHarness 0.4.0, **host kit + Agentic Recipes** — https://pypi.org/project/mechaharness/0.4.0/
+- MechaHarness 0.5.0, **host kit + Agentic Recipes + pyiv 1.1 DI** — https://pypi.org/project/mechaharness/0.5.0/
 
 **Requirements**
 - June SHOULD prefer reusable MechaHarness Agentic Recipes (`GraphTemplate` catalog ids such as `decision_plane`, `bounded_retry`, `verify_repair`) for generally useful patterns.

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 from june.channels import ChannelMessage, ChannelReply
 from june.config import JuneSettings
@@ -16,6 +17,7 @@ from june.recipes.chat import (
     ChatGraphState,
     run_chat_recipe,
 )
+from june.recipes.chat.run import ChatRecipeResult
 from june.tools import ToolRegistry
 
 __all__ = [
@@ -24,6 +26,7 @@ __all__ = [
     "ChatEngine",
     "ChatGraphRunner",
     "ChatGraphState",
+    "ChatRecipeResult",
     "execute_chat_graph",
 ]
 
@@ -46,15 +49,16 @@ class ChatGraphRunner:
         self.documents = documents
         self.knowledge = knowledge
 
-    def run(
+    def run_detailed(
         self,
         message: ChannelMessage,
         *,
         on_phase: Callable[[str, ChatGraphState], None] | None = None,
+        on_event: Callable[[Any], None] | None = None,
         checkpoint_path: str | None = None,
         run_id: str | None = None,
-    ) -> ChannelReply:
-        result = run_chat_recipe(
+    ) -> ChatRecipeResult:
+        return run_chat_recipe(
             message,
             provider=self.provider,
             tools=self.tools,
@@ -63,9 +67,26 @@ class ChatGraphRunner:
             knowledge=self.knowledge,
             checkpoint_path=checkpoint_path,
             on_phase=on_phase,
+            on_event=on_event,
             run_id=run_id,
         )
-        return result.reply
+
+    def run(
+        self,
+        message: ChannelMessage,
+        *,
+        on_phase: Callable[[str, ChatGraphState], None] | None = None,
+        on_event: Callable[[Any], None] | None = None,
+        checkpoint_path: str | None = None,
+        run_id: str | None = None,
+    ) -> ChannelReply:
+        return self.run_detailed(
+            message,
+            on_phase=on_phase,
+            on_event=on_event,
+            checkpoint_path=checkpoint_path,
+            run_id=run_id,
+        ).reply
 
 
 def execute_chat_graph(

@@ -47,7 +47,7 @@ source .venv/bin/activate
 pip install -U pip setuptools wheel
 pip install -e ".[dev]"
 # Optional MechaHarness client dependency (BudgetPolicy / GraphExecutor):
-# pip install -e ".[harness]"   # mechaharness>=0.4.0
+# pip install -e ".[harness]"   # mechaharness>=0.5.0
 # Web graph console + chat:
 # pip install -e ".[harness,console]"
 cp config.example.yaml config.yaml   # set junespark.base_url
@@ -58,7 +58,7 @@ pytest
 
 Configuration is layered: `config.yaml` then `.env` / process env
 (`JUNESPARK_BASE_URL`, `JUNESPARK_API_KEY`, `JUNESPARK_MODEL`, `JUNE_*`).
-Point `--config` or `$JUNE_CONFIG` at a yaml file. File→`pyiv.Config` binding
+Point `--config` or `$JUNE_CONFIG` at a yaml file. File→`pyiv≥1.1` `Config` binding
 is June-prototyped for now.
 
 ## Control graph entrypoint
@@ -98,6 +98,14 @@ june --config config.yaml serve --demo-graph
 # open http://localhost:8080  (Chat dock + Graph)
 ```
 
+Browser UI regressions (Playwright):
+
+```bash
+pip install -e ".[dev,console,ui]"
+python -m playwright install chromium
+pytest -q tests/ui
+```
+
 Docker:
 
 ```bash
@@ -128,8 +136,8 @@ Environment:
 Task payloads may set `execute_graph: true` so the task runner drives a live
 `GraphExecutor` run (events stream to the console when using `june serve`).
 
-`june serve` also boots a **cron graph** (`june.console.cron`) with **10s** and
-**60s** bucket subgraphs whose `june.event_log` nodes append to the left-docked
+`june serve` also boots a **cron graph** (`june.console.cron`) with **minute** and
+**hourly** empty-tick buckets whose `june.event_log` nodes append to the left-docked
 **Event log** view (MechaHarness lifecycle events + console log lines).
 
 ## First vertical slice

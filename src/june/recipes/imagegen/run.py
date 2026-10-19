@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 from uuid import uuid4
@@ -80,6 +81,7 @@ def run_imagegen_recipe(
     max_retries: int = DEFAULT_CRITERIA_MAX_RETRIES,
     checkpoint_path: str | None = None,
     grants: list[object] | None = None,
+    on_phase: Callable[[str], None] | None = None,
 ) -> ImagegenRecipeResult:
     if recipe == "criteria_refine":
         if crafter is None or evaluator is None:
@@ -91,6 +93,7 @@ def run_imagegen_recipe(
             evaluator=evaluator,
             max_retries=max_retries,
             checkpoint_path=checkpoint_path,
+            on_phase=on_phase,
         )
 
     from mechaharness.host_kit import host_graph_executor
@@ -102,13 +105,15 @@ def run_imagegen_recipe(
         graph = build_critique_refine_graph(problem, run_id=bound.run_id)
         state: dict[str, Any] = {"problem": problem, "problem_id": problem.id}
         runners = make_critique_refine_runners(
-            generator, crafter, critic, state=state
+            generator, crafter, critic, state=state, on_phase=on_phase
         )
         turn_sources = [generator, crafter, critic]
     else:
         graph = build_imagegen_graph(problem, run_id=bound.run_id)
         state = {"problem": problem, "problem_id": problem.id}
-        runners = make_imagegen_runners(generator, state=state)
+        runners = make_imagegen_runners(
+            generator, state=state, on_phase=on_phase
+        )
         turn_sources = [generator]
 
     executor = host_graph_executor(
@@ -196,6 +201,7 @@ def run_criteria_refine_loop(
     evaluator: ImageEvaluator,
     max_retries: int = DEFAULT_CRITERIA_MAX_RETRIES,
     checkpoint_path: str | None = None,
+    on_phase: Callable[[str], None] | None = None,
 ) -> ImagegenRecipeResult:
     """Host compose loop: craft → (generate → evaluate_criteria → refine?)×N.
 
@@ -206,8 +212,13 @@ def run_criteria_refine_loop(
     if max_retries < 0:
         raise ValueError("max_retries must be >= 0")
 
+    def _notify(phase: str) -> None:
+        if on_phase is not None:
+            on_phase(phase)
+
     run_id = f"imagegen-criteria-{problem.id}-{uuid4().hex[:8]}"
     prompt_text = problem.prompt_text()
+    _notify("craft_prompt")
     image_prompt = crafter.craft(problem, prior_critique=None)
     prior_spec: Any = None
     attempts: list[dict[str, Any]] = []
@@ -220,6 +231,7 @@ def run_criteria_refine_loop(
     image_bytes: bytes | None = None
 
     total_rounds = max_retries + 1
+    _notify("attempt_loop")
     for attempt in range(total_rounds):
         seed = int(problem.seed) + attempt
         data = generator.generate(
@@ -266,6 +278,7 @@ def run_criteria_refine_loop(
         if attempt < max_retries:
             image_prompt = crafter.craft(problem, prior_critique=critique)
 
+    _notify("verify")
     byte_failures = verify_image_bytes(
         bytes(image_bytes or b""),
         min_bytes=problem.min_bytes,

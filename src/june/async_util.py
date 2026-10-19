@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import concurrent.futures
-from collections.abc import Coroutine
+from collections.abc import Callable, Coroutine
+from contextvars import copy_context
 from typing import Any, TypeVar
 
 T = TypeVar("T")
@@ -23,3 +24,13 @@ def run_coro_sync(coro: Coroutine[Any, Any, T]) -> T:
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
         return pool.submit(asyncio.run, coro).result()
+
+
+async def run_sync_in_thread(fn: Callable[[], T]) -> T:
+    """Run blocking ``fn`` off the event loop, preserving ContextVars.
+
+    Console chat must not call host_kit / Comfy on the uvicorn thread: that
+    freezes ``/api/snapshot`` and WebSocket pushes for the whole hang.
+    """
+    ctx = copy_context()
+    return await asyncio.to_thread(ctx.run, fn)

@@ -116,8 +116,9 @@ def create_app(
     async def ws_console(websocket: WebSocket) -> None:
         await websocket.accept()
         queue: asyncio.Queue[ConsoleSnapshot] = asyncio.Queue(maxsize=32)
+        loop = asyncio.get_running_loop()
 
-        def push(snap: ConsoleSnapshot) -> None:
+        def _enqueue(snap: ConsoleSnapshot) -> None:
             try:
                 queue.put_nowait(snap)
             except asyncio.QueueFull:
@@ -129,6 +130,11 @@ def create_app(
                     queue.put_nowait(snap)
                 except asyncio.QueueFull:
                     pass
+
+        def push(snap: ConsoleSnapshot) -> None:
+            # Hub updates arrive from cron/chat worker threads; marshal onto the
+            # event loop so asyncio.Queue stays correct.
+            loop.call_soon_threadsafe(_enqueue, snap)
 
         hub.subscribe(push)
         try:

@@ -7,12 +7,15 @@ DI remains at the Config / host boundary.
 
 ## Current state
 
-- MechaHarness: DI-first via `MechaHarnessConfig` + pyiv ≥ 0.4.2 (`Named` /
-  `Matched` / `Key`, Completer/Judge flavors).
+- MechaHarness 0.5.0: DI-first via `MechaHarnessConfig` + **pyiv ≥ 1.1.0**
+  (`Named` / `Matched` / `Key`, Completer/Judge flavors, injectable
+  `AsyncHttpClient`, use-case stdlib doubles for `Environment` / time / files /
+  log / clock).
 - June: file→settings→`Config` / `register_instance` prototype in
-  `src/june/config/__init__.py` and `src/june/bootstrap.py`. The module
-  already notes promotion into pyiv/pyiv-common only after the pattern
-  stabilizes.
+  `src/june/config/__init__.py` and `src/june/bootstrap.py`. `JuneConfig`
+  registers the same leaf injectables and loads yaml/env through
+  `Environment` + `Filesystem`. Providers default to pyiv `HttpClient`
+  (`UrllibHttpClient`; tests may inject `MemoryHttpClient` or httpx).
 
 ## Open asks
 
@@ -23,7 +26,7 @@ DI remains at the Config / host boundary.
 
 **Ask:** A small shared helper for “YAML/env → settings model → Config
 hooks” once both hosts want the same shape. Until then, keep June’s prototype
-local.
+local (now reads env/files via injectables).
 
 **Status:** incubating in June; do not promote yet.
 
@@ -41,16 +44,24 @@ inject for graphs).
 
 ### PY-03 — Host kit without constructor sprawl
 
-**Evidence:** June’s `build_graph_executor` bypasses inject and hand-wires
-many MH collaborators. MH’s blessed path is Config inject, but hosts still
-override many hooks.
+**Evidence:** June formerly bypassed inject and hand-wired many MH
+collaborators. MH’s blessed path is Config inject + `host_graph_executor`.
 
 **Ask:** Keep expanding typed Config hooks rather than inventing string
 registries. If pyiv needs ergonomics for “override a few bindings, keep
 defaults,” prefer that over host-side factories that reimplement the injector.
 
-**Status:** open; pairs with `docs/requirements/mechaharness-host-friction.md`
-HF-01.
+**Status:** **largely closed for June** by MH 0.4 host_kit + pyiv 1.1
+`override` / stdlib doubles; remaining residue is HF-06 clone helpers, not DI.
+
+## Landed (keep for archaeology)
+
+- pyiv 1.0 `HttpClient` / `AsyncHttpClient` (+ Memory doubles) — June providers
+  and MH inference/judge HTTP.
+- pyiv 1.1 use-case stdlib surfaces (`files`, `time`, `process`, `log`, …) —
+  registered on `JuneConfig` and `MechaHarnessConfig`.
+- pyiv 0.4.3 catalog multibinds / `contribute_map` / `catalog_keys` — MH recipe
+  / backend / harness membership.
 
 ## Non-goals
 

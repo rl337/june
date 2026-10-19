@@ -4,9 +4,13 @@ June-sourced asks for a more readable MechaHarness host surface. This is not
 June permanent architecture: each item should either land as a MechaHarness
 interface improvement or be explicitly declined with rationale.
 
-Floor at time of writing: **mechaharness 0.4.0** (host kit + Agentic Recipes).
-Durable resume / `EffectfulGraphNodeRunner` / `CheckpointStore` exist since
-0.3.0; 0.4.0 adds `mechaharness.host_kit`.
+Floor at time of writing: **mechaharness 0.5.0** (pyiv ≥ 1.1 HTTP + stdlib DI;
+host kit + Agentic Recipes + HF-05/07/08). Durable resume /
+`EffectfulGraphNodeRunner` / `CheckpointStore` exist since 0.3.0; 0.4.0 adds
+`mechaharness.host_kit`; 0.4.1 adds tapped `host_graph_executor`,
+`conversational_tool_loop`, and `embed_recipe_as_tool`; 0.5.0 requires Config-
+injected `DateTimeService` / `Environment` / `AsyncHttpClient` and drops
+hand-wired Config getter service caches.
 
 ## Working rule
 
@@ -22,17 +26,16 @@ Do not grow permanent June wrappers that hide debts MechaHarness should fix.
 
 ### HF-01 — Host executor kit (P0)
 
-**June evidence:** `src/june/harness/execution.py` `build_graph_executor`
-hand-wires EventLog, AccessPolicy, LinkageResolver, failure/escalation,
-checkpoint store, and `NoopCrashProbe` for paths that need event tapping.
+**June evidence:** formerly `src/june/harness/execution.py` `build_graph_executor`
+hand-wired EventLog, AccessPolicy, LinkageResolver, failure/escalation,
+checkpoint store, and `NoopCrashProbe`.
 
 **Ask:** Blessed path remains `MechaHarnessConfig` → `inject(GraphExecutor)`,
 with a small host helper for the common case.
 
-**Status:** **partially landed in mechaharness 0.4.0** via
-`host_graph_executor`. Remote-task dispatch uses it. Remaining debt: console /
-`MechaHarnessClient` still use hand-wired `build_graph_executor` for
-`TappingEventLog` (see HF-05).
+**Status:** **landed in mechaharness 0.4.0** via `host_graph_executor`. June
+console / `MechaHarnessClient` / remote-task now all use host_kit (0.5
+adoption closed the dual hand-wired path).
 
 ### HF-02 — Effectful submit-once helper (P0)
 
@@ -70,13 +73,15 @@ Remote-task dispatch uses it.
 ### HF-05 — Single host entrypoint for runners + checkpoints + effects (P1)
 
 **June evidence:** Happy path uses `MechaHarnessClient.bind_template` /
-`execute`; remote-task uses `host_graph_executor`; cron/console still use
-`run_graph` / hand-wired executor for event taps.
+`execute`; remote-task / chat / console cron used to dual-path through
+hand-wired executors for event taps.
 
 **Ask:** One Config-injected entrypoint that also supports event tapping so
 June can drop the dual path.
 
-**Status:** open (remote-task path improved; console path remains).
+**Status:** **landed in mechaharness 0.4.1** via `tapping_event_log` /
+`host_graph_executor(event_log=...)`. June chat, console cron, and
+`MechaHarnessClient.execute` all use it (0.5 adoption).
 
 ### HF-06 — Subgraph clone-from-checkpoint (P2)
 
@@ -87,6 +92,33 @@ when spawning console cron/chat instances.
 stable namespacing (`instance_key` / tile semantics).
 
 **Status:** open.
+
+### HF-07 — Dynamic tool-loop as ExecutionGraph nodes (P0)
+
+**June evidence:** `ChatEngine.tool_loop` hides N× LLM/tool rounds inside one
+`june.chat.tool_loop` node; console cannot zoom into turns without a side
+channel.
+
+**Ask:** Bounded conversational tool-loop recipe whose runtime topology is an
+ExecutionGraph (`llm_turn` / `tool_call` / optional `tool_round`), with parent
+`tools.subgraph` reflecting children for host zoom.
+
+**Status:** **landed in mechaharness 0.4.1** as
+`ConversationalToolLoopTemplate` + `ConversationalToolLoopRunner`. June
+`june.chat` tools node binds that runner; see
+[`mechaharness-dynamic-tool-graph.md`](./mechaharness-dynamic-tool-graph.md).
+
+### HF-08 — Nested recipe-as-tool (P0)
+
+**June evidence:** `generate_image` formerly called `run_imagegen_recipe` as a
+side effect with a parallel console soft lane.
+
+**Ask:** Soft-point so a `tool_call` may bind/run a child GraphTemplate;
+child checkpoint attaches under that node (`child_run_id`, shared budget).
+
+**Status:** **landed in mechaharness 0.4.1** as `embed_recipe_as_tool`; June
+attaches the live imagegen checkpoint under the expanded `tool_call` node.
+Parallel console imagegen soft lane removed.
 
 ## Related pyiv asks
 

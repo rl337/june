@@ -1,33 +1,10 @@
-"""Run June-bound graphs through MechaHarness GraphExecutor."""
+"""Run June-bound graphs through MechaHarness host_kit GraphExecutor."""
 
 from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
 from typing import Any
-
-
-class TappingEventLog:
-    """Forward events to a store and an optional June callback."""
-
-    def __init__(
-        self,
-        store: Any,
-        on_event: Callable[[Any], None] | None = None,
-    ) -> None:
-        self._store = store
-        self._on_event = on_event
-
-    def emit(self, event: Any) -> None:
-        self._store.emit(event)
-        if self._on_event is not None:
-            self._on_event(event)
-
-    def query(self, **kwargs: Any) -> list[Any]:
-        return self._store.query(**kwargs)
-
-    def agents(self, **kwargs: Any) -> list[Any]:
-        return self._store.agents(**kwargs)
 
 
 def _june_runner_registry(
@@ -152,75 +129,26 @@ def build_graph_executor(
     checkpoint_path: str | None = None,
     runners: Any | None = None,
 ) -> tuple[Any, Any]:
-    """Return ``(executor, event_log)`` wired for June child-graph runs.
+    """Return ``(executor, event_log)`` via MechaHarness host_kit (MH ≥ 0.5).
 
-    When ``checkpoint_path`` is set, use durable SQLite checkpoints; otherwise
-    an ephemeral EventLog-backed store (fine for tests / short demos).
-
-    Prefer ``mechaharness.host_kit.host_graph_executor`` for new paths that do
-    not need event tapping (remote-task dispatch already does). This hand-wired
-    helper remains for ``MechaHarnessClient`` / console event taps — see
-    ``docs/requirements/mechaharness-host-friction.md`` HF-01 / HF-05.
+    Prefer this over hand-wiring EventLog / AccessControl / CheckpointStore.
+    Event taps use ``tapping_event_log`` + ``host_graph_executor(event_log=...)``
+    (HF-05). Checkpoint stores inject ``DateTimeService`` through host_kit.
     """
-    from mechaharness.checkpoint_store import EventLogCheckpointStore
-    from mechaharness.core.access import (
-        AccessPolicy,
-        GraphEscalate,
-        GraphExecute,
-        InMemoryAccessControl,
-    )
-    from mechaharness.core.environment import NoOpInferenceEnvironment
-    from mechaharness.core.events import InMemoryEventLog
-    from mechaharness.external_effect import NoopCrashProbe
-    from mechaharness.graph import GraphStore
-    from mechaharness.graph_executor import (
-        DefaultGraphFailurePolicy,
-        GraphExecutor,
-        RejectGraphEscalation,
-    )
-    from mechaharness.linkage_resolver import DefaultLinkageResolver
+    from mechaharness.core.access import GraphEscalate, GraphExecute
+    from mechaharness.host_kit import host_graph_executor, tapping_event_log
 
-    store = InMemoryEventLog()
-    event_log = TappingEventLog(store, on_event=on_event)
-    grant_keys = {
-        GraphExecute.key(),
-        GraphEscalate.key(),
-        *(grants or []),
-    }
-    access = InMemoryAccessControl(
-        event_log,  # type: ignore[arg-type]
-        AccessPolicy(grants=sorted(grant_keys)),
-    )
     runner_registry = runners if runners is not None else _june_runner_registry(
         on_console_log=on_console_log
     )
-    linkage = DefaultLinkageResolver(
-        runner_registry,
-        access,
-        NoOpInferenceEnvironment(),
-        require_execute_grant=True,
-    )
-    if checkpoint_path:
-        from mechaharness.sqlite_checkpoint_store import SqliteCheckpointStore
-
-        checkpoint_store: Any = SqliteCheckpointStore(checkpoint_path)
-    else:
-        checkpoint_store = EventLogCheckpointStore(
-            GraphStore(store, agent_id="june"),
-            event_log=store,
-            agent_id="june",
-        )
-    # TappingEventLog mirrors EventLog; MH types expect the Protocol.
-    executor = GraphExecutor(
-        event_log,  # type: ignore[arg-type]
-        access,
-        runner_registry,
-        DefaultGraphFailurePolicy(),
-        RejectGraphEscalation(),
-        linkage,
-        checkpoint_store,
-        NoopCrashProbe(),
+    event_log = tapping_event_log(on_event=on_event) if on_event is not None else None
+    grant_list: list[object] = [GraphExecute, GraphEscalate, *(grants or [])]
+    executor = host_graph_executor(
+        runners=runner_registry,
+        checkpoint_path=checkpoint_path,
+        grants=grant_list,
         agent_id="june",
+        event_log=event_log,  # type: ignore[arg-type]
     )
     return executor, event_log
 
