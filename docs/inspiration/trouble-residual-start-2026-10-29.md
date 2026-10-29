@@ -75,3 +75,5 @@ Capability ID: **TR-20261029-RESIDUAL-START**.
 Read current R11/R8 and relevant June test fixtures, refresh PR #25, locate the actual external-backend and graph-visible verification nodes, identify authoritative acceptance sources, then implement native June acceptance fixtures using a fake backend. Preserve original request and acceptance provenance across resume. Compare source benchmark methodology to the target environment; avoid copying external benchmark data without checking license and reproducibility. Update normative requirements and tests only after the candidate story is accepted.
 
 Ledger: rl337/trouble state/inspiration-watch-ledger.json, capability TR-20261029-RESIDUAL-START. This PR is documentation-only; it does not modify execution semantics.
+
+Cross-repository discovery ledger draft PR: https://github.com/rl337/trouble/pull/38 . Other resulting draft PRs: https://github.com/rl337/mechaharness/pull/37 , https://github.com/rl337/project-template/pull/1 , https://github.com/rl337/june/pull/26 .
